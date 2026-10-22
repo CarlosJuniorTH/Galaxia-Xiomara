@@ -158,7 +158,9 @@ export function crearUniversoLocal({ scene, uPR, uScale, centros }) {
         this.presencia[r.id] = k;
         r.grupo.visible = k > 0.002 || kc > 0.002;
         if (!r.grupo.visible) continue;
-        r.estrellas.visible = r.velo.visible = k > 0.002;
+        // El velo de color (una esfera que cubre toda la pantalla con ruido) aportaba ~1 % de la imagen y en la GPU de un
+        // iPhone costaba mucho en cada cuadro en todos los gigantes: no se dibuja.
+        r.estrellas.visible = k > 0.002; r.velo.visible = false;
         r.estrellas.material.uniforms.uVisible.value = k; r.estrellas.material.uniforms.uT.value = t;
         r.velo.material.uniforms.uVisible.value = k;
         r.estrellasC.material.uniforms.uVisible.value = kc; r.estrellasC.material.uniforms.uT.value = t;

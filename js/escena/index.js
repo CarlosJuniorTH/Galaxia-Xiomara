@@ -361,7 +361,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   });
   for (const ventana of ventanas) lectura.observe(ventana, { attributes: true, attributeFilter: ['open', 'class'] });
   const medir = location.hash === '#debug';
-  const diagnosticar = medir || ['render', 'completo', 'gigantes'].includes(new URLSearchParams(location.search).get('diag'));
+  const diagnosticar = medir || (['render', 'completo', 'gigantes'].includes(new URLSearchParams(location.search).get('diag')) || new URLSearchParams(location.search).has('hud'));
   let exposicion = 1;
   const ctx = { camera, exposicion: 1, pulso: 0, tiempoDentro: null, escala: 1, velocidadPolvo: new THREE.Vector3() };
 
@@ -1016,7 +1016,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // En vertical (móvil) la misma luz cabe en menos pantalla: base 1/1,6 siempre (también en los viajes, en casa y al
     // mirar hacia casa). Junto a un gigante, además, se compensa al alejar más del doble de su encuadre normal.
     const marco = Math.max(1, Math.min(1.6, 0.95 / camera.aspect));
-    let metaExpo = 1 / marco;
+    // Calibrado con capturas de un iPhone real (se veía más brillante que en el emulador, con más resplandor): en
+    // vertical la luz que se suma va a 0,45 en todo momento (gigantes, viajes de ida y vuelta, casa).
+    let metaExpo = THREE.MathUtils.lerp(1, 0.45, (marco - 1) / 0.6);   // 1 en horizontal, 0,45 en un móvil vertical
     // De viaje la cámara pasa junto a los filamentos (y entre los gigantes cruza el centro de la telaraña): en vertical, algo menos.
     if (vuelo && marco > 1) metaExpo *= 0.75;
     if (lejano && !vuelo) {

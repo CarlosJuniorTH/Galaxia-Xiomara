@@ -199,6 +199,9 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
         }
       }
     }
+    // Lejos de la telaraña (en los gigantes, al girar la cámara cambia de celda en cada cuadro) la lista sale vacía: no se
+    // rehace la geometría vacía una y otra vez (creaba y borraba búferes de la GPU en cada cuadro).
+    if (!lista.length && !cercano.geometry.attributes.position?.count) return;
     cercano.geometry.dispose(); cercano.geometry = empaquetar(lista, 'aBrillo');
   }
   // Toda la telaraña es fija: sus matrices se calculan una vez y no se recorren en cada cuadro (menos CPU en el móvil).

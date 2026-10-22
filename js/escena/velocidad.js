@@ -73,10 +73,10 @@ export function crearVelocidad(camera, { reducido = false } = {}) {
   const foco = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({
     uniforms: { uOpacidad: { value: 0 }, uRuptura: { value: 0 }, uAnillo: { value: 0 } },
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv - 0.5; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    // Ruptura del salto: un núcleo breve en el punto de fuga y un anillo fino que se expande (el
-    // destino sigue visible a través: es luz aditiva, nunca una pantalla blanca).
-    fragmentShader: 'uniform float uOpacidad, uRuptura, uAnillo; varying vec2 vUv; void main(){ float r = length(vUv) * 2.0; float a = (exp(-r * r * 40.0) + exp(-r * r * 6.0) * 0.35) * (1.0 - smoothstep(0.8, 1.0, r)) * uOpacidad;'
-      + ' float anillo = exp(-pow((r - uAnillo) / (0.03 + uAnillo * 0.07), 2.0)) * (1.0 - uAnillo) * uRuptura * 2.4; float nucleo = (exp(-r * r * 90.0) * 2.6 + exp(-r * r * 10.0) * 0.9) * uRuptura;'
+    // Ruptura del salto: un destello puntual en el punto de fuga y un anillo fino que se expande (el destino sigue
+    // visible a través: es luz aditiva, nunca una pantalla blanca). Sin halos difusos alrededor (se veían como una bola).
+    fragmentShader: 'uniform float uOpacidad, uRuptura, uAnillo; varying vec2 vUv; void main(){ float r = length(vUv) * 2.0; float a = exp(-r * r * 900.0) * (1.0 - smoothstep(0.8, 1.0, r)) * uOpacidad;'   // solo un punto nítido en el punto de fuga (sin halo difuso: tapaba media pantalla)
+      + ' float anillo = exp(-pow((r - uAnillo) / (0.03 + uAnillo * 0.07), 2.0)) * (1.0 - uAnillo) * uRuptura * 2.4; float nucleo = exp(-r * r * 1500.0) * 2.6 * uRuptura;'
       // Segundo anillo, rosado, algo detrás del primero (azulado): la luz se abre en un frente doble.
       + ' float r2 = uAnillo * 0.72; float anillo2 = exp(-pow((r - r2) / (0.04 + r2 * 0.08), 2.0)) * (1.0 - uAnillo) * uRuptura * 1.5;'
       + ' float borde = 1.0 - smoothstep(0.9, 1.0, r); a *= borde;'
