@@ -97,7 +97,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   // En el móvil se dibuja el 45 % de los puntos de la telaraña y cada uno lleva la luz de los que no se dibujan (uComp): la
   // misma luz total con menos de la mitad de trabajo para la GPU (en un iPhone la telaraña completa bajaba a ~10 FPS).
   const MUESTRA = esMovil ? 0.45 : 1, uComp = { value: 1 / MUESTRA };
-  const uPRgal = { value: 1 };   // las galaxias se pintan en su propia capa a resolución CSS (1 píxel de capa = 1 px CSS)
+  const uPRgal = { value: esMovil ? 0.6 : 1 };   // las galaxias se pintan en su propia capa a resolución CSS (1 píxel de capa = 1 px CSS)
   const matGalaxias = new THREE.ShaderMaterial({ uniforms: { ...uniformes, uPR: uPRgal, uComp, uBrazos: { value: texturaBrazos() } },
     vertexShader: /* glsl */`uniform float uPR, uScale, uCasa, uComp; ${OCULTO} attribute vec3 aCol; attribute float aBrillo; varying vec3 vC; varying float vA, vRes, vAng, vInc, vBrazos, vTipo;
       float h(vec3 p){ p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
@@ -182,7 +182,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   });
   compuesto.frustumCulled = false; compuesto.renderOrder = -1.5; raiz.add(compuesto);
   const colorPrevio = new THREE.Color();
-  let escalaCapa = 1;
+  let escalaCapa = esMovil ? 0.6 : 1;   // en el móvil, la capa de galaxias (luces suaves) al 60 %: medido en un iPhone caliente, +10 FPS
   function dibujarGalaxias(renderer, camera) {
     const w = Math.max(1, Math.round(innerWidth * escalaCapa)), h = Math.max(1, Math.round(innerHeight * escalaCapa));
     if (rtGalaxias.width !== w || rtGalaxias.height !== h) rtGalaxias.setSize(w, h);
@@ -226,6 +226,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   return {
     raiz, web, galaxias: bloquesGalaxias, nubes: bloquesNubes, cercano, polvoFil: bloquesPolvo, capaGalaxias, dibujarGalaxias,
     escalarCapaGalaxias(k) { escalaCapa = k; uPRgal.value = k; },
+    get escalaCapaGalaxias() { return escalaCapa; },
     // Unidos dibujan todos los puntos (no la muestra): la luz de cada uno vuelve a ser la normal.
     unirBloques(si) { for (const [grupo, p] of unidos) { grupo.visible = !si; p.visible = si; } uComp.value = si ? 1 : 1 / MUESTRA; },
     // Gigantes que tapan la telaraña: [{ centro, radio }] (coordenadas del mundo).

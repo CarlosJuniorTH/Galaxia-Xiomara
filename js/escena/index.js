@@ -308,7 +308,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // volumen, con menos muestras por rayo), en dos escalones como mucho: fluido antes que perfecto en un móvil modesto.
   let aligerado = 0;
   const aligerar = () => { if (aligerado >= 2) return; aligerado++; muestrasNube.value = Math.max(8, Math.round(muestrasNube.value * 0.7)); canvas.dataset.aligerado = String(aligerado); };
-  const regular = crearReguladorResolucion({ minimo: esMovil ? 1.5 : 1, maximo: esMovil ? Math.min(nucleo.prMaximo, 2) : nucleo.prMaximo, inicial: nucleo.resolucion, alAgotar: aligerar });
+  const regular = crearReguladorResolucion({ minimo: esMovil ? 1.5 : 1, maximo: esMovil ? Math.min(nucleo.prMaximo, 1.75) : nucleo.prMaximo, inicial: nucleo.resolucion, alAgotar: aligerar });
   // El cambio de resolución rehace los búferes de la imagen (en un móvil, una pausa visible): nunca en mitad de un gesto
   // o de un viaje; espera a que se suelte el dedo o se llegue.
   let resolucionPendiente = null;
@@ -347,8 +347,10 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     else escuchar();
   }
   const camaraGuardada = { pos: new THREE.Vector3(), rot: new THREE.Quaternion() }, haciaObjetivo = new THREE.Vector3();
-  const ritmoAhorro = new URLSearchParams(location.search).get('ritmo') === 'ahorro';
-  const planificador = crearPlanificador({ interaccion: 60, contemplacion: tactil && ritmoAhorro ? 30 : 60, esperaMs: 4000 });
+  // En pantallas táctiles, sin tocar (tras 4 s) se dibuja a 30 FPS y al tocar vuelve a 60: medido en un iPhone, a 60
+  // continuos el teléfono se calentaba y a los pocos minutos bajaba su GPU a la mitad (28 FPS con TODO). ?ritmo=fluido: siempre 60.
+  const ritmoAhorro = tactil && new URLSearchParams(location.search).get('ritmo') !== 'fluido';
+  const planificador = crearPlanificador({ interaccion: 60, contemplacion: ritmoAhorro ? 30 : 60, esperaMs: 4000 });
   let gesto = false, modoAnterior = null, cuadrosDibujados = 0, finGesto = -Infinity;
   const AMORTIGUACION = controls.dampingFactor;   // la de 60 FPS (nucleo.js)
   const marcarActividad = () => planificador.actividad(performance.now());
@@ -1024,7 +1026,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     if (vuelo && marco > 1) metaExpo *= 0.75;
     if (lejano && !vuelo) {
       const d = camera.position.distanceTo(lejano.centro);
-      metaExpo *= THREE.MathUtils.clamp(lejano.dist * 2 / Math.max(1, d), 0.5, 1);
+      metaExpo *= marco > 1 ? THREE.MathUtils.clamp(Math.pow(lejano.dist / Math.max(1, d), 0.8), 0.3, 1) : THREE.MathUtils.clamp(lejano.dist * 2 / Math.max(1, d), 0.5, 1);   // en vertical, desde el encuadre normal
     }
     exposicion += (metaExpo - exposicion) * Math.min(1, dt * 4); ctx.exposicion = EXPOSICION.value = exposicion;
     // Estrellas locales: las del cielo de casa (campo titilante, soles y cometas de decoración) son de

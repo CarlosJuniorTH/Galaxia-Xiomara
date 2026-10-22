@@ -32,7 +32,7 @@ export function crearNucleo(canvas) {
   //    así que en móvil empieza en DPR 2 y la resolución dinámica de index.js la ajusta.
   //    La pasada de salida la reescala a la nativa con un enfoque adaptativo (salida.js).
   const prMaximo = Math.min(devicePixelRatio, Q.pr);
-  let pr = esMovil ? Math.min(prMaximo, 2) : prMaximo;
+  let pr = esMovil ? Math.min(prMaximo, 1.75) : prMaximo;   // 1,75 en el móvil: en una pantalla de DPR 3 no se distingue de 2 y el teléfono se calienta menos
   renderer.setPixelRatio(pr);
   canvas.dataset.resolucion3d = String(pr);
   renderer.setSize(innerWidth, innerHeight);

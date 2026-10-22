@@ -66,20 +66,20 @@ export function crearMedidor(escena) {
     boton2.disabled = true; boton2.textContent = 'Probando…';
     const { renderer, nucleo, telarana, bloom, scene, cosmos, THREE } = int;
     const llamadas = () => { renderer.info.autoReset = false; renderer.info.reset(); nucleo.composer.render(); const c = renderer.info.render.calls; renderer.info.autoReset = true; return c; };
-    const prOriginal = nucleo.resolucion, w = new THREE.Vector3();
+    const prOriginal = nucleo.resolucion, w = new THREE.Vector3(); let escalaAntes = telarana.escalaCapaGalaxias;
     const raizCosmos = scene.children.find(o => o.userData.capa === 'cosmos');
     const actual = cosmos.cuerpos().find(c => int.camera.position.distanceTo(c.centro) < c.radio * 40)?.id;
     const otros = raizCosmos ? raizCosmos.children.filter(o => { if (!o.isGroup || !o.visible) return false; o.getWorldPosition(w); const c = cosmos.cuerpos().find(c => c.centro.distanceTo(w) < c.radio * 4); return c && c.id !== actual; }) : [];
     const pruebas = [
       ['tal cual', () => {}, () => {}],
       ['telaraña con 3 órdenes (sin bloques)', () => telarana.unirBloques(true), () => telarana.unirBloques(false)],
-      ['capa de galaxias a media resolución', () => telarana.escalarCapaGalaxias(0.5), () => telarana.escalarCapaGalaxias(1)],
+      ['capa de galaxias a media resolución', () => { escalaAntes = telarana.escalaCapaGalaxias; telarana.escalarCapaGalaxias(0.5); }, () => telarana.escalarCapaGalaxias(escalaAntes)],
       ['sin resplandor (bloom)', () => { bloom.enabled = false; }, () => { bloom.enabled = true; }],
       ['otros gigantes ocultos', () => otros.forEach(o => (o.visible = false)), () => otros.forEach(o => (o.visible = true))],
       ['resolución 1,25', () => nucleo.fijarResolucion(1.25), () => nucleo.fijarResolucion(prOriginal)],
       ['resolución 1', () => nucleo.fijarResolucion(1), () => nucleo.fijarResolucion(prOriginal)],
       ['todo lo anterior junto (res 1,25)', () => { telarana.unirBloques(true); telarana.escalarCapaGalaxias(0.5); bloom.enabled = false; otros.forEach(o => (o.visible = false)); nucleo.fijarResolucion(1.25); },
-        () => { telarana.unirBloques(false); telarana.escalarCapaGalaxias(1); bloom.enabled = true; otros.forEach(o => (o.visible = true)); nucleo.fijarResolucion(prOriginal); }]
+        () => { telarana.unirBloques(false); telarana.escalarCapaGalaxias(escalaAntes); bloom.enabled = true; otros.forEach(o => (o.visible = true)); nucleo.fijarResolucion(prOriginal); }]
     ];
     const res = [];
     for (const [nombre, poner, quitar] of pruebas) {
