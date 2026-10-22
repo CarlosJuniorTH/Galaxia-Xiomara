@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#05010c">
+  <meta name="description" content="Un universo hecho solo para ti.">
+
+  <!-- Pantalla completa al añadir a la pantalla de inicio (iPhone / Android) -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Xiomara">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="assets/iconos/icono.svg">
+  <link rel="apple-touch-icon" href="assets/iconos/icono-180.png">
+
+  <title>Un universo para Xiomara</title>
+
+  <link rel="stylesheet" href="css/fuentes.css">
+
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/entrada.css">
+  <link rel="stylesheet" href="css/interfaz.css">
+  <link rel="stylesheet" href="css/ventanas.css">
+  <link rel="stylesheet" href="css/universo.css">
+
+  <script async src="assets/vendor/es-module-shims.js"></script>
+  <script type="importmap">
+  {"imports":{"three":"./assets/vendor/three/three.module.js","three/addons/":"./assets/vendor/three/addons/"}}
+  </script>
+</head>
+<body>
+
+  <!-- ═════════ Entrada ═════════ -->
+  <div id="entrada">
+    <canvas id="portada-lienzo" aria-hidden="true"></canvas>
+    <div id="carga" class="carga" role="status" aria-live="polite"><p class="carga-ceja">Nuestro pequeño infinito</p><div class="carga-barra"><span class="carga-relleno"></span></div><p id="carga-texto" class="carga-texto">Cargando el universo…</p><p id="carga-pc" class="carga-pc">0 %</p></div>
+    <p id="portada-frase" class="portada-frase" aria-live="polite"></p>
+    <button id="portada-saltar" class="portada-saltar">Saltar la presentación ›</button>
+    <div class="tarjeta">
+      <div class="tarjeta-foto"><img id="foto" alt=""></div>
+      <div class="para">Nuestro pequeño infinito</div>
+      <div class="nombre" id="entrada-nombre"></div>
+      <div class="cita" id="entrada-cita"></div>
+      <button id="btn-entrar" disabled>
+        <span class="cargando"><i></i> Preparando tu universo…</span>
+        <span class="listo">Entrar a nuestro universo <b>↗</b></span>
+      </button>
+      <button id="btn-continuar" class="continuar-viaje" hidden disabled></button>
+      <div id="saludo-entrada" class="saludo-entrada"></div>
+      <div id="entrada-progreso" class="audifonos"></div>
+      <button id="btn-restaurar" class="enlace-suave" hidden>Recuperar mi viaje anterior</button>
+      <div id="entrada-opciones" class="entrada-opciones" hidden>
+        <button id="btn-desde-cero" class="enlace-suave">Descubrirlo todo de nuevo</button>
+      </div>
+      <div class="audifonos">Mejor con auriculares · hecho con amor, por Carlos</div>
+    </div>
+  </div>
+
+  <!-- ═════════ Interfaz dentro de la galaxia ═════════ -->
+  <div id="destello-viaje" aria-hidden="true"></div>
+  <div id="hud" inert>
+    <div class="marca-universo"><span class="marca-simbolo">✧</span><div>Carlos <i>&</i> Xiomara<small>UN MISMO CIELO</small></div></div>
+    <div class="horarios"><span id="hora-carlos"></span><span id="hora-xiomara"></span></div>
+    <header id="titulo">
+      <div id="titulo-texto"></div>
+      <div id="contador"></div>
+      <div id="contador-sub"></div>
+      <div id="pastilla-estrellas"></div>
+    </header>
+    <div id="mensaje" class="fuera"></div>
+    <div id="pista"></div>
+    <button class="btn-redondo" id="btn-carta" aria-label="Abrir carta" hidden>💌</button>
+    <button id="btn-tour" class="boton-tour"><span>✧</span> Deja que te lleve <span>↗</span></button>
+    <aside id="lugar" class="lugar" aria-label="Lugar actual">
+      <button id="lugar-volver" class="volver-centro" hidden><span aria-hidden="true">←</span> Volver al centro</button>
+      <div id="lugar-tipo" class="ceja">UN UNIVERSO POR DESCUBRIR</div>
+      <h1 id="lugar-nombre">Nuestro pequeño infinito</h1>
+      <p id="lugar-texto">Hay una historia escondida entre estas estrellas. La nuestra.</p>
+      <button id="lugar-accion" class="enlace-accion">Explorar los lugares <span>↗</span></button>
+      <div id="lugar-faro" class="lugar-extra" hidden><button id="faro-carta" type="button">Hay algo para ti</button></div>
+      <div id="lugar-extra" class="lugar-extra" hidden><button id="lugar-aislar" type="button" aria-pressed="false">Ver solo el corazón</button><button id="lugar-postal" type="button">Guardar una postal</button></div>
+    </aside>
+    <div id="ruta" class="ruta" hidden>
+      <div class="ruta-cabecera"><span id="ruta-paso"></span><button id="ruta-salir" aria-label="Terminar recorrido">✕</button></div>
+      <h2 id="ruta-titulo"></h2><p id="ruta-texto"></p><button id="ruta-descubrir" class="ruta-descubrir">Quiero explorar este lugar ↗</button>
+      <div id="ruta-avance" class="ruta-avance"><i></i></div>
+      <div class="ruta-botones"><button id="ruta-anterior" aria-label="Lugar anterior">←</button><button id="ruta-pausa">Pausar</button><button id="ruta-siguiente">Siguiente ↗</button></div>
+    </div>
+    <nav id="muelle" class="muelle" aria-label="Explorar el universo">
+      <button data-panel="lugares"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><ellipse cx="12" cy="12" rx="9.5" ry="4.2" transform="rotate(-22 12 12)"/><circle cx="19.2" cy="8.4" r="1.1" fill="currentColor" stroke="none"/></svg></span>Explorar</button>
+      <button data-panel="album"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l1.9 5.2 5.6.2-4.4 3.4 1.6 5.4L12 14.6l-4.7 3.1 1.6-5.4-4.4-3.4 5.6-.2z"/></svg></span>Mi álbum</button>
+      <button data-panel="cartas"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="6" width="17" height="12" rx="2"/><path d="M4 7l8 6 8-6"/><path d="M12 16.4c-.9-.7-1.9-1.4-1.9-2.3a1 1 0 0 1 1.9-.5 1 1 0 0 1 1.9.5c0 .9-1 1.6-1.9 2.3z" fill="currentColor" stroke="none"/></svg></span>Cartas</button>
+      <button id="btn-pista"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19l9-9"/><path d="M15.5 3.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/><path d="M19.5 12.5l.4 1.1 1.1.4-1.1.4-.4 1.1-.4-1.1-1.1-.4 1.1-.4z"/></svg></span>Una pista</button>
+      <button id="btn-postal"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M3.5 16l5-4.5 3.5 3 3-2.5 5.5 4.5"/><circle cx="15.5" cy="9" r="1.4"/></svg></span>Postal</button>
+    </nav>
+    <button id="btn-mapa" class="btn-mapa" aria-label="Ver el mapa del universo" aria-expanded="false" aria-controls="mapa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M14.8 9.2l-1.7 3.9-3.9 1.7 1.7-3.9z"/><circle cx="12" cy="12" r="0.6" fill="currentColor"/></svg></button>
+    <div id="mapa" class="mapa" hidden role="dialog" aria-label="Mapa del universo">
+      <div class="mapa-cabecera"><div><div class="ceja">TU MAPA</div><strong id="mapa-resumen"></strong></div><button id="mapa-cerrar" aria-label="Cerrar mapa">✕</button></div>
+      <svg id="mapa-svg" viewBox="0 0 300 240" role="group" aria-label="Lugares del universo"></svg>
+      <p class="mapa-nota">Toca un lugar para viajar. Los que aún no has visitado guardan su sorpresa.</p>
+    </div>
+    <div id="supernova-aviso" class="cometa-aviso supernova-aviso" hidden><button id="btn-supernova">♡ Nuestra luz sigue aquí <span>↗</span></button></div>
+    <div id="cometa-aviso" class="cometa-aviso" hidden><button id="btn-cometa">☄ Un cometa trae algo para ti <span>↗</span></button></div>
+    <button id="salir-calma" class="salir-calma" hidden>← Volver a nuestro universo</button>
+    <button class="btn-redondo pausado" id="btn-musica" aria-label="Música">
+      <span class="eq"><i></i><i></i><i></i><i></i></span>
+    </button>
+  </div>
+
+  <!-- ═════════ Carta ═════════ -->
+  <div class="ventana" id="carta" aria-hidden="true">
+    <div class="papel">
+      <button class="cerrar" aria-label="Cerrar">✕</button>
+      <h2 id="carta-titulo"></h2>
+      <p class="carta-cuerpo"><span id="carta-texto"></span><span class="cursor"></span></p>
+      <div class="firma" id="carta-firma"></div>
+      <div class="nota">Toca la carta para leerla completa</div>
+    </div>
+  </div>
+
+  <!-- ═════════ Recuerdo (estrellas secretas) ═════════ -->
+  <div class="ventana" id="recuerdo" aria-hidden="true">
+    <div class="papel papel-recuerdo">
+      <button class="cerrar" aria-label="Cerrar">✕</button>
+      <div class="recuerdo-mes" id="recuerdo-mes"></div>
+      <h2 id="recuerdo-titulo"></h2>
+      <img id="recuerdo-foto" alt="">
+      <p id="recuerdo-texto"></p>
+      <div class="nota" id="recuerdo-progreso"></div>
+    </div>
+  </div>
+
+  <!-- ═════════ Celebración final ═════════ -->
+  <div class="ventana" id="celebracion" aria-hidden="true">
+    <div class="papel papel-especial">
+      <button class="cerrar" aria-label="Cerrar">✕</button>
+      <div class="sello">💌</div>
+      <div class="recuerdo-mes" id="celebracion-etiqueta"></div>
+      <h2 id="celebracion-titulo"></h2>
+      <p class="carta-cuerpo"><span id="celebracion-texto"></span><span class="cursor"></span></p>
+      <div class="firma" id="celebracion-firma"></div>
+      <button id="btn-celebracion">♡ Seguir en nuestro universo ♡</button>
+      <div class="nota">Toca la carta para leerla completa</div>
+    </div>
+  </div>
+
+  <dialog id="panel-universo" class="panel-universo" aria-labelledby="panel-titulo">
+    <div class="panel-cabecera"><div><div id="panel-ceja" class="ceja"></div><h2 id="panel-titulo"></h2></div><button class="cerrar-panel" aria-label="Cerrar explorador">✕</button></div>
+    <div id="panel-contenido" class="panel-contenido"></div>
+  </dialog>
+  <dialog id="cielo-noche" class="lectura cielo-noche" aria-labelledby="cielo-noche-titulo">
+    <button class="cerrar-panel" aria-label="Cerrar el cielo de aquella noche">✕</button>
+    <div class="ceja">15 · 12 · 2025 · EL MISMO CIELO</div><h2 id="cielo-noche-titulo">El cielo de aquella noche</h2>
+    <p class="cielo-intro">Así estaba el cielo sobre cada uno, en el mismo instante, la noche en que empezó todo. Mueve la hora y mira cómo giraba.</p>
+    <div class="cielos"><figure><canvas aria-label="Cielo sobre Barcelona"></canvas><figcaption>Cas · Barcelona</figcaption></figure><figure><canvas aria-label="Cielo sobre Buenos Aires"></canvas><figcaption>Xio · Buenos Aires</figcaption></figure></div>
+    <label class="cielo-hora"><span id="cielo-hora-texto"></span><input id="cielo-hora" type="range" min="-5" max="30" step="0.25" value="4" aria-label="Hora en Barcelona"></label>
+    <div class="cielo-opciones cielo-momentos"><button type="button" data-hora="4">00:00 Xio · 04:00 Cas</button><button type="button" data-hora="23">19:00 Xio · 23:00 Cas</button></div>
+    <div class="cielo-opciones"><button type="button" data-opcion="lineas" aria-pressed="true">Constelaciones</button><button type="button" data-opcion="nombres" aria-pressed="true">Nombres</button></div>
+    <p id="cielo-nota" class="cielo-nota"></p>
+  </dialog>
+  <dialog id="lectura" class="lectura" aria-labelledby="lectura-titulo">
+    <button class="cerrar-panel" aria-label="Cerrar lectura">✕</button>
+    <div id="lectura-ceja" class="ceja"></div><h2 id="lectura-titulo"></h2>
+    <div id="lectura-texto"></div><div class="firma visible">Con todo mi amor, Carlos</div>
+  </dialog>
+  <dialog id="reinicio" class="lectura" aria-labelledby="reinicio-titulo">
+    <div class="ceja">OTRA VEZ, COMO LA PRIMERA</div><h2 id="reinicio-titulo">Un nuevo viaje</h2>
+    <p>Volverás a buscar las estrellas, tejer la constelación y descubrir las sorpresas. Dejaremos una copia de este viaje en este navegador para que puedas recuperarlo desde la entrada.</p>
+    <div class="acciones-dialogo"><button id="reinicio-cancelar" class="secundario">Seguir aquí</button><button id="reinicio-confirmar" class="primario">Empezar de nuevo ✧</button></div>
+  </dialog>
+  <dialog id="postal" class="postal-dialogo" aria-labelledby="postal-titulo">
+    <button class="cerrar-panel" aria-label="Cerrar postal">✕</button><div class="ceja">UN PEDACITO DE NUESTRO CIELO</div><h2 id="postal-titulo">Para llevar contigo</h2>
+    <img id="postal-imagen" alt="Postal de nuestro universo con una dedicatoria para Xiomara">
+    <a id="postal-descarga" class="primario" download="nuestro-pequeno-infinito.png">Guardar postal ↓</a>
+  </dialog>
+  <div id="brindis" class="brindis" role="status" aria-live="polite"></div>
+  <div id="problema-3d" class="problema-3d" hidden role="alert"><div class="ceja">LAS ESTRELLAS SIGUEN AQUÍ</div><h2>Volvamos a encender el cielo</h2><p id="problema-texto"></p><div class="acciones-dialogo"><button id="reintentar-3d" class="primario">Reintentar en 3D ↗</button><button id="compatible-3d" class="secundario">Probar 3D compatible ↗</button></div><details id="error-arranque" hidden><summary>Ver el error de arranque</summary><pre id="error-arranque-texto"></pre></details></div>
+  <div id="sobre-animado" class="sobre-animado" hidden aria-hidden="true"><div class="sobre"><div class="sobre-carta"><i></i><i></i><i></i><b>♡</b></div><div class="sobre-cuerpo"></div><div class="sobre-solapa"></div></div></div>
+  <div id="faro-frase" class="faro-frase" hidden aria-live="polite"><p id="faro-frase-texto"></p></div>
+  <button id="faro-saltar" class="faro-saltar" type="button" hidden>Saltar <span aria-hidden="true">›</span></button>
+  <div id="cometa-frase" class="cometa-frase" hidden aria-live="polite"><span aria-hidden="true">☄</span><p id="cometa-frase-texto"></p></div>
+  <div id="reunion" class="reunion" hidden aria-live="polite"><div id="reunion-mes" class="ceja"></div><div id="reunion-titulo" class="reunion-titulo"></div><div id="reunion-detalle" class="reunion-detalle"></div></div>
+  <div id="tejido" class="tejido" hidden><span id="tejido-texto">Uniendo nuestras estrellas…</span><i></i><button id="omitir-celebracion" hidden>Ir directamente a mi carta ↗</button></div>
+  <canvas id="galaxia"></canvas>
+  <canvas id="efectos"></canvas>
+  <audio id="musica" loop preload="auto" playsinline></audio>
+
+  <noscript><p class="sin-js">Activa JavaScript para ver tu universo 💖</p></noscript>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

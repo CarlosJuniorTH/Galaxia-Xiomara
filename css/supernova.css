@@ -1,0 +1,55 @@
+/* Solo la supernova: sus controles no cambian los demás destinos. */
+#supernova-amor[hidden],#supernova-amor [hidden]{display:none!important}
+#supernova-amor{position:fixed;inset:0;z-index:35;pointer-events:none;color:#f9e9e7;--sn-oro:#eac99e;--sn-rosa:#eeb4cd}
+.sn-cabecera{position:absolute;left:max(28px,env(safe-area-inset-left));right:max(28px,env(safe-area-inset-right));top:calc(env(safe-area-inset-top) + 25px);display:flex;justify-content:space-between;align-items:center;gap:16px}
+.sn-cabecera>span{font:500 .58rem 'Quicksand',sans-serif;letter-spacing:3px;color:var(--sn-oro)}
+#supernova-amor button{pointer-events:auto;font-family:'Quicksand',sans-serif;font-size:.73rem;cursor:pointer;min-height:44px;color:#f2dbdf;background:#1a0d24ed;border:1px solid #e7b8ca4a;border-radius:24px;padding:11px 19px;transition:background .25s,border-color .25s}
+#supernova-amor button:hover{background:#372039;border-color:#edc5cd99}
+#supernova-amor button:focus-visible{outline:2px solid #f6d6a9;outline-offset:5px}
+.sn-mensaje{position:absolute;bottom:100px;left:50%;width:min(680px,calc(100% - 44px));transform:translateX(-50%);text-align:center;text-shadow:0 2px 24px #08010c,0 1px 8px #08010c;background:radial-gradient(ellipse at center,#11071590,transparent 72%);padding:18px 12px;transition:opacity 1.2s}
+.sn-ceja{font:500 .62rem 'Quicksand',sans-serif;letter-spacing:3px;color:var(--sn-oro);line-height:1.8;margin:0 0 9px}
+.sn-mensaje h2{font:400 clamp(1.8rem,3vw,2.8rem)/1.1 'Cormorant Garamond',serif;margin:0;color:#fae8ee}
+.sn-dedicatoria{font:400 clamp(1.12rem,1.8vw,1.45rem)/1.5 'Cormorant Garamond',serif;color:#efd3df;max-width:480px;margin:15px auto 0;text-wrap:balance}
+.sn-acciones{position:absolute;bottom:calc(env(safe-area-inset-bottom) + 34px);left:50%;transform:translateX(-50%);display:flex;justify-content:center;gap:10px;width:min(760px,calc(100% - 40px));pointer-events:auto}
+.sn-acciones button:first-child{background:linear-gradient(120deg,#65404f,#332339)!important;border-color:#efc7b76b!important}
+.sn-despertar{position:absolute;bottom:calc(env(safe-area-inset-bottom) + 26px);left:50%;transform:translateX(-50%);white-space:nowrap}
+#supernova-amor[data-fase="silencio"] .sn-mensaje,#supernova-amor.sn-contemplando .sn-mensaje{opacity:0}
+#supernova-amor.sn-contemplando .sn-acciones{display:none}
+body.supernova-en-escena #hud{visibility:hidden;pointer-events:none}
+body.supernova-en-escena #brindis,body.supernova-en-escena #mensaje,body.supernova-en-escena #pista,body.supernova-en-escena #cometa-frase{display:none!important}
+@media(max-width:600px){
+.sn-cabecera{left:18px;right:18px;top:calc(env(safe-area-inset-top) + 14px)}
+.sn-cabecera>span{font-size:.5rem;letter-spacing:2px;max-width:190px;line-height:1.6}
+.sn-mensaje{bottom:calc(env(safe-area-inset-bottom) + 145px);padding:12px 0}
+.sn-mensaje h2{font-size:1.95rem}.sn-ceja{font-size:.55rem;letter-spacing:2px}
+.sn-dedicatoria{font-size:1.15rem;line-height:1.4;margin-top:12px}
+.sn-acciones{display:grid;grid-template-columns:1fr 1fr;gap:8px;bottom:calc(env(safe-area-inset-bottom) + 22px)}
+#supernova-amor .sn-acciones button{font-size:.65rem;padding:10px 9px;min-height:46px}
+}
+@media(max-height:530px) and (orientation:landscape){.sn-mensaje{left:auto;right:20px;transform:none;width:35%;bottom:90px}.sn-mensaje h2{font-size:1.6rem}.sn-dedicatoria{font-size:1rem}.sn-acciones{bottom:14px}.sn-cabecera{top:10px}}
+@media(prefers-reduced-motion:reduce){#supernova-amor *{transition:none!important}}
+.sn-cabecera>span{margin-right:auto}
+@media(max-width:600px){.sn-cabecera{gap:8px}#supernova-amor .sn-cabecera button{font-size:.6rem;padding:9px 12px}.sn-cabecera>span{max-width:150px}}
+.sn-estado{position:absolute;bottom:calc(env(safe-area-inset-bottom) + 90px);width:100%;text-align:center;font:500 .65rem 'Quicksand',sans-serif;color:#f2d8bd}
+#supernova-amor button:disabled{opacity:.5;cursor:wait}
+@media(max-width:600px){.sn-estado{bottom:calc(env(safe-area-inset-bottom) + 120px)}}
+
+/* Se puede conservar el recuerdo solo o dentro del cielo, también en vertical. */
+@media(max-width:600px){.sn-acciones button:last-child{grid-column:1/-1}.sn-mensaje{bottom:calc(env(safe-area-inset-bottom) + 202px)}.sn-estado{bottom:calc(env(safe-area-inset-bottom) + 176px)}}
+
+/* Penumbra de la ceremonia: los bordes se oscurecen y la mirada va al centro. Un degradado sobre
+   el lienzo, sin pasada de posproceso (que dejaba bloques grises junto al brillo). */
+#supernova-amor::before{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 75% 70% at 50% 42%,transparent 30%,#030008b3 100%);opacity:0;transition:opacity 2.5s ease}
+#supernova-amor[data-fase="encuentro"]::before,#supernova-amor[data-fase="silencio"]::before,#supernova-amor[data-fase="expansion"]::before{opacity:1}
+#supernova-amor[data-fase="formacion"]::before{opacity:.55;transition-duration:6s}
+
+/* Ceremonia sin botones: el texto baja (ya no hay acciones debajo). */
+.sn-mensaje{bottom:calc(env(safe-area-inset-bottom) + 70px)}
+@media(max-width:600px){.sn-mensaje{bottom:calc(env(safe-area-inset-bottom) + 60px)}}
+
+/* Corazón ya nacido: dos acciones discretas en la tarjeta del lugar (contemplar aislado y postal). */
+.lugar-extra[hidden]{display:none!important}
+.lugar-extra{display:flex;gap:14px;margin-top:10px;flex-wrap:wrap}
+.lugar-extra button{font:500 .64rem 'Quicksand',sans-serif;letter-spacing:.4px;color:#e7c9d6;background:none;border:0;border-bottom:1px solid #e7c9d64d;padding:6px 0;min-height:36px;cursor:pointer}
+.lugar-extra button:hover,.lugar-extra button[aria-pressed="true"]{color:#f6dcc0;border-bottom-color:#f6dcc0aa}
+.lugar-extra button:focus-visible{outline:2px solid #f6d6a9;outline-offset:4px;border-radius:6px}

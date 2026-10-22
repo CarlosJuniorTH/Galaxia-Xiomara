@@ -1,0 +1,54 @@
+/* ── Ventanas: carta, recuerdos y celebración ── */
+.ventana{
+  position:fixed;inset:0;z-index:60;
+  padding:calc(var(--arriba) + 16px) 16px calc(var(--abajo) + 16px);
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(8,0,16,.62);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  opacity:0;pointer-events:none;transition:opacity .6s ease;
+}
+.ventana.abierta{opacity:1;pointer-events:auto;}
+
+.papel{
+  position:relative;width:min(520px,100%);max-height:100%;overflow:auto;-webkit-overflow-scrolling:touch;
+  padding:38px 26px 24px;border-radius:24px;
+  background:linear-gradient(170deg,#fff8fb,#ffe4f0);color:#4a1630;
+  box-shadow:0 30px 90px rgba(255,60,150,.4),inset 0 0 0 1px rgba(255,140,190,.35);
+  transform:translateY(24px) scale(.97);transition:transform .7s cubic-bezier(.2,.8,.2,1);
+  -webkit-user-select:text;user-select:text;
+}
+.ventana.abierta .papel{transform:none;}
+.papel h2{font-family:'Great Vibes',cursive;font-weight:400;font-size:clamp(2rem,8vw,2.6rem);color:var(--vino);margin-bottom:12px;line-height:1.1;}
+.carta-cuerpo,#recuerdo-texto{font-family:'Cormorant Garamond',serif;font-size:clamp(1.08rem,4vw,1.24rem);line-height:1.62;white-space:pre-line;}
+.carta-cuerpo{min-height:9em;}
+.cursor{display:inline-block;width:1px;height:1.05em;background:var(--vino);vertical-align:-2px;margin-left:2px;animation:parpadeo .9s steps(1) infinite;}
+@keyframes parpadeo{50%{opacity:0}}
+.firma{font-family:'Great Vibes',cursive;font-size:clamp(1.5rem,6vw,1.9rem);color:var(--vino);text-align:right;margin-top:16px;opacity:0;transform:translateY(6px);transition:opacity 1.2s ease,transform 1.2s ease;}
+.firma.visible{opacity:1;transform:none;}
+.cerrar{position:absolute;top:12px;right:14px;width:38px;height:38px;border-radius:50%;border:none;background:rgba(212,42,116,.1);color:var(--vino);font-size:1.1rem;cursor:pointer;}
+.nota{font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:rgba(122,40,80,.5);text-align:center;margin-top:18px;}
+
+/* Recuerdo */
+.papel-recuerdo{text-align:center;width:min(440px,100%);padding-top:54px;}
+.recuerdo-mes{display:inline-block;padding:5px 14px;border-radius:30px;background:rgba(212,42,116,.1);color:var(--vino);font-size:.62rem;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:10px;}
+#recuerdo-foto{display:none;width:100%;max-height:42vh;object-fit:cover;border-radius:16px;margin:4px 0 14px;box-shadow:0 10px 30px rgba(212,42,116,.25);}
+#recuerdo-foto.visible{display:block;}
+
+/* Carta especial de los meses (al encontrar todas las estrellas) */
+body.celebrando #efectos{z-index:70;}
+#celebracion{background:radial-gradient(ellipse at center,rgba(120,10,70,.55),rgba(5,0,12,.78));}
+.papel-especial{
+  text-align:center;padding-top:30px;
+  background:linear-gradient(170deg,#fffaf3,#ffe8f2 60%,#ffd9ea);
+  box-shadow:0 30px 100px rgba(255,60,150,.55),inset 0 0 0 1px rgba(255,140,190,.45),inset 0 0 0 8px rgba(255,255,255,.55),inset 0 0 0 9px rgba(214,150,90,.35);
+}
+.papel-especial .carta-cuerpo{text-align:left;}
+.papel-especial h2{font-size:clamp(2.3rem,9vw,3rem);margin-top:4px;}
+.sello{font-size:2.2rem;line-height:1;margin-bottom:8px;animation:latido-sello 1.6s ease-in-out infinite;}
+@keyframes latido-sello{0%,100%{transform:scale(1)}15%{transform:scale(1.15)}30%{transform:scale(1)}45%{transform:scale(1.1)}}
+#btn-celebracion{
+  margin-top:22px;padding:13px 24px;border-radius:50px;border:none;cursor:pointer;
+  background:linear-gradient(135deg,var(--rosa),var(--rosa-2) 50%,var(--lila));
+  color:#fff;font-size:.68rem;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;
+  box-shadow:0 10px 26px rgba(255,70,150,.4);
+}

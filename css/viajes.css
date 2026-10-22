@@ -1,0 +1,39 @@
+#viaje-visual[hidden]{display:none!important}
+#viaje-visual{position:fixed;bottom:calc(env(safe-area-inset-bottom) + 28px);left:50%;transform:translateX(-50%);width:min(460px,calc(100% - 40px));z-index:24;display:flex;align-items:center;justify-content:space-between;gap:22px;padding:15px 20px 19px;border-radius:22px;background:linear-gradient(120deg,#100a1bd9,#140c1adb);border:1px solid #e8c6a028;box-shadow:0 8px 32px #0003;color:#f4e2e9}
+#viaje-visual small{font:500 .48rem 'Quicksand',sans-serif;letter-spacing:2px;color:#d8bfa0}
+#viaje-visual p{font:400 1.35rem/1.2 'Cormorant Garamond',serif;margin:5px 0 0;text-wrap:balance}
+#viaje-visual .viaje-lugar{display:block;margin-top:4px;font:400 .62rem/1.35 'Quicksand',sans-serif;color:#d9c2cf;letter-spacing:.3px;text-wrap:balance}
+#viaje-visual .viaje-lugar[hidden]{display:none}
+#viaje-visual .viaje-botones{display:flex;flex-direction:column;align-items:flex-end;gap:0}
+#viaje-visual .viaje-botones button[hidden]{display:none}
+#viaje-visual .viaje-breve[aria-pressed=true]{color:#f2cfac}
+#btn-mirar-casa{position:fixed;right:calc(env(safe-area-inset-right) + 18px);bottom:calc(env(safe-area-inset-bottom) + 96px);z-index:23;font:500 .62rem 'Quicksand',sans-serif;color:#f4e2e9;background:#140c1acc;border:1px solid #e8c6a033;border-radius:18px;padding:10px 14px;min-height:44px;cursor:pointer;backdrop-filter:blur(6px)}
+#btn-mirar-casa[hidden]{display:none}
+#btn-mirar-casa:focus-visible{outline:2px solid #e8c6a0;outline-offset:3px}
+/* Señal de Xiomara al mirar hacia casa: un anillo fino a su alrededor y su nombre con la distancia. */
+#marca-casa{position:fixed;left:0;top:0;z-index:20;pointer-events:none;opacity:0;transition:opacity .6s ease}
+#marca-casa.activa{opacity:1}
+#marca-casa i{position:absolute;left:calc(var(--r,30px) * -1);top:calc(var(--r,30px) * -1);width:calc(var(--r,30px) * 2);height:calc(var(--r,30px) * 2);border-radius:50%;border:1px solid #f3d7b999;box-shadow:0 0 18px #f3c9e033}
+#marca-casa span{position:absolute;left:50%;top:calc(var(--r,30px) + 10px);transform:translateX(-50%);white-space:nowrap;font:400 1rem 'Cormorant Garamond',serif;color:#f6e4ec;text-shadow:0 0 8px #000}
+#viaje-visual button{font:500 .6rem 'Quicksand',sans-serif;background:transparent;border:0;color:#d6bdce;cursor:pointer;min-height:44px;padding:8px;white-space:nowrap}
+#viaje-visual button:focus-visible{outline:2px solid #e8c6a0;outline-offset:4px;border-radius:10px}
+.viaje-hilo{position:absolute;bottom:8px;left:20px;right:20px;height:1px;background:#d9abc71c;overflow:hidden}
+.viaje-hilo i{display:block;width:100%;height:100%;transform:scaleX(0);transform-origin:left;background:linear-gradient(90deg,#8f687e,#f2cfac);transition:transform .35s linear}
+body.viajando:not(.en-ruta):not(.paseo-contemplar) #hud .lugar,body.viajando:not(.en-ruta):not(.paseo-contemplar) #hud .muelle,body.viajando:not(.en-ruta):not(.paseo-contemplar) #hud #btn-tour,body.viajando:not(.en-ruta):not(.paseo-contemplar) #hud #mensaje,body.viajando:not(.en-ruta):not(.paseo-contemplar) #hud #pista,body.viajando:not(.en-ruta):not(.paseo-contemplar) #hud #cometa-aviso,body.viajando:not(.en-ruta):not(.paseo-contemplar) #hud #supernova-aviso{opacity:0;pointer-events:none}
+body.viajando:not(.en-ruta):not(.paseo-contemplar) #titulo{opacity:0;pointer-events:none}
+body.en-ruta #viaje-visual,body.paseo-contemplar #viaje-visual,body.supernova-en-escena #viaje-visual,body:has(dialog[open]) #viaje-visual{display:none!important}
+@media(max-width:600px){#viaje-visual{gap:10px;bottom:calc(env(safe-area-inset-bottom) + 20px);padding:12px 15px 17px}#viaje-visual p{font-size:1.2rem}#viaje-visual small{font-size:.42rem;letter-spacing:1.4px}#viaje-visual button{font-size:.55rem}}
+@media(prefers-reduced-motion:reduce){.viaje-hilo i{transition:none}}
+/* Señal del destino durante la adquisición y la alineación del vuelo: un anillo fino anclado al
+   destino que se cierra al quedar alineado y desaparece en la ruptura. Fuera de pantalla, una
+   flecha discreta en el borde indica hacia dónde girará la cámara. */
+#marca-destino{position:fixed;left:0;top:0;width:46px;height:46px;margin:-23px 0 0 -23px;z-index:20;pointer-events:none;opacity:0;transition:opacity .45s ease}
+#marca-destino.activa{opacity:1}
+#marca-destino i{position:absolute;inset:0;border-radius:50%;border:1px solid #f3d7b9cc;box-shadow:0 0 14px #f3c9e055,inset 0 0 10px #f3c9e033;transform:scale(1.6);transition:transform .7s cubic-bezier(.2,.8,.2,1),border-color .4s}
+#marca-destino i::before,#marca-destino i::after{content:'';position:absolute;left:50%;width:1px;height:7px;background:#f3d7b9;transform:translateX(-50%)}
+#marca-destino i::before{top:-10px}#marca-destino i::after{bottom:-10px}
+#marca-destino.alineada i{transform:scale(1);border-color:#fff3e6}
+#marca-destino.fuera i{border-radius:0;border:0;box-shadow:none;transform:none}
+#marca-destino.fuera i::before{top:50%;left:50%;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:12px solid #f3d7b9cc;background:none;transform:translate(-50%,-50%) rotate(var(--giro,0deg))}
+#marca-destino.fuera i::after{display:none}
+@media(prefers-reduced-motion:reduce){#marca-destino i{transition:none}}

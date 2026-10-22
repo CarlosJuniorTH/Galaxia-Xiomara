@@ -1,0 +1,20 @@
+{
+  "name": "galaxia-xiomara",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "python3 scripts/servir.py",
+    "test": "node --test tests/*.test.js",
+    "vendor": "node scripts/vendor.mjs",
+    "check": "node scripts/comprobar.mjs",
+    "dev:movil": "python3 scripts/servir.py --lan",
+    "build:pages": "node scripts/preparar-pages.mjs",
+    "test:servidor": "python3 -m unittest discover -s tests -p 'test_*.py'",
+    "test:navegador": "node tests/navegador/ejecutar.mjs"
+  },
+  "dependencies": {
+    "es-module-shims": "1.10.0",
+    "three": "0.160.0"
+  }
+}

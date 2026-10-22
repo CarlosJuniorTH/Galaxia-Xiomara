@@ -1,0 +1,24 @@
+{
+  "name": "Un universo para Xiomara",
+  "short_name": "Xiomara",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#05010c",
+  "theme_color": "#05010c",
+  "icons": [
+    {
+      "src": "assets/iconos/icono-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/iconos/icono-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "id": "./",
+  "scope": "./"
+}

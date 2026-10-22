@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+<defs><radialGradient id="b"><stop stop-color="#71315e"/><stop offset="1" stop-color="#0c071a"/></radialGradient><linearGradient id="o"><stop stop-color="#f7bdcc"/><stop offset=".5" stop-color="#bd90e4"/><stop offset="1" stop-color="#ffe4c1"/></linearGradient><filter id="g"><feGaussianBlur stdDeviation="7"/></filter></defs>
+<rect width="800" height="600" fill="url(#b)"/>
+<g fill="white" opacity=".5"><circle cx="85" cy="100" r="2"/><circle cx="180" cy="420" r="1"/><circle cx="630" cy="130" r="2"/><circle cx="680" cy="445" r="1.5"/><circle cx="330" cy="80" r="1"/><circle cx="535" cy="500" r="2"/><circle cx="120" cy="280" r="1"/><circle cx="720" cy="280" r="2"/><circle cx="480" cy="120" r="1"/></g>
+<g fill="none" stroke="url(#o)"><ellipse cx="400" cy="290" rx="235" ry="100" transform="rotate(-28 400 290)" opacity=".2" stroke-width="15" filter="url(#g)"/><ellipse cx="400" cy="290" rx="235" ry="100" transform="rotate(-28 400 290)" opacity=".7"/><ellipse cx="400" cy="290" rx="170" ry="190" transform="rotate(38 400 290)" opacity=".3"/></g>
+<path d="M400 355C260 275 320 195 370 235L400 260L430 235C480 195 540 275 400 355Z" fill="none" stroke="#ffd5e8" stroke-width="2"/>
+<circle cx="198" cy="379" r="6" fill="#f9d2ba"/><circle cx="585" cy="205" r="8" fill="#dcbbff"/>
+<text x="400" y="465" fill="#f9d8e8" font-size="15" font-family="serif" text-anchor="middle" letter-spacing="8">NUESTRO PEQUEÑO INFINITO</text>
+</svg>

@@ -1,0 +1,87 @@
+/* ── Interfaz sobre la galaxia (título, contador, mensajes, botones) ── */
+#hud{opacity:0;transition:opacity 2.5s ease 2s;pointer-events:none;}
+body.dentro #hud{opacity:1;}
+
+#titulo{position:fixed;top:calc(var(--arriba) + 3.5vh);left:16px;right:16px;text-align:center;z-index:10;}
+#titulo-texto{
+  font-family:'Great Vibes',cursive;font-size:clamp(2rem,6.5vw,3.2rem);line-height:1.1;
+  color:#ffd6ea;text-shadow:0 0 22px rgba(255,90,170,.75),0 0 60px rgba(255,60,150,.35);
+}
+#contador{
+  margin-top:6px;font-size:clamp(.62rem,2.6vw,.78rem);font-weight:700;letter-spacing:2.5px;text-transform:uppercase;
+  color:#ffc9e2;text-shadow:0 0 12px rgba(255,80,160,.6);font-variant-numeric:tabular-nums;
+}
+#contador-sub{margin-top:3px;font-size:clamp(.55rem,2.2vw,.66rem);letter-spacing:2px;color:var(--suave);font-variant-numeric:tabular-nums;}
+#pastilla-estrellas{
+  position:fixed;left:50%;bottom:calc(var(--abajo) + 36px);transform:translateX(-50%);
+  max-width:calc(100% - 170px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  padding:6px 14px;border-radius:30px;opacity:0;transition:opacity 1.5s ease;
+  font-size:.62rem;font-weight:600;letter-spacing:1.5px;color:#ffe1ef;
+  background:var(--vidrio);border:1px solid var(--borde);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+}
+#pastilla-estrellas.visible{opacity:1;}
+#pastilla-estrellas:empty{display:none;}
+#pastilla-estrellas.salto{animation:salto .6s ease;}
+@keyframes salto{40%{transform:translateX(-50%) scale(1.18)}}
+
+#mensaje{
+  position:fixed;left:16px;right:16px;bottom:calc(var(--abajo) + 96px);z-index:10;text-align:center;
+  font-family:'Cormorant Garamond',serif;font-style:italic;font-size:clamp(1.08rem,3.8vw,1.5rem);
+  color:rgba(255,235,246,.95);text-shadow:0 0 18px rgba(255,80,160,.7),0 2px 6px rgba(0,0,0,.7);
+  transition:opacity 1.2s ease,transform 1.2s ease;
+}
+#mensaje.fuera{opacity:0;transform:translateY(10px);}
+
+#pista{
+  position:fixed;left:50%;bottom:calc(var(--abajo) + 30px);transform:translateX(-50%);z-index:10;
+  width:calc(100% - 170px);max-width:460px;text-align:center;
+  font-size:.56rem;letter-spacing:2.2px;line-height:1.7;text-transform:uppercase;color:rgba(255,190,225,.5);
+  transition:opacity 2s ease;
+}
+#pista.fuera{opacity:0;}
+
+.btn-redondo{
+  position:fixed;bottom:calc(var(--abajo) + 20px);z-index:20;pointer-events:auto;
+  width:56px;height:56px;border-radius:50%;cursor:pointer;display:grid;place-items:center;
+  border:1px solid var(--borde);background:var(--vidrio);color:#ffd6ea;
+  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  box-shadow:0 8px 26px rgba(255,60,150,.25);transition:transform .25s ease,background .25s ease;
+}
+.btn-redondo:active{transform:scale(.92);}
+@media (hover:hover){.btn-redondo:hover{transform:translateY(-3px);background:rgba(255,110,175,.25);}}
+
+#btn-carta{left:20px;font-size:1.45rem;animation:flotar-btn 3s ease-in-out infinite;}
+#btn-carta::after{content:'';position:absolute;top:8px;right:8px;width:10px;height:10px;border-radius:50%;background:var(--rosa);box-shadow:0 0 10px var(--rosa);}
+#btn-carta.leida::after{display:none;}
+@keyframes flotar-btn{0%,100%{translate:0 0}50%{translate:0 -4px}}
+
+#btn-musica{right:20px;}
+.eq{display:flex;gap:3px;align-items:flex-end;height:18px;}
+.eq i{width:3px;height:4px;border-radius:2px;background:#ffb3d4;animation:eq 1s ease-in-out infinite;}
+.eq i:nth-child(2){animation-delay:-.3s}
+.eq i:nth-child(3){animation-delay:-.6s}
+.eq i:nth-child(4){animation-delay:-.15s}
+#btn-musica.pausado .eq i{animation:none;height:3px;opacity:.6;}
+@keyframes eq{0%,100%{height:4px}50%{height:18px}}
+
+/* Texto que flota al tocar la pantalla */
+.flotante{
+  position:fixed;z-index:6;pointer-events:none;white-space:nowrap;
+  font-family:'Great Vibes',cursive;font-size:clamp(1.7rem,6vw,2.3rem);color:#ffe0ee;
+  text-shadow:0 0 16px var(--rosa),0 0 4px rgba(0,0,0,.6);
+  animation:flotar 2.6s ease-out forwards;
+}
+@keyframes flotar{
+  0%{opacity:0;transform:translate(-50%,-30%) scale(.6)}
+  15%{opacity:1;transform:translate(-50%,-70%) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-280%) scale(1.08)}
+}
+
+/* Pantallas bajitas (celular acostado) */
+@media (max-height:500px){
+  #titulo{top:calc(var(--arriba) + 8px);}
+  #titulo-texto{font-size:1.7rem;}
+  #mensaje{bottom:calc(var(--abajo) + 18px);left:90px;right:90px;font-size:1rem;}
+  #pista{display:none;}
+}

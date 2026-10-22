@@ -1,0 +1,138 @@
+/* ── Pantalla de entrada ── */
+#entrada{
+  position:fixed;inset:0;z-index:100;
+  padding:calc(var(--arriba) + 16px) 16px calc(var(--abajo) + 16px);
+  display:flex;justify-content:center;align-items:center;overflow:hidden;
+  background:radial-gradient(ellipse at 50% 40%,#2c0a2c,#080012 72%);
+  transition:opacity 1.5s ease;
+}
+#entrada.oculto{opacity:0;pointer-events:none;}
+
+/* Portada: el universo nace en un lienzo detrás de la tarjeta (js/ui/portada.js). */
+#portada-lienzo{position:absolute;inset:0;width:100%;height:100%;}
+.portada-frase{
+  position:absolute;left:24px;right:24px;top:62%;margin:0;text-align:center;pointer-events:none;
+  font-family:'Cormorant Garamond',serif;font-style:italic;font-size:clamp(1.25rem,4.6vw,1.7rem);line-height:1.4;
+  color:rgba(255,236,246,.94);text-shadow:0 0 18px rgba(255,120,190,.45);
+  opacity:0;transform:translateY(8px);transition:opacity 1s ease,transform 1.2s ease;
+}
+.portada-frase.visible{opacity:1;transform:none;}
+@media (orientation:landscape){.portada-frase{top:74%;}}
+.portada-saltar{
+  position:absolute;right:calc(16px + env(safe-area-inset-right));bottom:calc(var(--abajo) + 16px);z-index:2;
+  border:none;background:none;color:rgba(255,215,235,.62);font-size:.68rem;letter-spacing:1.5px;padding:10px 6px;cursor:pointer;
+}
+.portada-saltar[hidden]{display:none;}
+.tarjeta{
+  position:relative;width:min(360px,100%);max-height:100%;overflow:auto;
+  padding:20px 20px 22px;border-radius:30px;text-align:center;
+  background:linear-gradient(160deg,rgba(255,255,255,.13),rgba(255,160,205,.05));
+  border:1px solid rgba(255,200,230,.28);
+  box-shadow:0 30px 80px rgba(255,40,140,.28),inset 0 1px 0 rgba(255,255,255,.25);
+  -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
+  /* Aparece cuando el universo de la portada ya se ha formado. */
+  opacity:0;transform:translateY(30px) scale(.96);pointer-events:none;
+  transition:opacity 1.3s ease,transform 1.3s cubic-bezier(.2,.8,.2,1);
+}
+#entrada.formado .tarjeta{opacity:1;transform:none;pointer-events:auto;}
+/* En vertical la tarjeta deja ver el universo recién nacido en la parte de arriba. */
+@media (orientation:portrait){
+  #entrada{align-items:flex-end;}
+  #entrada .tarjeta-foto{aspect-ratio:2.2/1;}
+}
+@media (orientation:portrait) and (max-height:820px){
+  #entrada .tarjeta{padding:14px 18px 14px;}
+  #entrada .tarjeta-foto{aspect-ratio:2.8/1;margin-bottom:10px;}
+  #entrada .nombre{font-size:clamp(2.6rem,12vw,3.3rem);}
+  #entrada .cita{margin-bottom:12px;}
+}
+/* En horizontal, igual que en el móvil: la galaxia arriba en el centro y la tarjeta debajo, compacta. */
+@media (orientation:landscape){
+  #entrada{align-items:flex-end;}
+  #entrada .tarjeta{width:min(430px,100%);padding:14px 20px 14px;}
+  #entrada .tarjeta-foto{aspect-ratio:3/1;margin-bottom:8px;}
+  #entrada .nombre{font-size:3.2rem;}
+  #entrada .cita{margin-bottom:10px;}
+}
+.continuar-viaje{
+  width:100%;min-height:46px;margin-top:10px;padding:0 14px;border-radius:50px;cursor:pointer;
+  border:1px solid rgba(255,200,230,.4);background:rgba(255,255,255,.06);color:#ffe9f4;
+  font-size:.72rem;font-weight:600;letter-spacing:1.2px;
+}
+.continuar-viaje[hidden]{display:none;}
+.continuar-viaje:disabled{opacity:.5;}
+.entrada-opciones{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;column-gap:4px;margin-top:6px;}
+.entrada-opciones .enlace-suave+.enlace-suave::before{content:'·';margin-right:8px;color:rgba(255,215,235,.4);}
+.entrada-opciones[hidden]{display:none;}
+.entrada-opciones .enlace-suave{font-size:.62rem;padding:7px 4px;border-bottom:none;color:rgba(255,215,235,.7);}
+
+.tarjeta-foto{
+  position:relative;border-radius:18px;overflow:hidden;aspect-ratio:4/3;margin-bottom:16px;
+  background:#12001f;box-shadow:0 12px 40px rgba(255,80,160,.35);
+}
+.tarjeta-foto img{width:100%;height:100%;object-fit:cover;display:block;animation:kenburns 18s ease-in-out infinite alternate;}
+.tarjeta-foto::after{content:'';position:absolute;inset:0;background:linear-gradient(to top,rgba(25,0,25,.5),transparent 55%);}
+@keyframes kenburns{from{transform:scale(1)}to{transform:scale(1.12) translate(-2%,-2%)}}
+
+.para{font-size:.6rem;font-weight:600;letter-spacing:6px;text-transform:uppercase;color:var(--suave);}
+.nombre{
+  font-family:'Great Vibes',cursive;font-size:clamp(3rem,14vw,3.9rem);line-height:1.15;margin:0 0 4px;
+  background:linear-gradient(90deg,#ffd1e6,#ff6fae,#c58bff,#ffd1e6);background-size:300% 100%;
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 0 18px rgba(255,100,170,.45));
+  animation:brillo 7s linear infinite;
+}
+@keyframes brillo{to{background-position:300% 0}}
+.cita{
+  font-family:'Cormorant Garamond',serif;font-style:italic;
+  font-size:clamp(1.1rem,4.5vw,1.3rem);line-height:1.45;color:rgba(255,240,248,.92);margin-bottom:20px;
+}
+
+#btn-entrar{
+  position:relative;overflow:hidden;width:100%;min-height:52px;padding:0 10px;border:none;border-radius:50px;cursor:pointer;
+  background:linear-gradient(135deg,var(--rosa),var(--rosa-2) 50%,var(--lila));
+  color:#fff;font-size:.74rem;font-weight:700;letter-spacing:3.5px;text-transform:uppercase;
+  animation:latido 2.2s ease-in-out infinite;transition:transform .2s ease,filter .4s ease;
+}
+#btn-entrar .listo{display:none;}
+#btn-entrar.preparado .listo{display:inline;}
+#btn-entrar.preparado .cargando{display:none;}
+#btn-entrar:disabled{cursor:default;filter:saturate(.55) brightness(.85);animation:none;}
+#btn-entrar:not(:disabled):active{transform:scale(.97);}
+#btn-entrar::before{
+  content:'';position:absolute;top:0;left:-60%;width:40%;height:100%;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.55),transparent);
+  transform:skewX(-20deg);animation:destello 3.2s ease-in-out infinite;
+}
+#btn-entrar .cargando{display:inline-flex;align-items:center;gap:10px;letter-spacing:2px;text-transform:none;font-size:.82rem;font-weight:600;}
+#btn-entrar .cargando i{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;animation:girar .9s linear infinite;}
+@keyframes girar{to{transform:rotate(360deg)}}
+@keyframes destello{0%,60%{left:-60%}100%{left:130%}}
+@keyframes latido{0%,100%{box-shadow:0 10px 28px rgba(255,70,150,.42)}50%{box-shadow:0 10px 48px rgba(255,70,150,.8)}}
+
+.audifonos{margin-top:12px;font-size:.66rem;letter-spacing:1.5px;color:rgba(255,210,230,.5);}
+
+@media (max-height:620px){
+  .tarjeta-foto{aspect-ratio:16/9;}
+  .cita{margin-bottom:14px;}
+}
+
+/* Barra de carga dentro del botón de entrar. */
+#btn-entrar{position:relative;overflow:hidden;}
+.barra-carga{position:absolute;left:0;bottom:0;height:3px;width:100%;background:linear-gradient(90deg,#ffd6a5,#ff9ac8,#b9a2ff);transform-origin:left;transform:scaleX(0);transition:transform .25s ease;}
+#btn-entrar.preparado .barra-carga{opacity:0;transition:opacity .6s ease;}
+
+/* Fase 1: carga de paquetes (antes de la presentación). Solo animaciones de compositor (transform y opacidad): no
+   se paran aunque el equipo esté ocupado preparando el universo. */
+.carga{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;width:min(360px,80vw);text-align:center;transition:opacity .8s ease;pointer-events:none;}
+#entrada:not(.cargando) .carga{opacity:0;}
+.carga-ceja{margin:0 0 18px;font:600 .62rem 'Quicksand',sans-serif;letter-spacing:5px;text-transform:uppercase;color:#f3c9dd;animation:cargaRespira 2.6s ease-in-out infinite;}
+.carga-barra{position:relative;height:3px;border-radius:3px;background:#ffffff1f;overflow:hidden;}
+.carga-barra .carga-relleno{position:absolute;inset:0;background:linear-gradient(90deg,#ffd6a5,#ff9ac8,#b9a2ff);transform-origin:left;transform:scaleX(0);}
+.carga-barra::after{content:"";position:absolute;top:0;bottom:0;width:30%;background:linear-gradient(90deg,transparent,#ffffffaa,transparent);animation:cargaBrillo 1.6s linear infinite;}
+.carga-texto{margin:14px 0 0;font:italic 1.05rem 'Cormorant Garamond',serif;color:#e9d8e6;}
+/* Porcentaje: cifras de ancho fijo (no baila al cambiar). */
+.carga-pc{margin:6px 0 0;font:600 .8rem 'Quicksand',sans-serif;letter-spacing:2px;color:#f3c9dd;font-variant-numeric:tabular-nums;}
+@keyframes cargaBrillo{from{transform:translateX(-100%)}to{transform:translateX(340%)}}
+@keyframes cargaRespira{0%,100%{opacity:.55}50%{opacity:1}}
+#entrada.cargando .portada-saltar,#entrada.cargando .portada-frase{opacity:0;pointer-events:none;}

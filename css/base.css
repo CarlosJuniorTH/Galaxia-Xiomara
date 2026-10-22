@@ -1,0 +1,37 @@
+/* ── Base: colores, reset y lienzos ── */
+:root{
+  --rosa:#ff4f97;
+  --rosa-2:#ff86bd;
+  --rosa-claro:#ffd1e6;
+  --lila:#c06bff;
+  --vino:#d42a74;
+  --texto:#fff2f8;
+  --suave:rgba(255,200,228,.68);
+  --vidrio:rgba(255,110,175,.13);
+  --borde:rgba(255,190,225,.3);
+  --arriba:env(safe-area-inset-top,0px);
+  --abajo:env(safe-area-inset-bottom,0px);
+}
+
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+
+html,body{
+  width:100%;height:100%;overflow:hidden;
+  overscroll-behavior:none;
+  background:#05010c;color:var(--texto);
+  font-family:'Quicksand',system-ui,sans-serif;
+  -webkit-user-select:none;user-select:none;
+  -webkit-touch-callout:none;
+  -webkit-font-smoothing:antialiased;
+}
+
+button{font-family:inherit;touch-action:manipulation;}
+
+#galaxia{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;}
+#efectos{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:5;}
+
+.sin-js{position:fixed;inset:0;display:grid;place-items:center;font-size:1.1rem;z-index:999;}
+
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms!important;animation-iteration-count:1!important;}
+}

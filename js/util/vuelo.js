@@ -1,0 +1,269 @@
+// Vuelo cinematográfico por fases (convención de película: el salto y la compresión del tiempo no
+// son física). Planificación pura, sin escena: se calcula TODO antes de empezar, incluido el
+// corredor recto del crucero y su perfil de velocidad, y después se evalúa por tiempo.
+//
+//  A seleccion    se fija el destino (señal discreta anclada a él); empieza a la vez que la maniobra.
+//  B maniobra     si el corredor recto no está libre desde donde estamos (anillos, discos, la propia
+//                 galaxia), se va con suavidad a un punto despejado cercano.
+//  C alineacion   la mirada gira de forma continua hasta coincidir con la dirección del corredor.
+//  D ruptura      destello, expansión luminosa y arranque de las estelas.
+//  E crucero      rectilíneo en coordenadas del universo, mucho más rápido que la luz y mirando
+//                 siempre al destino (sin giros de cámara). La velocidad sigue con suavidad la
+//                 distancia a lo más cercano (raíz cuadrada: sin pararse en cada galaxia): las
+//                 galaxias crecen y pasan por los bordes, y al atravesar una nebulosa se frena lo
+//                 justo para ver su interior.
+//  F aproximacion la velocidad baja al acercarse a la región de llegada.
+//  G llegada      arco deliberado hasta el encuadre final, sin entrar nunca en el destino.
+// D, E, F y G comparten un único perfil de avance (velocidad continua).
+import * as THREE from 'three';
+import { holgura, cercanoSegmento } from './ruta.js';
+
+const V = () => new THREE.Vector3();
+const suave = t => t * t * t * (t * (t * 6 - 15) + 10);
+export const FASES = Object.freeze(['seleccion', 'maniobra', 'alineacion', 'ruptura', 'crucero', 'aproximacion', 'llegada']);
+
+// Duración objetivo del tramo de viaje (ruptura → llegada) según su longitud: el viaje completo a la
+// supernova (100 Mal) dura ~12 s; al cuásar (30 Mal), ~10 s; uno de 1 Mal, ~4 s. Modalidad breve: ×0,6.
+// Movimiento reducido: ×0,8. Referencia ajustable tras verlo (DURACION.escala).
+export const DURACION = { escala: 1 };
+export function duracionCrucero(longitud, { breve = false, reducido = false } = {}) {
+  const base = THREE.MathUtils.clamp(3.5 + 4.2 * Math.log10(Math.max(1, longitud) / 20000), 3.5, 15) * DURACION.escala;
+  return Math.max(3, base * (breve ? 0.6 : 1) * (reducido ? 0.8 : 1));
+}
+
+// ¿El segmento a→b libra los obstáculos? (mismas reglas que ruta.js: salida y llegada propias)
+function segmentoLibre(a, b, obstaculos, desde, hasta, margen = 1.05) {
+  const curva = new THREE.LineCurve3(a, b);
+  return holgura(curva, desde, hasta, obstaculos.map(o => ({ ...o, r: o.r * margen })), 80).minimo >= 1;
+}
+
+// Arco de aproximación alrededor del centro del destino, de q (en la recta) a hasta (encuadre).
+function arcoLlegada(q, hasta, centro) {
+  const a = q.clone().sub(centro), b = hasta.clone().sub(centro), ra = a.length(), rb = b.length();
+  a.normalize(); b.normalize();
+  const angulo = a.angleTo(b), pts = [q.clone()];
+  if (angulo < 0.02) { pts.push(q.clone().lerp(hasta, 0.5), hasta.clone()); return new THREE.CatmullRomCurve3(pts, false, 'centripetal'); }
+  let eje = V().crossVectors(a, b); if (eje.lengthSq() < 1e-8) eje.set(0, 1, 0); eje.normalize();
+  const tramos = Math.max(3, Math.ceil(angulo / 0.2));
+  // Puntos repartidos por igual (la suavidad la da el perfil de velocidad): con una curva de
+  // suavizado aquí se amontonaban al principio del arco y la velocidad daba un tirón al empezar a girar.
+  for (let k = 1; k <= tramos; k++) { const f = k / tramos; pts.push(centro.clone().addScaledVector(a.clone().applyAxisAngle(eje, angulo * f), ra + (rb - ra) * suave(f))); }
+  return new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+}
+
+// Perfil de velocidad del viaje: v(s) = k·d(s)·rampa(t)·frenada(s), integrado en el tiempo.
+// d(s): distancia a lo más cercano (catálogo, punto de partida, destino). k se ajusta para que el
+// viaje dure lo pedido. Devuelve una tabla tiempo → recorrido.
+function perfilViaje({ camino, longitud, cercania, interes, desde, salidaCentro, centro, dLlegada, duracion, tRampa }) {
+  const N = 1600, dist = new Float64Array(N + 1), p = V();
+  for (let i = 0; i <= N; i++) {
+    camino.getPointAt(i / N, p);
+    const dSalida = p.distanceTo(desde) + salidaCentro * 0.5;
+    const dDestino = Math.max(p.distanceTo(centro) - dLlegada * 0.6, dLlegada * 0.3);
+    // Lo más cercano (con un suelo: dentro de una nebulosa se va más despacio, pero no se para) y el
+    // arranque y la frenada. Raíz cuadrada: la velocidad acompaña al paisaje sin detenerse en él.
+    const cerca = Math.max(cercania ? cercania(p) : Infinity, Math.min(4000, dLlegada * 0.5));
+    dist[i] = Math.sqrt(Math.max(40, Math.min(cerca, dSalida, dDestino)));
+  }
+  // Suavizado en escala logarítmica (sin esquinas en la velocidad al pasar de un objeto a otro).
+  const ld = Array.from(dist, Math.log), sm = new Float64Array(N + 1), W = 6;
+  for (let i = 0; i <= N; i++) { let s = 0, n = 0; for (let j = Math.max(0, i - W); j <= Math.min(N, i + W); j++) { s += ld[j]; n++; } sm[i] = Math.exp(s / n); }
+  const dEn = s => { const x = Math.min(N, Math.max(0, s / longitud * N)), i = Math.min(N - 1, Math.floor(x)), f = x - i; return sm[i] + (sm[i + 1] - sm[i]) * f; };
+  const bFin = Math.min(longitud * 0.05, Math.max(dLlegada * 1.5, 50));
+  const dt = 1 / 120;
+  // limite: en la búsqueda basta saber si se pasa de la duración pedida (se corta ahí: mismo resultado, sin tirón).
+  const simular = (k, guardar, limite = 600) => {
+    let s = 0, t = 0; const tabla = guardar ? [0] : null;
+    while (s < longitud - 1e-3 && t < limite) {
+      const rampa = t < tRampa ? suave(Math.min(1, (t + dt * 0.5) / tRampa)) * 0.98 + 0.02 : 1;
+      // Frenada que se apaga del todo al llegar (v ∝ resto^0,75: la deceleración también llega a cero).
+      const frena = Math.pow(Math.min(1, Math.max(0, longitud - s) / bFin), 0.75);
+      s = Math.min(longitud, s + Math.max(k * dEn(s) * rampa * frena, longitud * 1e-6) * dt); t += dt;
+      if (guardar) tabla.push(s);
+    }
+    return guardar ? tabla : t;
+  };
+  let lo = Math.log(1e-3), hi = Math.log(1e6);
+  for (let i = 0; i < 26; i++) { const mid = (lo + hi) / 2; if (simular(Math.exp(mid), false, Math.min(600, duracion + dt * 2)) > duracion) lo = mid; else hi = mid; }
+  const k = Math.exp(hi), crudo = simular(k, true);
+  // La velocidad se suaviza en el TIEMPO (gaussiana de ±0,45 s): a toda velocidad, en los vacíos, un
+  // cuadro recorre más que la escala en la que cambia el perfil y la velocidad saltaba hasta un 37 %
+  // entre cuadros. Después se reescala para llegar exactamente al final.
+  const n = crudo.length - 1, vel = new Float64Array(n), WT = Math.round(0.45 / dt), g = Array.from({ length: 2 * WT + 1 }, (_, j) => Math.exp(-Math.pow((j - WT) / (WT / 3), 2) / 2)), sg = g.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < n; i++) vel[i] = (crudo[i + 1] - crudo[i]) / dt;
+  const tabla = [0];
+  for (let i = 0; i < n; i++) {
+    let a = 0; for (let j = -WT; j <= WT; j++) { const kk = i + j; a += (kk < 0 || kk >= n ? 0 : vel[kk]) * g[j + WT]; }
+    tabla.push(tabla[i] + a / sg * dt);
+  }
+  const escala = longitud / tabla[n]; for (let i = 0; i <= n; i++) tabla[i] = Math.min(longitud, tabla[i] * escala);
+  return { k, dt, tabla, duracion: n * dt, distancia: dEn };
+}
+
+// Interpola una dirección de mirada por guiñada (giro alrededor del eje vertical, por el lado más corto) e
+// inclinación, como gira la cabeza una persona.
+function girarMirada(a, b, k) {
+  const gu = v => Math.atan2(v.x, v.z), in_ = v => Math.asin(THREE.MathUtils.clamp(v.y, -1, 1));
+  let dg = gu(b) - gu(a); dg -= Math.PI * 2 * Math.round(dg / (Math.PI * 2));
+  // Mirando casi en vertical la guiñada no está definida: ahí basta el giro directo.
+  if (Math.abs(a.y) > 0.985 || Math.abs(b.y) > 0.985) return a.clone().lerp(b, k).normalize();
+  const g = gu(a) + dg * k, i = THREE.MathUtils.lerp(in_(a), in_(b), k), c = Math.cos(i);
+  return new THREE.Vector3(Math.sin(g) * c, Math.sin(i), Math.cos(g) * c);
+}
+
+export function planificarVuelo({ desde, miraDesde, hasta, mira, centro = mira, obstaculos = [], reducido = false, rAprox: rAproxPedido, cercania = null, interes = null, breve = false, duracion: duracionPedida, salidaFrente = null }) {
+  desde = desde.clone(); hasta = hasta.clone(); mira = mira.clone(); centro = centro.clone();
+  const dLlegada = hasta.distanceTo(centro);
+  // El crucero termina a esta distancia del destino (allí empieza el arco de llegada).
+  const rAprox = rAproxPedido ?? Math.max(dLlegada * 1.6, dLlegada + 900);
+  const finRecta = p => centro.clone().addScaledVector(p.clone().sub(centro).normalize(), rAprox);
+  const corredorLibre = p => segmentoLibre(p, finRecta(p), obstaculos, p, hasta);
+  // ── B: punto de maniobra ──
+  let salida = desde.clone(), motivo = 'corredor libre desde la posición actual';
+  if (desde.distanceTo(centro) <= rAprox * 1.05) motivo = 'ya cerca del destino';
+  else if (!corredorLibre(desde)) {
+    const haciaDestino = centro.clone().sub(desde).normalize();
+    const u = V().crossVectors(haciaDestino, new THREE.Vector3(0, 1, 0)); if (u.lengthSq() < 1e-6) u.set(1, 0, 0); u.normalize();
+    const w = V().crossVectors(u, haciaDestino).normalize();
+    // Escala de la maniobra: el obstáculo que bloquea más cerca de la salida.
+    let escala = 600;
+    for (const o of obstaculos) { const d = o.c.distanceTo(desde); if (d < o.r * 3) escala = Math.max(escala, o.r * 1.2); }
+    const direcciones = [w, w.clone().negate(), u, u.clone().negate(), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, -1, 0),
+      w.clone().add(u).normalize(), w.clone().sub(u).normalize(), w.clone().negate().add(u).normalize(), w.clone().negate().sub(u).normalize(), haciaDestino.clone().negate()];
+    let mejor = null;
+    for (const f of [0.5, 1, 1.6, 2.4, 3.5, 5]) {
+      for (const d of direcciones) {
+        const p = desde.clone().addScaledVector(d, escala * f);
+        if (!segmentoLibre(desde, p, obstaculos, desde, hasta) || !corredorLibre(p)) continue;
+        const coste = desde.distanceTo(p) + d.angleTo(haciaDestino) * escala * 0.3;
+        if (!mejor || coste < mejor.coste) mejor = { p, coste };
+      }
+      if (mejor) break;
+    }
+    if (mejor) { salida = mejor.p; motivo = 'maniobra para despejar el corredor'; }
+    else motivo = 'sin corredor libre: se usa el directo (revisar obstáculos)';
+  }
+  // Saliendo de un gigante: primero se rodea (sin atravesarlo) hasta quedar delante de él, en la línea hacia
+  // el destino; desde ahí el viaje recorre el mismo camino que la ida (en sentido contrario).
+  let arcoSalida = null;
+  if (salidaFrente) {
+    // soloAcercar (casa): no rodea; solo vuelve a su distancia normal sin cambiar de lado, y luego gira hacia el destino.
+    const c = salidaFrente.centro, rDesde = desde.distanceTo(c), haciaDestino = centro.clone().sub(c).normalize();
+    // Casa: se rodea la galaxia hacia el lado del destino, pero por encima del disco (sin verlo de canto).
+    if (salidaFrente.elevacion) { const arriba = new THREE.Vector3(0, 1, 0), plano = haciaDestino.clone().addScaledVector(arriba, -haciaDestino.dot(arriba)).normalize();
+      haciaDestino.copy(plano).multiplyScalar(Math.cos(salidaFrente.elevacion)).addScaledVector(arriba, Math.sin(salidaFrente.elevacion)).normalize(); }
+    // Delante del gigante a la distancia de llegada (si la cámara estaba muy lejos, primero se acerca).
+    salida = c.clone().addScaledVector(haciaDestino, salidaFrente.soloAcercar ? salidaFrente.radio : Math.max(salidaFrente.minimo ?? 0, salidaFrente.radio ? Math.min(rDesde, salidaFrente.radio) : rDesde));
+    arcoSalida = { c, d0: desde.clone().sub(c).normalize(), d1: haciaDestino, r0: rDesde, r1: salida.distanceTo(c) };
+    motivo = 'delante del gigante, por el mismo camino';
+  }
+  // ── Trayectoria del viaje: recta (crucero) + arco (llegada) ──
+  const q = finRecta(salida), recta = new THREE.LineCurve3(salida.clone(), q), arco = arcoLlegada(q, hasta, centro);
+  const camino = new THREE.CurvePath(); camino.add(recta); camino.add(arco);
+  const L = recta.getLength(), A = arco.getLength(), total = L + A;
+  // ── Duraciones ──
+  const dirInicial = miraDesde.clone().sub(desde).normalize(), dirCorredor = centro.clone().sub(salida).normalize();
+  const anguloAlinear = arcoSalida ? Math.PI : Math.acos(THREE.MathUtils.clamp(dirInicial.dot(dirCorredor), -1, 1));
+  const lSalida = desde.distanceTo(salida);
+  const tSeleccion = reducido ? 0.2 : 0.55;
+  const tManiobra = (lSalida > 1 || arcoSalida) ? (arcoSalida ? THREE.MathUtils.clamp(2.0 + arcoSalida.d0.angleTo(arcoSalida.d1) * 1.4 + Math.abs(Math.log2(arcoSalida.r0 / arcoSalida.r1)) * 1.0, 2.0, 7.0) : THREE.MathUtils.clamp(1.3 + Math.log10(1 + lSalida / 500) * 0.8, 1.3, 2.6)) * (reducido ? 0.6 : 1) : 0;
+  const tAlinear = THREE.MathUtils.clamp(1.0 + anguloAlinear / Math.PI * 2.2, 1.0, 3.0) * (reducido ? 0.6 : 1);   // giro suave hacia el destino
+  const tRuptura = reducido ? 0 : 0.7;
+  const inicioManiobra = Math.min(tSeleccion * 0.4, 0.25), finManiobra = inicioManiobra + tManiobra;
+  const inicioAlinear = tManiobra > 0 ? finManiobra - (arcoSalida ? 0 : Math.min(0.4, tManiobra * 0.3)) : tSeleccion * 0.6;   // se solapa un poco con la maniobra
+  const finAlinear = Math.max(inicioAlinear + tAlinear, tSeleccion);
+  const inicioViaje = finAlinear;
+  const salidaCentro = Math.max(400, desde.distanceTo(miraDesde));
+  const perfil = perfilViaje({ camino, longitud: total, cercania, interes, desde: salida, salidaCentro, centro, dLlegada,
+    duracion: duracionPedida ?? duracionCrucero(total, { breve, reducido }), tRampa: reducido ? 1.4 : 1.6 });
+  const tViaje = perfil.duracion, duracion = inicioViaje + tViaje;
+  // Mirada al pasar: durante el crucero la vista se inclina con suavidad (como mucho 20°) hacia lo que
+  // se está cruzando, para verlo pasar de lado; el avance (y el punto de fuga de las estelas) sigue
+  // siendo la recta. Tabla por instante, suavizada en el tiempo (±0,7 s): sin tirones entre objetos.
+  const nT = perfil.tabla.length, desvio = new Float32Array(nT * 3);
+  if (interes && !reducido) {
+    const p = V(), w = V(), MAX = Math.tan(20 * Math.PI / 180), crudo = new Float32Array(nT * 3);
+    for (let i = 0; i < nT; i += 2) {
+      const s = perfil.tabla[i]; if (s > L) break;
+      camino.getPointAt(Math.min(1, s / total), p); const r = interes(p, dirCorredor);
+      if (!r?.pos || !(r.w > 0)) continue;
+      w.subVectors(r.pos, p).normalize(); const c = w.dot(dirCorredor); w.addScaledVector(dirCorredor, -c);
+      if (w.lengthSq() < 1e-8) continue;
+      const ang = Math.acos(THREE.MathUtils.clamp(c, -1, 1)), k = Math.min(Math.tan(ang * 0.5), MAX) * r.w;
+      w.normalize().multiplyScalar(k); for (let j = 0; j < 2 && i + j < nT; j++) crudo.set([w.x, w.y, w.z], (i + j) * 3);
+    }
+    const ventana = Math.round(0.7 / perfil.dt), g = Array.from({ length: ventana * 2 + 1 }, (_, j) => Math.exp(-Math.pow((j - ventana) / (ventana * 0.5), 2))), sumaG = g.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < nT; i++) for (let c = 0; c < 3; c++) { let a = 0; for (let j = -ventana; j <= ventana; j++) { const k = Math.min(nT - 1, Math.max(0, i + j)); a += crudo[k * 3 + c] * g[j + ventana]; } desvio[i * 3 + c] = a / sumaG; }
+  }
+  // La inclinación entra después de la ruptura (en 1,5 s): el salto siempre ocurre alineado con el corredor.
+  const desvioEn = (tv, out) => { const i = Math.min(nT - 1, Math.max(0, Math.round(tv / perfil.dt))), k = THREE.MathUtils.smoothstep(tv, tRuptura, tRuptura + 1.5); return out.set(desvio[i * 3] * k, desvio[i * 3 + 1] * k, desvio[i * 3 + 2] * k); };
+  const tmpDesvio = V();
+  const distMira = Math.max(200, miraDesde.distanceTo(desde));
+  const recorridoEn = tv => { const x = Math.max(0, tv) / perfil.dt, i = Math.min(perfil.tabla.length - 2, Math.floor(x)), f = Math.min(1, x - i); return perfil.tabla[i] + (perfil.tabla[i + 1] - perfil.tabla[i]) * f; };
+  // Instantes de cada fase del viaje (para la interfaz, las pruebas y saltar el viaje).
+  const sAprox = Math.max(0, L - Math.min(L * 0.3, rAprox * 3)), tiempoDe = s => { const i = perfil.tabla.findIndex(x => x >= s); return inicioViaje + (i < 0 ? perfil.tabla.length - 1 : i) * perfil.dt; };
+  const tAprox = tiempoDe(sAprox), tLlegada = tiempoDe(L);
+
+  function evaluar(t) {
+    const pos = V(), m = V();
+    let fase, corriente = 0, ruptura = 0, avance = 0, velocidad = 0;
+    if (t < inicioViaje) {
+      // A/B/C: selección, maniobra y alineación (sin estelas de velocidad).
+      const ks = tManiobra > 0 ? suave(THREE.MathUtils.clamp((t - inicioManiobra) / tManiobra, 0, 1)) : 0;
+      if (arcoSalida) {   // primero se acerca (radio), después rodea (ángulo): el giro es corto, sin barrer el cielo
+        const kr = suave(THREE.MathUtils.clamp(ks / 0.4, 0, 1)), kg = suave(THREE.MathUtils.clamp((ks - 0.4) / 0.6, 0, 1));   // primero vuelve a su distancia, después rodea
+        const q = new THREE.Quaternion().setFromUnitVectors(arcoSalida.d0, arcoSalida.d1), dir = arcoSalida.d0.clone().applyQuaternion(new THREE.Quaternion().slerp(q, kg));
+        pos.copy(arcoSalida.c).addScaledVector(dir, THREE.MathUtils.lerp(arcoSalida.r0, arcoSalida.r1, kr)); }
+      else pos.copy(desde).lerp(salida, ks);
+      const ka = suave(THREE.MathUtils.clamp((t - inicioAlinear) / Math.max(1e-3, finAlinear - inicioAlinear), 0, 1));
+      // Al rodear un gigante se le mira (sigue en el centro de la pantalla); luego se gira hacia el destino.
+      const mirarDesde = arcoSalida ? arcoSalida.c.clone().sub(pos).normalize() : dirInicial;
+      // Giro de la mirada de lado (alrededor del eje vertical) y la inclinación a la vez: nunca da la vuelta por
+      // abajo ni por arriba aunque haya que girar media vuelta (con un cuaternión, 180° elegía un eje cualquiera).
+      const dir = girarMirada(mirarDesde, dirCorredor, ka);
+      m.copy(pos).addScaledVector(dir, THREE.MathUtils.lerp(distMira, pos.distanceTo(centro), ka));
+      fase = t < tSeleccion && ks < 0.02 ? 'seleccion' : (tManiobra > 0 && t < finManiobra && t < inicioAlinear) ? 'maniobra' : 'alineacion';
+    } else {
+      const tv = t - inicioViaje, s = recorridoEn(tv);
+      avance = s / total; velocidad = (recorridoEn(tv + 0.05) - recorridoEn(tv - 0.05)) / 0.1;
+      camino.getPointAt(Math.min(1, avance), pos);
+      if (s <= L) { desvioEn(tv, tmpDesvio); if (tmpDesvio.lengthSq() > 1e-10) m.copy(pos).addScaledVector(tmpDesvio.add(dirCorredor).normalize(), pos.distanceTo(centro)); else m.copy(centro); }
+      else { const ka = (s - L) / Math.max(1e-6, A); m.copy(centro).lerp(mira, suave(ka)); }
+      ruptura = tRuptura > 0 ? THREE.MathUtils.clamp(1 - Math.abs(tv - tRuptura * 0.35) / (tRuptura * 0.65), 0, 1) : 0;
+      fase = tv < tRuptura ? 'ruptura' : s < sAprox ? 'crucero' : s < L * 0.999 ? 'aproximacion' : 'llegada';
+      // Estelas: entran con la ruptura, acompañan el crucero y se apagan al aproximarse.
+      corriente = fase === 'ruptura' ? THREE.MathUtils.smoothstep(tv, 0, tRuptura * 0.5) : fase === 'crucero' ? 1 : fase === 'aproximacion' ? Math.max(0, 1 - (s - sAprox) / Math.max(1, L - sAprox)) : 0;
+    }
+    return { pos, mira: m, fase, corriente: reducido ? 0 : corriente, ruptura, avance, velocidad };
+  }
+  return {
+    duracion, evaluar, salida, finRecta: q, recta, arco, camino, motivo, rAprox, perfil,
+    tiempos: { seleccion: [0, tSeleccion], maniobra: [inicioManiobra, finManiobra], alineacion: [inicioAlinear, finAlinear], ruptura: [inicioViaje, inicioViaje + tRuptura], crucero: [inicioViaje + tRuptura, tAprox], aproximacion: [tAprox, tLlegada], llegada: [tLlegada, duracion], viaje: [inicioViaje, duracion] },
+    // Saltar el viaje: desde el instante t0, el resto del crucero se recorre en `segundos` y se sigue
+    // normal desde la aproximación. La curva de Hermite (quíntica) va en DISTANCIA recorrida, de la
+    // velocidad y aceleración actuales a las de la aproximación: sin tirones. (Comprimir el tiempo del plan comprimía también sus
+    // cambios de velocidad entre encuentros y vacíos, y daba tirones.) Devuelve tiempo real → tiempo del plan.
+    saltar(t0, segundos = 2.5) {
+      if (t0 >= tAprox - 0.5) return null;
+      const tv0 = Math.max(0, t0 - inicioViaje), s0 = recorridoEn(tv0), s1 = sAprox, T = segundos;
+      // Velocidad y aceleración del plan en los dos extremos (Hermite quíntica: se igualan las dos).
+      const vel = t => (recorridoEn(t + 0.04) - recorridoEn(Math.max(0, t - 0.04))) / (t > 0.04 ? 0.08 : 0.04 + t);
+      const acel = t => (vel(t + 0.04) - vel(Math.max(0, t - 0.04))) / (t > 0.04 ? 0.08 : 0.04 + t);
+      const tv1 = tAprox - inicioViaje, v0 = vel(tv0), v1 = vel(tv1), a0 = acel(tv0), a1 = acel(tv1);
+      const tabla = perfil.tabla, tiempoDeS = sx => { let lo = 0, hi = tabla.length - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (tabla[m] < sx) lo = m + 1; else hi = m; } const i = Math.max(1, lo), f = (sx - tabla[i - 1]) / Math.max(1e-9, tabla[i] - tabla[i - 1]); return inicioViaje + (i - 1 + Math.min(1, Math.max(0, f))) * perfil.dt; };
+      const tFin = tiempoDeS(s1);   // el mismo instante con el que termina la curva: sin salto al empalmar
+      return tau => {
+        if (tau >= T) return tFin + (tau - T);
+        if (tau <= 0) return t0 + tau;
+        const x = tau / T, x3 = x ** 3, x4 = x ** 4, x5 = x ** 5;
+        const H0 = 1 - 10 * x3 + 15 * x4 - 6 * x5, H1 = x - 6 * x3 + 8 * x4 - 3 * x5, H2 = 0.5 * x * x - 1.5 * x3 + 1.5 * x4 - 0.5 * x5, H3 = 0.5 * x3 - x4 + 0.5 * x5, H4 = -4 * x3 + 7 * x4 - 3 * x5, H5 = 10 * x3 - 15 * x4 + 6 * x5;
+        return tiempoDeS(H0 * s0 + H1 * v0 * T + H2 * a0 * T * T + H3 * a1 * T * T + H4 * v1 * T + H5 * s1);
+      };
+    },
+    // Toda la trayectoria (maniobra + viaje), para comprobar holguras y para pruebas.
+    trayectoria() { const c = new THREE.CurvePath(); if (lSalida > 1) c.add(new THREE.LineCurve3(desde.clone(), salida.clone())); c.add(recta); c.add(arco); return c; }
+  };
+}
+
+// Distancia de un punto al corredor recto (para pruebas y diagnóstico).
+export const distanciaAlCorredor = (plan, p) => cercanoSegmento(plan.recta.v1, plan.recta.v2, p);
