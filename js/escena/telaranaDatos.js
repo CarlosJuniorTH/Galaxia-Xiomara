@@ -16,6 +16,11 @@ export function trocearDatos(atributos, G = 4) {
   for (let i = 0; i < n; i++) { const c = (q(p[i * 3], x0, x1) * G + q(p[i * 3 + 1], y0, y1)) * G + q(p[i * 3 + 2], z0, z1); celda[i] = c; cuenta[c + 1]++; }
   for (let c = 0; c < G * G * G; c++) cuenta[c + 1] += cuenta[c];
   const inicio = cuenta.slice(), destino = new Uint32Array(n); for (let i = 0; i < n; i++) destino[i] = inicio[celda[i]]++;
+  // Dentro de cada bloque, orden barajado (con semilla: siempre igual): dibujar solo la primera parte de un bloque es una
+  // muestra repartida de todo él (en el móvil se dibuja una parte con más luz cada punto: telarana.js).
+  const barajado = new Uint32Array(n); for (let i = 0; i < n; i++) barajado[i] = i;
+  for (let c = 0; c < G * G * G; c++) { const a = cuenta[c], b = cuenta[c + 1], rnd = generador(semillaDe('bloque-' + c)); for (let i = b - 1; i > a; i--) { const j = a + Math.floor(rnd() * (i - a + 1)), t = barajado[i]; barajado[i] = barajado[j]; barajado[j] = t; } }
+  for (let i = 0; i < n; i++) destino[i] = barajado[destino[i]];
   const salida = {};
   // Atributo a atributo, soltando el original en cuanto está copiado (menos memoria a la vez).
   for (const nombre of Object.keys(atributos)) { const { datos, k } = atributos[nombre]; const a = new Float32Array(n * k); for (let i = 0; i < n; i++) for (let j = 0; j < k; j++) a[destino[i] * k + j] = datos[i * k + j]; salida[nombre] = { datos: a, k }; if (nombre !== 'position') atributos[nombre] = null; }

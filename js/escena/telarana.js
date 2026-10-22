@@ -6,6 +6,7 @@
 // píxeles y bordes suaves (no líneas de 1 px): se ven finas y limpias de lejos, sin temblar ni pixelarse.
 // Las galaxias del catálogo (con su imagen y sus estrellas) viven sobre ella; estas luces son el resto.
 import * as THREE from 'three';
+import { esMovil } from '../util/dispositivo.js';
 import { generador, semillaDe, ceder } from '../util/azarSemilla.js';
 import { crearTelarana, puntoFilamento } from '../data/telarana.js';
 import { generarDatosTelarana } from './telaranaDatos.js';
@@ -64,14 +65,15 @@ export function pedirDatosTelarana() {
 
 // Una nube de puntos en bloques: cada bloque es un Points con su esfera envolvente que comparte los MISMOS atributos
 // (se suben una vez a la GPU) con su tramo de dibujo: lo que queda fuera de la vista no se dibuja.
-function enBloques({ atributos, bloques }, material, O) {
+function enBloques({ atributos, bloques }, material, O, fraccion = 1) {
   // Una vez en la tarjeta gráfica, la copia en memoria ya no hace falta (son decenas de MB: en un iPhone cuenta mucho).
   const liberar = function () { this.array = null; };
   const attr = Object.fromEntries(Object.entries(atributos).map(([n, { datos, k }]) => [n, new THREE.BufferAttribute(datos, k).onUpload(liberar)]));
   const grupo = new THREE.Group(); grupo.position.copy(O); grupo.renderOrder = -1.5;
   for (const b of bloques) {
     const g = new THREE.BufferGeometry(); for (const [n, a] of Object.entries(attr)) g.setAttribute(n, a);
-    g.setDrawRange(b.a, b.n); g.boundingSphere = new THREE.Sphere(new THREE.Vector3(...b.centro), b.radio);
+    g.setDrawRange(b.a, Math.max(1, Math.ceil(b.n * fraccion)));   // una muestra repartida (los puntos de cada bloque están barajados)
+    g.boundingSphere = new THREE.Sphere(new THREE.Vector3(...b.centro), b.radio);
     const t = new THREE.Points(g, material); t.renderOrder = -1.5;
     grupo.add(t);
   }
@@ -92,9 +94,12 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
     return g;
   };
   const uniformes = { uPR, uScale, uCamL: { value: new THREE.Vector3() }, uGigA: { value: Array.from({ length: 6 }, () => new THREE.Vector4(0, 0, 1, 2)) }, uGigB: { value: Array.from({ length: 6 }, () => new THREE.Vector4(0, 0, 0, 0)) }, uCasa: { value: 1 }, uRes: { value: new THREE.Vector2(1, 1) }, uF: { value: 800 } };
+  // En el móvil se dibuja el 45 % de los puntos de la telaraña y cada uno lleva la luz de los que no se dibujan (uComp): la
+  // misma luz total con menos de la mitad de trabajo para la GPU (en un iPhone la telaraña completa bajaba a ~10 FPS).
+  const MUESTRA = esMovil ? 0.45 : 1, uComp = { value: 1 / MUESTRA };
   const uPRgal = { value: 1 };   // las galaxias se pintan en su propia capa a resolución CSS (1 píxel de capa = 1 px CSS)
-  const matGalaxias = new THREE.ShaderMaterial({ uniforms: { ...uniformes, uPR: uPRgal, uBrazos: { value: texturaBrazos() } },
-    vertexShader: /* glsl */`uniform float uPR, uScale, uCasa; ${OCULTO} attribute vec3 aCol; attribute float aBrillo; varying vec3 vC; varying float vA, vRes, vAng, vInc, vBrazos, vTipo;
+  const matGalaxias = new THREE.ShaderMaterial({ uniforms: { ...uniformes, uPR: uPRgal, uComp, uBrazos: { value: texturaBrazos() } },
+    vertexShader: /* glsl */`uniform float uPR, uScale, uCasa, uComp; ${OCULTO} attribute vec3 aCol; attribute float aBrillo; varying vec3 vC; varying float vA, vRes, vAng, vInc, vBrazos, vTipo;
       float h(vec3 p){ p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
       void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv; float d = length(mv.xyz);
         float R = 300.0 + aBrillo * 450.0, px = R * uScale / max(1.0, -mv.z);
@@ -111,6 +116,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
         vTipo = h(position * 0.0017 + 5.5);
         gl_PointSize = min(tam * uPR, lim);
         vA = ocultoGig(position) * k * (0.35 + 0.65 * aBrillo) * uCasa * (0.03 + 0.7 * smoothstep(6.0, 24.0, tam)) * (1.0 - smoothstep(lim * 0.7, lim, tam * uPR)) * step(0.0, -mv.z);
+        vA *= uComp;
         vAng = h(position * 0.001) * 6.2832; vInc = 0.25 + 0.75 * h(position * 0.0013 + 3.1); vBrazos = step(0.45, h(position * 0.0007 + 7.7));
         vC = aCol; }`,
     fragmentShader: /* glsl */`uniform sampler2D uBrazos; varying vec3 vC; varying float vA, vRes, vAng, vInc, vBrazos, vTipo;
@@ -134,25 +140,25 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
         float a = mix(punto, forma, vRes) * vA; gl_FragColor = vec4(col * a, a); }`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
   // Polvo luminoso de los cúmulos (1–2 px).
-  const matNubes = new THREE.ShaderMaterial({ uniforms: uniformes,
-    vertexShader: /* glsl */`uniform float uPR, uCasa; attribute vec3 aCol; attribute float aBrillo; varying vec3 vC; varying float vA;
+  const matNubes = new THREE.ShaderMaterial({ uniforms: { ...uniformes, uComp },
+    vertexShader: /* glsl */`uniform float uPR, uCasa, uComp; attribute vec3 aCol; attribute float aBrillo; varying vec3 vC; varying float vA;
       void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv; float d = length(mv.xyz);
-        vA = aBrillo * clamp(pow(3000000.0 / d, 0.5), 0.4, 1.5) * uCasa * step(0.0, -mv.z); vC = aCol; gl_PointSize = (1.0 + aBrillo) * uPR; }`,
+        vA = aBrillo * clamp(pow(3000000.0 / d, 0.5), 0.4, 1.5) * uCasa * uComp * step(0.0, -mv.z); vC = aCol; gl_PointSize = (1.0 + aBrillo) * uPR; }`,
     fragmentShader: /* glsl */`varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; if (d > 1.0) discard; float a = exp(-d * d * 3.0) * vA; gl_FragColor = vec4(vC * a, a); }`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
   // Polvo de los filamentos: motas finas (1–2,5 px), con un leve titileo.
-  const matPolvo = new THREE.ShaderMaterial({ uniforms: uniformes,
-    vertexShader: /* glsl */`uniform float uPR, uCasa; ${OCULTO} attribute vec3 aCol; attribute float aBrillo; varying vec3 vC; varying float vA;
+  const matPolvo = new THREE.ShaderMaterial({ uniforms: { ...uniformes, uComp },
+    vertexShader: /* glsl */`uniform float uPR, uCasa, uComp; ${OCULTO} attribute vec3 aCol; attribute float aBrillo; varying vec3 vC; varying float vA;
       void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv; float d = length(mv.xyz);
         float h = fract(sin(dot(position.xy, vec2(12.9898, 78.233)) * 0.0001) * 43758.5);
-        vA = aBrillo * 3.2 * clamp(pow(4500000.0 / d, 0.5), 0.6, 2.0) * uCasa * step(0.0, -mv.z) * smoothstep(60000.0, 250000.0, d) * ocultoGig(position); vC = aCol;
+        vA = aBrillo * 3.2 * clamp(pow(4500000.0 / d, 0.5), 0.6, 2.0) * uCasa * step(0.0, -mv.z) * smoothstep(60000.0, 250000.0, d) * ocultoGig(position) * uComp; vC = aCol;
         gl_PointSize = (1.2 + aBrillo * 1.0 + h * 0.5) * uPR; }`,
     fragmentShader: /* glsl */`varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; if (d > 1.0) discard; float a = (1.0 - smoothstep(0.35, 1.0, d)) * vA; gl_FragColor = vec4(vC * a, a); }`,   // motas nítidas, sin halo
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
   // Las tres nubes grandes de puntos (más de un millón en total), en bloques: solo se dibuja lo que está a la vista.
   // (Las cintas, los resplandores y la niebla de gas ya no se construyen: estaban ocultos para siempre —sin líneas ni
   // degradados—; sus datos se siguen calculando para que el azar, y por tanto el universo, no cambie.)
-  const bloquesGalaxias = enBloques(datos.galaxias, matGalaxias, O), bloquesNubes = enBloques(datos.nubes, matNubes, O), bloquesPolvo = enBloques(datos.polvo, matPolvo, O);
+  const bloquesGalaxias = enBloques(datos.galaxias, matGalaxias, O, MUESTRA), bloquesNubes = enBloques(datos.nubes, matNubes, O, MUESTRA), bloquesPolvo = enBloques(datos.polvo, matPolvo, O, MUESTRA);
   raiz.add(bloquesNubes, bloquesPolvo);
   // Partículas a baja resolución, como en los juegos: las galaxias de la telaraña (manchas suaves de luz, cientos de miles)
   // se pintan en una capa aparte a la resolución CSS de la pantalla y se suman a la escena. En el móvil (retina) son 4

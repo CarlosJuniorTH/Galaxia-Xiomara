@@ -498,6 +498,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   let mirada = null;
   const ORIGEN_CASA = new THREE.Vector3();
   const raicesLejanas = scene.children.filter(o => o.userData.capa === 'galaxiasLejanas');
+  const raicesCasa = scene.children.filter(o => ['frases', 'amor', 'mundos', 'secretas', 'agujeroNegro'].includes(o.userData.capa));
   function mirarCasa(activar = !mirada || mirada.saliendo) {
     if (vuelo || tEntrada === null) return false;
     if (activar) {
@@ -1039,6 +1040,11 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       cosmos.decor.visible = true; canvas.dataset.estrellasLocales = locales.toFixed(2);
     }
     for (const p of partes) p.actualizar(tiempo, dt, ctx);
+    // Lejos de casa (en los gigantes y en los viajes largos) lo de casa es un punto invisible: frases, el corazón de luz,
+    // los lugares y el agujero negro de casa no se dibujan (la galaxia de Xiomara se queda como su punto de luz). Con
+    // «Mirar hacia casa» (teleobjetivo) se vuelven a ver.
+    const casaVisible = camera.position.length() < 600000 || !!mirada;
+    for (const o of raicesCasa) o.visible = casaVisible;
     cieloProfundo.actualizar?.();
     planetas.actualizar(tiempo, dt, ctx); solar.actualizar(tiempo, camera);
     {

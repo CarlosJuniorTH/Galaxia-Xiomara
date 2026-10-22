@@ -21,7 +21,7 @@ export function crearGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia }) {
   const grupo = new THREE.Group();
   scene.add(grupo);
   const col = new THREE.Color();
-  const mats = [];
+  const mats = []; let cercanos = null;
   const n = k => Math.round(k * Q.k);
   const INTENSIDAD = 1.3;
 
@@ -327,6 +327,10 @@ export function crearGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia }) {
       // de absorción se quedaban y sumaban luz a la versión lejana: un 52 % de más).
       gas.material.uniforms.uVis.value = sombra.material.uniforms.uVis.value = 1 - paso; brilloCentro.material.opacity = 0.2 * (1 - paso);
       gas.visible = sombra.visible = brilloCentro.visible = paso < 0.995;
+      // Las estrellas de la galaxia cercana (150 000 puntos) también dejan de dibujarse ya fundidas: antes seguían en la
+      // GPU con opacidad 0 desde cualquier gigante (en un iPhone, una parte grande de cada cuadro sin que se viera nada).
+      cercanos ??= (() => { const l = []; grupo.traverse(o => { if (o.material && mats.includes(o.material)) l.push(o); }); return l; })();
+      for (const o of cercanos) o.visible = paso < 0.995;
       lejos.visible = paso > 0.005;
       // LUZ_LEJOS: ganancia medida para que la versión lejana tenga la misma luz por área que la
       // galaxia de verdad (tests/navegador/xiomara.mjs); antes sumaba 3,2 veces más.

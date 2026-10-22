@@ -126,7 +126,7 @@ try {
   await escena.listo;
   etapa = 'listo';
   entrada.listo();
-  crearMedidor();
+  crearMedidor(escena);
   if (location.hash === '#debug') window.__galaxia = { escena, recuerdos, interfaz, progreso, estrellas };
   // El cielo crece también si se queda abierto al cumplirse un nuevo mes.
   setInterval(() => {
