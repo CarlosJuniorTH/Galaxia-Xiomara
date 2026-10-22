@@ -17,6 +17,7 @@ import { cargarContenido, aplicarContenido } from './data/contenido.js';
 import { crearContemplacion } from './ui/contemplacion.js';
 import { crearViaje } from './util/viaje.js';
 import { vigilarPaquetes } from './util/paquetes.js';
+import { crearMedidor } from './ui/medidor.js';
 
 let interfaz, escena, contemplacion, etapa = 'fuentes';
 const problema = texto => { document.getElementById('problema-texto').textContent = texto; document.getElementById('problema-3d').hidden = false; if (interfaz?.enRuta) interfaz.pausarRuta(true); };
@@ -125,6 +126,7 @@ try {
   await escena.listo;
   etapa = 'listo';
   entrada.listo();
+  crearMedidor();
   if (location.hash === '#debug') window.__galaxia = { escena, recuerdos, interfaz, progreso, estrellas };
   // El cielo crece también si se queda abierto al cumplirse un nuevo mes.
   setInterval(() => {

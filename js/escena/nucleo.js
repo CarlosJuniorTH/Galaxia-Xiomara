@@ -102,8 +102,10 @@ export function crearNucleo(canvas) {
   }
   canvas.dataset.brillo3d ||= post ? 'hdr' : 'directo';
   // Con postprocesado el lienzo pasa a la resolución nativa; sin él la escena se dibuja
-  // directamente en el lienzo, que entonces sigue a la resolución interna.
-  const prLienzo = () => post ? prMaximo : pr;
+  // directamente en el lienzo, que entonces sigue a la resolución interna. En el móvil, como mucho 2: la escena ya se
+  // calcula a 2 o menos, y pintar la pasada final a la nativa de un iPhone (3, unos 3 Mpx) no añadía nada visible pero
+  // costaba mucho a la GPU en cada cuadro (y iOS tenía que componer esos 3 Mpx). El texto y la interfaz son HTML: nítidos igual.
+  const prLienzo = () => post ? (esMovil ? Math.min(prMaximo, 2) : prMaximo) : pr;
   renderer.setPixelRatio(prLienzo());
   renderer.setSize(innerWidth, innerHeight);
   canvas.dataset.lienzo3d = String(prLienzo());
