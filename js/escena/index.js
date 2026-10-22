@@ -313,7 +313,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // o de un viaje; espera a que se suelte el dedo o se llegue.
   let resolucionPendiente = null;
   function regularResolucion(ms) { const nueva = regular(ms); if (nueva !== null) resolucionPendiente = nueva; aplicarResolucionPendiente(); }
-  function aplicarResolucionPendiente() { if (resolucionPendiente === null || gesto || vuelo || mirada) return; nucleo.fijarResolucion(resolucionPendiente); resolucionPendiente = null; regular.reiniciar(); }
+  function aplicarResolucionPendiente() { if (resolucionPendiente === null || gesto || vuelo || mirada || performance.now() - finGesto < 2500) return; nucleo.fijarResolucion(resolucionPendiente); resolucionPendiente = null; regular.reiniciar(); }
 
   // Ritmo de dibujo (ver util/planificador.js). En el móvil, igual que en el PC: siempre a 60 FPS, también en
   // reposo (a 30 los gigantes animados se veían a saltos). ?ritmo=ahorro vuelve a 30 en reposo en pantallas táctiles.
@@ -349,7 +349,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   const camaraGuardada = { pos: new THREE.Vector3(), rot: new THREE.Quaternion() }, haciaObjetivo = new THREE.Vector3();
   const ritmoAhorro = new URLSearchParams(location.search).get('ritmo') === 'ahorro';
   const planificador = crearPlanificador({ interaccion: 60, contemplacion: tactil && ritmoAhorro ? 30 : 60, esperaMs: 4000 });
-  let gesto = false, modoAnterior = null, cuadrosDibujados = 0;
+  let gesto = false, modoAnterior = null, cuadrosDibujados = 0, finGesto = -Infinity;
+  const AMORTIGUACION = controls.dampingFactor;   // la de 60 FPS (nucleo.js)
   const marcarActividad = () => planificador.actividad(performance.now());
   for (const evento of ['pointerdown', 'wheel', 'keydown']) document.addEventListener(evento, marcarActividad, { passive: true });
   const capturador = crearCapturador({ obtener: () => nucleo.resolucion, fijar: v => { nucleo.fijarResolucion(v); regular.reiniciar(); } });
@@ -823,7 +824,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // La cámara no gira sola en ningún lugar: el cielo (telaraña, nubes, estrellas) se queda quieto mientras se mira;
   // solo se mueve cuando la mueve quien mira.
   const giraSolo = () => false;
-  controls.addEventListener('end', () => { gesto = false; marcarActividad(); setTimeout(aplicarResolucionPendiente, 400); retornoGiro = setTimeout(() => { if (!vuelo && !pausa && giraSolo()) controls.autoRotate = true; }, 8000); });
+  controls.addEventListener('end', () => { gesto = false; finGesto = performance.now(); marcarActividad(); setTimeout(aplicarResolucionPendiente, 2600); retornoGiro = setTimeout(() => { if (!vuelo && !pausa && giraSolo()) controls.autoRotate = true; }, 8000); });
   addEventListener('resize', () => { clearTimeout(esperaAjuste); esperaAjuste = setTimeout(reencuadrar, 220); nucleo.redimensionar(); regular.reiniciar(); planificador.pedirCuadro(); if (camera.view?.enabled) camera.setViewOffset(innerWidth, innerHeight, 0, desplazamiento, innerWidth, innerHeight); medirZonaLibre(); });
   document.addEventListener('visibilitychange', () => { prev = performance.now(); });
   canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); delete canvas.dataset.viaje; suspendida = true; vuelo?.resolver(false); vuelo = null; alProblema('El navegador ha pausado los gráficos. Tu viaje está guardado. Podemos volver a encender las estrellas.'); });
@@ -933,7 +934,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
         if (cometaAntes) { const d = ahoraCometa.clone().sub(cometaAntes); camera.position.add(d); controls.target.add(d); }
         cometaAntes = ahoraCometa;
       } else cometaAntes = null;
-      if (!mirada) controls.update(dt);
+      // Inercia de la cámara al soltar el dedo con tiempo real (como en los juegos): OrbitControls amortigua por cuadro;
+      // el factor se ajusta a lo que ha durado este cuadro, así un cuadro más largo no frena el giro ni uno corto lo acelera.
+      if (!mirada) { controls.dampingFactor = 1 - Math.pow(1 - AMORTIGUACION, THREE.MathUtils.clamp(dtReal * 60, 0.25, 4)); controls.update(dt); }
     }
     if (ajuste && !vuelo) {
       // Mantiene la dirección actual de la cámara (su órbita) y cambia la distancia y el punto de mira.
@@ -1010,13 +1013,13 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // pantalla; al alejar la cámara de un gigante más allá de su encuadre normal (el del PC), se amontonan y se
     // quemaban en blanco, sobre todo en el móvil (pantalla vertical: la cámara ya está más lejos). Más allá de esa
     // distancia la luz se compensa; en el encuadre normal del PC no cambia nada.
-    let metaExpo = 1;
+    // En vertical (móvil) la misma luz cabe en menos pantalla: base 1/1,6 siempre (también en los viajes, en casa y al
+    // mirar hacia casa). Junto a un gigante, además, se compensa al alejar más del doble de su encuadre normal.
+    const marco = Math.max(1, Math.min(1.6, 0.95 / camera.aspect));
+    let metaExpo = 1 / marco;
     if (lejano && !vuelo) {
-      const ref = lejano.dist / Math.max(1, Math.min(1.6, 0.95 / camera.aspect)), d = camera.position.distanceTo(lejano.centro);
-      // En horizontal (PC) empieza al doble del encuadre normal; en vertical (móvil) ya en el encuadre normal del PC: allí la
-      // cámara llega hasta 1,6 veces más lejos y la misma luz cabe en menos pantalla. Así el móvil se ve como el PC.
-      const desde = camera.aspect >= 0.95 ? 2 : 1;
-      metaExpo = THREE.MathUtils.clamp(ref * desde / Math.max(1, d), 0.3, 1);
+      const d = camera.position.distanceTo(lejano.centro);
+      metaExpo *= THREE.MathUtils.clamp(lejano.dist * 2 / Math.max(1, d), 0.5, 1);
     }
     exposicion += (metaExpo - exposicion) * Math.min(1, dt * 4); ctx.exposicion = EXPOSICION.value = exposicion;
     // Estrellas locales: las del cielo de casa (campo titilante, soles y cometas de decoración) son de

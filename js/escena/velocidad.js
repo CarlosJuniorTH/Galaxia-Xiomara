@@ -6,6 +6,7 @@
 // blanca azulada y la cola de color; en el punto de fuga brilla un pequeño foco. Sin desenfoque
 // ni deformación de la imagen. Girar despacio alrededor de algo no es viajar: no las activa.
 import * as THREE from 'three';
+import { EXPOSICION } from './exposicion.js';
 import { impulsoVisual } from '../util/impulsoVisual.js';
 
 const L = 2400;
@@ -20,12 +21,12 @@ export function crearVelocidad(camera, { reducido = false } = {}) {
   const semillas = new Float32Array(n * 4); for (let i = 0; i < n * 4; i++) semillas[i] = Math.random();
   g.setAttribute('aSemilla', new THREE.InstancedBufferAttribute(semillas, 4)); g.instanceCount = n;
   const u = { uFuerza: { value: 0 }, uAvance: { value: 0 }, uLargo: { value: 0 }, uDir: { value: new THREE.Vector3(0, 0, -1) }, uEscala: { value: 1 },
-    uViewport: { value: new THREE.Vector2(innerWidth, innerHeight) }, uGiro: { value: new THREE.Vector2() }, uPeriferia: { value: 0 }, uDensidad: { value: 1 }, uClaro: { value: 0 } };
+    uViewport: { value: new THREE.Vector2(innerWidth, innerHeight) }, uGiro: { value: new THREE.Vector2() }, uPeriferia: { value: 0 }, uDensidad: { value: 1 }, uClaro: { value: 0 }, uExpo: EXPOSICION };   // exposición automática: en la pantalla vertical del móvil las estelas se juntan en el centro
   const material = new THREE.ShaderMaterial({
     uniforms: u,
     vertexShader: /* glsl */`
       attribute vec2 aEsquina; attribute vec4 aSemilla;
-      uniform float uFuerza, uAvance, uLargo, uEscala, uPeriferia, uDensidad, uClaro; uniform vec3 uDir; uniform vec2 uViewport, uGiro;
+      uniform float uFuerza, uAvance, uLargo, uEscala, uPeriferia, uDensidad, uClaro, uExpo; uniform vec3 uDir; uniform vec2 uViewport, uGiro;
       varying float vA, vLado, vLargo; varying vec3 vC;
       void main(){
         vec3 eje = normalize(uDir), ref = abs(eje.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
@@ -55,7 +56,7 @@ export function crearVelocidad(camera, { reducido = false } = {}) {
         // de fuga y del centro, donde aparecen las galaxias y las nebulosas que se cruzan.
         vec4 cf = projectionMatrix * vec4(eje * 1000.0, 1.0); vec2 fuga = cf.w > 0.0 ? cf.xy / cf.w : vec2(0.0), asp = vec2(uViewport.x / uViewport.y, 1.0);
         float claro = min(length((p0 - fuga) * asp), length(p0 * asp));
-        vA *= step(aSemilla.x, uDensidad) * mix(1.0, smoothstep(0.18, 0.62, claro), uClaro);
+        vA *= step(aSemilla.x, uDensidad) * mix(1.0, smoothstep(0.18, 0.62, claro), uClaro) * uExpo;
         vLado = aEsquina.y; vLargo = aEsquina.x;
         vC = mix(vec3(0.72, 0.84, 1.0), vec3(1.0, 0.78, 0.92), aSemilla.y);
       }`,
@@ -146,7 +147,7 @@ export function crearVelocidad(camera, { reducido = false } = {}) {
       u.uLargo.value += (Math.min(vuelo ? 1200 : 520, visual * 0.22) * (1 + ruptura * 1.8) - u.uLargo.value) * Math.min(1, dt * (ruptura > 0 ? 12 : 5));
       foco.position.copy(u.uDir.value).multiplyScalar(L * 0.9 * u.uEscala.value);
       foco.scale.setScalar(L * 0.9 * u.uEscala.value * 0.1 * (0.8 + u.uFuerza.value * 0.6)); foco.quaternion.setFromUnitVectors(Z, haciaCam.copy(u.uDir.value).negate());
-      foco.material.uniforms.uOpacidad.value = u.uFuerza.value * 0.55;
+      foco.material.uniforms.uOpacidad.value = u.uFuerza.value * 0.55 * EXPOSICION.value;
       foco.material.uniforms.uRuptura.value = ruptura; foco.material.uniforms.uAnillo.value = anillo;
       if (ruptura > 0) foco.scale.multiplyScalar(1 + anillo * 16);   // el anillo se abre hacia los bordes de la pantalla
       empuje = Math.max(0, empuje - dt * 1.5);
