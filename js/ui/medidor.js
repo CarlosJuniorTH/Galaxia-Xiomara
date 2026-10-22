@@ -7,7 +7,9 @@ export function crearMedidor(escena) {
   caja.style.cssText = 'position:fixed;left:8px;bottom:calc(8px + env(safe-area-inset-bottom));z-index:500;padding:6px 9px;border-radius:10px;background:#000d;color:#9f9;font:600 11px/1.35 ui-monospace,monospace;pointer-events:none;white-space:pre;max-width:calc(100vw - 16px);overflow:hidden';
   const boton = document.createElement('button'); boton.type = 'button'; boton.textContent = 'Medir capas';
   boton.style.cssText = 'position:fixed;right:8px;bottom:calc(8px + env(safe-area-inset-bottom));z-index:501;padding:8px 12px;border-radius:10px;border:1px solid #9f9;background:#000d;color:#9f9;font:600 12px ui-monospace,monospace';
-  document.body.append(caja, boton);
+  const boton2 = document.createElement('button'); boton2.type = 'button'; boton2.textContent = 'Probar ajustes';
+  boton2.style.cssText = boton.style.cssText.replace('bottom:calc(8px', 'bottom:calc(52px');
+  document.body.append(caja, boton, boton2);
   const lienzo = document.getElementById('galaxia'), gl = lienzo.getContext('webgl2') || lienzo.getContext('webgl');
   const info = gl?.getExtension('WEBGL_debug_renderer_info'), gpu = info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)).slice(0, 34) : '';
   let antes = performance.now(), tiempos = [], ultimo = antes, informe = '';
@@ -55,5 +57,37 @@ export function crearMedidor(escena) {
     res.sort((a, b) => b[1] - a[1]);
     informe = `\nCON TODO: ${base.toFixed(0)} FPS. SIN CADA PARTE:\n` + res.slice(0, 16).map(([n, f]) => `${f.toFixed(0).padStart(3)} FPS sin ${n}`).join('\n');
     boton.disabled = false; boton.textContent = 'Medir capas';
+  });
+
+  // Prueba en el propio aparato varias soluciones candidatas (unos segundos cada una, girando la cámara) y muestra los FPS
+  // de cada una y las órdenes de dibujo por cuadro: así se elige la que de verdad va a 60 en ese teléfono.
+  boton2.addEventListener('click', async () => {
+    const int = escena.interno; if (!int) return;
+    boton2.disabled = true; boton2.textContent = 'Probando…';
+    const { renderer, nucleo, telarana, bloom, scene, cosmos, THREE } = int;
+    const llamadas = () => { renderer.info.autoReset = false; renderer.info.reset(); nucleo.composer.render(); const c = renderer.info.render.calls; renderer.info.autoReset = true; return c; };
+    const prOriginal = nucleo.resolucion, w = new THREE.Vector3();
+    const raizCosmos = scene.children.find(o => o.userData.capa === 'cosmos');
+    const actual = cosmos.cuerpos().find(c => int.camera.position.distanceTo(c.centro) < c.radio * 40)?.id;
+    const otros = raizCosmos ? raizCosmos.children.filter(o => { if (!o.isGroup || !o.visible) return false; o.getWorldPosition(w); const c = cosmos.cuerpos().find(c => c.centro.distanceTo(w) < c.radio * 4); return c && c.id !== actual; }) : [];
+    const pruebas = [
+      ['tal cual', () => {}, () => {}],
+      ['telaraña con 3 órdenes (sin bloques)', () => telarana.unirBloques(true), () => telarana.unirBloques(false)],
+      ['capa de galaxias a media resolución', () => telarana.escalarCapaGalaxias(0.5), () => telarana.escalarCapaGalaxias(1)],
+      ['sin resplandor (bloom)', () => { bloom.enabled = false; }, () => { bloom.enabled = true; }],
+      ['otros gigantes ocultos', () => otros.forEach(o => (o.visible = false)), () => otros.forEach(o => (o.visible = true))],
+      ['resolución 1,25', () => nucleo.fijarResolucion(1.25), () => nucleo.fijarResolucion(prOriginal)],
+      ['resolución 1', () => nucleo.fijarResolucion(1), () => nucleo.fijarResolucion(prOriginal)],
+      ['todo lo anterior junto (res 1,25)', () => { telarana.unirBloques(true); telarana.escalarCapaGalaxias(0.5); bloom.enabled = false; otros.forEach(o => (o.visible = false)); nucleo.fijarResolucion(1.25); },
+        () => { telarana.unirBloques(false); telarana.escalarCapaGalaxias(1); bloom.enabled = true; otros.forEach(o => (o.visible = true)); nucleo.fijarResolucion(prOriginal); }]
+    ];
+    const res = [];
+    for (const [nombre, poner, quitar] of pruebas) {
+      informe = `\n— probando ${res.length + 1}/${pruebas.length}: ${nombre}`;
+      poner(); await medir(600); const fps = await medir(1600); const c = llamadas(); quitar();
+      res.push(`${fps.toFixed(0).padStart(3)} FPS · ${String(c).padStart(3)} órdenes · ${nombre}`);
+    }
+    informe = `\nPRUEBAS (res ${prOriginal}, otros gigantes: ${otros.length}):\n` + res.join('\n');
+    boton2.disabled = false; boton2.textContent = 'Probar ajustes';
   });
 }

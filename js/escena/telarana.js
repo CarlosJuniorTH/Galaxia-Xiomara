@@ -171,10 +171,20 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
     fragmentShader: 'uniform sampler2D uCapa; varying vec2 vUv; void main(){ gl_FragColor = vec4(texture2D(uCapa, vUv).rgb, 1.0); }',
     transparent: true, depthTest: false, depthWrite: false, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor, blendEquation: THREE.AddEquation }));
+  // Alternativa con una sola orden de dibujo por nube de puntos (sin trocear): en Safari para iPhone cada orden cuesta;
+  // se elige la que vaya mejor en el aparato (unirBloques, medidor ?hud).
+  const unidos = [[bloquesGalaxias, matGalaxias], [bloquesNubes, matNubes], [bloquesPolvo, matPolvo]].map(([grupo, mat]) => {
+    const g0 = grupo.children[0].geometry, g = new THREE.BufferGeometry(); for (const [n, a] of Object.entries(g0.attributes)) g.setAttribute(n, a);
+    const total = grupo.children.reduce((m, t) => Math.max(m, t.geometry.drawRange.start + t.geometry.attributes.position.count), 0);
+    g.setDrawRange(0, total); g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e12);
+    const p = new THREE.Points(g, mat); p.position.copy(grupo.position); p.renderOrder = -1.5; p.frustumCulled = false; p.visible = false; grupo.parent.add(p); p.updateMatrixWorld(true);
+    return [grupo, p];
+  });
   compuesto.frustumCulled = false; compuesto.renderOrder = -1.5; raiz.add(compuesto);
   const colorPrevio = new THREE.Color();
+  let escalaCapa = 1;
   function dibujarGalaxias(renderer, camera) {
-    const w = Math.max(1, Math.round(innerWidth)), h = Math.max(1, Math.round(innerHeight));
+    const w = Math.max(1, Math.round(innerWidth * escalaCapa)), h = Math.max(1, Math.round(innerHeight * escalaCapa));
     if (rtGalaxias.width !== w || rtGalaxias.height !== h) rtGalaxias.setSize(w, h);
     const previo = renderer.getRenderTarget(), alfa = renderer.getClearAlpha(); renderer.getClearColor(colorPrevio);
     renderer.setRenderTarget(rtGalaxias); renderer.setClearColor(0x000000, 0); renderer.clear(true, false, false);
@@ -215,6 +225,9 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   const tam = new THREE.Vector2(), aux = new V(); let gigantes = [];
   return {
     raiz, web, galaxias: bloquesGalaxias, nubes: bloquesNubes, cercano, polvoFil: bloquesPolvo, capaGalaxias, dibujarGalaxias,
+    escalarCapaGalaxias(k) { escalaCapa = k; uPRgal.value = k; },
+    // Unidos dibujan todos los puntos (no la muestra): la luz de cada uno vuelve a ser la normal.
+    unirBloques(si) { for (const [grupo, p] of unidos) { grupo.visible = !si; p.visible = si; } uComp.value = si ? 1 : 1 / MUESTRA; },
     // Gigantes que tapan la telaraña: [{ centro, radio }] (coordenadas del mundo).
     fijarGigantes(lista) { gigantes = lista.slice(0, 6).map(g => ({ c: new V(g.centro.x - O.x, g.centro.y - O.y, g.centro.z - O.z), r: g.radio })); },
     actualizar(t, dt, ctx) { const { camera } = ctx;
