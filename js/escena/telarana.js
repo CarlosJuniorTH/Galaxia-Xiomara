@@ -27,6 +27,21 @@ const col = c => new THREE.Color(c);
 // Galaxias: sobre todo doradas y blancas (luz de estrellas viejas), algunas azuladas y alguna rosada.
 const GAL_CALIDAS = ['#fff3dc', '#ffe3b0', '#ffd291', '#ffc174'].map(col), GAL_FRIAS = ['#e2eaff', '#bcd0ff'].map(col), GAL_ROSA = col('#ffbfe0');
 const galaxiaColor = a => { const r = a(); return r < 0.72 ? GAL_CALIDAS[Math.floor(a() * 4)] : r < 0.95 ? GAL_FRIAS[Math.floor(a() * 2)] : GAL_ROSA; };
+// Brazos de las galaxias de la telaraña: pow(0.5 + 0.5·cos(2θ − ln(máx(r, 0,04))·5,5), 2) en una rejilla de 256×256 sobre
+// [−1, 1]² (se calcula una vez; el sombreador solo la lee).
+let brazosTex = null;
+function texturaBrazos() {
+  if (brazosTex) return brazosTex;
+  const N = 256, datos = new Uint8Array(N * N * 4);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const rx = (x + 0.5) / N * 2 - 1, ry = (y + 0.5) / N * 2 - 1, rr = Math.hypot(rx, ry), th = Math.atan2(ry, rx);
+    const v = Math.pow(0.5 + 0.5 * Math.cos(2 * th - Math.log(Math.max(rr, 0.04)) * 5.5), 2), k = (y * N + x) * 4;
+    datos[k] = datos[k + 1] = datos[k + 2] = Math.round(v * 255); datos[k + 3] = 255;
+  }
+  brazosTex = new THREE.DataTexture(datos, N, N, THREE.RGBAFormat); brazosTex.minFilter = brazosTex.magFilter = THREE.LinearFilter; brazosTex.needsUpdate = true;
+  return brazosTex;
+}
+
 // Pide los datos (posiciones, colores, brillos ya troceados en bloques) al obrero, que los calcula en otro núcleo
 // mientras se prepara el resto del universo; si el navegador no puede, se calculan aquí cediendo el control a menudo.
 export function pedirDatosTelarana() {
@@ -57,12 +72,13 @@ function enBloques({ atributos, bloques }, material, O) {
   for (const b of bloques) {
     const g = new THREE.BufferGeometry(); for (const [n, a] of Object.entries(attr)) g.setAttribute(n, a);
     g.setDrawRange(b.a, b.n); g.boundingSphere = new THREE.Sphere(new THREE.Vector3(...b.centro), b.radio);
-    const t = new THREE.Points(g, material); t.renderOrder = -1.5; grupo.add(t);
+    const t = new THREE.Points(g, material); t.renderOrder = -1.5;
+    grupo.add(t);
   }
   return grupo;
 }
 
-export async function crearTelaranaCosmica({ scene, uPR, uScale }, datos) {
+export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, datos) {
   datos ??= await generarDatosTelarana(THREE, ceder);
   const V = THREE.Vector3, web = crearTelarana(V);
   const raiz = new THREE.Group(); raiz.name = 'Telaraña cósmica'; raiz.userData.profundo = true; scene.add(raiz);
@@ -76,7 +92,8 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale }, datos) {
     return g;
   };
   const uniformes = { uPR, uScale, uCamL: { value: new THREE.Vector3() }, uGigA: { value: Array.from({ length: 6 }, () => new THREE.Vector4(0, 0, 1, 2)) }, uGigB: { value: Array.from({ length: 6 }, () => new THREE.Vector4(0, 0, 0, 0)) }, uCasa: { value: 1 }, uRes: { value: new THREE.Vector2(1, 1) }, uF: { value: 800 } };
-  const matGalaxias = new THREE.ShaderMaterial({ uniforms: uniformes,
+  const uPRgal = { value: 1 };   // las galaxias se pintan en su propia capa a resolución CSS (1 píxel de capa = 1 px CSS)
+  const matGalaxias = new THREE.ShaderMaterial({ uniforms: { ...uniformes, uPR: uPRgal, uBrazos: { value: texturaBrazos() } },
     vertexShader: /* glsl */`uniform float uPR, uScale, uCasa; ${OCULTO} attribute vec3 aCol; attribute float aBrillo; varying vec3 vC; varying float vA, vRes, vAng, vInc, vBrazos, vTipo;
       float h(vec3 p){ p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
       void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv; float d = length(mv.xyz);
@@ -96,15 +113,17 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale }, datos) {
         vA = ocultoGig(position) * k * (0.35 + 0.65 * aBrillo) * uCasa * (0.03 + 0.7 * smoothstep(6.0, 24.0, tam)) * (1.0 - smoothstep(lim * 0.7, lim, tam * uPR)) * step(0.0, -mv.z);
         vAng = h(position * 0.001) * 6.2832; vInc = 0.25 + 0.75 * h(position * 0.0013 + 3.1); vBrazos = step(0.45, h(position * 0.0007 + 7.7));
         vC = aCol; }`,
-    fragmentShader: /* glsl */`varying vec3 vC; varying float vA, vRes, vAng, vInc, vBrazos, vTipo;
+    fragmentShader: /* glsl */`uniform sampler2D uBrazos; varying vec3 vC; varying float vA, vRes, vAng, vInc, vBrazos, vTipo;
       void main(){ vec2 q = gl_PointCoord - 0.5; float d = length(q) * 2.0; if (d > 1.0) discard;
         float punto = exp(-d * d * 4.0);
         // Forma: disco elíptico girado e inclinado, núcleo brillante y, en unas, dos brazos.
         float c = cos(vAng), s = sin(vAng); vec2 r = vec2(c * q.x - s * q.y, s * q.x + c * q.y) * 2.0; r.y /= vInc;
-        float rr = length(r), th = atan(r.y, r.x);
+        float rr = length(r);
         // Tipos: espiral (núcleo dorado, brazos azulados o rosados), elíptica (dorada, suave) y de canto.
         float espiral = step(vTipo, 0.55), eliptica = step(0.7, vTipo);
-        float brazos = pow(0.5 + 0.5 * cos(2.0 * th - log(max(rr, 0.04)) * 5.5), 2.0);
+        // Brazos espirales precalculados en una textura (la misma fórmula; ver texturaBrazos): sin atan, log, cos ni pow por
+        // píxel. Era lo más caro de toda la telaraña mirando hacia el centro del universo, donde se amontonan las galaxias.
+        float brazos = texture2D(uBrazos, clamp(r * 0.5 + 0.5, 0.0, 1.0)).r;
         float disco = exp(-rr * 2.6) * mix(0.35, 1.3, brazos * espiral + (1.0 - espiral) * 0.5) * (1.0 - smoothstep(0.8, 1.0, rr));
         float elip = exp(-rr * rr * 5.0) * eliptica;
         float forma = mix(disco * 0.9, elip * 1.3, eliptica) + exp(-rr * rr * 70.0) * 1.3;
@@ -134,14 +153,35 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale }, datos) {
   // (Las cintas, los resplandores y la niebla de gas ya no se construyen: estaban ocultos para siempre —sin líneas ni
   // degradados—; sus datos se siguen calculando para que el azar, y por tanto el universo, no cambie.)
   const bloquesGalaxias = enBloques(datos.galaxias, matGalaxias, O), bloquesNubes = enBloques(datos.nubes, matNubes, O), bloquesPolvo = enBloques(datos.polvo, matPolvo, O);
-  raiz.add(bloquesGalaxias, bloquesNubes, bloquesPolvo);
+  raiz.add(bloquesNubes, bloquesPolvo);
+  // Partículas a baja resolución, como en los juegos: las galaxias de la telaraña (manchas suaves de luz, cientos de miles)
+  // se pintan en una capa aparte a la resolución CSS de la pantalla y se suman a la escena. En el móvil (retina) son 4
+  // veces menos píxeles para la misma imagen; en el PC es la misma resolución que antes. Su luz es aditiva (el orden da
+  // igual) y la ocultación por los gigantes ya la hace su sombreador (ocultoGig): no necesitan la profundidad.
+  const capaGalaxias = new THREE.Scene(); capaGalaxias.add(bloquesGalaxias); bloquesGalaxias.updateMatrixWorld(true); bloquesGalaxias.matrixWorldAutoUpdate = false;
+  const tipoCapa = renderer && (renderer.extensions.has('EXT_color_buffer_float') || renderer.extensions.has('EXT_color_buffer_half_float')) ? THREE.HalfFloatType : THREE.UnsignedByteType;   // la luz sumada puede pasar de 1
+  const rtGalaxias = new THREE.WebGLRenderTarget(1, 1, { type: tipoCapa, depthBuffer: false, stencilBuffer: false });
+  const compuesto = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ uniforms: { uCapa: { value: rtGalaxias.texture } },
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+    fragmentShader: 'uniform sampler2D uCapa; varying vec2 vUv; void main(){ gl_FragColor = vec4(texture2D(uCapa, vUv).rgb, 1.0); }',
+    transparent: true, depthTest: false, depthWrite: false, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor, blendEquation: THREE.AddEquation }));
+  compuesto.frustumCulled = false; compuesto.renderOrder = -1.5; raiz.add(compuesto);
+  const colorPrevio = new THREE.Color();
+  function dibujarGalaxias(renderer, camera) {
+    const w = Math.max(1, Math.round(innerWidth)), h = Math.max(1, Math.round(innerHeight));
+    if (rtGalaxias.width !== w || rtGalaxias.height !== h) rtGalaxias.setSize(w, h);
+    const previo = renderer.getRenderTarget(), alfa = renderer.getClearAlpha(); renderer.getClearColor(colorPrevio);
+    renderer.setRenderTarget(rtGalaxias); renderer.setClearColor(0x000000, 0); renderer.clear(true, false, false);
+    renderer.render(capaGalaxias, camera);
+    renderer.setClearColor(colorPrevio, alfa); renderer.setRenderTarget(previo);
+  }
   // ── Campo cercano: dentro de un filamento o de un cúmulo, cientos de galaxias diminutas alrededor de la cámara
   // (las mismas siempre en cada lugar: semilla por celda). Así, al meterse en la telaraña, se ve que está hecha
   // de galaxias de verdad. Se rehace solo al cambiar de celda. ──
   const C = 60000, muestras = [];
   for (const f of web.filamentos) for (let k = 0; k <= 24; k++) muestras.push({ p: puntoFilamento(k / 24, web.nudos, f, V), g: f.grosor * 0.45, n: 1 });
   for (const nudo of web.nudos) muestras.push({ p: nudo.pos, g: nudo.r * 0.6, n: 3 });
-  const cercano = new THREE.Points(new THREE.BufferGeometry(), matGalaxias); cercano.frustumCulled = false; cercano.renderOrder = -1.5; cercano.position.copy(web.centro); raiz.add(cercano);
+  const cercano = new THREE.Points(new THREE.BufferGeometry(), matGalaxias); cercano.frustumCulled = false; cercano.renderOrder = -1.5; cercano.position.copy(web.centro); capaGalaxias.add(cercano);
   let celdaActual = '';
   function rehacerCercano(cam) {
     const ci = Math.floor(cam.x / C), cj = Math.floor(cam.y / C), ck = Math.floor(cam.z / C), clave = `${ci},${cj},${ck}`;
@@ -165,7 +205,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale }, datos) {
   raiz.updateMatrixWorld(true); raiz.matrixWorldAutoUpdate = false;
   const tam = new THREE.Vector2(), aux = new V(); let gigantes = [];
   return {
-    raiz, web, galaxias: bloquesGalaxias, nubes: bloquesNubes, cercano, polvoFil: bloquesPolvo,
+    raiz, web, galaxias: bloquesGalaxias, nubes: bloquesNubes, cercano, polvoFil: bloquesPolvo, capaGalaxias, dibujarGalaxias,
     // Gigantes que tapan la telaraña: [{ centro, radio }] (coordenadas del mundo).
     fijarGigantes(lista) { gigantes = lista.slice(0, 6).map(g => ({ c: new V(g.centro.x - O.x, g.centro.y - O.y, g.centro.z - O.z), r: g.radio })); },
     actualizar(t, dt, ctx) { const { camera } = ctx;

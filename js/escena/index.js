@@ -274,7 +274,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // visible, para que ningún programa de GPU se compile por primera vez al entrar o durante un viaje.
   const calentar = () => {
     const ocultos = []; scene.traverse(o => { if (!o.visible) { ocultos.push(o); o.visible = true; } });
-    try { composer.render(); } catch (e) { console.warn('Calentamiento', e); }
+    try { telarana.dibujarGalaxias(renderer, camera); composer.render(); } catch (e) { console.warn('Calentamiento', e); }
     for (const o of ocultos) o.visible = false;
   };
   // Carga completa, como un videojuego: antes de entrar se crean todas las nebulosas, se calculan todas las texturas,
@@ -1017,6 +1017,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // mirar hacia casa). Junto a un gigante, además, se compensa al alejar más del doble de su encuadre normal.
     const marco = Math.max(1, Math.min(1.6, 0.95 / camera.aspect));
     let metaExpo = 1 / marco;
+    // De viaje la cámara pasa junto a los filamentos (y entre los gigantes cruza el centro de la telaraña): en vertical, algo menos.
+    if (vuelo && marco > 1) metaExpo *= 0.75;
     if (lejano && !vuelo) {
       const d = camera.position.distanceTo(lejano.centro);
       metaExpo *= THREE.MathUtils.clamp(lejano.dist * 2 / Math.max(1, d), 0.5, 1);
@@ -1119,6 +1121,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       // cámara tal como se dibuja: si no, la respiración lo hacía acercarse, alejarse y moverse.
       acompanar();
     }
+    if (escenaActiva !== 'solar') telarana.dibujarGalaxias(renderer, camera);   // capa de galaxias a resolución CSS (telarana.js)
     try { if (document.body.dataset.supernovaAislada === 'true') conFocoSupernova(scene, cosmos.raiz, cosmos.supernova.grupo, () => composer.render()); else composer.render(); } catch (e) { suspendida = true; alProblema('No se ha podido dibujar el universo. Conservamos tu progreso; vuelve a intentarlo en 3D.'); console.error(e); }
     // El sistema solar se prepara (shaders y texturas) en un momento tranquilo tras la entrada,
     // no durante la carga: así se entra antes y el móvil trabaja menos al principio.
@@ -1163,7 +1166,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // Quieta la cámara sin congelar el tiempo (la celebración sigue animándose).
     detenerGiro(valor) { controls.autoRotate = !valor && !pausa && !vuelo && giraSolo(); },
     // Solo en #debug: acceso a la escena para vistas de diagnóstico por capas.
-    get interno() { return diagnosticar ? { THREE, scene, camera, controls, renderer, bloom, nucleo, cosmos, galaxia, planetas, solar, get escenaActiva() { return escenaActiva; }, lento: v => { escalaTiempo = v; }, get encuadre() { return estadoEncuadre(); }, get tiempo() { return tiempo; }, get estelas() { return campoVelocidad.mesh.material.uniforms.uFuerza.value; }, nube: { MUESTRAS: muestrasNube }, get curvaVuelo() { return vuelo ? { curva: vuelo.curva, desde: vuelo.curva.getPoint(0), hasta: vuelo.curva.getPoint(1), duracion: vuelo.duracion, transcurrido: vuelo.transcurrido, real: vuelo.real ?? vuelo.transcurrido, plan: vuelo.plan } : null; }, lejanas, cercania: cercaniaUniverso, get lente() { return { activa: nucleo.lente.enabled, uL: nucleo.lente.uniforms.uL.value.map(v => v.toArray()) }; } } : null; },
+    get interno() { return diagnosticar ? { THREE, scene, camera, controls, renderer, bloom, nucleo, telarana, cosmos, galaxia, planetas, solar, get escenaActiva() { return escenaActiva; }, lento: v => { escalaTiempo = v; }, get encuadre() { return estadoEncuadre(); }, get tiempo() { return tiempo; }, get estelas() { return campoVelocidad.mesh.material.uniforms.uFuerza.value; }, nube: { MUESTRAS: muestrasNube }, get curvaVuelo() { return vuelo ? { curva: vuelo.curva, desde: vuelo.curva.getPoint(0), hasta: vuelo.curva.getPoint(1), duracion: vuelo.duracion, transcurrido: vuelo.transcurrido, real: vuelo.real ?? vuelo.transcurrido, plan: vuelo.plan } : null; }, lejanas, cercania: cercaniaUniverso, get lente() { return { activa: nucleo.lente.enabled, uL: nucleo.lente.uniforms.uL.value.map(v => v.toArray()) }; } } : null; },
     get destino() { return destinoActual; },
     get viajando() { return !!vuelo; },
     get cometaVisible() { return mundos.cometaVisible; },

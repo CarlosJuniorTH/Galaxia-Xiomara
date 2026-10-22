@@ -1,6 +1,7 @@
 // Gas con volumen real: el rayo atraviesa una densidad 3D. No son planos orientados
 // a la cámara. Atlas pequeño precalculado y número fijo de pasos para acotar coste.
 import * as THREE from 'three';
+import { esMovil } from '../util/dispositivo.js';
 import { crearAtlasNebulosa } from '../util/volumenNebulosa.js';
 const cache = new Map();
 // Tabla de ruido de valor 3D (32³ valores del retículo, con un borde repetido para el filtrado) en un atlas 2D de
@@ -26,7 +27,7 @@ export function texturaRuido() {
   return (tablaRuido = t);
 }
 // Muestras por rayo, compartidas por todas las nubes (las pruebas de calidad las cambian).
-export const MUESTRAS = { value: 24 };   // la misma calidad en móvil y en PC (index.js solo la aligera si un aparato no llega)
+export const MUESTRAS = { value: esMovil ? 16 : 24 };   // en una pantalla de móvil 16 muestras por rayo se ven igual que 24 (y el gas del púlsar cuesta un tercio menos)
 // Variantes (la forma la dibuja su imagen: nebulosaFondo con la misma forma): su densidad 3D acompaña
 // a la imagen (cáscara, columnas, velos, nube suave, núcleo de polvo) y la lámina es más gruesa, para
 // que tengan volumen desde cualquier lado sin verse como cajas ni rayas.
