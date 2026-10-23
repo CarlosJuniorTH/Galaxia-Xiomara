@@ -3,6 +3,7 @@
 // agujero negro ultramasivo (como TON 618), cada uno con posición y tamaño fijos. Se atenúa bajo
 // el velo al visitar un lugar (index.js). Las galaxias lejanas evitan estas zonas (ZONAS_OCUPADAS).
 import * as THREE from 'three';
+const ejeCometa = new THREE.Vector3(), frenteCometa = new THREE.Vector3(), auxCometa = new THREE.Vector3();   // reutilizados por los cometas en cada cuadro
 import { esMovil } from '../util/dispositivo.js';
 import { texBrillo, texDestello, texEstrellaGigante, texNebulosa } from './texturas.js';
 import { texturaPlaneta } from './fabricaTexturas.js';
@@ -515,9 +516,10 @@ export function crearCosmos({ uScale, uPR }) {
         c.g.visible = avance > 0 && avance < 1;
         if (!c.g.visible) continue;
         c.curva.getPoint(avance, c.g.position);
-        const eje = c.curva.getTangent(avance).negate().lerp(c.g.position.clone().normalize(), 0.5).normalize();
-        const frente = c.g.position.clone().negate().normalize(); frente.addScaledVector(eje, -frente.dot(eje)).normalize();   // la cola, en el plano que mira a Xiomara
-        c.velo.quaternion.setFromRotationMatrix(base.makeBasis(eje, new THREE.Vector3().crossVectors(frente, eje), frente));
+        // Con vectores reutilizados (sin memoria nueva en cada cuadro: el recolector ya no frena a los cometas).
+        const eje = c.curva.getTangent(avance, ejeCometa).negate().lerp(auxCometa.copy(c.g.position).normalize(), 0.5).normalize();
+        const frente = frenteCometa.copy(c.g.position).negate().normalize(); frente.addScaledVector(eje, -frente.dot(eje)).normalize();   // la cola, en el plano que mira a Xiomara
+        c.velo.quaternion.setFromRotationMatrix(base.makeBasis(eje, auxCometa.crossVectors(frente, eje), frente));
         c.velo.material.uniforms.uTime.value = t; c.velo.material.uniforms.uI.value = 0.75 * Math.min(1, avance * 8, (1 - avance) * 8);
       }
       // Púlsar: gira rápido; cuando un haz se acerca a la línea de visión, el núcleo destella.

@@ -56,15 +56,17 @@ export function mapaGalaxia(d) {
   const mapa = { n, peso, acumulado, total };
   mapas.set(clave, mapa); return mapa;
 }
-export function estrellaGalaxia(d, rnd = Math.random) {
-  const m = mapaGalaxia(d), objetivo = rnd() * m.total;
+export function estrellaGalaxia(d, rnd = Math.random) { const o = new Float64Array(4); estrellaEn(mapaGalaxia(d), d, rnd, o); return Array.from(o); }
+// La misma estrella escribiendo en `o` (sin crear objetos: se llama miles de veces al acercarse a una galaxia).
+function estrellaEn(m, d, rnd, o) {
+  const objetivo = rnd() * m.total;
   let lo = 0, hi = m.n * m.n - 1;
   while (lo < hi) { const mid = (lo + hi) >> 1; if (m.acumulado[mid] < objetivo) lo = mid + 1; else hi = mid; }
   const x = lo % m.n, y = (lo / m.n) | 0, u = (x + rnd()) / m.n * 2 - 1, v = (y + rnd()) / m.n * 2 - 1;
   const w0 = m.peso[lo * 3], w1 = m.peso[lo * 3 + 1], w2 = m.peso[lo * 3 + 2], e = rnd() * (w0 + w1 + w2);
   const comp = e < w0 ? 0 : e < w0 + w1 ? 1 : 2, r = Math.hypot(u, v);
   const espesor = d.tipo === 'eliptica' ? 0.45 * Math.exp(-r * 2) : comp === 0 ? 0.05 * (1 - r) + 0.01 : 0.015 * (1 - r * 0.5);
-  return [u, v, gauss(rnd) * espesor, comp];
+  o[0] = u; o[1] = v; o[2] = gauss(rnd) * espesor; o[3] = comp;
 }
 
 export function crearCampoGalaxias({ lista, texturas, descriptores, uPR }) {
@@ -117,19 +119,25 @@ export function crearCampoGalaxias({ lista, texturas, descriptores, uPR }) {
     // premultipliedAlpha: el color ya lleva el alfa (vC·a); sin esto WebGL lo multiplicaba otra vez
     // por a y el fundido de las estrellas era a² (más apagado y más brusco que el de la imagen).
     transparent: true, premultipliedAlpha: true, depthWrite: false, blending: THREE.AdditiveBlending });
-  const v = new THREE.Vector3(), c = new THREE.Color(), activas = new Set(); let turno = 0;
+  const v = new THREE.Vector3(), c = new THREE.Color(), activas = new Set(), p = new Float64Array(4); let turno = 0;
   const BETA_MAX = 0.6, luzTextura = new Map();
   // Luminancia media REAL de una imagen (cuando el generador la ha rellenado).
   const mediaLuz = t => { if (luzTextura.has(t)) return luzTextura.get(t); const datos = t.image?.data; if (!datos) return null; let suma = 0; for (let j = 0; j < datos.length; j += 4) suma += 0.2126 * datos[j] + 0.7152 * datos[j + 1] + 0.0722 * datos[j + 2]; const media = suma / (datos.length / 4) / 255; if (media < 1e-4) return null; luzTextura.set(t, media); return media; };
+  // Las estrellas ya creadas se guardan (las ~60 últimas galaxias): si se vuelve a acercar, reaparecen sin recalcular ni
+  // crear memoria nueva (antes, girando cerca de un gigante se creaban y borraban miles de estrellas en cada cuadro).
+  const guardadas = new Map(), GUARDAR = 60;
   function crearEstrellas(g) {
+    const vieja = guardadas.get(g.id);
+    if (vieja) { guardadas.delete(g.id); grupo.add(vieja); g.estrellas = vieja; activas.add(g); g.flujoEstrellas = vieja.userData.flujo; const ab = g.instancia.im.geometry.attributes.aBeta; ab.array[g.instancia.i] = vieja.userData.beta; ab.needsUpdate = true; return vieja; }
     const rnd = generador(semillaDe(`estrellas-${g.id}`)), n = g.puntos;
     const d = descriptores[g.textura ?? g.tipo] ?? descriptores[0], cols = (PALETAS_GALAXIA[d.paleta] || PALETAS_GALAXIA.clasica).map(x => new THREE.Color(...x));
     const pos = new Float32Array(n * 3), col = new Float32Array(n * 3), radio = new Float32Array(n).fill(g.radio), tam = new Float32Array(n);
     let flujo = 0;
+    const m = mapaGalaxia(d);
     for (let i = 0; i < n; i++) {
-      const p = estrellaGalaxia(d, rnd); v.set(p[0], -p[1], p[2]).multiplyScalar(g.radio).applyQuaternion(g.quaternion);
-      pos.set([v.x, v.y, v.z], i * 3);
-      c.copy(cols[p[3]]).lerp(cols[1], p[3] === 0 ? rnd() * 0.15 : 0).multiplyScalar(g.op); col.set([c.r, c.g, c.b], i * 3);
+      estrellaEn(m, d, rnd, p); v.set(p[0], -p[1], p[2]).multiplyScalar(g.radio).applyQuaternion(g.quaternion);
+      pos[i * 3] = v.x; pos[i * 3 + 1] = v.y; pos[i * 3 + 2] = v.z;
+      c.copy(cols[p[3]]).lerp(cols[1], p[3] === 0 ? rnd() * 0.15 : 0).multiplyScalar(g.op); col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
       tam[i] = 1.0 + rnd() * 1.4;
       // (La imagen se sube con flipY: su fila 0, v = −1, queda ARRIBA del plano; por eso la estrella
       // va en −v. Sin esto las estrellas eran el reflejo de la imagen: brazos con el giro invertido.)
@@ -152,7 +160,12 @@ export function crearCampoGalaxias({ lista, texturas, descriptores, uPR }) {
     grupo.add(pts); g.estrellas = pts; activas.add(g);
     return pts;
   }
-  function liberarEstrellas(g) { if (!g.estrellas) return; grupo.remove(g.estrellas); g.estrellas.geometry.dispose(); g.estrellas = null; activas.delete(g); }
+  function liberarEstrellas(g) {
+    if (!g.estrellas) return; const pts = g.estrellas; grupo.remove(pts); g.estrellas = null; activas.delete(g);
+    pts.userData.flujo = g.flujoEstrellas; pts.userData.beta = g.instancia.im.geometry.attributes.aBeta.array[g.instancia.i];
+    guardadas.set(g.id, pts);
+    if (guardadas.size > GUARDAR) { const [id, viejo] = guardadas.entries().next().value; guardadas.delete(id); viejo.geometry.dispose(); }
+  }
   // ── Muy lejos: luz no resuelta. Un punto por galaxia, en su centro, con el FLUJO de su propia
   // imagen (color medio × área proyectada, que crece con px² y con el coseno de su inclinación):
   // al alejarse baja como 1/d², sin umbral; entre 1,5 y 3,5 px de radio se funde con la imagen y
@@ -220,7 +233,7 @@ export function crearCampoGalaxias({ lista, texturas, descriptores, uPR }) {
       camera.updateMatrixWorld(); const e = camera.matrixWorldInverse.elements, cx = camera.position.x, cy = camera.position.y, cz = camera.position.z, f = uFocal.value;
       // Sin memoria temporal por cuadro (nada de arrays por galaxia): menos pausas del recolector en el móvil.
       let zv = 0;
-      const medir = g => { const p = g.pos, z = -(e[2] * p.x + e[6] * p.y + e[10] * p.z + e[14]), dx = p.x - cx, dy = p.y - cy, dz = p.z - cz, d = Math.sqrt(dx * dx + dy * dy + dz * dz); zv = z; return g.radio * f / Math.max(1, Math.min(d, z > 0 ? z : d)); };
+      const medir = g => { const p = g.pos, z = -(e[2] * p.x + e[6] * p.y + e[10] * p.z + e[14]), dx = p.x - cx, dy = p.y - cy, dz = p.z - cz, d = Math.sqrt(dx * dx + dy * dy + dz * dz); zv = z; return g.radio * f / Math.max(1, d); };   // crear/soltar según la DISTANCIA (girar no las crea ni las borra); la profundidad solo decide si se ven
       let nuevas = 0;
       const n = lista.length, tramo = Math.ceil(n / 4), fin = Math.min(n, turno + tramo);
       for (let i = turno; i < fin && nuevas < 2; i++) { const g = lista[i]; if (!g.estrellas && medir(g) > 24) { crearEstrellas(g); nuevas++; } }

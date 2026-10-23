@@ -549,6 +549,8 @@ export function crearMundos({ scene, uScale, uPR }, { alConstelar = () => {}, co
       return hit ? (hit.object.userData.nodo !== undefined ? { tipo: 'nodo', id: hit.object.userData.nodo } : { tipo: 'destino', id: hit.object.userData.destino }) : null;
     },
     actualizar(t, dt, { tiempoDentro, camera }) {
+      // Lejos de casa (desde los gigantes) los lugares no se ven: solo sigue el cometa, que tiene su propio recorrido.
+      if (!raiz.visible) { cometa.actualizar(t, dt, { tiempoDentro, foco, camera }); return; }
       // La figura sigue siendo espacial, pero no desaparece de canto cuando
       // la cámara orbita. Igual que el corazón central, mira a quien la visita.
       constelacion.quaternion.copy(camera.quaternion);

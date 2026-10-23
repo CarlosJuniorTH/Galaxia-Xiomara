@@ -406,8 +406,9 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
         d.g.position.set(Math.cos(ang) * radio, Math.sin(ang * 2) * radio * 0.08, Math.sin(ang) * radio * 0.55);
         const tam = R * P * (1.6 + 1.2 * (1 - u)) * (1 + 0.15 * Math.sin(t * 9 + i));
         d.nucleo.scale.setScalar(tam * 1.4); d.luz.scale.setScalar(tam * 3.2); d.nucleo.material.opacity = kDos; d.luz.material.opacity = 0.6 * kDos;
-        d.hist.unshift(d.g.position.clone()); if (d.hist.length > NE) d.hist.length = NE;
-        for (let k = 0; k < NE; k++) { const q = d.hist[Math.min(k, d.hist.length - 1)]; d.pos.set([q.x, q.y, q.z], k * 3); }
+        // Estela con vectores reutilizados (el más antiguo pasa a ser el nuevo): sin memoria nueva en cada cuadro.
+        const nuevo = d.hist.length >= NE ? d.hist.pop() : new THREE.Vector3(); d.hist.unshift(nuevo.copy(d.g.position));
+        for (let k = 0; k < NE; k++) { const q = d.hist[Math.min(k, d.hist.length - 1)]; d.pos[k * 3] = q.x; d.pos[k * 3 + 1] = q.y; d.pos[k * 3 + 2] = q.z; }
         d.estela.geometry.attributes.position.needsUpdate = true;
         d.estela.material.uniforms.uTam.value = tam * 0.9; d.estela.material.uniforms.uVis.value = kDos * 0.9;
       });

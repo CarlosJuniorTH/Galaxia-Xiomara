@@ -200,11 +200,22 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   for (const f of web.filamentos) for (let k = 0; k <= 24; k++) muestras.push({ p: puntoFilamento(k / 24, web.nudos, f, V), g: f.grosor * 0.45, n: 1 });
   for (const nudo of web.nudos) muestras.push({ p: nudo.pos, g: nudo.r * 0.6, n: 3 });
   const cercano = new THREE.Points(new THREE.BufferGeometry(), matGalaxias); cercano.frustumCulled = false; cercano.renderOrder = -1.5; cercano.position.copy(web.centro); capaGalaxias.add(cercano);
-  let celdaActual = '';
+  const celda = [NaN, NaN, NaN], pendiente = [NaN, NaN, NaN]; let desdePendiente = 0;
   function rehacerCercano(cam) {
-    const ci = Math.floor(cam.x / C), cj = Math.floor(cam.y / C), ck = Math.floor(cam.z / C), clave = `${ci},${cj},${ck}`;
-    if (clave === celdaActual) return; celdaActual = clave;
-    const lista = [], centroZona = new V((ci + 0.5) * C, (cj + 0.5) * C, (ck + 0.5) * C);
+    const ci = Math.floor(cam.x / C), cj = Math.floor(cam.y / C), ck = Math.floor(cam.z / C);
+    if (ci === celda[0] && cj === celda[1] && ck === celda[2]) return;
+    // Solo cuando la cámara se queda ~0,3 s en la misma celda: al girar alrededor de un gigante cambia de celda en cada
+    // cuadro y antes se rehacía (y se volvía a subir a la GPU) todo el campo en cada cuadro, con tirones al girar.
+    const ahora = performance.now();
+    if (ci !== pendiente[0] || cj !== pendiente[1] || ck !== pendiente[2]) { pendiente[0] = ci; pendiente[1] = cj; pendiente[2] = ck; desdePendiente = ahora; return; }
+    if (ahora - desdePendiente < 300) return;
+    celda[0] = ci; celda[1] = cj; celda[2] = ck;
+    // Lejos de la telaraña (lo normal en los gigantes, donde al girar se cambia de celda en cada cuadro) no hay nada que
+    // rehacer: se comprueba sin crear memoria nueva.
+    const zx = (ci + 0.5) * C, zy = (cj + 0.5) * C, zz = (ck + 0.5) * C;
+    let alguna = false; for (const m of muestras) { const dx = m.p.x - zx, dy = m.p.y - zy, dz = m.p.z - zz, lim = C * 2.2 + m.g * 2; if (dx * dx + dy * dy + dz * dz < lim * lim) { alguna = true; break; } }
+    if (!alguna && !cercano.geometry.attributes.position?.count) return;
+    const lista = [], centroZona = new V(zx, zy, zz);
     const cerca = muestras.filter(m => m.p.distanceTo(centroZona) < C * 2.2 + m.g * 2);
     for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let c = -1; c <= 1; c++) {
       const x0 = (ci + a) * C, y0 = (cj + b) * C, z0 = (ck + c) * C, rnd = generador(semillaDe(`celda-${ci + a},${cj + b},${ck + c}`));
