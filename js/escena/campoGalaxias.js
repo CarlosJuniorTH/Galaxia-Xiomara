@@ -119,6 +119,11 @@ export function crearCampoGalaxias({ lista, texturas, descriptores, uPR }) {
     // premultipliedAlpha: el color ya lleva el alfa (vC·a); sin esto WebGL lo multiplicaba otra vez
     // por a y el fundido de las estrellas era a² (más apagado y más brusco que el de la imagen).
     transparent: true, premultipliedAlpha: true, depthWrite: false, blending: THREE.AdditiveBlending });
+  // Muestra oculta con este material: la carga (que compila todo lo que hay en la escena) prepara ya su programa de GPU,
+  // y la primera galaxia cercana de un viaje no lo compila en pleno vuelo.
+  const geoMuestra = new THREE.BufferGeometry();
+  for (const [n, k] of [['position', 3], ['aColor', 3], ['aRadio', 1], ['aTam', 1]]) geoMuestra.setAttribute(n, new THREE.BufferAttribute(new Float32Array(k), k));
+  const muestra = new THREE.Points(geoMuestra, mat); muestra.visible = false; muestra.frustumCulled = false; muestra.renderOrder = -2; grupo.add(muestra);
   const v = new THREE.Vector3(), c = new THREE.Color(), activas = new Set(), p = new Float64Array(4); let turno = 0;
   const BETA_MAX = 0.6, luzTextura = new Map();
   // Luminancia media REAL de una imagen (cuando el generador la ha rellenado).

@@ -280,12 +280,20 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // completa en un único cuadro enorme: en un iPhone caliente o con poca batería tardaba tanto que iOS daba la página por
   // colgada y la cerraba. Después, un cuadro normal (con lo visible) prepara el resplandor y la pasada final.
   const calentar = () => {
-    const ocultos = []; scene.traverse(o => { if (!o.visible) { ocultos.push(o); o.visible = true; } });
+    // Todo visible y sin descartar lo que queda fuera de la cámara: así cada geometría se sube ya a la tarjeta gráfica
+    // (si no, la primera vez que entra en pantalla —al volver a casa, al llegar a un universo— se sube en pleno viaje).
+    // También la escena del sistema solar (Rosa, Azul, la luna de las cartas), que se dibuja aparte.
+    const ocultos = [], recortados = [];
+    for (const esc of [scene, solar.escena]) esc.traverse(o => { if (!o.visible) { ocultos.push(o); o.visible = true; } if (o.frustumCulled) { recortados.push(o); o.frustumCulled = false; } });
     const leer = nucleo.post?.readBuffer, rt = new THREE.WebGLRenderTarget(128, 128, { type: leer?.texture?.type ?? THREE.UnsignedByteType });
-    try { const previo = renderer.getRenderTarget(); renderer.setRenderTarget(rt); renderer.render(scene, camera); renderer.setRenderTarget(previo); } catch (e) { console.warn('Calentamiento', e); }
+    try { const previo = renderer.getRenderTarget(); renderer.setRenderTarget(rt); renderer.render(scene, camera); renderer.render(solar.escena, camera); renderer.setRenderTarget(previo); } catch (e) { console.warn('Calentamiento', e); }
     for (const o of ocultos) o.visible = false;
+    for (const o of recortados) o.frustumCulled = true;
     rt.dispose();
+    // La lente (cerca de los universos) solo se activa allí: se enciende en este cuadro para compilar su programa.
+    const lente = nucleo.lente, conLente = lente?.enabled; if (lente) lente.enabled = true;
     try { capaVolumen.dibujar(camera, 64); telarana.dibujarGalaxias(renderer, camera); composer.render(); } catch (e) { console.warn('Calentamiento', e); }
+    if (lente) lente.enabled = conLente;
   };
   // Carga completa, como un videojuego: antes de entrar se crean todas las nebulosas, se calculan todas las texturas,
   // llega el cielo, se compilan todos los programas de GPU (también los del sistema solar) y todo se sube a la
@@ -295,6 +303,14 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // con la mitad de llamadas y sin generar memoria temporal en cada cuadro (menos pausas del recolector en el móvil).
   const unaPasada = esc => esc.traverse(o => { for (const m of [].concat(o.material || [])) if (m.transparent && m.side === THREE.DoubleSide && m.blending === THREE.AdditiveBlending) m.forceSinglePass = true; });
   unaPasada(scene); unaPasada(solar.escena);
+  // Luces siempre presentes: three.js compila cada material con el número de luces visibles, y una luz que se oculta con
+  // su grupo (la casa vista desde un gigante) haría recompilar todos los materiales al llegar (un tirón la primera vez).
+  // Las luces puntuales pasan a la raíz de la escena y siguen a su ancla; tienen alcance limitado, así que lejos de su
+  // grupo no iluminan nada aunque sigan encendidas.
+  const lucesFijas = [];
+  scene.traverse(o => { if (o.isLight && !o.isAmbientLight && o.parent !== scene) lucesFijas.push(o); });
+  for (const luz of lucesFijas) { const ancla = new THREE.Object3D(); ancla.position.copy(luz.position); luz.parent.add(ancla); luz.removeFromParent(); scene.add(luz); luz.userData.ancla = ancla; }
+  const seguirLuces = () => { for (const luz of lucesFijas) { const a = luz.userData.ancla; let o = a; while (o && o.visible) o = o.parent; if (!o) luz.position.setFromMatrixPosition(a.matrixWorld); } };
   // Gas volumétrico a media resolución (capaVolumen.js): las nebulosas con volumen se pintan en su propia capa.
   const capaVolumen = crearCapaVolumen({ scene, renderer, uPR: nucleo.uPR, hdr: canvas.dataset.brillo3d === 'hdr' });
   const listo = (async () => {
@@ -1176,6 +1192,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       acompanar();
     }
     if (escenaActiva !== 'solar') { capaVolumen.dibujar(camera); telarana.dibujarGalaxias(renderer, camera); }   // capas a menor resolución: gas volumétrico (capaVolumen.js) y galaxias de la telaraña (telarana.js)
+    seguirLuces();
     try { if (document.body.dataset.supernovaAislada === 'true') conFocoSupernova(scene, cosmos.raiz, cosmos.supernova.grupo, () => composer.render()); else composer.render(); } catch (e) { suspendida = true; alProblema('No se ha podido dibujar el universo. Conservamos tu progreso; vuelve a intentarlo en 3D.'); console.error(e); }
     // El sistema solar se prepara (shaders y texturas) en un momento tranquilo tras la entrada,
     // no durante la carga: así se entra antes y el móvil trabaja menos al principio.
