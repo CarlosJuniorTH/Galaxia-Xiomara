@@ -18,6 +18,7 @@ import { crearContemplacion } from './ui/contemplacion.js';
 import { crearViaje } from './util/viaje.js';
 import { vigilarPaquetes } from './util/paquetes.js';
 import { crearMedidor } from './ui/medidor.js';
+import { cargaTerminada } from './util/dispositivo.js';
 
 let interfaz, escena, contemplacion, etapa = 'fuentes';
 const problema = texto => { document.getElementById('problema-texto').textContent = texto; document.getElementById('problema-3d').hidden = false; if (interfaz?.enRuta) interfaz.pausarRuta(true); };
@@ -125,6 +126,7 @@ try {
   etapa = 'preparación de shaders y texturas';
   await escena.listo;
   etapa = 'listo';
+  cargaTerminada();   // la carga llegó al final: no hubo cierre
   entrada.listo();
   crearMedidor(escena);
   if (location.hash === '#debug') window.__galaxia = { escena, recuerdos, interfaz, progreso, estrellas };

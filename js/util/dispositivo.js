@@ -20,3 +20,22 @@ const NIVELES = {
 };
 
 export const Q = modoCompatible ? { pr: 1, k: 0.42, cielo: 512, galaxiasLejanas: 9 } : NIVELES[calidad];
+
+// Protección contra cierres: si una carga no llegó a terminar (iOS cierra la página cuando le falta memoria), la siguiente
+// arranca en un modo más ligero en memoria (nivelSeguro 1: sin HDR y con menos puntos; 2: además menos resolución y
+// texturas). Tras varias cargas buenas seguidas se vuelve a probar el nivel anterior. Así nunca se queda en un cierre.
+const CLAVE_CARGA = 'xiomara:carga';
+let estadoCarga = { enCurso: false, nivel: 0, buenas: 0 };
+try { estadoCarga = { ...estadoCarga, ...JSON.parse(localStorage.getItem(CLAVE_CARGA) || '{}') }; } catch {}
+const forzado = new URLSearchParams(location.search).get('seguro');
+export const nivelSeguro = forzado !== null ? Math.max(0, Math.min(2, Number(forzado) || 0))
+  : estadoCarga.enCurso ? Math.min(2, (estadoCarga.nivel || 0) + 1) : (estadoCarga.nivel || 0);
+try { localStorage.setItem(CLAVE_CARGA, JSON.stringify({ enCurso: true, nivel: nivelSeguro, buenas: estadoCarga.enCurso ? 0 : estadoCarga.buenas || 0 })); } catch {}
+export function cargaTerminada() {
+  try {
+    const buenas = (estadoCarga.enCurso ? 0 : estadoCarga.buenas || 0) + 1;
+    const nivel = nivelSeguro > 0 && buenas >= 4 ? nivelSeguro - 1 : nivelSeguro;
+    localStorage.setItem(CLAVE_CARGA, JSON.stringify({ enCurso: false, nivel, buenas: nivel !== nivelSeguro ? 0 : buenas }));
+  } catch {}
+}
+

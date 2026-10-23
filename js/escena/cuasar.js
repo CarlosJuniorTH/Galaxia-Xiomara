@@ -10,6 +10,7 @@
 //  · rayos rojizos que brotan del núcleo (radiación).
 // Unidades locales del grupo (el grupo se escala desde cosmos.js).
 import * as THREE from 'three';
+import { nivelSeguro } from '../util/dispositivo.js';
 import { EXPOSICION } from './exposicion.js';
 import { esMovil } from '../util/dispositivo.js';
 
@@ -256,7 +257,7 @@ export function crearCuasar({ uScale, uPR, texGigante, texBrillo, texNebulosa })
           if (uH != 0.0) { fin = mix(fin, fin * vec3(0.85, 0.9, 1.25), 0.4); alfa *= 0.75; }   // capas exteriores: algo más frías y translúcidas
           alfa *= capa * mix(0.55, 1.0, smoothstep(0.08, 0.35, vC));
           gl_FragColor = vec4(fin * capa, alfa); }`;
-  const LADO_REM = esMovilCuasar ? 2048 : 4096;
+  const LADO_REM = nivelSeguro ? 1024 : esMovilCuasar ? 2048 : 4096;   // tras un cierre por memoria, la textura del remolino más pequeña
   const rtRemolino = new THREE.WebGLRenderTarget(LADO_REM, LADO_REM, { generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter });
   const texRemolino = rtRemolino.texture; texRemolino.colorSpace = THREE.NoColorSpace; texRemolino.anisotropy = 8;
   function hornearRemolino(renderer) {

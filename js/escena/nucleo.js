@@ -9,7 +9,7 @@ import { SalidaPass, LIMITE_HDR } from './salida.js';
 import { crearPasadaLente } from './lente.js';
 import { crearPasadaSalto } from './salto.js';
 import { crearContextoWebGL } from '../util/webgl.js';
-import { esMovil, Q, modoCompatible, calidadFija } from '../util/dispositivo.js';
+import { esMovil, Q, modoCompatible, calidadFija, nivelSeguro } from '../util/dispositivo.js';
 
 export const BRILLO_BASE = 0.45;
 
@@ -19,7 +19,7 @@ export function crearNucleo(canvas) {
   const seleccion = crearContextoWebGL(canvas, { antialias: !modoCompatible && !esMovil });
   const renderer = new THREE.WebGLRenderer({ canvas, context: seleccion.contexto, alpha: false });
   canvas.dataset.webgl = seleccion.api;
-  canvas.dataset.perfil3d = modoCompatible ? 'compatible' : calidadFija ? 'alta' : 'normal';
+  canvas.dataset.perfil3d = modoCompatible ? 'compatible' : calidadFija ? 'alta' : 'normal'; canvas.dataset.seguro = String(nivelSeguro);
   renderer.setClearColor(0x05010c, 1);
   // Cadena de color única: la pasada de salida codifica en sRGB y el lienzo se presenta
   // en sRGB en todas las pantallas. (Presentarlo como Display P3 sin convertir las
@@ -32,7 +32,7 @@ export function crearNucleo(canvas) {
   //    así que en móvil empieza en DPR 2 y la resolución dinámica de index.js la ajusta.
   //    La pasada de salida la reescala a la nativa con un enfoque adaptativo (salida.js).
   const prMaximo = Math.min(devicePixelRatio, Q.pr);
-  let pr = esMovil ? Math.min(prMaximo, 1.75) : prMaximo;   // 1,75 en el móvil: en una pantalla de DPR 3 no se distingue de 2 y el teléfono se calienta menos
+  let pr = esMovil ? Math.min(prMaximo, nivelSeguro >= 2 ? 1.25 : 1.75) : prMaximo;   // 1,75 en el móvil: en una pantalla de DPR 3 no se distingue de 2 y el teléfono se calienta menos
   renderer.setPixelRatio(pr);
   canvas.dataset.resolucion3d = String(pr);
   renderer.setSize(innerWidth, innerHeight);
@@ -64,7 +64,7 @@ export function crearNucleo(canvas) {
     ? !!(seleccion.contexto.getExtension('EXT_color_buffer_float') || seleccion.contexto.getExtension('EXT_color_buffer_half_float'))
     : !!seleccion.contexto.getExtension('EXT_color_buffer_half_float');
   let post = null, bloom = { strength: BRILLO_BASE }, lente = null, salto = null, pasadaEscena = null, escenaActiva = scene;
-  if (!modoCompatible && soportaHDR) {
+  if (!modoCompatible && soportaHDR && nivelSeguro < 1) {   // tras un cierre por memoria, sin HDR (menos memoria de GPU)
     try {
       post = new EffectComposer(renderer);
       post.setPixelRatio(pr); post.setSize(innerWidth, innerHeight);

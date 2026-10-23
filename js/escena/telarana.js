@@ -6,7 +6,7 @@
 // píxeles y bordes suaves (no líneas de 1 px): se ven finas y limpias de lejos, sin temblar ni pixelarse.
 // Las galaxias del catálogo (con su imagen y sus estrellas) viven sobre ella; estas luces son el resto.
 import * as THREE from 'three';
-import { esMovil } from '../util/dispositivo.js';
+import { esMovil, nivelSeguro } from '../util/dispositivo.js';
 import { generador, semillaDe, ceder } from '../util/azarSemilla.js';
 import { crearTelarana, puntoFilamento } from '../data/telarana.js';
 import { generarDatosTelarana } from './telaranaDatos.js';
@@ -98,7 +98,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   // misma luz total con menos de la mitad de trabajo para la GPU (en un iPhone la telaraña completa bajaba a ~10 FPS).
   // La compensación es suave (1/√f, no 1/f): con todo concentrado en menos puntos, cada uno se pasaba del umbral del
   // resplandor y la telaraña se volvía una niebla blanca. La exposición automática equilibra la luz total.
-  const MUESTRA = esMovil ? 0.45 : 1, uComp = { value: 1 / Math.sqrt(MUESTRA) }; let muestraActual = MUESTRA;
+  const MUESTRA = esMovil ? (nivelSeguro ? 0.3 : 0.45) : (nivelSeguro ? 0.6 : 1), uComp = { value: 1 / Math.sqrt(MUESTRA) }; let muestraActual = MUESTRA;
   const uPRgal = { value: esMovil ? 0.6 : 1 };   // las galaxias se pintan en su propia capa a resolución CSS (1 píxel de capa = 1 px CSS)
   const matGalaxias = new THREE.ShaderMaterial({ uniforms: { ...uniformes, uPR: uPRgal, uComp, uBrazos: { value: texturaBrazos() } },
     vertexShader: /* glsl */`uniform float uPR, uScale, uCasa, uComp; ${OCULTO} attribute vec3 aCol; attribute float aBrillo; varying vec3 vC; varying float vA, vRes, vAng, vInc, vBrazos, vTipo;

@@ -33,6 +33,7 @@ import { esMovil } from '../util/dispositivo.js';
 import { crearReguladorResolucion } from '../util/resolucion.js';
 import { crearPlanificador } from '../util/planificador.js';
 import { MUESTRAS as muestrasNube } from './nube.js';
+import { nivelSeguro } from '../util/dispositivo.js';
 import { esquivar, sinRepetidos } from '../util/ruta.js';
 import { planificarVuelo, DURACION } from '../util/vuelo.js';
 import { aMal, SEMIEJES_CORAZON, ESCALA_SUPERNOVA, PROGENITORA_RELATIVA, LLEGADA_GIGANTE } from '../data/escalaCosmica.js';
@@ -272,10 +273,17 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   restaurarAzar();
   // Calentamiento: un cuadro completo (escena, fondo y resplandor) dibujado una vez tras la portada, con todo
   // visible, para que ningún programa de GPU se compile por primera vez al entrar o durante un viaje.
+  // Todo (también lo oculto) se dibuja una vez en una imagen diminuta de 128×128 con el mismo formato que la escena: se
+  // preparan programas, búferes y texturas igual, pero la GPU apenas pinta. Antes se dibujaba TODO a la vez a pantalla
+  // completa en un único cuadro enorme: en un iPhone caliente o con poca batería tardaba tanto que iOS daba la página por
+  // colgada y la cerraba. Después, un cuadro normal (con lo visible) prepara el resplandor y la pasada final.
   const calentar = () => {
     const ocultos = []; scene.traverse(o => { if (!o.visible) { ocultos.push(o); o.visible = true; } });
-    try { telarana.dibujarGalaxias(renderer, camera); composer.render(); } catch (e) { console.warn('Calentamiento', e); }
+    const leer = nucleo.post?.readBuffer, rt = new THREE.WebGLRenderTarget(128, 128, { type: leer?.texture?.type ?? THREE.UnsignedByteType });
+    try { const previo = renderer.getRenderTarget(); renderer.setRenderTarget(rt); renderer.render(scene, camera); renderer.setRenderTarget(previo); } catch (e) { console.warn('Calentamiento', e); }
     for (const o of ocultos) o.visible = false;
+    rt.dispose();
+    try { telarana.dibujarGalaxias(renderer, camera); composer.render(); } catch (e) { console.warn('Calentamiento', e); }
   };
   // Carga completa, como un videojuego: antes de entrar se crean todas las nebulosas, se calculan todas las texturas,
   // llega el cielo, se compilan todos los programas de GPU (también los del sistema solar) y todo se sube a la
@@ -318,7 +326,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   let aligerado = 0;
   const aligerar = () => { if (aligerado >= ESCALONES.length) return; ESCALONES[aligerado][0](); aligerado++; canvas.dataset.aligerado = String(aligerado); };
   const recuperar = () => { if (!aligerado) return false; aligerado--; ESCALONES[aligerado][1](); canvas.dataset.aligerado = String(aligerado); return true; };
-  const regular = crearReguladorResolucion({ minimo: esMovil ? 1.5 : 1, maximo: esMovil ? Math.min(nucleo.prMaximo, 1.75) : nucleo.prMaximo, inicial: nucleo.resolucion, alAgotar: aligerar, alRecuperar: recuperar });
+  const regular = crearReguladorResolucion({ minimo: esMovil ? Math.min(1.5, nucleo.resolucion) : 1, maximo: esMovil ? Math.min(nucleo.prMaximo, Math.max(nucleo.resolucion, 1.75 - (nivelSeguro >= 2 ? 0.5 : 0))) : nucleo.prMaximo, inicial: nucleo.resolucion, alAgotar: aligerar, alRecuperar: recuperar });
   // El cambio de resolución rehace los búferes de la imagen (en un móvil, una pausa visible): nunca en mitad de un gesto
   // o de un viaje; espera a que se suelte el dedo o se llegue.
   let resolucionPendiente = null;
@@ -363,6 +371,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   const planificador = crearPlanificador({ interaccion: 60, contemplacion: ritmoAhorro ? 30 : 60, esperaMs: 4000 });
   let gesto = false, modoAnterior = null, cuadrosDibujados = 0, finGesto = -Infinity;
   const AMORTIGUACION = controls.dampingFactor;   // la de 60 FPS (nucleo.js)
+  const esfera = new THREE.Spherical(), desplazamientoCam = new THREE.Vector3(), muestrasGiro = []; let impulso = null;
   const marcarActividad = () => planificador.actividad(performance.now());
   for (const evento of ['pointerdown', 'wheel', 'keydown']) document.addEventListener(evento, marcarActividad, { passive: true });
   const capturador = crearCapturador({ obtener: () => nucleo.resolucion, fijar: v => { nucleo.fijarResolucion(v); regular.reiniciar(); } });
@@ -833,12 +842,18 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // Exportado para pruebas: cuánto mide el encuadre ahora y cuánto debería medir.
   const estadoEncuadre = () => ({ actual: camera.position.distanceTo(controls.target), ideal: distanciaIdeal()?.d ?? null, ajustando: !!ajuste });
   canvas.addEventListener('pointerdown', () => { if (mirada && !mirada.saliendo) mirarCasa(false); });
-  controls.addEventListener('start', () => { ajuste = null; gesto = true; marcarActividad(); controls.autoRotate = false; clearTimeout(retornoGiro); });
+  controls.addEventListener('start', () => { impulso = null; muestrasGiro.length = 0; ajuste = null; gesto = true; marcarActividad(); controls.autoRotate = false; clearTimeout(retornoGiro); });
   // En los destinos lejanos no hay giro automático: daría vueltas todo el cielo alrededor.
   // La cámara no gira sola en ningún lugar: el cielo (telaraña, nubes, estrellas) se queda quieto mientras se mira;
   // solo se mueve cuando la mueve quien mira.
   const giraSolo = () => false;
-  controls.addEventListener('end', () => { gesto = false; finGesto = performance.now(); marcarActividad(); setTimeout(aplicarResolucionPendiente, 2600); retornoGiro = setTimeout(() => { if (!vuelo && !pausa && giraSolo()) controls.autoRotate = true; }, 8000); });
+  controls.addEventListener('end', () => {
+    // Velocidad del gesto en sus últimas ~0,1 s (radianes por segundo): de ahí sale el impulso.
+    if (muestrasGiro.length > 1) { const a = muestrasGiro[0], b = muestrasGiro[muestrasGiro.length - 1], t = Math.max(16, b[0] - a[0]) / 1000;
+      let dth = b[1] - a[1]; dth -= Math.PI * 2 * Math.round(dth / (Math.PI * 2));
+      const vt = dth / t * 0.55, vp = (b[2] - a[2]) / t * 0.55; impulso = Math.abs(vt) + Math.abs(vp) > 0.15 ? { vt: THREE.MathUtils.clamp(vt, -6, 6), vp: THREE.MathUtils.clamp(vp, -4, 4) } : null; }
+    muestrasGiro.length = 0;
+    gesto = false; finGesto = performance.now(); marcarActividad(); setTimeout(aplicarResolucionPendiente, 2600); retornoGiro = setTimeout(() => { if (!vuelo && !pausa && giraSolo()) controls.autoRotate = true; }, 8000); });
   addEventListener('resize', () => { clearTimeout(esperaAjuste); esperaAjuste = setTimeout(reencuadrar, 220); nucleo.redimensionar(); regular.reiniciar(); planificador.pedirCuadro(); if (camera.view?.enabled) camera.setViewOffset(innerWidth, innerHeight, 0, desplazamiento, innerWidth, innerHeight); medirZonaLibre(); });
   document.addEventListener('visibilitychange', () => { prev = performance.now(); });
   canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); delete canvas.dataset.viaje; suspendida = true; vuelo?.resolver(false); vuelo = null; alProblema('El navegador ha pausado los gráficos. Tu viaje está guardado. Podemos volver a encender las estrellas.'); });
@@ -950,7 +965,20 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       } else cometaAntes = null;
       // Inercia de la cámara al soltar el dedo con tiempo real (como en los juegos): OrbitControls amortigua por cuadro;
       // el factor se ajusta a lo que ha durado este cuadro, así un cuadro más largo no frena el giro ni uno corto lo acelera.
-      if (!mirada) { controls.dampingFactor = 1 - Math.pow(1 - AMORTIGUACION, THREE.MathUtils.clamp(dtReal * 60, 0.25, 4)); controls.update(dt); }
+      // Con el dedo puesto la vista sigue al dedo casi al instante (como en los juegos: antes solo aplicaba el 8,5 % del
+      // movimiento por cuadro y se quedaba detrás del dedo, «dura»); al soltar, se desliza con la velocidad que llevaba.
+      if (!mirada) { const base = gesto ? 0.3 : AMORTIGUACION; controls.dampingFactor = 1 - Math.pow(1 - base, THREE.MathUtils.clamp(dtReal * 60, 0.25, 4)); controls.update(dt); }
+      // Impulso al soltar (como en los juegos): la vista sigue girando con la velocidad del gesto y frena con suavidad.
+      if (!mirada && !vuelo) {
+        esfera.setFromVector3(desplazamientoCam.copy(camera.position).sub(controls.target));
+        if (gesto) { muestrasGiro.push([ahora, esfera.theta, esfera.phi]); while (muestrasGiro.length && ahora - muestrasGiro[0][0] > 120) muestrasGiro.shift(); }
+        else if (impulso) {
+          esfera.theta += impulso.vt * dtReal; esfera.phi = THREE.MathUtils.clamp(esfera.phi + impulso.vp * dtReal, controls.minPolarAngle, controls.maxPolarAngle);
+          camera.position.copy(controls.target).add(desplazamientoCam.setFromSpherical(esfera)); camera.lookAt(controls.target);
+          const f = Math.exp(-dtReal * 3.2); impulso.vt *= f; impulso.vp *= f;
+          if (Math.abs(impulso.vt) + Math.abs(impulso.vp) < 0.02) impulso = null;
+        }
+      } else impulso = null;   // un viaje o «Mirar hacia casa» cancelan el impulso
     }
     if (ajuste && !vuelo) {
       // Mantiene la dirección actual de la cámara (su órbita) y cambia la distancia y el punto de mira.
