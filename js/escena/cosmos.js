@@ -426,6 +426,7 @@ export function crearCosmos({ uScale, uPR }) {
   // sombra tapa su propio disco y lo que hay detrás, pero no lo que queda delante.
   raiz.traverse(o => { o.renderOrder -= 20; }); decor.traverse(o => { o.renderOrder -= 20; });
   const camLocal = new THREE.Vector3(), normal = new THREE.Vector3(), vista = new THREE.Vector3(), cuaternion = new THREE.Quaternion(), base = new THREE.Matrix4();
+  let listaGrupos = null, discos = null;   // listas fijas para el cuadro (se crean una vez)
   return {
     raiz, decor,
     acentoCuasar: v => piezasCuasar.acento(v),
@@ -502,13 +503,14 @@ export function crearCosmos({ uScale, uPR }) {
       // Nada se oculta ni se agranda por estar seleccionado, por la distancia o por umbrales:
       // cada cuerpo tiene su posición y su tamaño fijos y lo lejano es pequeño por perspectiva
       // (docs/ESCALA-Y-ESPACIO.md).
-      for (const g of Object.values(gruposEstrella)) g.scale.setScalar(g.userData.base || 1);
+      const grupos = listaGrupos ??= Object.values(gruposEstrella);   // la misma lista siempre (sin memoria nueva por cuadro)
+      for (const g of grupos) g.scale.setScalar(g.userData.base || 1);
       sagitario.scale.setScalar(0.7 * ESCALA_SGR); pulsar.scale.setScalar(ESCALA_PULSAR); sn.grupo.scale.setScalar(ESCALA_SUPERNOVA);
       // El halo óptico de las estrellas (el destello de la lente/ojo, no la estrella) se mide en
       // pantalla: se reduce cuando la estrella está muy cerca para no tapar la escena.
-      for (const g of Object.values(gruposEstrella)) {
+      for (const g of grupos) {
         g.userData.k = Math.min(1, Math.max(0.12, (g.parent === decor ? g.position.length() : camara.distanceTo(g.position)) / DIST_ESTRELLAS));
-        for (const [h, base] of g.userData.halos) h.scale.setScalar(base * g.userData.k);
+        for (const hb of g.userData.halos) hb[0].scale.setScalar(hb[1] * g.userData.k);
       }
       for (const s of estrellas) s.nucleo.scale.setScalar(s.base * (0.92 + 0.08 * Math.sin(t * 1.3 + s.fase)) * (s.grupo ? s.grupo.userData.k : 1));
       for (const c of cometas) {
@@ -517,7 +519,9 @@ export function crearCosmos({ uScale, uPR }) {
         if (!c.g.visible) continue;
         c.curva.getPoint(avance, c.g.position);
         // Con vectores reutilizados (sin memoria nueva en cada cuadro: el recolector ya no frena a los cometas).
-        const eje = c.curva.getTangent(avance, ejeCometa).negate().lerp(auxCometa.copy(c.g.position).normalize(), 0.5).normalize();
+        // Tangente como la de three.js (dos puntos muy cercanos), sin los dos vectores nuevos que crea getTangent.
+        c.curva.getPoint(Math.max(0, avance - 1e-4), ejeCometa); c.curva.getPoint(Math.min(1, avance + 1e-4), auxCometa);
+        const eje = ejeCometa.sub(auxCometa).normalize().lerp(auxCometa.copy(c.g.position).normalize(), 0.5).normalize();
         const frente = frenteCometa.copy(c.g.position).negate().normalize(); frente.addScaledVector(eje, -frente.dot(eje)).normalize();   // la cola, en el plano que mira a Xiomara
         c.velo.quaternion.setFromRotationMatrix(base.makeBasis(eje, auxCometa.crossVectors(frente, eje), frente));
         c.velo.material.uniforms.uTime.value = t; c.velo.material.uniforms.uI.value = 0.75 * Math.min(1, avance * 8, (1 - avance) * 8);
@@ -539,7 +543,7 @@ export function crearCosmos({ uScale, uPR }) {
       discoAtras.material.uniforms.uT.value = t; discoDelante.material.uniforms.uT.value = t; for (const { superficie, late, fase } of superficies) { superficie.material.uniforms.uT.value = t; if (late) superficie.scale.setScalar(1 + 0.03 * Math.sin(t * 0.25 + fase)); }   // las rojas laten despacio
       for (const e of envolturas) e.material.uniforms.uT.value = t;
       delante.material.uniforms.uT.value = t;
-      for (const d of [discoAtras, discoDelante]) d.material.uniforms.uCentro.value.copy(gigantesco.position).multiplyScalar(raiz.scale.x).add(raiz.position);
+      for (const d of (discos ??= [discoAtras, discoDelante])) d.material.uniforms.uCentro.value.copy(gigantesco.position).multiplyScalar(raiz.scale.x).add(raiz.position);
       // El anillo mira a la cámara (a su posición, no a su orientación: no «persigue» la pantalla).
       // El anillo mira a la posición de la cámara (no a su orientación: no «persigue» la pantalla).
       anilloEHT.lookAt(camera.position); anilloEHT.material.uniforms.uT.value = t;
