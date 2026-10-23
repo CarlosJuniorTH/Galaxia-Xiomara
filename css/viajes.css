@@ -13,7 +13,7 @@
 /* Señal de Xiomara al mirar hacia casa: un anillo fino a su alrededor y su nombre con la distancia. */
 #marca-casa{position:fixed;left:0;top:0;z-index:20;pointer-events:none;opacity:0;transition:opacity .6s ease}
 #marca-casa.activa{opacity:1}
-#marca-casa i{position:absolute;left:calc(var(--r,30px) * -1);top:calc(var(--r,30px) * -1);width:calc(var(--r,30px) * 2);height:calc(var(--r,30px) * 2);border-radius:50%;border:1px solid #f3d7b999;box-shadow:0 0 18px #f3c9e033}
+#marca-casa i{position:absolute;left:calc(var(--r,30px) * -1);top:calc(var(--r,30px) * -1);width:calc(var(--r,30px) * 2);height:calc(var(--r,30px) * 2);border-radius:50%;border:1.5px solid #f3d7b9b3;box-shadow:0 0 0 4px #f3c9e012}   /* trazo nítido, sin halo difuso */
 #marca-casa span{position:absolute;left:50%;top:calc(var(--r,30px) + 10px);transform:translateX(-50%);white-space:nowrap;font:400 1rem 'Cormorant Garamond',serif;color:#f6e4ec;text-shadow:0 0 8px #000}
 #viaje-visual button{font:500 .6rem 'Quicksand',sans-serif;background:transparent;border:0;color:#d6bdce;cursor:pointer;min-height:44px;padding:8px;white-space:nowrap}
 #viaje-visual button:focus-visible{outline:2px solid #e8c6a0;outline-offset:4px;border-radius:10px}
@@ -29,11 +29,13 @@ body.en-ruta #viaje-visual,body.paseo-contemplar #viaje-visual,body.supernova-en
    flecha discreta en el borde indica hacia dónde girará la cámara. */
 #marca-destino{position:fixed;left:0;top:0;width:46px;height:46px;margin:-23px 0 0 -23px;z-index:20;pointer-events:none;opacity:0;transition:opacity .45s ease}
 #marca-destino.activa{opacity:1}
-#marca-destino i{position:absolute;inset:0;border-radius:50%;border:1px solid #f3d7b9cc;box-shadow:0 0 14px #f3c9e055,inset 0 0 10px #f3c9e033;transform:scale(1.6);transition:transform .7s cubic-bezier(.2,.8,.2,1),border-color .4s}
-#marca-destino i::before,#marca-destino i::after{content:'';position:absolute;left:50%;width:1px;height:7px;background:#f3d7b9;transform:translateX(-50%)}
+/* Nítido: el círculo cambia de tamaño con inset (se dibuja a su tamaño real; con scale se estiraba y quedaba borroso),
+   trazo fino y una banda tenue de borde nítido en vez del halo difuso. */
+#marca-destino i{position:absolute;inset:-14px;border-radius:50%;border:1.5px solid #f3d7b9e6;box-shadow:0 0 0 4px #f3c9e014;transition:inset .7s cubic-bezier(.2,.8,.2,1),border-color .4s}
+#marca-destino i::before,#marca-destino i::after{content:'';position:absolute;left:50%;width:1.5px;height:7px;margin-left:-.75px;background:#f3d7b9}
 #marca-destino i::before{top:-10px}#marca-destino i::after{bottom:-10px}
-#marca-destino.alineada i{transform:scale(1);border-color:#fff3e6}
-#marca-destino.fuera i{border-radius:0;border:0;box-shadow:none;transform:none}
-#marca-destino.fuera i::before{top:50%;left:50%;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:12px solid #f3d7b9cc;background:none;transform:translate(-50%,-50%) rotate(var(--giro,0deg))}
+#marca-destino.alineada i{inset:0;border-color:#fff3e6}
+#marca-destino.fuera i{inset:0;border-radius:0;border:0;box-shadow:none}
+#marca-destino.fuera i::before{top:50%;left:50%;width:0;height:0;margin:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:12px solid #f3d7b9cc;background:none;transform:translate(-50%,-50%) rotate(var(--giro,0deg))}
 #marca-destino.fuera i::after{display:none}
 @media(prefers-reduced-motion:reduce){#marca-destino i{transition:none}}

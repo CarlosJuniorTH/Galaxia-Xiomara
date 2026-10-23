@@ -101,8 +101,6 @@ try {
       } else { efectos.explosion(x, y, 14); efectos.texto(x, y, elegir(CONFIG.toques)); escena.besar(); }
     }
   });
-  // El giroscopio (efecto ventana) se activa con el toque de entrada: iOS pide permiso en un gesto.
-  for (const id of ['btn-entrar', 'btn-continuar']) document.getElementById(id)?.addEventListener('click', () => escena.activarGiroscopio(), { once: true });
   entrada.alEntrar(({ continuar } = {}) => {
     // Continuar: el vuelo de entrada lleva directamente al lugar (o al paso del recorrido).
     musica.reproducir(true); mensajes.iniciar(); setTimeout(efectos.programarFugaces, 4000);

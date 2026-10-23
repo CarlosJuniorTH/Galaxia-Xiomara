@@ -364,31 +364,11 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // Movimiento reducido: el universo sigue en 3D, pero la cámara no gira sola.
   const movimientoReducido = matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (movimientoReducido) controls.autoRotateSpeed = 0;
-  // Cámara que respira: el giro automático arranca suave (sin tirón) y, quieta en un lugar,
-  // la cámara se acerca y se aleja un poquito, como una respiración lenta. Con el giroscopio
-  // del móvil, inclinar el teléfono mueve el cielo unos grados (efecto ventana).
+  // Cámara que respira: el giro automático arranca suave (sin tirón). La vista la mueve solo el dedo: el efecto
+  // ventana del giroscopio (inclinar el teléfono movía el cielo unos grados) se quitó, en un móvil de verdad hacía que
+  // la vista se moviera sola de lado a lado y temblara con el pulso de la mano al arrastrar.
   const giroBase = controls.autoRotateSpeed;
   let giroSuave = 0, respira = 0;
-  const inclinacion = { x: 0, y: 0, mx: 0, my: 0, base: null };
-  function alInclinar(e) {
-    if (e.beta === null || e.gamma === null) return;
-    const angulo = screen.orientation?.angle ?? window.orientation ?? 0;
-    let x = e.gamma, y = e.beta;
-    if (angulo === 90) { x = e.beta; y = -e.gamma; } else if (angulo === -90 || angulo === 270) { x = -e.beta; y = e.gamma; }
-    if (!inclinacion.base) inclinacion.base = { x, y };
-    // La referencia sigue despacio a la postura: solo cuentan los cambios, no cómo se sujeta.
-    inclinacion.base.x += (x - inclinacion.base.x) * 0.004; inclinacion.base.y += (y - inclinacion.base.y) * 0.004;
-    const lim = v => Math.max(-14, Math.min(14, v));
-    inclinacion.mx = lim(x - inclinacion.base.x) * Math.PI / 180 * 0.22; inclinacion.my = lim(y - inclinacion.base.y) * Math.PI / 180 * 0.18;
-  }
-  let giroscopioActivo = false;
-  function activarGiroscopio() {
-    if (giroscopioActivo || movimientoReducido || !esMovil || typeof DeviceOrientationEvent === 'undefined') return;
-    const escuchar = () => { giroscopioActivo = true; addEventListener('deviceorientation', alInclinar); };
-    // iOS pide permiso (solo con HTTPS y tras un toque); Android lo da directamente.
-    if (typeof DeviceOrientationEvent.requestPermission === 'function') DeviceOrientationEvent.requestPermission().then(r => { if (r === 'granted') escuchar(); }).catch(() => {});
-    else escuchar();
-  }
   const camaraGuardada = { pos: new THREE.Vector3(), rot: new THREE.Quaternion() }, haciaObjetivo = new THREE.Vector3();
   // En pantallas táctiles, sin tocar (tras 4 s) se dibuja a 30 FPS y al tocar vuelve a 60: medido en un iPhone, a 60
   // continuos el teléfono se calentaba y a los pocos minutos bajaba su GPU a la mitad (28 FPS con TODO). ?ritmo=fluido: siempre 60.
@@ -573,8 +553,10 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     proyMarca.copy(ORIGEN_CASA).project(camera);
     const x = (proyMarca.x + 1) / 2 * vista.ancho, y = (1 - proyMarca.y) / 2 * vista.alto, rpx = 980 / camera.position.length() * vista.alto / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
     marcaCasa.classList.toggle('activa', !mirada.saliendo && mirada.t > 0.6 && proyMarca.z < 1);
-    marcaCasa.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`; marcaCasa.style.setProperty('--r', `${Math.max(18, rpx * 1.25).toFixed(1)}px`);
-    marcaCasa.querySelector('span').textContent = `Xiomara · ${mirada.distanciaMal < 10 ? mirada.distanciaMal.toFixed(1) : Math.round(mirada.distanciaMal)} millones de años luz`;
+    const dpr = devicePixelRatio || 1, px = v => Math.round(v * dpr) / dpr;   // en píxeles exactos de la pantalla: nítido
+    marcaCasa.style.transform = `translate(${px(x)}px, ${px(y)}px)`; marcaCasa.style.setProperty('--r', `${px(Math.max(18, rpx * 1.25))}px`);
+    const textoCasa = `Xiomara · ${mirada.distanciaMal < 10 ? mirada.distanciaMal.toFixed(1) : Math.round(mirada.distanciaMal)} millones de años luz`, rotulo = marcaCasa.querySelector('span');
+    if (rotulo.textContent !== textoCasa) rotulo.textContent = textoCasa;   // solo si cambia (cada cambio rehace el texto de la página)
     if (mirada.saliendo && mirada.t >= 1) { cieloProfundo.ampliar(1); for (const o of raicesLejanas) o.visible = true; mirada = null; estrellasLocales = -1; controls.enabled = true; delete canvas.dataset.mirandoCasa; marcaCasa.classList.remove('activa'); camera.fov = FOV_BASE; camera.updateProjectionMatrix(); camera.lookAt(controls.target); }
     else planificador.pedirCuadro();
   }
@@ -618,7 +600,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     controls.enabled = false; controls.autoRotate = false;
     return promesa;
   }
-  const FOV_BASE = 60, proyMarca = new THREE.Vector3();
+  const FOV_BASE = 60, proyMarca = new THREE.Vector3(), proyCentro = new THREE.Vector3(), adelante = new THREE.Vector3();
   // Señal del destino: estable (sin parpadeos). Su posición se suaviza, y los cambios de forma (círculo /
   // flecha en el borde) y de estado (alineada) tienen margen: no saltan de uno a otro en el límite.
   const marcaEstado = { x: null, y: null, fuera: false, alineada: false };
@@ -626,12 +608,21 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // Solo mientras la cámara se alinea con el destino (no mientras maniobra o rodea un gigante): así no baila.
     const visible = fase === 'alineacion' || fase === 'ruptura';
     marca.classList.toggle('activa', visible && fase !== 'ruptura');
-    if (!visible) { marcaEstado.x = null; return; }
+    if (!visible) {
+      marcaEstado.x = null;
+      // Tras el salto (ya invisible), vuelve a su forma inicial para el próximo viaje: abierto, no ya apuntado.
+      if (fase !== 'ruptura' && marcaEstado.alineada) { marcaEstado.alineada = false; marca.classList.remove('alineada'); }
+      return;
+    }
     camera.updateMatrixWorld();   // con la orientación de ESTE cuadro (antes usaba la del anterior: temblaba al girar)
     proyMarca.copy(centro).project(camera);
     const detras = proyMarca.z > 1, x = (proyMarca.x + 1) / 2 * vista.ancho, y = (1 - proyMarca.y) / 2 * vista.alto;
+    // Apuntado: el destino está donde mira la cámara. En el móvil la proyección está desplazada hacia la franja libre de
+    // la interfaz, así que ese punto no es el centro de la pantalla (antes nunca contaba como apuntado y el círculo no se cerraba).
+    camera.getWorldDirection(adelante); proyCentro.copy(camera.position).addScaledVector(adelante, 1000).project(camera);
+    const cx = (proyCentro.x + 1) / 2 * vista.ancho, cy = (1 - proyCentro.y) / 2 * vista.alto;
     const m = marcaEstado.fuera ? 52 : 30;   // histéresis en el borde
-    const fuera = detras || x < m || x > vista.ancho - m || y < m || y > vista.alto - m, aCentro = Math.hypot(x - vista.ancho / 2, y - vista.alto / 2);
+    const fuera = detras || x < m || x > vista.ancho - m || y < m || y > vista.alto - m, aCentro = Math.hypot(x - cx, y - cy);
     const alineada = !fuera && aCentro < (marcaEstado.alineada ? 70 : 36);
     if (fuera !== marcaEstado.fuera) { marcaEstado.fuera = fuera; marca.classList.toggle('fuera', fuera); }
     if (alineada !== marcaEstado.alineada) { marcaEstado.alineada = alineada; marca.classList.toggle('alineada', alineada); }
@@ -640,7 +631,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       px = vista.ancho / 2 + dx * (vista.ancho / 2 - 36); py = vista.alto / 2 + dy * (vista.alto / 2 - 36); marca.style.setProperty('--giro', `${Math.atan2(dy, dx) * 180 / Math.PI + 90}deg`); }
     if (marcaEstado.x === null) { marcaEstado.x = px; marcaEstado.y = py; }
     marcaEstado.x = px; marcaEstado.y = py;   // exactamente sobre el destino
-    marca.style.transform = `translate(${marcaEstado.x.toFixed(1)}px, ${marcaEstado.y.toFixed(1)}px)`;
+    // En píxeles exactos de la pantalla (sin medios píxeles, que la emborronaban).
+    const dpr = devicePixelRatio || 1;
+    marca.style.transform = `translate(${Math.round(marcaEstado.x * dpr) / dpr}px, ${Math.round(marcaEstado.y * dpr) / dpr}px)`;
   }
   // Llegada en órbita: la cámara se acerca hasta una esfera amplia alrededor del destino
   // (por el lado desde el que viene), lo BORDEA girando a su alrededor hasta el ángulo final
@@ -1181,17 +1174,15 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       });
       u.uAspecto.value = camera.aspect; nucleo.lente.enabled = alguna;
     }
-    // Respiración y giroscopio: desplazamientos temporales solo para este cuadro.
+    // Respiración y temblor del estallido: desplazamientos temporales solo para este cuadro.
     respira = 0;   // sin respiración: la cámara quieta no se acerca, aleja ni balancea (el cielo no se mueve al mirar)
-    inclinacion.x += (inclinacion.mx - inclinacion.x) * Math.min(1, dt * 5); inclinacion.y += (inclinacion.my - inclinacion.y) * Math.min(1, dt * 5);
-    const temporal = respira > 0.001 || Math.abs(inclinacion.x) + Math.abs(inclinacion.y) > 0.0005 || flash > 0.05;
+    const temporal = respira > 0.001 || flash > 0.05;
     if (temporal) {
       camaraGuardada.pos.copy(camera.position); camaraGuardada.rot.copy(camera.quaternion);
       const dist = haciaObjetivo.copy(controls.target).sub(camera.position).length();
       haciaObjetivo.normalize();
       camera.position.addScaledVector(haciaObjetivo, Math.sin(tiempo * 0.22) * dist * 0.014 * respira);
       camera.position.y += Math.sin(tiempo * 0.13 + 1.1) * dist * 0.006 * respira;
-      camera.rotateY(-inclinacion.x); camera.rotateX(-inclinacion.y);
       // La onda del estallido sacude un poco la cámara.
       if (flash > 0.05 && !movimientoReducido) { const fuerzaTemblor = flash * 0.012; camera.rotateX((Math.random() - 0.5) * fuerzaTemblor); camera.rotateY((Math.random() - 0.5) * fuerzaTemblor); }
       camera.updateMatrixWorld();
@@ -1228,7 +1219,6 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     listo,
     iniciar(destino = 'hogar', { duracion = 7 } = {}) { if (tEntrada !== null) return; tEntrada = tiempo; return viajar(destino, { duracion }); },
     actividad: marcarActividad,
-    activarGiroscopio,
     pedirCuadro: () => planificador.pedirCuadro(),
     get cuadrosDibujados() { return cuadrosDibujados; },
     viajar,

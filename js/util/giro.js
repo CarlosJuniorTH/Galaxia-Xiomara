@@ -8,15 +8,24 @@ import * as THREE from 'three';
 
 export function crearGiro({ canvas, camera, controls, sensibilidad = 1, alEmpezar = () => {}, alTerminar = () => {} }) {
   const esfera = new THREE.Spherical(), desp = new THREE.Vector3();
-  const punteros = new Set();
+  const punteros = new Map();   // dedo → su última posición (para seguir girando con el que queda tras un pellizco)
   let id = null, x = 0, y = 0, arrastrando = false;
   let objT = 0, objP = 0, camT = 0, camP = 0, velT = 0, velP = 0, sincronizado = false;
   const muestras = [];   // [tiempo, theta objetivo, phi objetivo] del dedo
   const limitar = p => THREE.MathUtils.clamp(p, controls.minPolarAngle, controls.maxPolarAngle);
   const leerCamara = () => { esfera.setFromVector3(desp.copy(camera.position).sub(controls.target)); camT = esfera.theta; camP = esfera.phi; };
 
+  // Empieza a arrastrar con este dedo desde (px, py).
+  function empezar(pid, px, py) {
+    leerCamara(); objT = camT; objP = camP; velT = velP = 0; sincronizado = true;
+    arrastrando = true; id = pid; x = px; y = py;
+    muestras.length = 0; muestras.push([performance.now(), objT, objP]);
+    alEmpezar();
+  }
   function soltar(e) {
     punteros.delete(e.pointerId);
+    // Tras un pellizco, el dedo que queda en la pantalla sigue girando (sin tener que levantarlo y volver a tocar).
+    if (!arrastrando && punteros.size === 1 && e.type === 'pointerup' && controls.enabled) { const [[pid, p]] = punteros; empezar(pid, p.x, p.y); return; }
     if (!arrastrando || e.pointerId !== id) return;
     arrastrando = false; id = null;
     // Velocidad del dedo: entre la muestra más reciente y la de hace ~80 ms (si el dedo se paró antes de soltar, ~0).
@@ -30,16 +39,17 @@ export function crearGiro({ canvas, camera, controls, sensibilidad = 1, alEmpeza
     alTerminar();
   }
   canvas.addEventListener('pointerdown', e => {
-    punteros.add(e.pointerId);
+    // El primer dedo de un gesto nuevo: si quedaba algún dedo «perdido» (un aviso de soltar que no llegó), se olvida;
+    // si no, el giro creería que hay dos dedos y no giraría más.
+    if (e.isPrimary) punteros.clear();
+    punteros.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (!controls.enabled) return;
     if (punteros.size > 1) { if (arrastrando) { arrastrando = false; id = null; velT = velP = 0; alTerminar(); } return; }   // pellizco: solo acercar
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-    leerCamara(); objT = camT; objP = camP; velT = velP = 0; sincronizado = true;
-    arrastrando = true; id = e.pointerId; x = e.clientX; y = e.clientY;
-    muestras.length = 0; muestras.push([performance.now(), objT, objP]);
-    alEmpezar();
+    empezar(e.pointerId, e.clientX, e.clientY);
   });
   addEventListener('pointermove', e => {
+    const p = punteros.get(e.pointerId); if (p) { p.x = e.clientX; p.y = e.clientY; }
     if (!arrastrando || e.pointerId !== id) return;
     const alto = canvas.clientHeight || innerHeight, k = 2 * Math.PI / alto * sensibilidad;
     objT -= (e.clientX - x) * k; objP = limitar(objP - (e.clientY - y) * k);
