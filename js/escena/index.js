@@ -34,6 +34,7 @@ import { crearReguladorResolucion } from '../util/resolucion.js';
 import { crearPlanificador } from '../util/planificador.js';
 import { MUESTRAS as muestrasNube } from './nube.js';
 import { crearGiro } from '../util/giro.js';
+import { crearZoom } from '../util/zoom.js';
 import { crearCapaVolumen } from './capaVolumen.js';
 import { nivelSeguro } from '../util/dispositivo.js';
 import { esquivar, sinRepetidos } from '../util/ruta.js';
@@ -878,6 +879,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // OrbitControls queda solo para acercar y alejar.
   controls.enableRotate = false;
   const giro = crearGiro({ canvas, camera, controls, sensibilidad: controls.rotateSpeed, alEmpezar: empezarGesto, alTerminar: terminarGesto });
+  // La rueda del ratón acerca y aleja con suavidad (util/zoom.js): antes cada paso se aplicaba de golpe en un cuadro.
+  const zoom = crearZoom({ canvas, camera, controls, alGesto: () => { empezarGesto(); terminarGesto(); } });
   addEventListener('resize', () => { clearTimeout(esperaAjuste); esperaAjuste = setTimeout(reencuadrar, 220); nucleo.redimensionar(); regular.reiniciar(); planificador.pedirCuadro(); if (camera.view?.enabled) camera.setViewOffset(innerWidth, innerHeight, 0, desplazamiento, innerWidth, innerHeight); medirZonaLibre(); });
   document.addEventListener('visibilitychange', () => { prev = performance.now(); });
   canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); delete canvas.dataset.viaje; suspendida = true; vuelo?.resolver(false); vuelo = null; alProblema('El navegador ha pausado los gráficos. Tu viaje está guardado. Podemos volver a encender las estrellas.'); });
@@ -992,6 +995,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       // OrbitControls (acercar/alejar) con su amortiguación ajustada al tiempo real; después, el giro propio (util/giro.js).
       if (!mirada) { controls.dampingFactor = 1 - Math.pow(1 - AMORTIGUACION, THREE.MathUtils.clamp(dtReal * 60, 0.25, 4)); controls.update(dt); }
       giro.actualizar(Math.min(0.05, dtReal), !mirada && !vuelo);
+      zoom.actualizar(Math.min(0.05, dtReal), !mirada && !vuelo);
     }
     if (ajuste && !vuelo) {
       // Mantiene la dirección actual de la cámara (su órbita) y cambia la distancia y el punto de mira.
