@@ -16,7 +16,7 @@
 //  G llegada      arco deliberado hasta el encuadre final, sin entrar nunca en el destino.
 // D, E, F y G comparten un único perfil de avance (velocidad continua).
 import * as THREE from 'three';
-import { holgura, cercanoSegmento } from './ruta.js';
+import { cercanoSegmento, segmentoLibre as libreSegmento } from './ruta.js';
 
 const V = () => new THREE.Vector3();
 const suave = t => t * t * t * (t * (t * 6 - 15) + 10);
@@ -32,10 +32,7 @@ export function duracionCrucero(longitud, { breve = false, reducido = false } = 
 }
 
 // ¿El segmento a→b libra los obstáculos? (mismas reglas que ruta.js: salida y llegada propias)
-function segmentoLibre(a, b, obstaculos, desde, hasta, margen = 1.05) {
-  const curva = new THREE.LineCurve3(a, b);
-  return holgura(curva, desde, hasta, obstaculos.map(o => ({ ...o, r: o.r * margen })), 80).minimo >= 1;
-}
+const segmentoLibre = (a, b, obstaculos, desde, hasta, margen = 1.05) => libreSegmento(a, b, obstaculos, desde, hasta, margen, 80);
 
 // Arco de aproximación alrededor del centro del destino, de q (en la recta) a hasta (encuadre).
 function arcoLlegada(q, hasta, centro) {
@@ -83,8 +80,16 @@ function perfilViaje({ camino, longitud, cercania, interes, desde, salidaCentro,
     }
     return guardar ? tabla : t;
   };
-  let lo = Math.log(1e-3), hi = Math.log(1e6);
-  for (let i = 0; i < 26; i++) { const mid = (lo + hi) / 2; if (simular(Math.exp(mid), false, Math.min(600, duracion + dt * 2)) > duracion) lo = mid; else hi = mid; }
+  // Búsqueda de k (la duración baja al subir k, casi como 1/k): primero una estimación con una sola simulación y un
+  // intervalo estrecho alrededor; si no la contiene, el intervalo amplio de siempre. Misma precisión (≈1e-4 en k,
+  // menos de un milisegundo en la duración) con la mitad de simulaciones: el viaje arranca sin tirón.
+  const limite = Math.min(600, duracion + dt * 2), tarda = lk => simular(Math.exp(lk), false, limite);
+  let lo = Math.log(1e-3), hi = Math.log(1e6), pasos = 26;
+  // Estimación: sin arranque ni frenada, la duración sería Σ ds / (k·d(s)); con ellos es algo mayor (k algo mayor).
+  let integral = 0; for (let i = 0; i < N; i++) integral += longitud / N / (0.5 * (sm[i] + sm[i + 1]));
+  const guia = Math.log(integral / duracion), a = guia - 0.3, b = guia + 1.1;
+  if (tarda(a) > duracion && !(tarda(b) > duracion)) { lo = a; hi = b; pasos = 14; }
+  for (let i = 0; i < pasos; i++) { const mid = (lo + hi) / 2; if (tarda(mid) > duracion) lo = mid; else hi = mid; }
   const k = Math.exp(hi), crudo = simular(k, true);
   // La velocidad se suaviza en el TIEMPO (gaussiana de ±0,45 s): a toda velocidad, en los vacíos, un
   // cuadro recorre más que la escala en la que cambia el perfil y la velocidad saltaba hasta un 37 %
@@ -193,7 +198,11 @@ export function planificarVuelo({ desde, miraDesde, hasta, mira, centro = mira, 
       w.normalize().multiplyScalar(k); for (let j = 0; j < 2 && i + j < nT; j++) crudo.set([w.x, w.y, w.z], (i + j) * 3);
     }
     const ventana = Math.round(0.7 / perfil.dt), g = Array.from({ length: ventana * 2 + 1 }, (_, j) => Math.exp(-Math.pow((j - ventana) / (ventana * 0.5), 2))), sumaG = g.reduce((a, b) => a + b, 0);
-    for (let i = 0; i < nT; i++) for (let c = 0; c < 3; c++) { let a = 0; for (let j = -ventana; j <= ventana; j++) { const k = Math.min(nT - 1, Math.max(0, i + j)); a += crudo[k * 3 + c] * g[j + ventana]; } desvio[i * 3 + c] = a / sumaG; }
+    // (Donde no hay nada en toda la ventana el resultado es cero: se salta sin calcular, mismo resultado.)
+    const usados = new Int32Array(nT + 1); for (let i = 0; i < nT; i++) usados[i + 1] = usados[i] + (crudo[i * 3] || crudo[i * 3 + 1] || crudo[i * 3 + 2] ? 1 : 0);
+    for (let i = 0; i < nT; i++) {
+      if (usados[Math.min(nT, i + ventana + 1)] === usados[Math.max(0, i - ventana)]) continue;
+      for (let c = 0; c < 3; c++) { let a = 0; for (let j = -ventana; j <= ventana; j++) { const k = Math.min(nT - 1, Math.max(0, i + j)); a += crudo[k * 3 + c] * g[j + ventana]; } desvio[i * 3 + c] = a / sumaG; } }
   }
   // La inclinación entra después de la ruptura (en 1,5 s): el salto siempre ocurre alineado con el corredor.
   const desvioEn = (tv, out) => { const i = Math.min(nT - 1, Math.max(0, Math.round(tv / perfil.dt))), k = THREE.MathUtils.smoothstep(tv, tRuptura, tRuptura + 1.5); return out.set(desvio[i * 3] * k, desvio[i * 3 + 1] * k, desvio[i * 3 + 2] * k); };

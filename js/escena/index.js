@@ -282,18 +282,21 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   const calentar = () => {
     // Todo visible y sin descartar lo que queda fuera de la cámara: así cada geometría se sube ya a la tarjeta gráfica
     // (si no, la primera vez que entra en pantalla —al volver a casa, al llegar a un universo— se sube en pleno viaje).
-    // También la escena del sistema solar (Rosa, Azul, la luna de las cartas), que se dibuja aparte.
-    const ocultos = [], recortados = [];
-    for (const esc of [scene, solar.escena]) esc.traverse(o => { if (!o.visible) { ocultos.push(o); o.visible = true; } if (o.frustumCulled) { recortados.push(o); o.frustumCulled = false; } });
+    // También las escenas que se dibujan aparte: el sistema solar (Rosa, Azul, la luna de las cartas) y la capa de las
+    // galaxias de la telaraña (sus bloques fuera de la vista se estrenaban al salir de casa en el primer viaje).
+    const ocultos = [], recortados = [], aparte = [scene, solar.escena, telarana.capaGalaxias].filter(Boolean);
+    for (const esc of aparte) esc.traverse(o => { if (!o.visible) { ocultos.push(o); o.visible = true; } if (o.frustumCulled) { recortados.push(o); o.frustumCulled = false; } });
     const leer = nucleo.post?.readBuffer, rt = new THREE.WebGLRenderTarget(128, 128, { type: leer?.texture?.type ?? THREE.UnsignedByteType });
-    try { const previo = renderer.getRenderTarget(); renderer.setRenderTarget(rt); renderer.render(scene, camera); renderer.render(solar.escena, camera); renderer.setRenderTarget(previo); } catch (e) { console.warn('Calentamiento', e); }
+    try { const previo = renderer.getRenderTarget(); renderer.setRenderTarget(rt); for (const esc of aparte) renderer.render(esc, camera); renderer.setRenderTarget(previo); } catch (e) { console.warn('Calentamiento', e); }
     for (const o of ocultos) o.visible = false;
     for (const o of recortados) o.frustumCulled = true;
     rt.dispose();
-    // La lente (cerca de los universos) solo se activa allí: se enciende en este cuadro para compilar su programa.
-    const lente = nucleo.lente, conLente = lente?.enabled; if (lente) lente.enabled = true;
+    // La lente (cerca de los universos) y el salto (el destello de los viajes) solo se activan allí: se encienden en
+    // este cuadro para que su programa quede listo y el primer viaje no los estrene con un tirón.
+    const pasadas = [nucleo.lente, nucleo.salto].filter(Boolean), antes = pasadas.map(p => p.enabled);
+    for (const p of pasadas) p.enabled = true;
     try { capaVolumen.dibujar(camera, 64); telarana.dibujarGalaxias(renderer, camera); composer.render(); } catch (e) { console.warn('Calentamiento', e); }
-    if (lente) lente.enabled = conLente;
+    pasadas.forEach((p, i) => { p.enabled = antes[i]; });
   };
   // Carga completa, como un videojuego: antes de entrar se crean todas las nebulosas, se calculan todas las texturas,
   // llega el cielo, se compilan todos los programas de GPU (también los del sistema solar) y todo se sube a la

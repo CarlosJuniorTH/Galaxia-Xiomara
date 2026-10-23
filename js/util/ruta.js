@@ -22,9 +22,9 @@ export function cercanoSegmento(a, b, c, fuera = new THREE.Vector3()) {
   const t = l2 > 0 ? THREE.MathUtils.clamp(tmp.subVectors(c, a).dot(ab) / l2, 0, 1) : 0;
   fuera.copy(a).addScaledVector(ab, t); return fuera.distanceTo(c);
 }
-const aplica = (o, p, desde, hasta) => {
-  const destinoDentro = hasta.distanceTo(o.c) <= o.r, salidaDentro = desde.distanceTo(o.c) < o.r;
-  if (destinoDentro && !(o.llegada && p.distanceTo(hasta) > o.r * 2.2)) return false;
+const aplica = (o, p, desde, hasta, r = o.r) => {
+  const destinoDentro = hasta.distanceTo(o.c) <= r, salidaDentro = desde.distanceTo(o.c) < r;
+  if (destinoDentro && !(o.llegada && p.distanceTo(hasta) > r * 2.2)) return false;
   if (salidaDentro && p.distanceTo(o.c) >= desde.distanceTo(o.c) * 0.95) return false;   // margen del 5 %: el giro inicial alrededor de casa
   return true;
 };
@@ -39,6 +39,17 @@ export function holgura(curva, desde, hasta, obstaculos, muestras = 2000) {
     if (d / o.r < minimo) { minimo = d / o.r; cual = k; }
   });
   return { minimo, obstaculo: cual };
+}
+
+// ¿El segmento a→b libra los obstáculos (con su radio × margen)? Lo mismo que holgura(...).minimo >= 1 sobre la recta
+// muestreada en `muestras` tramos, sin crear la curva ni copias de los obstáculos y parando en el primer choque.
+const pa = new THREE.Vector3(), pb = new THREE.Vector3(), qq = new THREE.Vector3();
+export function segmentoLibre(a, b, obstaculos, desde, hasta, margen = 1, muestras = 80) {
+  for (let i = 1; i <= muestras; i++) {
+    pa.lerpVectors(a, b, (i - 1) / muestras); if (i === muestras) pb.copy(b); else pb.lerpVectors(a, b, i / muestras);
+    for (const o of obstaculos) { const r = o.r * margen, d = cercanoSegmento(pa, pb, o.c, qq); if (d < r && aplica(o, qq, desde, hasta, r)) return false; }
+  }
+  return true;
 }
 
 // Desvía la curva alrededor de cada cuerpo que corta: se busca su punto de máxima aproximación y la
