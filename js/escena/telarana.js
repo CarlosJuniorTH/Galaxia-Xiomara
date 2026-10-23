@@ -96,7 +96,9 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   const uniformes = { uPR, uScale, uCamL: { value: new THREE.Vector3() }, uGigA: { value: Array.from({ length: 6 }, () => new THREE.Vector4(0, 0, 1, 2)) }, uGigB: { value: Array.from({ length: 6 }, () => new THREE.Vector4(0, 0, 0, 0)) }, uCasa: { value: 1 }, uRes: { value: new THREE.Vector2(1, 1) }, uF: { value: 800 } };
   // En el móvil se dibuja el 45 % de los puntos de la telaraña y cada uno lleva la luz de los que no se dibujan (uComp): la
   // misma luz total con menos de la mitad de trabajo para la GPU (en un iPhone la telaraña completa bajaba a ~10 FPS).
-  const MUESTRA = esMovil ? 0.45 : 1, uComp = { value: 1 / MUESTRA }; let muestraActual = MUESTRA;
+  // La compensación es suave (1/√f, no 1/f): con todo concentrado en menos puntos, cada uno se pasaba del umbral del
+  // resplandor y la telaraña se volvía una niebla blanca. La exposición automática equilibra la luz total.
+  const MUESTRA = esMovil ? 0.45 : 1, uComp = { value: 1 / Math.sqrt(MUESTRA) }; let muestraActual = MUESTRA;
   const uPRgal = { value: esMovil ? 0.6 : 1 };   // las galaxias se pintan en su propia capa a resolución CSS (1 píxel de capa = 1 px CSS)
   const matGalaxias = new THREE.ShaderMaterial({ uniforms: { ...uniformes, uPR: uPRgal, uComp, uBrazos: { value: texturaBrazos() } },
     vertexShader: /* glsl */`uniform float uPR, uScale, uCasa, uComp; ${OCULTO} attribute vec3 aCol; attribute float aBrillo; varying vec3 vC; varying float vA, vRes, vAng, vInc, vBrazos, vTipo;
@@ -223,20 +225,41 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   // Toda la telaraña es fija: sus matrices se calculan una vez y no se recorren en cada cuadro (menos CPU en el móvil).
   raiz.updateMatrixWorld(true); raiz.matrixWorldAutoUpdate = false;
   const tam = new THREE.Vector2(), aux = new V(); let gigantes = [];
+  const frustum = new THREE.Frustum(), mProy = new THREE.Matrix4(), esfera = new THREE.Sphere();
+  let cuadroExpo = 0, densidadWeb = 0, expoAuto = 1;
+  const DENSIDAD_COMODA = 0.85;   // luz de telaraña por píxel CSS con la que se ve bien (la del PC en los gigantes: 0,7–1,1)
   return {
     raiz, web, galaxias: bloquesGalaxias, nubes: bloquesNubes, cercano, polvoFil: bloquesPolvo, capaGalaxias, dibujarGalaxias,
     escalarCapaGalaxias(k) { escalaCapa = k; uPRgal.value = k; },
     escalaCapaInicial: esMovil ? 0.6 : 1, muestraInicial: MUESTRA,
     // Fracción de puntos que se dibuja en cada bloque (barajados), con la luz compensada.
-    fijarMuestra(f) { muestraActual = f; for (const grupo of [bloquesGalaxias, bloquesNubes, bloquesPolvo]) for (const t of grupo.children) { const b = t.userData.bloque; t.geometry.setDrawRange(b.a, Math.max(1, Math.ceil(b.n * f))); } uComp.value = 1 / f; },
+    fijarMuestra(f) { muestraActual = f; for (const grupo of [bloquesGalaxias, bloquesNubes, bloquesPolvo]) for (const t of grupo.children) { const b = t.userData.bloque; t.geometry.setDrawRange(b.a, Math.max(1, Math.ceil(b.n * f))); } uComp.value = 1 / Math.sqrt(f); },
     get escalaCapaGalaxias() { return escalaCapa; },
     // Unidos dibujan todos los puntos (no la muestra): la luz de cada uno vuelve a ser la normal.
-    unirBloques(si) { for (const [grupo, p] of unidos) { grupo.visible = !si; p.visible = si; } uComp.value = si ? 1 : 1 / muestraActual; },
+    get densidadWeb() { return densidadWeb; }, get expoAuto() { return expoAuto; },
+    unirBloques(si) { for (const [grupo, p] of unidos) { grupo.visible = !si; p.visible = si; } uComp.value = si ? 1 : 1 / Math.sqrt(muestraActual); },
     // Gigantes que tapan la telaraña: [{ centro, radio }] (coordenadas del mundo).
     fijarGigantes(lista) { gigantes = lista.slice(0, 6).map(g => ({ c: new V(g.centro.x - O.x, g.centro.y - O.y, g.centro.z - O.z), r: g.radio })); },
     actualizar(t, dt, ctx) { const { camera } = ctx;
       // En casa, más discreta: el cielo de Xiomara ya es rico; lejos de ella, la telaraña es el cielo.
-      uniformes.uCasa.value = (0.22 + 0.78 * THREE.MathUtils.smoothstep(camera.position.length(), 20000, 400000)) * (ctx.exposicion ?? 1);   // exposición automática (index.js)
+      // Exposición automática de la telaraña (como el ojo o una cámara): se estima cuánta luz de la telaraña cae en la
+      // pantalla —puntos dentro de la vista por su brillo a esa distancia, por píxel CSS— y si se amontona demasiado (mirar
+      // hacia el centro del universo, alejarse, viajar, una pantalla pequeña) se baja lo justo; si hay poca, se deja.
+      // Funciona igual en cualquier dirección, gigante, viaje o aparato.
+      if (++cuadroExpo % 3 === 0) {
+        camera.updateMatrixWorld(); frustum.setFromProjectionMatrix(mProy.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+        let luz = 0;
+        for (const [grupo, peso, ref] of [[bloquesPolvo, 1, 4500000], [bloquesNubes, 0.6, 3000000], [bloquesGalaxias, 5, 2500000]]) for (const t of grupo.children) {
+          const b = t.userData.bloque; esfera.center.set(b.centro[0] + O.x, b.centro[1] + O.y, b.centro[2] + O.z); esfera.radius = b.radio;
+          if (!frustum.intersectsSphere(esfera)) continue;
+          const d = Math.max(1, esfera.center.distanceTo(camera.position) - b.radio * 0.5);
+          luz += t.geometry.drawRange.count * uComp.value * peso * Math.min(2, Math.max(0.5, Math.sqrt(ref / d)));
+        }
+        densidadWeb = luz / Math.max(1, innerWidth * innerHeight);
+      }
+      const metaAuto = Math.min(1, Math.pow(DENSIDAD_COMODA / Math.max(1e-9, densidadWeb), 0.85));
+      expoAuto += (Math.max(0.12, metaAuto) - expoAuto) * Math.min(1, dt * 3);
+      uniformes.uCasa.value = (0.22 + 0.78 * THREE.MathUtils.smoothstep(camera.position.length(), 20000, 400000)) * expoAuto;
       const pr = uPR.value; uniformes.uRes.value.set(innerWidth * pr * 0.5, innerHeight * pr * 0.5);
       uniformes.uF.value = innerHeight / (2 * Math.tan(camera.fov * Math.PI / 360));
       rehacerCercano(camera.position);

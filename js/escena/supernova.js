@@ -2,6 +2,7 @@
 // nebulosa de corazón persistente. Los puntos se transforman en la GPU y las
 // texturas aditivas tienen fondo negro opaco para evitar artefactos en Safari.
 import * as THREE from 'three';
+import { EXPOSICION } from './exposicion.js';
 import { crearNube } from './nube.js';
 import { RADIO_REMANENTE_SUPERNOVA, PROGENITORA_RELATIVA as P } from '../data/escalaCosmica.js';
 import { crearRuido } from '../util/ruido.js';
@@ -281,8 +282,8 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
     pF.set([Math.cos(phi) * v, h, Math.sin(phi) * v], i * 3); dF.set([azar(), azar(), azar()], i * 3);
   }
   const gF = new THREE.BufferGeometry(); gF.setAttribute('position', new THREE.BufferAttribute(pF, 3)); gF.setAttribute('aDato', new THREE.BufferAttribute(dF, 3));
-  const fragmentos = new THREE.Points(gF, aditivo({ uE, uScale, uPR }, RUIDO + /* glsl */`
-    attribute vec3 aDato; uniform float uE, uScale, uPR; varying vec3 vC; varying float vA;
+  const fragmentos = new THREE.Points(gF, aditivo({ uE, uScale, uPR, uExpo: EXPOSICION }, RUIDO + /* glsl */`
+    attribute vec3 aDato; uniform float uE, uScale, uPR, uExpo; varying vec3 vC; varying float vA;
     void main(){
       // Chorros: las direcciones con más «dedo» van más lejos (la explosión no es una esfera lisa).
       float dedo = smoothstep(0.35, 0.8, fbm3(position * 2.5 + 11.0));
@@ -293,7 +294,7 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
       vC = mix(vC, vec3(1.0, 0.95, 0.75), smoothstep(0.35, 0.7, T)); vC = mix(vC, vec3(0.8, 0.88, 1.0), smoothstep(0.75, 1.0, T));
       vA = smoothstep(0.0, 0.12, uE) * (1.0 - smoothstep(6.0 + aDato.z * 3.0, 11.0 + aDato.z * 3.0, uE)) * (1.2 + T * 2.5);
       float px = (10.0 + aDato.z * 18.0 + T * 14.0) * ${escala.toFixed(3)} * uScale / max(1.0, -mv.z);
-      gl_PointSize = clamp(px, 1.5, 9.0 * uPR); vA *= min(1.0, px * px * 0.5);
+      gl_PointSize = clamp(px, 1.5, 9.0 * uPR); vA *= min(1.0, px * px * 0.5) * uExpo;   // exposición automática: en el móvil no se amontonan en manchas blancas
     }`, /* glsl */`varying vec3 vC; varying float vA;
     void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; if (d > 1.0) discard; float a = (exp(-d * d * 4.0) + exp(-d * 10.0) * 0.4) * vA; gl_FragColor = vec4(vC * a * 1.5, a); }`));
   fragmentos.frustumCulled = false; fragmentos.visible = false; explosion.add(fragmentos);

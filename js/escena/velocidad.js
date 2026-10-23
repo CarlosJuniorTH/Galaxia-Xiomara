@@ -76,9 +76,9 @@ export function crearVelocidad(camera, { reducido = false } = {}) {
     // Ruptura del salto: un destello puntual en el punto de fuga y un anillo fino que se expande (el destino sigue
     // visible a través: es luz aditiva, nunca una pantalla blanca). Sin halos difusos alrededor (se veían como una bola).
     fragmentShader: 'uniform float uOpacidad, uRuptura, uAnillo; varying vec2 vUv; void main(){ float r = length(vUv) * 2.0; float a = exp(-r * r * 900.0) * (1.0 - smoothstep(0.8, 1.0, r)) * uOpacidad;'   // solo un punto nítido en el punto de fuga (sin halo difuso: tapaba media pantalla)
-      + ' float anillo = exp(-pow((r - uAnillo) / (0.03 + uAnillo * 0.07), 2.0)) * (1.0 - uAnillo) * uRuptura * 2.4; float nucleo = exp(-r * r * 1500.0) * 2.6 * uRuptura;'
+      + ' float anillo = exp(-pow((r - uAnillo) / 0.012, 2.0)) * (1.0 - uAnillo) * uRuptura * 1.2; float nucleo = exp(-r * r * 1500.0) * 2.6 * uRuptura;'
       // Segundo anillo, rosado, algo detrás del primero (azulado): la luz se abre en un frente doble.
-      + ' float r2 = uAnillo * 0.72; float anillo2 = exp(-pow((r - r2) / (0.04 + r2 * 0.08), 2.0)) * (1.0 - uAnillo) * uRuptura * 1.5;'
+      + ' float r2 = uAnillo * 0.72; float anillo2 = exp(-pow((r - r2) / 0.014, 2.0)) * (1.0 - uAnillo) * uRuptura * 0.8;'   // anillos finos y nítidos que no se ensanchan (antes se volvían un halo difuso enorme)
       + ' float borde = 1.0 - smoothstep(0.9, 1.0, r); a *= borde;'
       + ' vec3 c = vec3(0.86, 0.92, 1.0) * (a + (anillo + nucleo) * borde) + vec3(1.0, 0.62, 0.86) * anillo2 * borde; gl_FragColor = vec4(c, a + (anillo + nucleo + anillo2) * borde); }',
     transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending
@@ -148,7 +148,7 @@ export function crearVelocidad(camera, { reducido = false } = {}) {
       foco.position.copy(u.uDir.value).multiplyScalar(L * 0.9 * u.uEscala.value);
       foco.scale.setScalar(L * 0.9 * u.uEscala.value * 0.1 * (0.8 + u.uFuerza.value * 0.6)); foco.quaternion.setFromUnitVectors(Z, haciaCam.copy(u.uDir.value).negate());
       foco.material.uniforms.uOpacidad.value = u.uFuerza.value * 0.55 * EXPOSICION.value;
-      foco.material.uniforms.uRuptura.value = ruptura; foco.material.uniforms.uAnillo.value = anillo;
+      foco.material.uniforms.uRuptura.value = ruptura * EXPOSICION.value; foco.material.uniforms.uAnillo.value = anillo;
       if (ruptura > 0) foco.scale.multiplyScalar(1 + anillo * 16);   // el anillo se abre hacia los bordes de la pantalla
       empuje = Math.max(0, empuje - dt * 1.5);
       mesh.visible = foco.visible = u.uFuerza.value > 0.015 || ruptura > 0.01;
