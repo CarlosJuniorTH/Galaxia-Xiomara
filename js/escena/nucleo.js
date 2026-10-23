@@ -42,7 +42,7 @@ export function crearNucleo(canvas) {
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
-  controls.dampingFactor = 0.055;
+  controls.dampingFactor = esMovil ? 0.085 : 0.055;   // con el dedo, inercia algo más corta: sigue al dedo y se para limpia (no flota)
   // Evita atravesar el núcleo y llenar toda la pantalla con el disco de acreción.
   controls.minDistance = 300;
   controls.maxDistance = 14000;
@@ -57,8 +57,11 @@ export function crearNucleo(canvas) {
 
   // Algunos controladores permiten WebGL pero no los búferes HDR del brillo.
   // El modo compatible conserva toda la escena 3D y evita ese postprocesado.
+  // Búferes de coma flotante para el HDR: en WebGL 2 basta con los de media precisión (EXT_color_buffer_half_float), que
+  // es lo que usa el compositor. Antes se exigía la extensión de precisión completa y un iPhone que solo ofrece la media
+  // caía al modo de 8 bits: sin resplandor y con la luz sumada (telaraña) saturada en blanco y sin color.
   const soportaHDR = seleccion.api === 'webgl2'
-    ? !!seleccion.contexto.getExtension('EXT_color_buffer_float')
+    ? !!(seleccion.contexto.getExtension('EXT_color_buffer_float') || seleccion.contexto.getExtension('EXT_color_buffer_half_float'))
     : !!seleccion.contexto.getExtension('EXT_color_buffer_half_float');
   let post = null, bloom = { strength: BRILLO_BASE }, lente = null, salto = null, pasadaEscena = null, escenaActiva = scene;
   if (!modoCompatible && soportaHDR) {

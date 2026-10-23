@@ -343,3 +343,8 @@ body.faro-en-curso #titulo,body.faro-en-curso #mensaje,body.faro-en-curso #btn-m
   border:1px solid rgba(255,200,230,.4);background:rgba(20,6,28,.86);color:#ffe9f4;
   font:600 .72rem 'Quicksand',sans-serif;letter-spacing:1px;white-space:nowrap;max-width:calc(100vw - 32px);
 }
+
+/* La tarjeta del lugar no atrapa el dedo: arrastrar sobre su texto gira el universo (como en el resto de la pantalla);
+   sus botones siguen respondiendo. En el móvil cubre buena parte de la mitad de abajo. */
+.lugar{pointer-events:none;}
+.lugar button,.lugar a,.lugar .lugar-extra{pointer-events:auto;}

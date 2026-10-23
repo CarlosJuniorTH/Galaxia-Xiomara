@@ -74,7 +74,7 @@ function enBloques({ atributos, bloques }, material, O, fraccion = 1) {
     const g = new THREE.BufferGeometry(); for (const [n, a] of Object.entries(attr)) g.setAttribute(n, a);
     g.setDrawRange(b.a, Math.max(1, Math.ceil(b.n * fraccion)));   // una muestra repartida (los puntos de cada bloque están barajados)
     g.boundingSphere = new THREE.Sphere(new THREE.Vector3(...b.centro), b.radio);
-    const t = new THREE.Points(g, material); t.renderOrder = -1.5;
+    const t = new THREE.Points(g, material); t.renderOrder = -1.5; t.userData.bloque = b;
     grupo.add(t);
   }
   return grupo;
@@ -96,7 +96,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   const uniformes = { uPR, uScale, uCamL: { value: new THREE.Vector3() }, uGigA: { value: Array.from({ length: 6 }, () => new THREE.Vector4(0, 0, 1, 2)) }, uGigB: { value: Array.from({ length: 6 }, () => new THREE.Vector4(0, 0, 0, 0)) }, uCasa: { value: 1 }, uRes: { value: new THREE.Vector2(1, 1) }, uF: { value: 800 } };
   // En el móvil se dibuja el 45 % de los puntos de la telaraña y cada uno lleva la luz de los que no se dibujan (uComp): la
   // misma luz total con menos de la mitad de trabajo para la GPU (en un iPhone la telaraña completa bajaba a ~10 FPS).
-  const MUESTRA = esMovil ? 0.45 : 1, uComp = { value: 1 / MUESTRA };
+  const MUESTRA = esMovil ? 0.45 : 1, uComp = { value: 1 / MUESTRA }; let muestraActual = MUESTRA;
   const uPRgal = { value: esMovil ? 0.6 : 1 };   // las galaxias se pintan en su propia capa a resolución CSS (1 píxel de capa = 1 px CSS)
   const matGalaxias = new THREE.ShaderMaterial({ uniforms: { ...uniformes, uPR: uPRgal, uComp, uBrazos: { value: texturaBrazos() } },
     vertexShader: /* glsl */`uniform float uPR, uScale, uCasa, uComp; ${OCULTO} attribute vec3 aCol; attribute float aBrillo; varying vec3 vC; varying float vA, vRes, vAng, vInc, vBrazos, vTipo;
@@ -226,9 +226,12 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   return {
     raiz, web, galaxias: bloquesGalaxias, nubes: bloquesNubes, cercano, polvoFil: bloquesPolvo, capaGalaxias, dibujarGalaxias,
     escalarCapaGalaxias(k) { escalaCapa = k; uPRgal.value = k; },
+    escalaCapaInicial: esMovil ? 0.6 : 1, muestraInicial: MUESTRA,
+    // Fracción de puntos que se dibuja en cada bloque (barajados), con la luz compensada.
+    fijarMuestra(f) { muestraActual = f; for (const grupo of [bloquesGalaxias, bloquesNubes, bloquesPolvo]) for (const t of grupo.children) { const b = t.userData.bloque; t.geometry.setDrawRange(b.a, Math.max(1, Math.ceil(b.n * f))); } uComp.value = 1 / f; },
     get escalaCapaGalaxias() { return escalaCapa; },
     // Unidos dibujan todos los puntos (no la muestra): la luz de cada uno vuelve a ser la normal.
-    unirBloques(si) { for (const [grupo, p] of unidos) { grupo.visible = !si; p.visible = si; } uComp.value = si ? 1 : 1 / MUESTRA; },
+    unirBloques(si) { for (const [grupo, p] of unidos) { grupo.visible = !si; p.visible = si; } uComp.value = si ? 1 : 1 / muestraActual; },
     // Gigantes que tapan la telaraña: [{ centro, radio }] (coordenadas del mundo).
     fijarGigantes(lista) { gigantes = lista.slice(0, 6).map(g => ({ c: new V(g.centro.x - O.x, g.centro.y - O.y, g.centro.z - O.z), r: g.radio })); },
     actualizar(t, dt, ctx) { const { camera } = ctx;

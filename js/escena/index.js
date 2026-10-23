@@ -306,9 +306,19 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // solo tras seis ventanas estables; si la subida no se sostiene, vuelve y fija ese techo.
   // Si con la resolución mínima el aparato sigue sin llegar a 60 FPS, se aligera lo más caro (las nebulosas con
   // volumen, con menos muestras por rayo), en dos escalones como mucho: fluido antes que perfecto en un móvil modesto.
+  // Escalones (como la calidad automática de los juegos): si el aparato no llega —un móvil modesto o uno caliente que ha
+  // bajado su GPU— se aligera paso a paso; cuando vuelve a ir sobrado durante un rato, se recupera en orden inverso.
+  const muestrasBase = muestrasNube.value;
+  const ESCALONES = [
+    [() => { muestrasNube.value = Math.max(8, Math.round(muestrasBase * 0.7)); }, () => { muestrasNube.value = muestrasBase; }],
+    [() => { muestrasNube.value = Math.max(8, Math.round(muestrasBase * 0.5)); }, () => { muestrasNube.value = Math.max(8, Math.round(muestrasBase * 0.7)); }],
+    [() => telarana.escalarCapaGalaxias(telarana.escalaCapaInicial * 0.75), () => telarana.escalarCapaGalaxias(telarana.escalaCapaInicial)],
+    [() => telarana.fijarMuestra(telarana.muestraInicial * 0.65), () => telarana.fijarMuestra(telarana.muestraInicial)]
+  ];
   let aligerado = 0;
-  const aligerar = () => { if (aligerado >= 2) return; aligerado++; muestrasNube.value = Math.max(8, Math.round(muestrasNube.value * 0.7)); canvas.dataset.aligerado = String(aligerado); };
-  const regular = crearReguladorResolucion({ minimo: esMovil ? 1.5 : 1, maximo: esMovil ? Math.min(nucleo.prMaximo, 1.75) : nucleo.prMaximo, inicial: nucleo.resolucion, alAgotar: aligerar });
+  const aligerar = () => { if (aligerado >= ESCALONES.length) return; ESCALONES[aligerado][0](); aligerado++; canvas.dataset.aligerado = String(aligerado); };
+  const recuperar = () => { if (!aligerado) return false; aligerado--; ESCALONES[aligerado][1](); canvas.dataset.aligerado = String(aligerado); return true; };
+  const regular = crearReguladorResolucion({ minimo: esMovil ? 1.5 : 1, maximo: esMovil ? Math.min(nucleo.prMaximo, 1.75) : nucleo.prMaximo, inicial: nucleo.resolucion, alAgotar: aligerar, alRecuperar: recuperar });
   // El cambio de resolución rehace los búferes de la imagen (en un móvil, una pausa visible): nunca en mitad de un gesto
   // o de un viaje; espera a que se suelte el dedo o se llegue.
   let resolucionPendiente = null;
@@ -500,6 +510,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   let mirada = null;
   const ORIGEN_CASA = new THREE.Vector3();
   const raicesLejanas = scene.children.filter(o => o.userData.capa === 'galaxiasLejanas');
+  let gruposGigantes = null;
   const raicesCasa = scene.children.filter(o => ['frases', 'amor', 'mundos', 'secretas', 'agujeroNegro'].includes(o.userData.capa));
   function mirarCasa(activar = !mirada || mirada.saliendo) {
     if (vuelo || tEntrada === null) return false;
@@ -1024,6 +1035,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     let metaExpo = THREE.MathUtils.lerp(1, 0.45, (marco - 1) / 0.6);   // 1 en horizontal, 0,45 en un móvil vertical
     // De viaje la cámara pasa junto a los filamentos (y entre los gigantes cruza el centro de la telaraña): en vertical, algo menos.
     if (vuelo && marco > 1) metaExpo *= 0.75;
+    // Sin HDR (búferes de 8 bits) la luz sumada se satura antes: algo menos.
+    if (canvas.dataset.brillo3d === 'sin-brillo') metaExpo *= 0.6;
     if (lejano && !vuelo) {
       const d = camera.position.distanceTo(lejano.centro);
       metaExpo *= marco > 1 ? THREE.MathUtils.clamp(Math.pow(lejano.dist / Math.max(1, d), 0.8), 0.3, 1) : THREE.MathUtils.clamp(lejano.dist * 2 / Math.max(1, d), 0.5, 1);   // en vertical, desde el encuadre normal
@@ -1047,6 +1060,15 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // «Mirar hacia casa» (teleobjetivo) se vuelven a ver.
     const casaVisible = camera.position.length() < 600000 || !!mirada;
     for (const o of raicesCasa) o.visible = casaVisible;
+    // Los gigantes que no se visitan y desde aquí miden menos de ~3 px no dibujan su detalle (en un móvil cada uno costaba
+    // varios FPS siendo un puntito); sus luces en el cielo se quedan. Al acercarse, vuelven enteros.
+    if (cuadrosDibujados % 10 === 0) {
+      gruposGigantes ??= (() => { const raizC = scene.children.find(o => o.userData.capa === 'cosmos'), w = new THREE.Vector3(), l = [];
+        for (const g of raizC?.children ?? []) { if (!g.isGroup) continue; g.getWorldPosition(w); const c = cosmos.cuerpos().find(c => c.id !== 'xiomara' && c.centro.distanceTo(w) < c.radio * 4); if (c) l.push({ g, c }); }
+        return l; })();
+      const focal = innerHeight / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
+      for (const { g, c } of gruposGigantes) g.visible = c.id === destinoActual || !!mirada || c.visible * focal / Math.max(1, camera.position.distanceTo(c.centro)) > 3;
+    }
     cieloProfundo.actualizar?.();
     planetas.actualizar(tiempo, dt, ctx); solar.actualizar(tiempo, camera);
     {

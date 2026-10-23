@@ -7,9 +7,10 @@
 //  · Sube 0,25 solo tras seis ventanas CONSECUTIVAS estables (9 s, p90 < 18,5 ms); cualquier
 //    ventana que no cumpla reinicia la cuenta (histéresis entre 18,5 y 19,5 ms).
 //  · Si una subida no se sostiene, vuelve atrás y fija ahí el techo para no oscilar.
-//  · Si ya está en el mínimo y sigue lento, avisa (alAgotar) para aligerar efectos (index.js).
+//  · Si ya está en el mínimo y sigue lento, avisa (alAgotar) para aligerar efectos (index.js); con margen estable,
+//    alRecuperar los devuelve uno a uno antes de volver a subir la resolución (el teléfono se ha enfriado).
 //  · reiniciar() descarta la ventana en curso (pausas, cambios de estado o de tamaño).
-export function crearReguladorResolucion({ minimo, maximo, inicial, paso = 0.25, ventanaMs = 1500, ventanasParaSubir = 6, alAgotar = () => {} }) {
+export function crearReguladorResolucion({ minimo, maximo, inicial, paso = 0.25, ventanaMs = 1500, ventanasParaSubir = 6, alAgotar = () => {}, alRecuperar = () => false }) {
   let actual = inicial, techo = maximo, tiempos = [], suma = 0, estables = 0, subio = false;
   function bajar(pasos) {
     estables = 0;
@@ -27,7 +28,11 @@ export function crearReguladorResolucion({ minimo, maximo, inicial, paso = 0.25,
     if (mediana > 19.5) return bajar(1);
     subio = false;
     if (p90 >= 18.5) { estables = 0; return null; }
-    if (++estables >= ventanasParaSubir && actual + paso <= techo + 1e-9) { actual += paso; estables = 0; subio = true; return actual; }
+    if (++estables >= ventanasParaSubir) {
+      // Con margen: primero se recupera lo que se aligeró (index.js) y luego la resolución.
+      if (alRecuperar()) { estables = 0; return null; }
+      if (actual + paso <= techo + 1e-9) { actual += paso; estables = 0; subio = true; return actual; }
+    }
     return null;
   }
   registrar.reiniciar = () => { tiempos = []; suma = 0; estables = 0; };
