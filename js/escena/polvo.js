@@ -2,6 +2,7 @@
 // (algunas brillan al girar); al viajar se estiran en la dirección del movimiento y pasan
 // rozando: se siente la velocidad aunque el cielo lejano no se mueva.
 import * as THREE from 'three';
+import { vista } from '../util/vista.js';
 
 const S = 1400;   // lado del cubo de polvo que acompaña a la cámara (se repite sin costuras)
 
@@ -42,8 +43,8 @@ export function crearPolvo({ scene, uPR }) {
   quad.setIndex([0, 2, 1, 2, 3, 1]);
   quad.setAttribute('aSemilla', new THREE.InstancedBufferAttribute(new Float32Array(semillas.flat()), 4));
   quad.instanceCount = n;
-  uniforms.uAspecto = { value: new THREE.Vector2(innerWidth, innerHeight) };
-  addEventListener('resize', () => uniforms.uAspecto.value.set(innerWidth, innerHeight));
+  uniforms.uAspecto = { value: new THREE.Vector2(vista.ancho, vista.alto) };
+  addEventListener('resize', () => uniforms.uAspecto.value.set(vista.ancho, vista.alto));
   const lineas = new THREE.Mesh(quad, new THREE.ShaderMaterial({
     uniforms,
     vertexShader: comun + /* glsl */`

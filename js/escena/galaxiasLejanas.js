@@ -13,6 +13,7 @@ import { crearCampoGalaxias } from './campoGalaxias.js';
 import { crearInteriorNebulosa } from './interiorNebulosa.js';
 import { DESCRIPTORES } from './formasGalaxia.js';
 import { universoCatalogo, ENCUENTROS } from '../data/catalogo.js';
+import { vista } from '../util/vista.js';
 
 // Texturas como en las fotografías (bulbo, brazos azulados, regiones HII rosadas, polvo),
 // calculadas en el Web Worker (texturasPlaneta.js).
@@ -118,14 +119,14 @@ export async function crearGalaxiasLejanas({ scene, uPR, uScale }) {
     },
     actualizar(t, dt, { camera }) {
       campo.actualizar(camera);
-      const f = innerHeight / (2 * Math.tan(camera.fov * Math.PI / 360));
+      const f = vista.alto / (2 * Math.tan(camera.fov * Math.PI / 360)), ahora = performance.now();   // un solo reloj por cuadro
       for (const n of listaNubes) {
         const d = Math.max(1, v.copy(n.pos).distanceTo(camera.position)), px = n.r * f / d;
         if (!n.malla && px > 1.2) prepararNube(n);
         // Por debajo de ~4 px el volumen no aporta forma y su polvo oscurecía un recuadro: no se dibuja.
         // Sin imagen aún, no se dibuja; al llegar, fundido. Se enciende muy despacio con su tamaño en pantalla (de 1,5 a 25 px): de lejos aparece tenue y va ganando
         // presencia al acercarse, sin encenderse de golpe.
-        if (n.malla) { const lista = n.tex.userData.lista, k = THREE.MathUtils.smoothstep(px, 1.5, 25) * (lista ? THREE.MathUtils.smoothstep(performance.now() - lista, 0, 2500) : 0); n.malla.visible = k > 0.002; n.malla.material.uniforms.uOpacidad.value = k * k; }
+        if (n.malla) { const lista = n.tex.userData.lista, k = THREE.MathUtils.smoothstep(px, 1.5, 25) * (lista ? THREE.MathUtils.smoothstep(ahora - lista, 0, 2500) : 0); n.malla.visible = k > 0.002; n.malla.material.uniforms.uOpacidad.value = k * k; }
         if (n.interior) { n.interior.visible = px > 20; n.interior.material.uniforms.uOpacidad.value = THREE.MathUtils.smoothstep(px, 20, 120); }
       }
     }

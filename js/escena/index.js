@@ -42,6 +42,7 @@ import { planificarVuelo, DURACION } from '../util/vuelo.js';
 import { aMal, SEMIEJES_CORAZON, ESCALA_SUPERNOVA, PROGENITORA_RELATIVA, LLEGADA_GIGANTE } from '../data/escalaCosmica.js';
 const RADIO_ESTRELLA = 110 * ESCALA_SUPERNOVA * PROGENITORA_RELATIVA;
 import { resolucionPostal, crearCapturador } from '../util/captura.js';
+import { vista } from '../util/vista.js';
 
 const OBJETIVO = new THREE.Vector3(0, 70, 0);
 // Figuras más pequeñas que la media para su distancia base (el planeta azul mide la mitad):
@@ -417,21 +418,21 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     .filter(el => !el.hidden && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden')
     .map(el => el.getBoundingClientRect());
   function medirZonaLibre() {
-    const estrecha = innerWidth <= 600 || innerWidth / innerHeight < 0.8;
+    const estrecha = vista.ancho <= 600 || vista.ancho / vista.alto < 0.8;
     if (!estrecha) { desplazamientoMeta = 0; fraccionZona = 1; return; }
     const arriba = Math.max(0, ...cajas(['#titulo', '#btn-tour', '.marca-universo', '.horarios']).map(r => r.bottom));
-    const abajo = Math.min(innerHeight, ...cajas(['#ruta', '#lugar', '#cometa-aviso']).map(r => r.top));
-    desplazamientoMeta = -desplazamientoZonaLibre(arriba, abajo, innerHeight);
+    const abajo = Math.min(vista.alto, ...cajas(['#ruta', '#lugar', '#cometa-aviso']).map(r => r.top));
+    desplazamientoMeta = -desplazamientoZonaLibre(arriba, abajo, vista.alto);
     // En casa, la galaxia algo más abajo: encima asoma la franja de cielo con los destinos.
-    if (destinoActual === 'hogar') desplazamientoMeta -= innerHeight * 0.13;
-    fraccionZona = Math.max(0, abajo - arriba) / innerHeight;
+    if (destinoActual === 'hogar') desplazamientoMeta -= vista.alto * 0.13;
+    fraccionZona = Math.max(0, abajo - arriba) / vista.alto;
   }
   setInterval(medirZonaLibre, 1500);
   function aplicarDesplazamiento(dt) {
     const anterior = desplazamiento;
     desplazamiento += (desplazamientoMeta - desplazamiento) * Math.min(1, dt * 2.5);
     if (Math.abs(desplazamiento) < 0.5 && desplazamientoMeta === 0) { if (camera.view?.enabled) camera.clearViewOffset(); desplazamiento = 0; return; }
-    if (Math.abs(desplazamiento - anterior) > 0.05 || !camera.view?.enabled) camera.setViewOffset(innerWidth, innerHeight, 0, desplazamiento, innerWidth, innerHeight);
+    if (Math.abs(desplazamiento - anterior) > 0.05 || !camera.view?.enabled) camera.setViewOffset(vista.ancho, vista.alto, 0, desplazamiento, vista.ancho, vista.alto);
   }
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 
@@ -445,7 +446,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     const candidatos = DESTINOS.filter(d => SOLARES.has(d.id) === enSolar).map(d => [d.id, v3(d.posicion), d.id === 'hogar' ? 95 : 120]);
     if (enSolar) candidatos.push(['gigante', CENTRO_GIGANTE.clone(), 260]);
     else { candidatos.push(['rosa', marcaSolar.position.clone(), 60]); if (mundos.cometaVisible) candidatos.push(['cometa', mundos.posicionCometa(), 90]); }
-    const escalaPx = innerHeight / 2 / Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+    const escalaPx = vista.alto / 2 / Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
     let mejor = null, mejorD = Infinity;
     for (const [id, pos, radio] of candidatos) {
       // El lugar donde ya se está no cuenta (tras una pista se mira una estrella, no el centro).
@@ -453,7 +454,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       const profundidad = pos.distanceTo(camera.position);
       centroToque.copy(pos).project(camera);
       if (centroToque.z < -1 || centroToque.z > 1) continue;
-      const px = (centroToque.x + 1) / 2 * innerWidth, py = (1 - centroToque.y) / 2 * innerHeight;
+      const px = (centroToque.x + 1) / 2 * vista.ancho, py = (1 - centroToque.y) / 2 * vista.alto;
       const alcance = Math.max(44, Math.min(160, radio / profundidad * escalaPx));
       const d = Math.hypot(px - x, py - y);
       if (d < alcance && d / alcance < mejorD) { mejorD = d / alcance; mejor = id; }
@@ -461,7 +462,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     return mejor;
   }
   function distanciaEncuadre(base) {
-    const aspecto = innerWidth / innerHeight;
+    const aspecto = vista.ancho / vista.alto;
     return base * Math.max(1, Math.min(1.8, 0.95 / aspecto));
   }
   // Viajes con intención: la cámara recorre una curva por puntos de paso propios de cada
@@ -484,7 +485,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       cometaInicio: destinoActual === 'cometa' ? mundos.posicionCometa() : null, perfil: paso.length > 0 || corriente >= 1,
       // Con qué pantalla y qué encuadre ideal se trazó esta curva: si gira o cambia la interfaz
       // durante el vuelo, la llegada se corrige al aterrizar (correccionAlLlegar).
-      vw: innerWidth, vh: innerHeight, idealSalida: idealDelVuelo(hasta.distanceTo(objetivo)) };
+      vw: vista.ancho, vh: vista.alto, idealSalida: idealDelVuelo(hasta.distanceTo(objetivo)) };
     if (!fija) { canvas.dataset.viaje = destinoActual; canvas.dataset.avance = '0'; }   // un recorrido contemplativo no es un viaje (sin su tarjeta)
     controls.enabled = false; controls.autoRotate = false;
     return promesa;
@@ -570,7 +571,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     cieloProfundo.ampliar(ampliacion);
     for (const o of raicesLejanas) o.visible = ampliacion > 0.08;
     proyMarca.copy(ORIGEN_CASA).project(camera);
-    const x = (proyMarca.x + 1) / 2 * innerWidth, y = (1 - proyMarca.y) / 2 * innerHeight, rpx = 980 / camera.position.length() * innerHeight / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
+    const x = (proyMarca.x + 1) / 2 * vista.ancho, y = (1 - proyMarca.y) / 2 * vista.alto, rpx = 980 / camera.position.length() * vista.alto / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
     marcaCasa.classList.toggle('activa', !mirada.saliendo && mirada.t > 0.6 && proyMarca.z < 1);
     marcaCasa.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`; marcaCasa.style.setProperty('--r', `${Math.max(18, rpx * 1.25).toFixed(1)}px`);
     marcaCasa.querySelector('span').textContent = `Xiomara · ${mirada.distanciaMal < 10 ? mirada.distanciaMal.toFixed(1) : Math.round(mirada.distanciaMal)} millones de años luz`;
@@ -612,7 +613,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     canvas.dataset.planMs = (performance.now() - t0Plan).toFixed(0);   // coste de planificar (diagnóstico)
     vuelo = { plan, curva: plan.trayectoria(), centroDesde, objetivo: mira.clone(), transcurrido: 0, duracion: plan.duracion, distanciaTotal: plan.camino.getLength(), llegada: hasta.distanceTo(mira),
       salida: Math.max(400, desde.distanceTo(centroDesde)), resolver, corriente: 0, perfil: false, centroDestino: centro.clone(), rupturaHecha: false,
-      vw: innerWidth, vh: innerHeight, idealSalida: idealDelVuelo(hasta.distanceTo(mira)) };
+      vw: vista.ancho, vh: vista.alto, idealSalida: idealDelVuelo(hasta.distanceTo(mira)) };
     canvas.dataset.viaje = destinoActual; canvas.dataset.avance = '0'; canvas.dataset.fase = 'seleccion';
     controls.enabled = false; controls.autoRotate = false;
     return promesa;
@@ -628,15 +629,15 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     if (!visible) { marcaEstado.x = null; return; }
     camera.updateMatrixWorld();   // con la orientación de ESTE cuadro (antes usaba la del anterior: temblaba al girar)
     proyMarca.copy(centro).project(camera);
-    const detras = proyMarca.z > 1, x = (proyMarca.x + 1) / 2 * innerWidth, y = (1 - proyMarca.y) / 2 * innerHeight;
+    const detras = proyMarca.z > 1, x = (proyMarca.x + 1) / 2 * vista.ancho, y = (1 - proyMarca.y) / 2 * vista.alto;
     const m = marcaEstado.fuera ? 52 : 30;   // histéresis en el borde
-    const fuera = detras || x < m || x > innerWidth - m || y < m || y > innerHeight - m, aCentro = Math.hypot(x - innerWidth / 2, y - innerHeight / 2);
+    const fuera = detras || x < m || x > vista.ancho - m || y < m || y > vista.alto - m, aCentro = Math.hypot(x - vista.ancho / 2, y - vista.alto / 2);
     const alineada = !fuera && aCentro < (marcaEstado.alineada ? 70 : 36);
     if (fuera !== marcaEstado.fuera) { marcaEstado.fuera = fuera; marca.classList.toggle('fuera', fuera); }
     if (alineada !== marcaEstado.alineada) { marcaEstado.alineada = alineada; marca.classList.toggle('alineada', alineada); }
     let px = x, py = y;
     if (fuera) { let dx = (proyMarca.x) * (detras ? -1 : 1), dy = (-proyMarca.y) * (detras ? -1 : 1); const k = Math.max(Math.abs(dx), Math.abs(dy)) || 1; dx /= k; dy /= k;
-      px = innerWidth / 2 + dx * (innerWidth / 2 - 36); py = innerHeight / 2 + dy * (innerHeight / 2 - 36); marca.style.setProperty('--giro', `${Math.atan2(dy, dx) * 180 / Math.PI + 90}deg`); }
+      px = vista.ancho / 2 + dx * (vista.ancho / 2 - 36); py = vista.alto / 2 + dy * (vista.alto / 2 - 36); marca.style.setProperty('--giro', `${Math.atan2(dy, dx) * 180 / Math.PI + 90}deg`); }
     if (marcaEstado.x === null) { marcaEstado.x = px; marcaEstado.y = py; }
     marcaEstado.x = px; marcaEstado.y = py;   // exactamente sobre el destino
     marca.style.transform = `translate(${marcaEstado.x.toFixed(1)}px, ${marcaEstado.y.toFixed(1)}px)`;
@@ -685,7 +686,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // libre la cabecera y el texto, y coloca el centro del corazón en el centro de esa franja,
   // entero y con margen, en vertical y en horizontal.
   function franjaSupernova() {
-    const H = innerHeight, estrecha = innerWidth <= 600 || innerWidth / innerHeight < 0.8;
+    const H = vista.alto, estrecha = vista.ancho <= 600 || vista.ancho / vista.alto < 0.8;
     const cab = document.querySelector('#supernova-amor .sn-cabecera')?.getBoundingClientRect();
     const msg = document.querySelector('#supernova-amor .sn-mensaje')?.getBoundingClientRect();
     const arriba = cab && cab.height ? cab.bottom + 14 : H * 0.08;
@@ -701,7 +702,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     const dir = new THREE.Vector3(0, 0, 1).applyQuaternion(q), arriba = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
     const escala = sn.corazon.getWorldScale(new THREE.Vector3()).x, caja = sn.cajaCorazon;
     const c = sn.corazon.localToWorld(caja.getCenter(new THREE.Vector3())), mitad = caja.getSize(new THREE.Vector3()).multiplyScalar(0.5 * escala);
-    const H = innerHeight, tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2), estrecha = innerWidth <= 600 || innerWidth / innerHeight < 0.8;
+    const H = vista.alto, tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2), estrecha = vista.ancho <= 600 || vista.ancho / vista.alto < 0.8;
     let fraccion, yc;
     if (modo === 'ceremonia') { const { arriba: a, abajo: b } = franjaSupernova(); fraccion = (b - a) / H; yc = 1 - (a + b) / H; }
     // En vertical la proyección ya se desplaza a la franja libre (medirZonaLibre).
@@ -723,7 +724,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // La cámara gira despacio hacia el destino, sale recta hacia él (ya enfocado) y se detiene
     // delante, a la distancia a la que se ve entero: sin rodeos, subidas ni giros al llegar.
     const desde = camera.position.clone(), dir = desde.clone().sub(o.centro).normalize();
-    let dist = o.distancia * Math.max(1, Math.min(1.6, 0.95 / (innerWidth / innerHeight))), hasta = o.centro.clone().addScaledVector(dir, dist), mira = o.centro;
+    let dist = o.distancia * Math.max(1, Math.min(1.6, 0.95 / (vista.ancho / vista.alto))), hasta = o.centro.clone().addScaledVector(dir, dist), mira = o.centro;
     // Se llega de frente, por el lado desde el que se viene: la cámara apunta todo el viaje al destino.
     lejano = { id, centro: o.centro, dist };
     // Al corazón ya nacido se llega por delante (mira a casa), encuadrado como los demás lugares.
@@ -777,14 +778,14 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     if (id !== 'hogar') objetivo.add(v3(d?.foco || [0, -15, 0]));
     let offset;
     if (id === 'hogar') {
-      const aspecto = innerWidth / innerHeight, { distancia, elevacion } = encuadreHogar(aspecto);
+      const aspecto = vista.ancho / vista.alto, { distancia, elevacion } = encuadreHogar(aspecto);
       // En pantallas anchas se conserva exactamente el vector de escritorio.
       offset = aspecto >= 0.8 ? new THREE.Vector3(distancia * 0.2, distancia * 0.42, distancia * 0.88)
         : new THREE.Vector3(0.2, 0, 0.88).normalize().multiplyScalar(Math.cos(elevacion) * distancia).setY(Math.sin(elevacion) * distancia);
     } else {
       // Se mide la franja libre con la tarjeta del nuevo destino ya actualizada.
       medirZonaLibre();
-      const aspecto = innerWidth / innerHeight, base = d?.distancia || 530;
+      const aspecto = vista.ancho / vista.alto, base = d?.distancia || 530;
       const dist = distanciaDestino(base * (aspecto < 0.95 ? TAMANO_FIGURA[id] || 1 : 1), aspecto, fraccionZona);
       // Se llega desde el lado iluminado (la luz sale del centro de la galaxia), girando
       // unos 40° para ver el relieve en tres cuartos con el terminador a un lado.
@@ -799,7 +800,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       }
       offset = haciaLuz.multiplyScalar(dist).setY(dist * (d?.altura ?? 0.2));
       // Horizontal bajo (móvil girado): la figura se aparta de la tarjeta de la izquierda.
-      if (innerHeight < 620 && innerWidth > innerHeight && innerWidth <= 900) {
+      if (vista.alto < 620 && vista.ancho > vista.alto && vista.ancho <= 900) {
         const derecha = new THREE.Vector3().crossVectors(offset.clone().negate(), EJE_Y).normalize();
         objetivo.addScaledVector(derecha, -base * 0.32);
       }
@@ -824,7 +825,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // (barras del navegador que aparecen y desaparecen) no reencuadran.
   let encuadre = null, ajuste = null, esperaAjuste = 0;
   function distanciaIdeal() {
-    const aspecto = innerWidth / innerHeight, id = destinoActual;
+    const aspecto = vista.ancho / vista.alto, id = destinoActual;
     // Durante la explosión el encuadre ya es el del corazón que se forma (la cámara se retira a él).
     if (lejano?.id === 'supernova' && (cosmos.supernova.estado === 'remanente' || cosmos.supernova.desdeEstallido !== null || cosmos.supernova.fase === 'silencio')) { const e = encuadreCorazon('lugar'); return { d: e.distancia, mira: e.objetivo }; }
     if (lejano) { const o = lejano.id === 'gigante' ? { distancia: 680 } : cosmos.objetivo(lejano.id); return o ? { d: o.distancia * ESCALA_CIELO * Math.max(1, Math.min(1.6, 0.95 / aspecto)) } : null; }
@@ -833,21 +834,21 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     medirZonaLibre();
     // Punto de mira del lugar; en horizontal bajo (móvil girado) se aparta de la tarjeta, como al llegar.
     const mira = v3(d.posicion).add(v3(d.foco || [0, -15, 0])), base = d.distancia || 530;
-    if (innerHeight < 620 && innerWidth > innerHeight && innerWidth <= 900) mira.addScaledVector(new THREE.Vector3().crossVectors(controls.target.clone().sub(camera.position), EJE_Y).normalize(), -base * 0.32);
+    if (vista.alto < 620 && vista.ancho > vista.alto && vista.ancho <= 900) mira.addScaledVector(new THREE.Vector3().crossVectors(controls.target.clone().sub(camera.position), EJE_Y).normalize(), -base * 0.32);
     return { mira, d: distanciaDestino((d.distancia || 530) * (aspecto < 0.95 ? TAMANO_FIGURA[id] || 1 : 1), aspecto, fraccionZona) };
   }
   // Solo los vuelos que van al encuadre del destino (su llegada coincide con la distancia ideal
   // ±25 %) se corrigen al aterrizar; un vuelo a otra cosa (entrar en el sistema solar, acercarse
   // a la estrella antes de repetir) no se reescala con un encuadre que no es el suyo.
   function idealDelVuelo(llegada) { const d = distanciaIdeal()?.d; return d > 0 && Math.abs(llegada / d - 1) < 0.25 ? d : undefined; }
-  const fijarEncuadre = () => { const n = distanciaIdeal(); encuadre = n ? { ...n, vw: innerWidth, vh: innerHeight } : null; };
+  const fijarEncuadre = () => { const n = distanciaIdeal(); encuadre = n ? { ...n, vw: vista.ancho, vh: vista.alto } : null; };
   function reencuadrar({ interfaz = false } = {}) {
     if (vuelo || !encuadre || tEntrada === null) return;
     if (interfaz) { if (gesto || ajuste) return; }   // nunca contra un gesto ni encima de otro ajuste
-    else if (innerWidth === encuadre.vw && Math.abs(innerHeight - encuadre.vh) / encuadre.vh < 0.2) return;
+    else if (vista.ancho === encuadre.vw && Math.abs(vista.alto - encuadre.vh) / encuadre.vh < 0.2) return;
     medirZonaLibre(); const n = distanciaIdeal(); if (!n) return;
     if (interfaz && !cambioInterfazApreciable(encuadre.d, n.d)) return;
-    const r = n.d / encuadre.d; encuadre = { ...n, vw: innerWidth, vh: innerHeight };
+    const r = n.d / encuadre.d; encuadre = { ...n, vw: vista.ancho, vh: vista.alto };
     if (lejano) lejano.dist = n.d;
     const actual = camera.position.distanceTo(controls.target);
     if (!CERCA[destinoActual]) controls.minDistance *= r;
@@ -881,7 +882,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   const giro = crearGiro({ canvas, camera, controls, sensibilidad: controls.rotateSpeed, alEmpezar: empezarGesto, alTerminar: terminarGesto });
   // La rueda del ratón acerca y aleja con suavidad (util/zoom.js): antes cada paso se aplicaba de golpe en un cuadro.
   const zoom = crearZoom({ canvas, camera, controls, alGesto: () => { empezarGesto(); terminarGesto(); } });
-  addEventListener('resize', () => { clearTimeout(esperaAjuste); esperaAjuste = setTimeout(reencuadrar, 220); nucleo.redimensionar(); regular.reiniciar(); planificador.pedirCuadro(); if (camera.view?.enabled) camera.setViewOffset(innerWidth, innerHeight, 0, desplazamiento, innerWidth, innerHeight); medirZonaLibre(); });
+  addEventListener('resize', () => { clearTimeout(esperaAjuste); esperaAjuste = setTimeout(reencuadrar, 220); nucleo.redimensionar(); regular.reiniciar(); planificador.pedirCuadro(); if (camera.view?.enabled) camera.setViewOffset(vista.ancho, vista.alto, 0, desplazamiento, vista.ancho, vista.alto); medirZonaLibre(); });
   document.addEventListener('visibilitychange', () => { prev = performance.now(); });
   canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); delete canvas.dataset.viaje; suspendida = true; vuelo?.resolver(false); vuelo = null; alProblema('El navegador ha pausado los gráficos. Tu viaje está guardado. Podemos volver a encender las estrellas.'); });
   canvas.addEventListener('webglcontextrestored', () => { suspendida = false; prev = performance.now(); document.getElementById('problema-3d')?.setAttribute('hidden', ''); });
@@ -973,7 +974,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
         // Si la pantalla giró o cambió la interfaz DURANTE el vuelo, la curva llevó la cámara al
         // punto bueno para la situación anterior: se corrige con el mismo ajuste suave del giro en
         // reposo (conserva la órbita, solo cambia la distancia: no atraviesa ni reescala nada).
-        const correccion = correccionAlLlegar({ vwVuelo: fin.vw, vhVuelo: fin.vh, vw: innerWidth, vh: innerHeight,
+        const correccion = correccionAlLlegar({ vwVuelo: fin.vw, vhVuelo: fin.vh, vw: vista.ancho, vh: vista.alto,
           distanciaActual: camera.position.distanceTo(controls.target), distanciaIdeal: encuadre?.d, idealSalida: fin.idealSalida });
         if (correccion && fin.idealSalida) {
           ajuste = { t: 0, desdeMira: controls.target.clone(), aMira: encuadre?.mira ? encuadre.mira.clone() : controls.target.clone(), ...correccion };
@@ -1111,13 +1112,13 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       gruposGigantes ??= (() => { const raizC = scene.children.find(o => o.userData.capa === 'cosmos'), w = new THREE.Vector3(), l = [];
         for (const g of raizC?.children ?? []) { if (!g.isGroup) continue; g.getWorldPosition(w); const c = cosmos.cuerpos().find(c => c.id !== 'xiomara' && c.centro.distanceTo(w) < c.radio * 4); if (c) l.push({ g, c }); }
         return l; })();
-      const focal = innerHeight / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
+      const focal = vista.alto / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
       for (const { g, c } of gruposGigantes) g.visible = c.id === destinoActual || !!mirada || c.visible * focal / Math.max(1, camera.position.distanceTo(c.centro)) > 3;
     }
     cieloProfundo.actualizar?.();
     planetas.actualizar(tiempo, dt, ctx); solar.actualizar(tiempo, camera);
     {
-      const sn = cosmos.supernova, c = sn.grupo.getWorldPosition(luzCorazon.position), f = innerHeight / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
+      const sn = cosmos.supernova, c = sn.grupo.getWorldPosition(luzCorazon.position), f = vista.alto / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
       const px = SEMIEJES_CORAZON[0] / Math.max(1, c.distanceTo(camera.position)) * f, fundido = 1 - THREE.MathUtils.smoothstep(px, 4, 12);
       const comprime = Math.pow(Math.max(1, 1.5 / Math.max(px, 0.02)), 1.0);   // GAMMA_LUZ = 0,5 (campoGalaxias.js)
       uLuzCorazon.value = sn.estado === 'remanente' ? fundido * Math.min(4, 0.16 * 4 * px * px * comprime / (0.1678 * 16)) : 0;
@@ -1315,7 +1316,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       const enSolar = escenaActiva === 'solar';
       // Solo cuenta lo que hay en la escena que se ve (la principal o el sistema solar).
       const mundo = mundos.probarToque(x, y, camera); if (mundo && !(mundo.id && SOLARES.has(mundo.id) !== enSolar) && !(enSolar && mundo.tipo !== 'destino')) return mundo;
-      ndc.set(x / innerWidth * 2 - 1, 1 - y / innerHeight * 2); ray.setFromCamera(ndc, camera);
+      ndc.set(x / vista.ancho * 2 - 1, 1 - y / vista.alto * 2); ray.setFromCamera(ndc, camera);
       if (enSolar) { const hit = ray.intersectObjects(planetas.objetos, false)[0]; if (hit) return { tipo: 'destino', id: hit.object.userData.destino }; }
       else { const estrella = secretas.probarToque(x, y); if (estrella >= 0) return { tipo: 'estrella', id: estrella }; }
       const cercano = destinoCercano(x, y);
@@ -1386,13 +1387,13 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     posicionEstrella: i => secretas.posicion(i),
     dondeEstrella(i) {
       const v = secretas.posicion(i); if (!v) return null; v.project(camera);
-      return { x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight, visible: v.z > -1 && v.z < 1 };
+      return { x: (v.x + 1) / 2 * vista.ancho, y: (1 - v.y) / 2 * vista.alto, visible: v.z > -1 && v.z < 1 };
     },
     dondeNodo(i) {
       const nodos = scene.getObjectsByProperty('isSprite', true).find(s => s.userData.nodo === i);
       if (!nodos) return null;
       const v = nodos.getWorldPosition(new THREE.Vector3()).project(camera);
-      return { x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight };
+      return { x: (v.x + 1) / 2 * vista.ancho, y: (1 - v.y) / 2 * vista.alto };
     },
     marcarEstrella: i => { secretas.marcar(i); pulso = 1; },
     reunirEstrellas: indices => secretas.reunir(indices),
@@ -1405,7 +1406,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     capturar() {
       if (suspendida || document.hidden) return Promise.reject(new Error('Vuelve al universo para guardar la postal.'));
       // Resolución máxima con presupuesto de memoria; se restaura en éxito, error o tiempo agotado.
-      return capturador(resolucionPostal(innerWidth, innerHeight, nucleo.prMaximo), () => new Promise((resolve, reject) => {
+      return capturador(resolucionPostal(vista.ancho, vista.alto, nucleo.prMaximo), () => new Promise((resolve, reject) => {
         const timer = setTimeout(() => { captura = null; reject(Error('La postal no pudo terminarse. Vuelve al universo e inténtalo otra vez.')); }, 6000);
         captura = { timer, resolver: canvas => {
           try { const copia = document.createElement('canvas'); copia.width = canvas.width; copia.height = canvas.height; copia.getContext('2d').drawImage(canvas, 0, 0); resolve(copia); }

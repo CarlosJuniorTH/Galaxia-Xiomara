@@ -1,6 +1,7 @@
 // Efectos 2D sobre la galaxia: estrellas fugaces, explosiones de corazones y fuegos artificiales
 import { esMovil } from '../util/dispositivo.js';
 import { trazarCorazon, azar } from '../util/dibujo.js';
+import { vista } from '../util/vista.js';
 
 const COLORES = ['#ff4f97', '#ff86bd', '#ffc2dc', '#ffffff', '#d68bff', '#ff2d7a', '#ffd27a'];
 
@@ -20,7 +21,7 @@ export function crearEfectos() {
 
   function ajustar() {
     const dpr = Math.min(devicePixelRatio, 2);
-    W = innerWidth; H = innerHeight;
+    W = vista.ancho; H = vista.alto;
     lienzo.width = W * dpr; lienzo.height = H * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }

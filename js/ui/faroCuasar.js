@@ -4,6 +4,7 @@
 // cancela sola al salir del cuásar, viajar, ocultar la pestaña o girar el teléfono: entonces no
 // queda ninguna frase, luz ni cámara bloqueada. Los textos están en js/data/universo.js.
 import { FARO_CUASAR } from '../data/universo.js';
+import { vista } from '../util/vista.js';
 
 const $ = id => document.getElementById(id);
 const espera = ms => new Promise(r => setTimeout(r, ms));
@@ -11,7 +12,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
 export function crearFaroCuasar({ escena, progreso, mostrarLectura, alCambiar = () => {} }) {
   const caja = $('faro-frase'), texto = $('faro-frase-texto'), saltar = $('faro-saltar');
   const reducido = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let estado = 'inactivo', revision = 0, visto = false, acentoRaf = 0, anchoInicio = innerWidth, altoInicio = innerHeight;
+  let estado = 'inactivo', revision = 0, visto = false, acentoRaf = 0, anchoInicio = vista.ancho, altoInicio = vista.alto;
 
   const vigente = mia => mia === revision && estado === 'secuencia' && escena.destino === 'cuasar';
   function frase(t) {
@@ -39,7 +40,7 @@ export function crearFaroCuasar({ escena, progreso, mostrarLectura, alCambiar = 
 
   async function iniciar() {
     if (estado !== 'inactivo' || escena.destino !== 'cuasar' || escena.viajando) return false;
-    estado = 'secuencia'; const mia = ++revision; anchoInicio = innerWidth; altoInicio = innerHeight;
+    estado = 'secuencia'; const mia = ++revision; anchoInicio = vista.ancho; altoInicio = vista.alto;
     document.body.classList.add('faro-en-curso'); saltar.hidden = false;
     const [a, b, c, d] = FARO_CUASAR.frases;
     try {
@@ -96,7 +97,7 @@ export function crearFaroCuasar({ escena, progreso, mostrarLectura, alCambiar = 
   // Girar el teléfono (o cambiar mucho la ventana) durante el recorrido lo cancela: la cámara queda libre.
   addEventListener('resize', () => {
     if (estado !== 'secuencia') return;
-    if ((innerWidth > innerHeight) !== (anchoInicio > altoInicio) || Math.abs(innerWidth - anchoInicio) > 120) cancelar();
+    if ((vista.ancho > vista.alto) !== (anchoInicio > altoInicio) || Math.abs(vista.ancho - anchoInicio) > 120) cancelar();
   });
 
   return {

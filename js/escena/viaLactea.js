@@ -17,6 +17,7 @@
 import * as THREE from 'three';
 import { gauss, azar } from '../util/dibujo.js';
 import { sitioDestino } from './cosmos.js';
+import { vista } from '../util/vista.js';
 
 export const RADIO_VIA_LACTEA = 1300;   // ≈ 66 000 años luz de radio con 51 al por unidad (licencia: algo mayor que la real para que el aparato de Sagitario A* no la domine)
 
@@ -161,7 +162,7 @@ export function crearViaLactea({ scene, uPR }) {
   return {
     grupo, centro, radio: R, normal,
     actualizar(camera) {
-      const f = innerHeight / (2 * Math.tan(camera.fov * Math.PI / 360));
+      const f = vista.alto / (2 * Math.tan(camera.fov * Math.PI / 360));
       uFocal.value = f;
       const z = Math.max(1, -v.copy(centro).applyMatrix4(camera.matrixWorldInverse).z), radioPx = R * f / Math.max(z, 1);
       // Brillo superficial constante: con N puntos de tamaño fijo, la luz total debe crecer con el área.

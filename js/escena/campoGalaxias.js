@@ -15,6 +15,7 @@ import { generador, semillaDe } from '../util/azarSemilla.js';
 import { PALETAS_GALAXIA } from './texturasPlaneta.js';
 import { componentesGalaxia, componentesAndromeda, componentesColision, paso } from './formasGalaxia.js';
 import { crearRuido } from '../util/ruido.js';
+import { vista } from '../util/vista.js';
 
 const gauss = (rnd = Math.random) => { let u = 0, v = 0; while (!u) u = rnd(); while (!v) v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
 // Compresión perceptiva de la luz no resuelta (licencia declarada, como el tamaño de las estrellas en
@@ -228,7 +229,7 @@ export function crearCampoGalaxias({ lista, texturas, descriptores, uPR }) {
     activas: () => [...activas].map(g => g.estrellas),
     actualizar(camera) {
       if (!calibrado) calibrar();
-      uFocal.value = innerHeight / (2 * Math.tan(camera.fov * Math.PI / 360));
+      uFocal.value = vista.alto / (2 * Math.tan(camera.fov * Math.PI / 360));
       // Estrellas por galaxia: se preparan a 24 px (antes del fundido, que empieza a 35) y se liberan
       // por debajo de 12. Con la profundidad en la vista, como los sombreadores; por la distancia
       // también, para tenerlas listas antes de girar hacia ellas. Como mucho dos nuevas por cuadro.

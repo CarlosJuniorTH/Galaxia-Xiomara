@@ -5,6 +5,7 @@
 // Para que el gas no quede pintado encima de lo sólido (la estrella del púlsar, la sombra de un agujero negro), la capa
 // registra antes la profundidad de los objetos opacos del cosmos y el gas se dibuja con esa profundidad.
 import * as THREE from 'three';
+import { vista } from '../util/vista.js';
 
 const CAPA_VOLUMEN = 2, CAPA_OPACOS = 3;
 
@@ -53,7 +54,7 @@ export function crearCapaVolumen({ scene, renderer, uPR, hdr }) {
       if (!volumenes || (!lado && !hayGas(camera))) { compuesto.visible = false; return; }
       // Calentamiento: el material de solo profundidad se compila ya (con una pieza que siempre está en pantalla).
       if (lado) { muestra.layers.set(CAPA_OPACOS); scene.add(muestra); }
-      const pr = uPR.value * 0.5, w = lado || Math.max(1, Math.round(innerWidth * pr)), h = lado || Math.max(1, Math.round(innerHeight * pr));
+      const pr = uPR.value * 0.5, w = lado || Math.max(1, Math.round(vista.ancho * pr)), h = lado || Math.max(1, Math.round(vista.alto * pr));
       if (rt.width !== w || rt.height !== h) rt.setSize(w, h);
       const previo = renderer.getRenderTarget(), alfa = renderer.getClearAlpha(), autoClear = renderer.autoClear, fondo = scene.background, mascara = camera.layers.mask, auto = scene.matrixWorldAutoUpdate;
       renderer.getClearColor(color);

@@ -12,6 +12,7 @@ import { texBrillo, texDestello, texTexto, texSobre, texFlor, texFlorRedonda, li
 import { crearDestellos, materialPuntos, geometriaPuntos } from './materiales.js';
 import { texCrateres, crearDosEstrellas } from './planetas.js';
 import { crearCometa } from './cometa.js';
+import { vista } from '../util/vista.js';
 const vector = a => new THREE.Vector3(...a);
 const EJE_Z = new THREE.Vector3(0, 0, 1), giroRueda = new THREE.Quaternion();
 
@@ -529,7 +530,7 @@ export function crearMundos({ scene, uScale, uPR }, { alConstelar = () => {}, co
     // Un punto de la ruta postal en coordenadas del mundo (ángulo en su plano).
     puntoRuta(angulo) { correo.updateMatrixWorld(true); return ruta.localToWorld(new THREE.Vector3(Math.cos(angulo) * RADIO_RUTA, 12, Math.sin(angulo) * RADIO_RUTA)); },
     probarToque(x, y, camera) {
-      ndc.set(x / innerWidth * 2 - 1, 1 - y / innerHeight * 2); ray.setFromCamera(ndc, camera);
+      ndc.set(x / vista.ancho * 2 - 1, 1 - y / vista.alto * 2); ray.setFromCamera(ndc, camera);
       raiz.updateMatrixWorld(true);
       // Un destello fino conserva una zona de toque de 44 px; no es necesario
       // convertir la estrella en un halo gigante para poder unirla con el dedo.
@@ -538,7 +539,7 @@ export function crearMundos({ scene, uScale, uPR }, { alConstelar = () => {}, co
         for (const nodo of luces) {
           nodo.getWorldPosition(proyectado).project(camera);
           if (proyectado.z < -1 || proyectado.z > 1) continue;
-          const dx = (proyectado.x + 1) * innerWidth / 2 - x, dy = (1 - proyectado.y) * innerHeight / 2 - y;
+          const dx = (proyectado.x + 1) * vista.ancho / 2 - x, dy = (1 - proyectado.y) * vista.alto / 2 - y;
           const d = dx * dx + dy * dy;
           if (d < distancia) { distancia = d; cercano = nodo; }
         }
@@ -629,7 +630,7 @@ export function crearMundos({ scene, uScale, uPR }, { alConstelar = () => {}, co
       posP.needsUpdate = true; puente.material.uniforms.uTime.value = t;
       // En pantallas estrechas la tarjeta ya muestra el nombre del lugar visitado: su
       // etiqueta 3D se atenúa para no repetirlo justo encima. Las demás se siguen viendo.
-      const estrecha = innerWidth / innerHeight < 0.95;
+      const estrecha = vista.ancho / vista.alto < 0.95;
       for (const e of etiquetas) { const meta = estrecha && e.userData.etiquetaDestino === foco ? 0 : 0.8; e.material.opacity += (meta - e.material.opacity) * Math.min(1, dt * 3); }
       // Constelación: trazo, luces y relleno al completarla.
       const total = puntosHilo.length;

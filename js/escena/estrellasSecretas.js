@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { escalaLimitada } from '../util/encuadre.js';
 import { texCorazonBrillo, texBrillo, texAnillo } from './texturas.js';
 import { crearDestellos } from './materiales.js';
+import { vista } from '../util/vista.js';
 
 const ROSA = new THREE.Color(0xff6fb5);
 const DORADO = new THREE.Color(0xffd27a);
@@ -66,7 +67,7 @@ export function crearEstrellasSecretas({ scene, camera, uScale, uPR }, cantidad,
     reiniciar() { for (const s of estrellas) { s.userData.encontrada = false; s.material.color.copy(ROSA); } },
     // Devuelve el índice de la estrella tocada o -1
     probarToque(x, y) {
-      v.set((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1);
+      v.set((x / vista.ancho) * 2 - 1, -(y / vista.alto) * 2 + 1);
       ray.setFromCamera(v, camera);
       // Zona de toque más generosa que el dibujo (dedos en celular)
       for (const s of estrellas) s.scale.multiplyScalar(1.8);
@@ -124,7 +125,7 @@ export function crearEstrellasSecretas({ scene, camera, uScale, uPR }, cantidad,
         }
         enVista.copy(s.position).applyMatrix4(camera.matrixWorldInverse);
         const reunida = destinos.has(u.indice) && reunion > 0.5;
-        const visible = escalaLimitada(k * (reunida ? 1.6 : 1), senalada ? 38 : reunida ? 44 : 26, -enVista.z, innerHeight, camera.fov);
+        const visible = escalaLimitada(k * (reunida ? 1.6 : 1), senalada ? 38 : reunida ? 44 : 26, -enVista.z, vista.alto, camera.fov);
         s.scale.set(visible, visible, 1);
       }
     }

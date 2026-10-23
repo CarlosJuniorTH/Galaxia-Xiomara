@@ -10,6 +10,7 @@ import { esMovil, nivelSeguro } from '../util/dispositivo.js';
 import { generador, semillaDe, ceder } from '../util/azarSemilla.js';
 import { crearTelarana, puntoFilamento } from '../data/telarana.js';
 import { generarDatosTelarana } from './telaranaDatos.js';
+import { vista } from '../util/vista.js';
 
 // Lo que queda detrás de un gigante (en su silueta, más lejos que él) se apaga: la telaraña no tapa al cuásar, la
 // supernova… (uGigA/uGigB, ver OCULTO).
@@ -186,7 +187,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   const colorPrevio = new THREE.Color();
   let escalaCapa = esMovil ? 0.6 : 1;   // en el móvil, la capa de galaxias (luces suaves) al 60 %: medido en un iPhone caliente, +10 FPS
   function dibujarGalaxias(renderer, camera) {
-    const w = Math.max(1, Math.round(innerWidth * escalaCapa)), h = Math.max(1, Math.round(innerHeight * escalaCapa));
+    const w = Math.max(1, Math.round(vista.ancho * escalaCapa)), h = Math.max(1, Math.round(vista.alto * escalaCapa));
     if (rtGalaxias.width !== w || rtGalaxias.height !== h) rtGalaxias.setSize(w, h);
     const previo = renderer.getRenderTarget(), alfa = renderer.getClearAlpha(); renderer.getClearColor(colorPrevio);
     renderer.setRenderTarget(rtGalaxias); renderer.setClearColor(0x000000, 0); renderer.clear(true, false, false);
@@ -266,13 +267,13 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
           const d = Math.max(1, esfera.center.distanceTo(camera.position) - b.radio * 0.5);
           luz += t.geometry.drawRange.count * uComp.value * peso * Math.min(2, Math.max(0.5, Math.sqrt(ref / d)));
         }
-        densidadWeb = luz / Math.max(1, innerWidth * innerHeight);
+        densidadWeb = luz / Math.max(1, vista.ancho * vista.alto);
       }
       const metaAuto = Math.min(1, Math.pow(DENSIDAD_COMODA / Math.max(1e-9, densidadWeb), 0.85));
       expoAuto += (Math.max(0.12, metaAuto) - expoAuto) * Math.min(1, dt * 3);
       uniformes.uCasa.value = (0.22 + 0.78 * THREE.MathUtils.smoothstep(camera.position.length(), 20000, 400000)) * expoAuto;
-      const pr = uPR.value; uniformes.uRes.value.set(innerWidth * pr * 0.5, innerHeight * pr * 0.5);
-      uniformes.uF.value = innerHeight / (2 * Math.tan(camera.fov * Math.PI / 360));
+      const pr = uPR.value; uniformes.uRes.value.set(vista.ancho * pr * 0.5, vista.alto * pr * 0.5);
+      uniformes.uF.value = vista.alto / (2 * Math.tan(camera.fov * Math.PI / 360));
       rehacerCercano(camera.position);
       // Ocultación por los gigantes: lo que solo depende de la cámara, una vez por cuadro (ver OCULTO).
       bloquesGalaxias.updateWorldMatrix(true, false); const cam = bloquesGalaxias.worldToLocal(uniformes.uCamL.value.copy(camera.position));

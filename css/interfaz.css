@@ -58,12 +58,13 @@ body.dentro #hud{opacity:1;}
 
 #btn-musica{right:20px;}
 .eq{display:flex;gap:3px;align-items:flex-end;height:18px;}
-.eq i{width:3px;height:4px;border-radius:2px;background:#ffb3d4;animation:eq 1s ease-in-out infinite;}
+/* Las barras se estiran con transform (lo anima la tarjeta gráfica, sin recalcular la página en cada cuadro). */
+.eq i{width:3px;height:18px;border-radius:2px;background:#ffb3d4;transform-origin:50% 100%;transform:scaleY(.2222);animation:eq 1s ease-in-out infinite;}
 .eq i:nth-child(2){animation-delay:-.3s}
 .eq i:nth-child(3){animation-delay:-.6s}
 .eq i:nth-child(4){animation-delay:-.15s}
-#btn-musica.pausado .eq i{animation:none;height:3px;opacity:.6;}
-@keyframes eq{0%,100%{height:4px}50%{height:18px}}
+#btn-musica.pausado .eq i{animation:none;transform:scaleY(.1667);opacity:.6;}
+@keyframes eq{0%,100%{transform:scaleY(.2222)}50%{transform:scaleY(1)}}
 
 /* Texto que flota al tocar la pantalla */
 .flotante{

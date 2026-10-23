@@ -6,6 +6,7 @@ import { gauss, azar } from '../util/dibujo.js';
 import { materialPuntos, geometriaPuntos } from './materiales.js';
 import { texBrillo } from './texturas.js';
 import { texturaPlaneta } from './fabricaTexturas.js';
+import { vista } from '../util/vista.js';
 
 const BRAZOS = 5, GIRO = 4.5, RADIO = 980;
 const lerpH = (a, b, t) => a + (b - a) * Math.min(1, Math.max(0, t));
@@ -320,7 +321,7 @@ export function crearGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia }) {
       // luz total ya crece con el área que ocupan. Los puntos tienen tamaño fijo en píxeles, así
       // que cada uno lleva la parte de luz que le toca por área (sin suelo: si la galaxia ocupa
       // poco, da poca luz, como debe).
-      const d = camera.position.length(), focal = innerHeight / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
+      const d = camera.position.length(), focal = vista.alto / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
       const radioPx = radioPxDisco(RADIO, Math.max(1, d), focal), paso = 1 - THREE.MathUtils.smoothstep(radioPx, 30, 85);
       for (let i = 0; i < mats.length; i++) { const u = mats[i].uniforms?.uOp; if (u) { opBase[i] ??= u.value; u.value = opBase[i] * (1 - paso); } }
       // TODA la galaxia cercana se funde a la vez (antes el gas, el resplandor del centro y el disco

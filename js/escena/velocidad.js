@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import { EXPOSICION } from './exposicion.js';
 import { impulsoVisual } from '../util/impulsoVisual.js';
+import { vista } from '../util/vista.js';
 
 const L = 2400;
 const Z = new THREE.Vector3(0, 0, 1), haciaCam = new THREE.Vector3();   // profundidad del campo de estelas (espacio de cámara, por unidad de escala)
@@ -21,7 +22,7 @@ export function crearVelocidad(camera, { reducido = false } = {}) {
   const semillas = new Float32Array(n * 4); for (let i = 0; i < n * 4; i++) semillas[i] = Math.random();
   g.setAttribute('aSemilla', new THREE.InstancedBufferAttribute(semillas, 4)); g.instanceCount = n;
   const u = { uFuerza: { value: 0 }, uAvance: { value: 0 }, uLargo: { value: 0 }, uDir: { value: new THREE.Vector3(0, 0, -1) }, uEscala: { value: 1 },
-    uViewport: { value: new THREE.Vector2(innerWidth, innerHeight) }, uGiro: { value: new THREE.Vector2() }, uPeriferia: { value: 0 }, uDensidad: { value: 1 }, uClaro: { value: 0 }, uExpo: EXPOSICION };   // exposición automática: en la pantalla vertical del móvil las estelas se juntan en el centro
+    uViewport: { value: new THREE.Vector2(vista.ancho, vista.alto) }, uGiro: { value: new THREE.Vector2() }, uPeriferia: { value: 0 }, uDensidad: { value: 1 }, uClaro: { value: 0 }, uExpo: EXPOSICION };   // exposición automática: en la pantalla vertical del móvil las estelas se juntan en el centro
   const material = new THREE.ShaderMaterial({
     uniforms: u,
     vertexShader: /* glsl */`
@@ -85,7 +86,7 @@ export function crearVelocidad(camera, { reducido = false } = {}) {
   }));
   foco.frustumCulled = false;
   foco.renderOrder = 5; foco.visible = false; mesh.add(foco);   // un único objeto colgado de la cámara
-  if (typeof addEventListener === 'function') addEventListener('resize', () => u.uViewport.value.set(innerWidth, innerHeight));
+  if (typeof addEventListener === 'function') addEventListener('resize', () => u.uViewport.value.set(vista.ancho, vista.alto));
 
   const antes = new THREE.Vector3(), vel = new THREE.Vector3(), dirCam = new THREE.Vector3(), inversa = new THREE.Matrix4();
   const giroAnterior = new THREE.Quaternion(), delta = new THREE.Quaternion(), flujo = new THREE.Vector2();
