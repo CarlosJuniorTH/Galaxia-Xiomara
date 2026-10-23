@@ -33,6 +33,7 @@ import { esMovil } from '../util/dispositivo.js';
 import { crearReguladorResolucion } from '../util/resolucion.js';
 import { crearPlanificador } from '../util/planificador.js';
 import { MUESTRAS as muestrasNube } from './nube.js';
+import { crearGiro } from '../util/giro.js';
 import { nivelSeguro } from '../util/dispositivo.js';
 import { esquivar, sinRepetidos } from '../util/ruta.js';
 import { planificarVuelo, DURACION } from '../util/vuelo.js';
@@ -371,7 +372,6 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   const planificador = crearPlanificador({ interaccion: 60, contemplacion: ritmoAhorro ? 30 : 60, esperaMs: 4000 });
   let gesto = false, modoAnterior = null, cuadrosDibujados = 0, finGesto = -Infinity;
   const AMORTIGUACION = controls.dampingFactor;   // la de 60 FPS (nucleo.js)
-  const esfera = new THREE.Spherical(), desplazamientoCam = new THREE.Vector3(), muestrasGiro = []; let impulso = null;
   const marcarActividad = () => planificador.actividad(performance.now());
   for (const evento of ['pointerdown', 'wheel', 'keydown']) document.addEventListener(evento, marcarActividad, { passive: true });
   const capturador = crearCapturador({ obtener: () => nucleo.resolucion, fijar: v => { nucleo.fijarResolucion(v); regular.reiniciar(); } });
@@ -842,18 +842,20 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // Exportado para pruebas: cuánto mide el encuadre ahora y cuánto debería medir.
   const estadoEncuadre = () => ({ actual: camera.position.distanceTo(controls.target), ideal: distanciaIdeal()?.d ?? null, ajustando: !!ajuste });
   canvas.addEventListener('pointerdown', () => { if (mirada && !mirada.saliendo) mirarCasa(false); });
-  controls.addEventListener('start', () => { impulso = null; muestrasGiro.length = 0; ajuste = null; gesto = true; marcarActividad(); controls.autoRotate = false; clearTimeout(retornoGiro); });
+  // Inicio y fin de un gesto (giro propio o acercamiento con OrbitControls): despiertan la interfaz y esperan a que la
+  // cámara se quede quieta para cambiar la resolución.
+  const empezarGesto = () => { ajuste = null; gesto = true; marcarActividad(); controls.autoRotate = false; clearTimeout(retornoGiro); };
+  const terminarGesto = () => { gesto = giro?.arrastrando ?? false; finGesto = performance.now(); marcarActividad(); setTimeout(aplicarResolucionPendiente, 2600); retornoGiro = setTimeout(() => { if (!vuelo && !pausa && giraSolo()) controls.autoRotate = true; }, 8000); };
+  controls.addEventListener('start', empezarGesto);
   // En los destinos lejanos no hay giro automático: daría vueltas todo el cielo alrededor.
   // La cámara no gira sola en ningún lugar: el cielo (telaraña, nubes, estrellas) se queda quieto mientras se mira;
   // solo se mueve cuando la mueve quien mira.
   const giraSolo = () => false;
-  controls.addEventListener('end', () => {
-    // Velocidad del gesto en sus últimas ~0,1 s (radianes por segundo): de ahí sale el impulso.
-    if (muestrasGiro.length > 1) { const a = muestrasGiro[0], b = muestrasGiro[muestrasGiro.length - 1], t = Math.max(16, b[0] - a[0]) / 1000;
-      let dth = b[1] - a[1]; dth -= Math.PI * 2 * Math.round(dth / (Math.PI * 2));
-      const vt = dth / t * 0.55, vp = (b[2] - a[2]) / t * 0.55; impulso = Math.abs(vt) + Math.abs(vp) > 0.15 ? { vt: THREE.MathUtils.clamp(vt, -6, 6), vp: THREE.MathUtils.clamp(vp, -4, 4) } : null; }
-    muestrasGiro.length = 0;
-    gesto = false; finGesto = performance.now(); marcarActividad(); setTimeout(aplicarResolucionPendiente, 2600); retornoGiro = setTimeout(() => { if (!vuelo && !pausa && giraSolo()) controls.autoRotate = true; }, 8000); });
+  controls.addEventListener('end', terminarGesto);
+  // El giro con el dedo o el ratón lo lleva util/giro.js (sigue al dedo, impulso real al soltar, frenado parejo);
+  // OrbitControls queda solo para acercar y alejar.
+  controls.enableRotate = false;
+  const giro = crearGiro({ canvas, camera, controls, sensibilidad: controls.rotateSpeed, alEmpezar: empezarGesto, alTerminar: terminarGesto });
   addEventListener('resize', () => { clearTimeout(esperaAjuste); esperaAjuste = setTimeout(reencuadrar, 220); nucleo.redimensionar(); regular.reiniciar(); planificador.pedirCuadro(); if (camera.view?.enabled) camera.setViewOffset(innerWidth, innerHeight, 0, desplazamiento, innerWidth, innerHeight); medirZonaLibre(); });
   document.addEventListener('visibilitychange', () => { prev = performance.now(); });
   canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); delete canvas.dataset.viaje; suspendida = true; vuelo?.resolver(false); vuelo = null; alProblema('El navegador ha pausado los gráficos. Tu viaje está guardado. Podemos volver a encender las estrellas.'); });
@@ -965,20 +967,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       } else cometaAntes = null;
       // Inercia de la cámara al soltar el dedo con tiempo real (como en los juegos): OrbitControls amortigua por cuadro;
       // el factor se ajusta a lo que ha durado este cuadro, así un cuadro más largo no frena el giro ni uno corto lo acelera.
-      // Con el dedo puesto la vista sigue al dedo casi al instante (como en los juegos: antes solo aplicaba el 8,5 % del
-      // movimiento por cuadro y se quedaba detrás del dedo, «dura»); al soltar, se desliza con la velocidad que llevaba.
-      if (!mirada) { const base = gesto ? 0.3 : AMORTIGUACION; controls.dampingFactor = 1 - Math.pow(1 - base, THREE.MathUtils.clamp(dtReal * 60, 0.25, 4)); controls.update(dt); }
-      // Impulso al soltar (como en los juegos): la vista sigue girando con la velocidad del gesto y frena con suavidad.
-      if (!mirada && !vuelo) {
-        esfera.setFromVector3(desplazamientoCam.copy(camera.position).sub(controls.target));
-        if (gesto) { muestrasGiro.push([ahora, esfera.theta, esfera.phi]); while (muestrasGiro.length && ahora - muestrasGiro[0][0] > 120) muestrasGiro.shift(); }
-        else if (impulso) {
-          esfera.theta += impulso.vt * dtReal; esfera.phi = THREE.MathUtils.clamp(esfera.phi + impulso.vp * dtReal, controls.minPolarAngle, controls.maxPolarAngle);
-          camera.position.copy(controls.target).add(desplazamientoCam.setFromSpherical(esfera)); camera.lookAt(controls.target);
-          const f = Math.exp(-dtReal * 3.2); impulso.vt *= f; impulso.vp *= f;
-          if (Math.abs(impulso.vt) + Math.abs(impulso.vp) < 0.02) impulso = null;
-        }
-      } else impulso = null;   // un viaje o «Mirar hacia casa» cancelan el impulso
+      // OrbitControls (acercar/alejar) con su amortiguación ajustada al tiempo real; después, el giro propio (util/giro.js).
+      if (!mirada) { controls.dampingFactor = 1 - Math.pow(1 - AMORTIGUACION, THREE.MathUtils.clamp(dtReal * 60, 0.25, 4)); controls.update(dt); }
+      giro.actualizar(Math.min(0.05, dtReal), !mirada && !vuelo);
     }
     if (ajuste && !vuelo) {
       // Mantiene la dirección actual de la cámara (su órbita) y cambia la distancia y el punto de mira.
