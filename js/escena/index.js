@@ -34,6 +34,7 @@ import { crearReguladorResolucion } from '../util/resolucion.js';
 import { crearPlanificador } from '../util/planificador.js';
 import { MUESTRAS as muestrasNube } from './nube.js';
 import { crearGiro } from '../util/giro.js';
+import { crearCapaVolumen } from './capaVolumen.js';
 import { nivelSeguro } from '../util/dispositivo.js';
 import { esquivar, sinRepetidos } from '../util/ruta.js';
 import { planificarVuelo, DURACION } from '../util/vuelo.js';
@@ -284,7 +285,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     try { const previo = renderer.getRenderTarget(); renderer.setRenderTarget(rt); renderer.render(scene, camera); renderer.setRenderTarget(previo); } catch (e) { console.warn('Calentamiento', e); }
     for (const o of ocultos) o.visible = false;
     rt.dispose();
-    try { telarana.dibujarGalaxias(renderer, camera); composer.render(); } catch (e) { console.warn('Calentamiento', e); }
+    try { capaVolumen.dibujar(camera, 64); telarana.dibujarGalaxias(renderer, camera); composer.render(); } catch (e) { console.warn('Calentamiento', e); }
   };
   // Carga completa, como un videojuego: antes de entrar se crean todas las nebulosas, se calculan todas las texturas,
   // llega el cielo, se compilan todos los programas de GPU (también los del sistema solar) y todo se sube a la
@@ -294,6 +295,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // con la mitad de llamadas y sin generar memoria temporal en cada cuadro (menos pausas del recolector en el móvil).
   const unaPasada = esc => esc.traverse(o => { for (const m of [].concat(o.material || [])) if (m.transparent && m.side === THREE.DoubleSide && m.blending === THREE.AdditiveBlending) m.forceSinglePass = true; });
   unaPasada(scene); unaPasada(solar.escena);
+  // Gas volumétrico a media resolución (capaVolumen.js): las nebulosas con volumen se pintan en su propia capa.
+  const capaVolumen = crearCapaVolumen({ scene, renderer, uPR: nucleo.uPR, hdr: canvas.dataset.brillo3d === 'hdr' });
   const listo = (async () => {
     window.__pasoCarga = 'nebulosas'; await lejanas.prepararTodas((h, t) => avance(0.5 + 0.06 * h / t, 0.56));
     window.__pasoCarga = 'texturas'; await texturasTodas((h, t) => avance(0.56 + 0.28 * h / t, 0.84));
@@ -1172,7 +1175,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       // cámara tal como se dibuja: si no, la respiración lo hacía acercarse, alejarse y moverse.
       acompanar();
     }
-    if (escenaActiva !== 'solar') telarana.dibujarGalaxias(renderer, camera);   // capa de galaxias a resolución CSS (telarana.js)
+    if (escenaActiva !== 'solar') { capaVolumen.dibujar(camera); telarana.dibujarGalaxias(renderer, camera); }   // capas a menor resolución: gas volumétrico (capaVolumen.js) y galaxias de la telaraña (telarana.js)
     try { if (document.body.dataset.supernovaAislada === 'true') conFocoSupernova(scene, cosmos.raiz, cosmos.supernova.grupo, () => composer.render()); else composer.render(); } catch (e) { suspendida = true; alProblema('No se ha podido dibujar el universo. Conservamos tu progreso; vuelve a intentarlo en 3D.'); console.error(e); }
     // El sistema solar se prepara (shaders y texturas) en un momento tranquilo tras la entrada,
     // no durante la carga: así se entra antes y el móvil trabaja menos al principio.
@@ -1217,7 +1220,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // Quieta la cámara sin congelar el tiempo (la celebración sigue animándose).
     detenerGiro(valor) { controls.autoRotate = !valor && !pausa && !vuelo && giraSolo(); },
     // Solo en #debug: acceso a la escena para vistas de diagnóstico por capas.
-    get interno() { return diagnosticar ? { THREE, scene, camera, controls, renderer, bloom, nucleo, telarana, cosmos, galaxia, planetas, solar, get escenaActiva() { return escenaActiva; }, lento: v => { escalaTiempo = v; }, get encuadre() { return estadoEncuadre(); }, get tiempo() { return tiempo; }, get estelas() { return campoVelocidad.mesh.material.uniforms.uFuerza.value; }, nube: { MUESTRAS: muestrasNube }, get curvaVuelo() { return vuelo ? { curva: vuelo.curva, desde: vuelo.curva.getPoint(0), hasta: vuelo.curva.getPoint(1), duracion: vuelo.duracion, transcurrido: vuelo.transcurrido, real: vuelo.real ?? vuelo.transcurrido, plan: vuelo.plan } : null; }, lejanas, cercania: cercaniaUniverso, get lente() { return { activa: nucleo.lente.enabled, uL: nucleo.lente.uniforms.uL.value.map(v => v.toArray()) }; } } : null; },
+    get interno() { return diagnosticar ? { THREE, scene, camera, controls, renderer, bloom, nucleo, telarana, capaVolumen, cosmos, galaxia, planetas, solar, get escenaActiva() { return escenaActiva; }, lento: v => { escalaTiempo = v; }, get encuadre() { return estadoEncuadre(); }, get tiempo() { return tiempo; }, get estelas() { return campoVelocidad.mesh.material.uniforms.uFuerza.value; }, nube: { MUESTRAS: muestrasNube }, get curvaVuelo() { return vuelo ? { curva: vuelo.curva, desde: vuelo.curva.getPoint(0), hasta: vuelo.curva.getPoint(1), duracion: vuelo.duracion, transcurrido: vuelo.transcurrido, real: vuelo.real ?? vuelo.transcurrido, plan: vuelo.plan } : null; }, lejanas, cercania: cercaniaUniverso, get lente() { return { activa: nucleo.lente.enabled, uL: nucleo.lente.uniforms.uL.value.map(v => v.toArray()) }; } } : null; },
     get destino() { return destinoActual; },
     get viajando() { return !!vuelo; },
     get cometaVisible() { return mundos.cometaVisible; },

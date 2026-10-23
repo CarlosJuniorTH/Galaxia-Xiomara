@@ -12,6 +12,7 @@
 import * as THREE from 'three';
 import { nivelSeguro } from '../util/dispositivo.js';
 import { EXPOSICION } from './exposicion.js';
+import { RUIDO_TABLA, texturaRuido } from './nube.js';
 import { esMovil } from '../util/dispositivo.js';
 
 export const CUASAR = Object.freeze({ sombra: 280, discoIn: 300, discoOut: 1100, toroR: 1500, toroTubo: 240, anfitriona: 4800, chorro: 7600 });
@@ -27,6 +28,11 @@ const RUIDO = /* glsl */`
   float rn3(vec3 p){ vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
     return mix(mix(mix(h3(i), h3(i + vec3(1,0,0)), f.x), mix(h3(i + vec3(0,1,0)), h3(i + vec3(1,1,0)), f.x), f.y),
                mix(mix(h3(i + vec3(0,0,1)), h3(i + vec3(1,0,1)), f.x), mix(h3(i + vec3(0,1,1)), h3(i + vec3(1,1,1)), f.x), f.y), f.z); }
+  float fbm3(vec3 p){ return rn3(p) * 0.55 + rn3(p * 2.03 + 7.1) * 0.3 + rn3(p * 4.1 + 3.7) * 0.15; }`;
+
+// Las nubes de plasma de los chorros llenan la pantalla al mirar a lo largo de uno: su ruido (el mismo ruido de valor
+// suavizado, con los mismos grumos y hebras) se lee de la tabla precalculada (dos lecturas en vez de ocho hashes).
+const RUIDO_RAPIDO = /* glsl */`${RUIDO_TABLA}
   float fbm3(vec3 p){ return rn3(p) * 0.55 + rn3(p * 2.03 + 7.1) * 0.3 + rn3(p * 4.1 + 3.7) * 0.15; }`;
 
 const aditivo = (uniforms, vertexShader, fragmentShader, extra = {}) => new THREE.ShaderMaterial({ uniforms, vertexShader, fragmentShader, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, ...extra });
@@ -424,17 +430,23 @@ export function crearCuasar({ uScale, uPR, texGigante, texBrillo, texNebulosa })
     // Nubes de plasma alrededor del chorro (como en la imagen: hebras azules y blancas retorcidas, con toques naranjas
     // donde el chorro atraviesa el gas): ruido con estructura (no un resplandor liso), más ancho hacia la punta.
     const geoN = new THREE.CylinderGeometry(1300, 140, LARGO * 0.95, 96, 48, true); geoN.translate(0, LARGO * 0.475, 0);
-    const nubeChorro = new THREE.Mesh(geoN, aditivo({ uT: { value: 0 }, uS: { value: s > 0 ? 1.7 : 5.3 } },
+    const nubeChorro = new THREE.Mesh(geoN, aditivo({ uT: { value: 0 }, uS: { value: s > 0 ? 1.7 : 5.3 }, uRuido: { value: texturaRuido() } },
       'varying vec2 vU; varying float vCara; void main(){ vU = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vCara = abs(dot(normalize(normalMatrix * normal), normalize(-mv.xyz))); gl_Position = projectionMatrix * mv; }',
-      /* glsl */`uniform float uT, uS; varying vec2 vU; varying float vCara; ${RUIDO}
+      /* glsl */`uniform float uT, uS; varying vec2 vU; varying float vCara; ${RUIDO_RAPIDO}
         void main(){ float l = vU.y, a = vU.x * 6.2831853;
+          // Lo que no puede verse se descarta antes de calcular el ruido (mismo resultado, menos trabajo: la máscara de
+          // borde y de largo, y luego la de huecos; con f < 0,01 la luz que aportaría es < 0,0002, invisible).
+          float m = pow(vCara, 2.0) * smoothstep(0.02, 0.12, l) * (1.0 - smoothstep(0.6, 1.0, l));
+          if (m * 1.7 < 0.01) discard;
           vec3 q = vec3(cos(a) * 1.2, sin(a) * 1.2, l * 9.0 - uT * 0.08) + uS;
           vec3 w = q + (vec3(fbm3(q * 1.3), fbm3(q * 1.3 + 4.0), fbm3(q * 1.3 + 8.0)) - 0.5) * 1.6;
+          m *= smoothstep(0.35, 0.65, fbm3(w * 0.7 + 31.0));
+          if (m * 1.7 < 0.01) discard;
           float hebra = pow(1.0 - abs(fbm3(w * 2.2) * 2.0 - 1.0), 6.0) + pow(1.0 - abs(fbm3(w * 5.0 + 3.0) * 2.0 - 1.0), 9.0) * 0.6;
           float nube = smoothstep(0.45, 0.8, fbm3(w * 1.4 + 11.0));
-          float f = (hebra * 0.9 + nube * 0.2) * smoothstep(0.35, 0.65, fbm3(w * 0.7 + 31.0)) * pow(vCara, 2.0) * smoothstep(0.02, 0.12, l) * (1.0 - smoothstep(0.6, 1.0, l));
+          float f = (hebra * 0.9 + nube * 0.2) * m;
           vec3 c = mix(vec3(0.25, 0.45, 1.0), vec3(0.8, 0.9, 1.0), hebra * 0.45);
-          c = mix(c, vec3(1.0, 0.55, 0.25), smoothstep(0.55, 0.8, fbm3(w * 0.9 + 21.0)) * (1.0 - smoothstep(0.1, 0.35, l)) * 0.7);
+          if (l < 0.35) c = mix(c, vec3(1.0, 0.55, 0.25), smoothstep(0.55, 0.8, fbm3(w * 0.9 + 21.0)) * (1.0 - smoothstep(0.1, 0.35, l)) * 0.7);
           gl_FragColor = vec4(c * f * 1.1, f * 1.1); }`));
     nubeChorro.renderOrder = 20; lado.add(nubeChorro); animados.push(nubeChorro);
     const columna = capaChorro({ rBase: 14, rPunta: 120, colorA: '#ffffff', colorB: '#a9c6ff', intensidad: 1.5, helice: 0.35 });
@@ -443,13 +455,15 @@ export function crearCuasar({ uScale, uPR, texGigante, texBrillo, texNebulosa })
     const lobulo = new THREE.Sprite(new THREE.SpriteMaterial({ map: texBrillo, color: '#8d8cff', transparent: true, opacity: 0.16, depthWrite: false, blending: THREE.AdditiveBlending }));
     lobulo.position.y = LARGO * 0.97; lobulo.scale.setScalar(2200); lobulo.visible = false;   // sin resplandor difuso: se sustituye por la nube de abajo
     // Nube de plasma al final del chorro (donde se frena y se abre): hebras azules y violetas con estructura.
-    const nubeFin = new THREE.Mesh(new THREE.SphereGeometry(1700, 48, 32), aditivo({ uT: { value: 0 }, uS: { value: s > 0 ? 2.3 : 7.1 } },
+    const nubeFin = new THREE.Mesh(new THREE.SphereGeometry(1700, 48, 32), aditivo({ uT: { value: 0 }, uS: { value: s > 0 ? 2.3 : 7.1 }, uRuido: { value: texturaRuido() } },
       'varying vec3 vP; varying float vCara; void main(){ vP = position / 1700.0; vec4 mv = modelViewMatrix * vec4(position, 1.0); vCara = abs(dot(normalize(normalMatrix * normal), normalize(-mv.xyz))); gl_Position = projectionMatrix * mv; }',
-      /* glsl */`uniform float uT, uS; varying vec3 vP; varying float vCara; ${RUIDO}
-        void main(){ vec3 q = vP * 1.6 + uS + vec3(0.0, uT * 0.02, 0.0);
+      /* glsl */`uniform float uT, uS; varying vec3 vP; varying float vCara; ${RUIDO_RAPIDO}
+        void main(){ if (pow(vCara, 1.5) * 0.45 * 1.35 < 0.01) discard;
+          vec3 q = vP * 1.6 + uS + vec3(0.0, uT * 0.02, 0.0);
           vec3 w = q + (vec3(fbm3(q * 1.2), fbm3(q * 1.2 + 4.0), fbm3(q * 1.2 + 8.0)) - 0.5) * 1.4;
           float hebra = pow(1.0 - abs(fbm3(w * 2.4) * 2.0 - 1.0), 7.0), nube = smoothstep(0.5, 0.8, fbm3(w * 1.5 + 9.0));
           float f = (hebra + nube * 0.35) * pow(vCara, 1.5) * 0.45;
+          if (f < 0.01) discard;   // invisible (aportaría < 0,0001): se ahorra el ruido del color
           vec3 c = mix(vec3(0.45, 0.5, 1.0), vec3(0.85, 0.9, 1.0), hebra); c = mix(c, vec3(0.75, 0.45, 1.0), smoothstep(0.5, 0.8, fbm3(w + 3.0)) * 0.5);
           gl_FragColor = vec4(c * f, f); }`));
     nubeFin.position.y = LARGO * 0.97; nubeFin.scale.set(1.0, 1.3, 1.0); nubeFin.renderOrder = 20; lado.add(nubeFin); animados.push(nubeFin);
