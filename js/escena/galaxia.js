@@ -54,7 +54,7 @@ export function crearGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia }) {
   // por píxel y por cuadro). Lo que depende de la vista se sigue calculando en vivo.
   const LADO_GAS = 1150;
   const campoGas = /* glsl */`
-    float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float h(vec2 p){ vec3 q = fract(p.xyx * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
     float rn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
       return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
     float fbm(vec2 p){ float v = 0.0, a = 0.5; for (int i = 0; i < 3; i++){ v += a * rn(p); p = p * 2.07 + vec2(3.1, 1.7); a *= 0.5; } return v; }

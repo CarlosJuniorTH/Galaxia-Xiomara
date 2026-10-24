@@ -179,7 +179,7 @@ function crearAnillo(rIn, rOut, centro, radioPlaneta) {
       vertexShader: `varying vec2 vP; varying vec3 vMundo; void main(){ vP = position.xy; vec4 m = modelMatrix * vec4(position, 1.0); vMundo = m.xyz; gl_Position = projectionMatrix * viewMatrix * m; }`,
       fragmentShader: /* glsl */`
         uniform float uIn, uOut, uRadio; uniform vec3 uCentro; varying vec2 vP; varying vec3 vMundo;
-        float h(float x){ return fract(sin(x * 127.1) * 43758.5453); }
+        float h(float x){ x = fract(x * 0.1031); x *= x + 33.33; x *= x + x; return fract(x); }
         void main(){
           float t = (length(vP) - uIn) / (uOut - uIn);
           // Muchos anillos finos de densidad distinta, como los de Saturno, con la división de Cassini.
@@ -381,7 +381,7 @@ function crearAsteroides(rIn, rOut, cantidad, { detalle = 1, tamMin = 0.8, tamMa
       }`,
     fragmentShader: /* glsl */`
       varying vec3 vN, vMundo, vObj; varying float vTinte, vEscala;
-      float h(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+      float h(vec3 p){ p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
       float rn(vec3 p){ vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
         return mix(mix(mix(h(i), h(i + vec3(1,0,0)), f.x), mix(h(i + vec3(0,1,0)), h(i + vec3(1,1,0)), f.x), f.y), mix(mix(h(i + vec3(0,0,1)), h(i + vec3(1,0,1)), f.x), mix(h(i + vec3(0,1,1)), h(i + vec3(1,1,1)), f.x), f.y), f.z); }
       // Cráteres: celdas con un hoyo redondo y borde, más rugosidad fina.
@@ -460,7 +460,7 @@ function crearOtrosPlanetas(scene, radiosOrbita) {
         uniforms: { uCentro: { value: p.centro.clone() }, uRadio: { value: p.radio } },
         vertexShader: 'varying vec2 vP; varying vec3 vMundo; void main(){ vP = position.xy; vec4 m = modelMatrix * vec4(position, 1.0); vMundo = m.xyz; gl_Position = projectionMatrix * viewMatrix * m; }',
         fragmentShader: `uniform vec3 uCentro; uniform float uRadio; varying vec2 vP; varying vec3 vMundo;
-          float h(float x){ return fract(sin(x * 127.1) * 43758.5453); }
+          float h(float x){ x = fract(x * 0.1031); x *= x + 33.33; x *= x + x; return fract(x); }
           void main(){ float t = (length(vP) - uRadio * 1.25) / (uRadio * 1.1);
             float i = floor(t * 160.0), f = fract(t * 160.0), fino = mix(h(i), h(i + 1.0), smoothstep(0.0, 1.0, f));
             float cassini = smoothstep(0.6, 0.62, t) * (1.0 - smoothstep(0.67, 0.69, t));

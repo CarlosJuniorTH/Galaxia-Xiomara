@@ -103,7 +103,7 @@ function crearDisco(rIn, rOut, colores, giroVel = 0.6, lado = 0) {
     { uT: { value: 0 }, uIn: { value: rIn }, uOut: { value: rOut }, uC1: { value: new THREE.Color(colores[0]) }, uC2: { value: new THREE.Color(colores[1]) }, uC3: { value: new THREE.Color(colores[2]) }, uV: { value: giroVel }, uLado: { value: lado }, uCentro: { value: new THREE.Vector3() } },
     'varying vec2 vP; varying float vDelante; uniform vec3 uCentro; void main(){ vP = position.xy; vec4 m = modelMatrix * vec4(position, 1.0); vec3 c = cameraPosition - uCentro; vDelante = dot(m.xyz - uCentro, normalize(c)); gl_Position = projectionMatrix * viewMatrix * m; }',
     /* glsl */`uniform float uT, uIn, uOut, uV, uLado; uniform vec3 uC1, uC2, uC3; varying vec2 vP; varying float vDelante;
-      float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float h(vec2 p){ vec3 q = fract(p.xyx * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
       float rn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
       void main(){
         float r = length(vP), t = clamp((r - uIn) / (uOut - uIn), 0.0, 1.0), ang = atan(vP.y, vP.x);
@@ -160,7 +160,7 @@ export function crearCosmos({ uScale, uPR }) {
       uniforms: { uT: { value: 0 }, uC: { value: c }, uCel: { value: roja ? 2.4 : 4.6 }, uOpacidad: { value: 1 } }, transparent: true,
       vertexShader: 'varying vec3 vN; varying vec3 vP; void main(){ vP = position; vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
       fragmentShader: /* glsl */`uniform float uT, uCel, uOpacidad; uniform vec3 uC; varying vec3 vN; varying vec3 vP;
-        float h(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+        float h(vec3 p){ p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
         float rn(vec3 p){ vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
           return mix(mix(mix(h(i), h(i + vec3(1,0,0)), f.x), mix(h(i + vec3(0,1,0)), h(i + vec3(1,1,0)), f.x), f.y), mix(mix(h(i + vec3(0,0,1)), h(i + vec3(1,0,1)), f.x), mix(h(i + vec3(0,1,1)), h(i + vec3(1,1,1)), f.x), f.y), f.z); }
         void main(){
@@ -187,7 +187,7 @@ export function crearCosmos({ uScale, uPR }) {
         { uT: { value: 0 }, uC: { value: new THREE.Color(roja ? '#ff7448' : '#8fa6ff') }, uC2: { value: new THREE.Color(roja ? '#ffb27a' : '#d68cff') }, uTipo: { value: roja ? 0 : 1 }, uSemilla: { value: acimut * 0.13 } },
         'varying vec2 vP; void main(){ vP = uv * 2.0 - 1.0; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
         /* glsl */`uniform float uT, uTipo, uSemilla; uniform vec3 uC, uC2; varying vec2 vP;
-          float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+          float h(vec2 p){ vec3 q = fract(p.xyx * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
           float rn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
           float fbm(vec2 p){ return rn(p) * 0.5 + rn(p * 2.1 + 3.1) * 0.3 + rn(p * 4.3 + 7.7) * 0.2; }
           void main(){
@@ -278,7 +278,7 @@ export function crearCosmos({ uScale, uPR }) {
   const toro = new THREE.Mesh(new THREE.RingGeometry(180, 720, 160, 6), aditivo({ uT: { value: 0 } },
     'varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
     /* glsl */`uniform float uT; varying vec2 vP;
-      float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float h(vec2 p){ vec3 q = fract(p.xyx * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
       void main(){ float r = length(vP), ang = atan(vP.y, vP.x);
         float anillos = exp(-pow((r - 300.0) / 40.0, 2.0)) + 0.7 * exp(-pow((r - 520.0) / 70.0, 2.0)) + 0.35 * exp(-pow((r - 660.0) / 50.0, 2.0));
         float grumos = 0.55 + 0.45 * sin(ang * 14.0 + uT * 0.8 + sin(ang * 5.0) * 2.0) * sin(r * 0.03 - uT * 1.5);

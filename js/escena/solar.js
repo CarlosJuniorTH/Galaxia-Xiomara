@@ -8,7 +8,7 @@ import { texBrillo, texDestello, texEstrellaGigante } from './texturas.js';
 import { Q } from '../util/dispositivo.js';
 
 const RUIDO = /* glsl */`
-  float h3(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+  float h3(vec3 p){ p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }   // sin senos: con fract(sin(x)·43758) cada GPU redondea distinto el mismo punto de la rejilla y el ruido salía a bloques de bordes rectos
   float rn3(vec3 p){ vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
     return mix(mix(mix(h3(i), h3(i + vec3(1,0,0)), f.x), mix(h3(i + vec3(0,1,0)), h3(i + vec3(1,1,0)), f.x), f.y), mix(mix(h3(i + vec3(0,0,1)), h3(i + vec3(1,0,1)), f.x), mix(h3(i + vec3(0,1,1)), h3(i + vec3(1,1,1)), f.x), f.y), f.z); }
   float fbm3(vec3 p){ return rn3(p) * 0.5 + rn3(p * 2.03 + 1.7) * 0.27 + rn3(p * 4.1 + 3.1) * 0.15 + rn3(p * 8.3 + 5.3) * 0.08; }`;
@@ -52,7 +52,9 @@ export function crearSolar({ haciaCentroGalactico, renderer }) {
     side: THREE.BackSide, depthWrite: false
   }));
   const horno = new THREE.Scene(); horno.add(banda);
-  const cubo = new THREE.WebGLCubeRenderTarget(Q.cielo, { generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
+  // En sRGB (como una foto): con 8 bits lineales los tonos oscuros de la banda tenían escalones gruesos que, ampliados,
+  // se veían como rectángulos de bordes rectos en el cielo de Rosa, Azul y las cartas. Misma memoria, ~3 veces más niveles en lo oscuro.
+  const cubo = new THREE.WebGLCubeRenderTarget(Q.cielo, { generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, colorSpace: THREE.SRGBColorSpace });
   new THREE.CubeCamera(1, 1000, cubo).update(renderer, horno);
   banda.geometry.dispose(); banda.material.dispose();
   escena.background = cubo.texture;
