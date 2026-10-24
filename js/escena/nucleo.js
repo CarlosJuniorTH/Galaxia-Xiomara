@@ -63,10 +63,14 @@ export function crearNucleo(canvas) {
   const soportaHDR = seleccion.api === 'webgl2'
     ? !!(seleccion.contexto.getExtension('EXT_color_buffer_float') || seleccion.contexto.getExtension('EXT_color_buffer_half_float'))
     : !!seleccion.contexto.getExtension('EXT_color_buffer_half_float');
-  let post = null, bloom = { strength: BRILLO_BASE }, lente = null, salto = null, pasadaEscena = null, escenaActiva = scene;
+  let muestrasAA = 0, post = null, bloom = { strength: BRILLO_BASE }, lente = null, salto = null, pasadaEscena = null, escenaActiva = scene;
   if (!modoCompatible && soportaHDR && nivelSeguro < 1) {   // tras un cierre por memoria, sin HDR (menos memoria de GPU)
     try {
-      post = new EffectComposer(renderer);
+      // Bordes suaves (MSAA ×4, WebGL 2) en el sistema solar (fijarEscena): sin él, sus órbitas, anillos y bordes de planetas
+      // salían en escalera (el antialias del lienzo no actúa al dibujar en una imagen intermedia). En los gigantes no hace
+      // falta (casi no hay líneas finas) y con tanta luz superpuesta costaría mucho. ?aa=0 lo quita (comparaciones).
+      muestrasAA = seleccion.api === 'webgl2' && new URLSearchParams(location.search).get('aa') !== '0' ? 4 : 0;
+      post = new EffectComposer(renderer, new THREE.WebGLRenderTarget(innerWidth * pr, innerHeight * pr, { type: THREE.HalfFloatType }));
       post.setPixelRatio(pr); post.setSize(innerWidth, innerHeight);
       pasadaEscena = new RenderPass(scene, camera); post.addPass(pasadaEscena);
       lente = crearPasadaLente(); post.addPass(lente); salto = crearPasadaSalto(); post.addPass(salto);
@@ -149,7 +153,12 @@ export function crearNucleo(canvas) {
   }
 
   // Escena que se dibuja: la principal o la del sistema solar (index.js).
-  function fijarEscena(otra) { escenaActiva = otra; if (pasadaEscena) pasadaEscena.scene = otra; }
+  function fijarEscena(otra) {
+    escenaActiva = otra; if (pasadaEscena) pasadaEscena.scene = otra;
+    // Suavizado de bordes solo fuera de la escena principal (el sistema solar); el cambio ocurre en el destello del salto.
+    const muestras = otra !== scene ? muestrasAA : 0;
+    if (post) for (const rt of [post.renderTarget1, post.renderTarget2]) if (rt.samples !== muestras) { rt.samples = muestras; rt.dispose(); }
+  }
   return { renderer, scene, camera, controls, composer, bloom, fijarEscena, get escenaActiva() { return escenaActiva; }, get lente() { return lente; }, get post() { return post; }, get salto() { return salto; }, uScale, uPR, uTamGalaxia, redimensionar, fijarResolucion,
     get resolucion() { return pr; }, prMaximo, get resolucionLienzo() { return prLienzo(); } };
 }

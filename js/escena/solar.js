@@ -15,7 +15,7 @@ const RUIDO = /* glsl */`
 
 export const RADIO_SOL = 150;
 
-export function crearSolar({ haciaCentroGalactico, renderer }) {
+export function crearSolar({ haciaCentroGalactico, renderer, uPR = { value: 1 } }) {
   const escena = new THREE.Scene();
 
   // ── La galaxia de Xiomara vista desde dentro: se «hornea» una sola vez en un cubemap que es
@@ -42,8 +42,7 @@ export function crearSolar({ haciaCentroGalactico, renderer }) {
         float luz = bandaV * (0.25 + 0.75 * nubes) * (0.4 + 0.55 * bulbo) + exp(-lon * lon * 10.0 - lat * lat * 160.0) * 0.5 + exp(-pow(lat / (ancho * 2.8), 2.0)) * 0.05;
         vec3 c = col * luz * (1.0 - polvo);
         c += vec3(1.0, 0.4, 0.62) * pow(smoothstep(0.72, 0.92, fbm3(d * 24.0 + 5.0)), 2.0) * bandaV * (1.0 - polvo) * 0.6;
-        // Estrellas de la galaxia, mucho más densas en la banda.
-        float e = h3(floor(d * 900.0)); c += step(0.9965 - bandaV * 0.012, e) * mix(vec3(1.0), col, 0.4) * (0.4 + 0.8 * fract(e * 77.0));
+        // (Las estrellas de la galaxia ya no se hornean aquí: son puntos nítidos, ver estrellasBanda.)
         float a = max(max(c.r, c.g), c.b);
         // Sin pasar del umbral del brillo: una zona grande y brillante haría bloques al difuminarse.
         c = min(c * 0.7, vec3(0.55)) + vec3(0.006, 0.002, 0.012);
@@ -58,6 +57,36 @@ export function crearSolar({ haciaCentroGalactico, renderer }) {
   new THREE.CubeCamera(1, 1000, cubo).update(renderer, horno);
   banda.geometry.dispose(); banda.material.dispose();
   escena.background = cubo.texture;
+
+  // Estrellas de la galaxia de Xiomara, mucho más densas en la banda: antes iban horneadas en el cielo (1024 por cara) y
+  // al ampliarse en un móvil se veían como manchitas borrosas. Ahora son puntos nítidos a cualquier resolución, con la
+  // misma densidad (≈0,35 % de los píxeles del cielo horneado, hasta 4,4 veces más en la banda), colores y brillos que las horneadas.
+  {
+    const azar = (() => { let s = 20251215; return () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; })();   // mulberry32
+    const pos = [], col = [], v = new THREE.Vector3(), base = centro, lado = new THREE.Vector3(-base.z, 0, base.x);
+    const c1 = new THREE.Color(0.75, 0.45, 1.0), c2 = new THREE.Color(1.0, 0.45, 0.75), c3 = new THREE.Color(1.0, 0.82, 0.6), c = new THREE.Color();
+    const CELDAS = 6 * 1024 * 1024;   // el cielo horneado decidía una estrella por cada píxel de sus 6 caras de 1024
+    let intentos = Math.round(CELDAS * 0.0155);
+    while (intentos-- > 0) {
+      const z = azar() * 2 - 1, a = azar() * Math.PI * 2, r = Math.sqrt(1 - z * z); v.set(r * Math.cos(a), z, r * Math.sin(a));
+      const lat = v.y, lon = Math.acos(Math.min(1, Math.max(-1, (v.x * base.x + v.z * base.z) / Math.max(1e-6, Math.hypot(v.x, v.z)))));
+      const bulbo = Math.exp(-lon * lon * 1.3), ancho = 0.075 + 0.11 * bulbo, l2 = lat / ancho, bandaV = Math.exp(-l2 * l2);
+      if (azar() * 0.0155 > 0.0035 + 0.012 * bandaV) continue;
+      c.copy(c1).lerp(c2, THREE.MathUtils.smoothstep(bulbo + 0.15, 0, 0.6)).lerp(c3, bulbo * 0.8);
+      const k = 0.4 + 0.8 * azar(), luz = (x) => Math.min(0.55, x * 0.7 * k);   // el mismo brillo que las horneadas
+      const r0 = 1 + (c.r - 1) * 0.4, g0 = 1 + (c.g - 1) * 0.4, b0 = 1 + (c.b - 1) * 0.4;
+      pos.push(v.x, v.y, v.z); col.push(luz(r0), luz(g0), luz(b0));
+    }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    const estrellasBanda = new THREE.Points(geo, new THREE.ShaderMaterial({ uniforms: { uPR },
+      // A distancia infinita (solo la rotación de la cámara). Se dibujan las primeras, justo después del cielo y sin
+      // profundidad: todo lo demás se pinta encima. Un poco por delante del plano lejano: justo en él, el recorte de la GPU
+      // descartaba por redondeo la mayoría de los puntos.
+      vertexShader: 'uniform float uPR; attribute vec3 color; varying vec3 vC; void main(){ vC = color; vec4 p = projectionMatrix * vec4(mat3(modelViewMatrix) * position, 1.0); gl_Position = vec4(p.xy, p.w * 0.9999, p.w); gl_PointSize = 2.0 * uPR; }',
+      fragmentShader: 'varying vec3 vC; void main(){ vec2 q = gl_PointCoord - 0.5; if (dot(q, q) > 0.25) discard; gl_FragColor = vec4(vC, 1.0); }',
+      transparent: false, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending }));
+    estrellasBanda.frustumCulled = false; estrellasBanda.renderOrder = -900; estrellasBanda.name = 'Estrellas de la banda'; escena.add(estrellasBanda);
+  }
 
   // ── El Sol: superficie hirviendo, corona y destellos; ilumina a los planetas ──
   const sol = new THREE.Group(); escena.add(sol);

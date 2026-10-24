@@ -111,7 +111,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // lanzándose a la velocidad de la luz hacia ese punto del brazo (entrarOSalir).
   const SOLARES = new Set(['rosa', 'azul', 'cartas', 'gigante']);
   const brazoInicial = enBrazo(1, 0.62, 0);
-  const solar = crearSolar({ haciaCentroGalactico: new THREE.Vector3(-brazoInicial.x, 0, -brazoInicial.z), renderer });
+  const solar = crearSolar({ haciaCentroGalactico: new THREE.Vector3(-brazoInicial.x, 0, -brazoInicial.z), renderer, uPR: nucleo.uPR });
   const planetas = crearPlanetas({ ...nucleo, scene: solar.escena }, fechaTexto);
   await ceder();
   const mundos = capa('mundos', () => crearMundos(nucleo, { consteladas, alConstelar }));
