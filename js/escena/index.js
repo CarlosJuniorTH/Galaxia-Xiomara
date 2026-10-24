@@ -891,7 +891,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // Mientras se ve la portada (opaca) el 3D no se dibuja: menos trabajo y calor al empezar.
     const reposo = document.hidden || suspendida || lecturaActiva || (tEntrada === null && !document.body.classList.contains('dentro') && !captura);
     // Motivo por el que se dibuja a ritmo de interacción (se informa en el diagnóstico).
-    const motivo = vuelo ? 'vuelo' : gesto ? 'gesto' : pulso > 0.02 ? 'pulso' : captura ? 'captura'
+    // La inercia del giro (y el final de un zoom) también son movimiento: a 60 hasta que se paran del todo. Antes, a los 4 s
+    // sin tocar se pasaba a 30 aunque la vista siguiera deslizándose y el final del giro iba a frenitos.
+    const motivo = vuelo ? 'vuelo' : gesto ? 'gesto' : giro.moviendo || zoom.moviendo ? 'inercia' : pulso > 0.02 ? 'pulso' : captura ? 'captura'
       : document.body.classList.contains('celebrando') || document.body.classList.contains('reuniendo') ? 'celebracion' : tEntrada !== null && tiempo - tEntrada < 12 ? 'entrada'
       : Math.abs(desplazamientoMeta - desplazamiento) > 0.5 ? 'encuadre' : '';
     const activo = !!motivo;

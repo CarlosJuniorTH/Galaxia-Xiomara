@@ -15,7 +15,7 @@ export function crearGiro({ canvas, camera, controls, sensibilidad = 1, alEmpeza
   // Tras un pellizco no se gira hasta levantar todos los dedos: si no, el dedo que se levanta el último giraba la vista
   // (y la lanzaba con inercia) al terminar de acercar o alejar.
   let id = null, x = 0, y = 0, arrastrando = false, trasPellizco = false;
-  let objT = 0, objP = 0, camT = 0, camP = 0, velT = 0, velP = 0, sincronizado = false;
+  let objT = 0, objP = 0, camT = 0, camP = 0, velT = 0, velP = 0, resT = 0, resP = 0, sincronizado = false;
   const muestras = [];   // [tiempo, theta objetivo, phi objetivo] del dedo
   const limitar = p => THREE.MathUtils.clamp(p, controls.minPolarAngle, controls.maxPolarAngle);
   const leerCamara = () => { esfera.setFromVector3(desp.copy(camera.position).sub(controls.target)); camT = esfera.theta; camP = esfera.phi; };
@@ -32,13 +32,18 @@ export function crearGiro({ canvas, camera, controls, sensibilidad = 1, alEmpeza
     if (!punteros.size) trasPellizco = false;
     if (!arrastrando || e.pointerId !== id) return;
     arrastrando = false; id = null;
-    // Velocidad del dedo: entre la muestra más reciente y la de hace ~80 ms (si el dedo se paró antes de soltar, ~0).
-    const ahora = performance.now();
-    while (muestras.length > 2 && ahora - muestras[0][0] > 130) muestras.shift();
-    if (muestras.length > 1 && ahora - muestras[muestras.length - 1][0] < 110) {
-      const a = muestras[0], b = muestras[muestras.length - 1], t = Math.max(12, b[0] - a[0]) / 1000;
-      velT = THREE.MathUtils.clamp((b[1] - a[1]) / t, -7, 7); velP = THREE.MathUtils.clamp((b[2] - a[2]) / t, -5, 5);
+    // Velocidad del dedo al soltar: la de sus últimos ~60 ms (si el dedo se paró antes de soltar, ~0). Con una ventana más
+    // larga entraba el principio del gesto, aún lento, y la inercia arrancaba más despacio que la vista: frenazo al soltar.
+    const ahora = performance.now(), b = muestras[muestras.length - 1];
+    let a = b; for (let i = muestras.length - 2; i >= 0 && b[0] - muestras[i][0] <= 60; i--) a = muestras[i];
+    if (a === b && muestras.length > 1) a = muestras[muestras.length - 2];
+    if (b && a !== b && ahora - b[0] < 110) {
+      // Sin recortar casi la velocidad: con un tope bajo, un giro fuerte frenaba de golpe justo al soltar.
+      const t = Math.max(8, b[0] - a[0]) / 1000;
+      velT = THREE.MathUtils.clamp((b[1] - a[1]) / t, -24, 24); velP = THREE.MathUtils.clamp((b[2] - a[2]) / t, -12, 12);
     } else { velT = 0; velP = 0; }
+    // Lo que le faltaba a la vista para alcanzar al dedo se recorre con suavidad en los primeros cuadros del deslizamiento.
+    resT = objT - camT; resP = objP - camP;
     muestras.length = 0;
     alTerminar();
   }
@@ -50,7 +55,7 @@ export function crearGiro({ canvas, camera, controls, sensibilidad = 1, alEmpeza
     if (!controls.enabled) return;
     // Pellizco: solo acercar. La vista se queda exactamente donde está (el primer dedo suele moverse un poco antes de que
     // llegue el segundo: ese giro ya no se completa solo después).
-    if (punteros.size > 1) { trasPellizco = true; if (arrastrando) { arrastrando = false; id = null; velT = velP = 0; objT = camT; objP = camP; alTerminar(); } return; }
+    if (punteros.size > 1) { trasPellizco = true; if (arrastrando) { arrastrando = false; id = null; velT = velP = resT = resP = 0; objT = camT; objP = camP; alTerminar(); } return; }
     if (trasPellizco) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     empezar(e.pointerId, e.clientX, e.clientY);
@@ -73,25 +78,15 @@ export function crearGiro({ canvas, camera, controls, sensibilidad = 1, alEmpeza
 
   return {
     get arrastrando() { return arrastrando; },
-    get moviendo() { return arrastrando || Math.abs(velT) + Math.abs(velP) > 0.01 || Math.abs(objT - camT) + Math.abs(objP - camP) > 1e-4; },
-    detener() { velT = velP = 0; arrastrando = false; id = null; sincronizado = false; },
+    get moviendo() { return arrastrando || Math.abs(velT) + Math.abs(velP) > 0.003 || Math.abs(resT) + Math.abs(resP) > 1e-4 || Math.abs(objT - camT) + Math.abs(objP - camP) > 1e-4; },
+    detener() { velT = velP = resT = resP = 0; arrastrando = false; id = null; sincronizado = false; },
     // Cada cuadro, después de controls.update(): mueve la cámara (si hay giro en curso) con el tiempo real transcurrido.
     actualizar(dt, puede) {
-      if (!puede) { velT = velP = 0; sincronizado = false; if (arrastrando) { arrastrando = false; id = null; alTerminar(); } return; }
-      if (!arrastrando && !(Math.abs(velT) + Math.abs(velP) > 0.01) && !(sincronizado && Math.abs(objT - camT) + Math.abs(objP - camP) > 1e-4)) { sincronizado = false; return; }
+      if (!puede) { velT = velP = resT = resP = 0; sincronizado = false; if (arrastrando) { arrastrando = false; id = null; alTerminar(); } return; }
+      if (!arrastrando && !(Math.abs(velT) + Math.abs(velP) > 0) && !(Math.abs(resT) + Math.abs(resP) > 0) && !(sincronizado && Math.abs(objT - camT) + Math.abs(objP - camP) > 1e-4)) { sincronizado = false; return; }
       if (!sincronizado) { leerCamara(); objT = camT; objP = camP; sincronizado = true; }
       // La distancia la lleva OrbitControls (zoom): se respeta la actual.
       esfera.setFromVector3(desp.copy(camera.position).sub(controls.target));
-      if (!arrastrando) {
-        objT += velT * dt; objP += velP * dt;
-        // Frenado parejo (la misma proporción por segundo a cualquier ritmo de cuadros).
-        const f = Math.exp(-dt * 3.4); velT *= f; velP *= f;
-        // Cerca de los límites verticales, el impulso vertical se apaga con suavidad.
-        const margen = 0.12, bajo = objP - controls.minPolarAngle, alto = controls.maxPolarAngle - objP;
-        if ((velP < 0 && bajo < margen) || (velP > 0 && alto < margen)) velP *= Math.exp(-dt * 14);
-        objP = limitar(objP);
-        if (Math.abs(velT) + Math.abs(velP) <= 0.01) { velT = velP = 0; }
-      }
       if (arrastrando) {
         // Con el dedo: la posición del dedo en ESTE instante (un poco en el pasado), interpolada entre sus avisos con su hora
         // real. Los avisos llegan a otro ritmo que los cuadros (1, 2 o 3 por cuadro en una pantalla de 120 Hz) y seguirlos
@@ -105,9 +100,21 @@ export function crearGiro({ canvas, camera, controls, sensibilidad = 1, alEmpeza
         const s = 1 - Math.exp(-dt * 60);   // un suavizado mínimo encima (casi directo: responde al instante)
         camT += (rT - camT) * s; camP += (rP - camP) * s;
       } else {
-        // Al deslizar (inercia), algo más suave.
-        const s = 1 - Math.exp(-dt * 22);
-        camT += (objT - camT) * s; camP += (objP - camP) * s;
+        // Deslizamiento (inercia): la vista sigue con la velocidad que llevaba el dedo y frena de forma pareja y continua
+        // (la misma proporción por segundo), sin escalones: lo que faltaba por alcanzar se suma poco a poco al principio.
+        const r = 1 - Math.exp(-dt * 18), dT = resT * r, dP = resP * r; resT -= dT; resP -= dP;
+        camT += velT * dt + dT; camP += velP * dt + dP;
+        // Frenado como el roce del aire: más fuerte cuanto más rápido gira (un giro muy potente se calma enseguida, siempre
+        // de forma continua; uno suave conserva su inercia larga). Sin topes que lo corten de golpe.
+        const f = Math.exp(-dt * (3.4 + 0.45 * Math.hypot(velT, velP))); velT *= f; velP *= f;
+        // Límites de arriba y abajo: la velocidad vertical nunca supera la distancia que queda hasta el límite × 5, así que se
+        // acerca a él cada vez más despacio y nunca choca (antes podía llegar con velocidad y pararse en seco).
+        const bajo = Math.max(0, camP - controls.minPolarAngle), alto = Math.max(0, controls.maxPolarAngle - camP);
+        if (velP < 0) velP = Math.max(velP, -bajo * 5); else if (velP > 0) velP = Math.min(velP, alto * 5);
+        camP = limitar(camP);
+        if (Math.abs(velT) + Math.abs(velP) < 0.003) { velT = velP = 0; }
+        if (Math.abs(resT) + Math.abs(resP) < 1e-5) { resT = resP = 0; }
+        objT = camT; objP = camP;
       }
       esfera.theta = camT; esfera.phi = camP; esfera.makeSafe();
       camera.position.copy(controls.target).add(desp.setFromSpherical(esfera)); camera.lookAt(controls.target);
