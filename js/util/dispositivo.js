@@ -31,6 +31,9 @@ const forzado = new URLSearchParams(location.search).get('seguro');
 export const nivelSeguro = forzado !== null ? Math.max(0, Math.min(2, Number(forzado) || 0))
   : estadoCarga.enCurso ? Math.min(2, (estadoCarga.nivel || 0) + 1) : (estadoCarga.nivel || 0);
 try { localStorage.setItem(CLAVE_CARGA, JSON.stringify({ enCurso: true, nivel: nivelSeguro, buenas: estadoCarga.enCurso ? 0 : estadoCarga.buenas || 0 })); } catch {}
+// Texturas a la medida de la pantalla: el móvil usa los mismos tamaños que el PC (sus objetos se ven igual de grandes o más
+// en su pantalla; con la mitad se veían borrosos). Solo tras un cierre por memoria (modo seguro) se usan las reducidas.
+export const texturasLigeras = nivelSeguro >= 1;
 export function cargaTerminada() {
   try {
     const buenas = (estadoCarga.enCurso ? 0 : estadoCarga.buenas || 0) + 1;

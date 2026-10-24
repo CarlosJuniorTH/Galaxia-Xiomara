@@ -4,7 +4,7 @@
 // acompaña a la cámara (fondo óptico a distancia infinita: nada de lo que se descubre está ahí).
 import { crearIndiceEsferas } from '../util/indiceEsferas.js';
 import * as THREE from 'three';
-import { esMovil } from '../util/dispositivo.js';
+import { esMovil, texturasLigeras } from '../util/dispositivo.js';
 import { azar } from '../util/dibujo.js';
 import { ceder } from '../util/azarSemilla.js';
 import { texturaPlaneta } from './fabricaTexturas.js';
@@ -17,7 +17,10 @@ import { vista } from '../util/vista.js';
 
 // Texturas como en las fotografías (bulbo, brazos azulados, regiones HII rosadas, polvo),
 // calculadas en el Web Worker (texturasPlaneta.js).
-const LADO = esMovil ? 320 : 384;   // en pantalla ocupan como mucho ~300 px
+const LADO = texturasLigeras ? 320 : 384;   // en pantalla ocupan como mucho ~300 px
+// Las imágenes de las nebulosas alimentan su gas con volumen, que se dibuja a media resolución (capaVolumen.js): en el
+// móvil, 384 px ya dan todo el detalle que cabe en esa capa (con 512 la carga tardaba ~8 s más sin verse diferencia).
+const LADO_NEBULOSA = esMovil || texturasLigeras ? 384 : 512;
 const texGalaxia = (tipo, semilla, extra = {}, lado = LADO) => {
   const t = texturaPlaneta('galaxia', { tipo, semilla, ancho: lado, alto: lado, ...extra }, { relleno: [0, 0, 0], bloquea: true });
   t.wrapS = THREE.ClampToEdgeWrapping; return t;
@@ -33,13 +36,13 @@ const texEspecial = (tipo, semilla, lado) => {
 const cacheNebulosa = new Map();
 const texNebulosa = (semilla, tono, forma = 'emision', bloquea = false) => {
   const clave = `${tono}:${semilla % 3}:${forma}`;
-  if (!cacheNebulosa.has(clave)) { const t = texturaPlaneta('nebulosaFondo', { semilla: semilla % 3 * 7 + 2, tono, forma, ancho: esMovil ? 384 : 512, alto: esMovil ? 384 : 512 }, { relleno: [0, 0, 0], bloquea }); t.userData.liberable = true; t.wrapS = THREE.ClampToEdgeWrapping; cacheNebulosa.set(clave, t); }
+  if (!cacheNebulosa.has(clave)) { const t = texturaPlaneta('nebulosaFondo', { semilla: semilla % 3 * 7 + 2, tono, forma, ancho: LADO_NEBULOSA, alto: LADO_NEBULOSA }, { relleno: [0, 0, 0], bloquea }); t.userData.liberable = true; t.wrapS = THREE.ClampToEdgeWrapping; cacheNebulosa.set(clave, t); }
   return cacheNebulosa.get(clave);
 };
 
 // Se construye por pasos (cede el control al navegador entre nebulosas): la portada no se congela.
 export async function crearGalaxiasLejanas({ scene, uPR, uScale }) {
-  const tipos = DESCRIPTORES.map(d => d.especial ? texEspecial(d.especial, d.semilla, esMovil ? d.lado[0] : d.lado[1]) : texGalaxia(d.tipo, d.semilla, { brazos: d.brazos, enrollado: d.enrollado, paleta: d.paleta }));
+  const tipos = DESCRIPTORES.map(d => d.especial ? texEspecial(d.especial, d.semilla, texturasLigeras ? d.lado[0] : d.lado[1]) : texGalaxia(d.tipo, d.semilla, { brazos: d.brazos, enrollado: d.enrollado, paleta: d.paleta }));
   const grupo = new THREE.Group(); grupo.name = 'Fondo óptico (acompaña a la cámara)';
   const nubes = new THREE.Group(); nubes.name = 'Nebulosas (coordenadas fijas)'; nubes.userData.profundo = true;
   const universo = new THREE.Group(); universo.name = 'Galaxias del catálogo (coordenadas fijas)'; universo.userData.profundo = true;

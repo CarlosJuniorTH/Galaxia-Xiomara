@@ -239,7 +239,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   const tam = new THREE.Vector2(), aux = new V(); let gigantes = [];
   const frustum = new THREE.Frustum(), mProy = new THREE.Matrix4(), esfera = new THREE.Sphere();
   let cuadroExpo = 0, densidadWeb = 0, expoAuto = 1;
-  const DENSIDAD_COMODA = 0.85;   // luz de telaraña por píxel CSS con la que se ve bien (la del PC en los gigantes: 0,7–1,1)
+  const AREA_REF = 1440 * 900, TAN_REF = Math.tan(Math.PI / 6), CAL = 5.2, DENSIDAD_COMODA = 0.85;   // luz de telaraña por píxel CSS con la que se ve bien (la del PC en los gigantes: 0,7–1,1)
   return {
     raiz, web, galaxias: bloquesGalaxias, nubes: bloquesNubes, cercano, polvoFil: bloquesPolvo, capaGalaxias, dibujarGalaxias,
     escalarCapaGalaxias(k) { escalaCapa = k; uPRgal.value = k; },
@@ -265,9 +265,17 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
           const b = t.userData.bloque; esfera.center.set(b.centro[0] + O.x, b.centro[1] + O.y, b.centro[2] + O.z); esfera.radius = b.radio;
           if (!frustum.intersectsSphere(esfera)) continue;
           const d = Math.max(1, esfera.center.distanceTo(camera.position) - b.radio * 0.5);
-          luz += t.geometry.drawRange.count * uComp.value * peso * Math.min(2, Math.max(0.5, Math.sqrt(ref / d)));
+          const l = t.geometry.drawRange.count * uComp.value * peso * Math.min(2, Math.max(0.5, Math.sqrt(ref / d)));
+          // Solo la parte del bloque que cae dentro de la vista (por cada plano del encuadre, la fracción de su esfera
+          // que queda dentro): contando el bloque entero, una pantalla estrecha (el móvil) medía casi la misma luz que una ancha.
+          let dentro = 1; for (let i = 0; i < 4; i++) dentro *= Math.min(1, Math.max(0, (frustum.planes[i].distanceToPoint(esfera.center) + b.radio) / (2 * b.radio)));
+          luz += l * dentro;
         }
-        densidadWeb = luz / Math.max(1, vista.ancho * vista.alto);
+        // Por grado de vista (no por píxel): la telaraña tiene el mismo tamaño en el cielo en cualquier aparato, así que
+        // con la misma luz por grado el móvil se ve como un recorte exacto del PC. (Antes, por píxel CSS y contando los
+        // bloques enteros, el móvil quedaba unas tres veces más apagado.) CAL deja el PC con la exposición de siempre.
+        const t = Math.tan(camera.fov * Math.PI / 360);
+        densidadWeb = luz * CAL / AREA_REF * (1.6 * TAN_REF * TAN_REF) / (camera.aspect * t * t);
       }
       const metaAuto = Math.min(1, Math.pow(DENSIDAD_COMODA / Math.max(1e-9, densidadWeb), 0.85));
       expoAuto += (Math.max(0.12, metaAuto) - expoAuto) * Math.min(1, dt * 3);

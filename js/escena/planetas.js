@@ -4,7 +4,7 @@
 // La luz viene del centro de la galaxia. El halo y la atmósfera son discretos: la máxima
 // luminosidad se reserva para lo importante (la fecha, las ciudades, las estrellas).
 import * as THREE from 'three';
-import { esMovil } from '../util/dispositivo.js';
+import { texturasLigeras } from '../util/dispositivo.js';
 import { texTexto, texBrillo, texDestello } from './texturas.js';
 import { BARCELONA, BUENOS_AIRES } from './geografia.js';
 import { puntoSubsolar } from '../util/sol.js';
@@ -12,15 +12,15 @@ import { crearRuido } from '../util/ruido.js';
 
 import { texturaPlaneta } from './fabricaTexturas.js';
 // Las texturas se calculan en un Web Worker (texturasPlaneta.js); aquí solo se piden.
-const RES = esMovil ? 768 : 1024;
+const RES = texturasLigeras ? 768 : 1024;
 const RELIEVE = 16;   // fuerza del relieve de los cráteres
 const texGaseosa = (paleta, semilla) => texturaPlaneta('gaseosa', { paleta, semilla, ancho: RES, alto: RES / 2 }, { relleno: [240, 170, 205], bloquea: false });
 // Resolución según el tamaño en pantalla: las lunas pequeñas no necesitan más de 512 px.
 export const texCrateres = (paleta, semilla, cantidad = 46, mares = 0, ancho = 512, { relieve = false, rayos = 0 } = {}) => texturaPlaneta('crateres', { paleta, semilla, cantidad, mares, ancho, alto: ancho / 2, relieve, rayos }, { relleno: [150, 140, 175], bloquea: false });   // el sistema solar no retrasa la entrada
 // Lunas con relieve de verdad (altura en el canal alfa) y rayos en los cráteres jóvenes.
 const texLuna = (paleta, semilla, cantidad, mares, ancho, rayos = 3) => { const t = texCrateres(paleta, semilla, cantidad, mares, ancho, { relieve: true, rayos }); t.colorSpace = THREE.SRGBColorSpace; return t; };
-const texTierra = semilla => texturaPlaneta('tierra', { semilla, ancho: esMovil ? 1024 : 2048, alto: esMovil ? 512 : 1024 }, { claves: ['superficie', 'mascara'], relleno: [40, 80, 150], bloquea: false });
-const texNubes = semilla => texturaPlaneta('nubes', { semilla, ancho: esMovil ? 512 : 1024, alto: esMovil ? 256 : 512 }, { relleno: [0, 0, 0], bloquea: false });
+const texTierra = semilla => texturaPlaneta('tierra', { semilla, ancho: texturasLigeras ? 1024 : 2048, alto: texturasLigeras ? 512 : 1024 }, { claves: ['superficie', 'mascara'], relleno: [40, 80, 150], bloquea: false });
+const texNubes = semilla => texturaPlaneta('nubes', { semilla, ancho: texturasLigeras ? 512 : 1024, alto: texturasLigeras ? 256 : 512 }, { relleno: [0, 0, 0], bloquea: false });
 
 // Opciones: sol (dirección de la luz en el mundo; por defecto, desde el centro de la galaxia),
 // relieve (cráteres con sombra a partir de la textura), reflejo (luz que el planeta vecino
@@ -543,7 +543,7 @@ export function crearPlanetas({ scene, uScale, uPR }, fechaTexto) {
   });
   // Lunita con cráteres
   const orbitaLuna = new THREE.Group(); planeta.add(orbitaLuna);
-  const luna = new THREE.Mesh(new THREE.SphereGeometry(14, 64, 48), materialPlaneta(texLuna(['#4c4650', '#a49aa6', '#efe7ee'], 3, 170, 1, esMovil ? 768 : 1024), 0xffd8ea, { atmosfera: 0.04, especular: 0.0, terminador: 0.3, relieve: RELIEVE, altura: true, lunar: true, reflejo: 0x3a1c2c }));
+  const luna = new THREE.Mesh(new THREE.SphereGeometry(14, 64, 48), materialPlaneta(texLuna(['#4c4650', '#a49aa6', '#efe7ee'], 3, 170, 1, texturasLigeras ? 768 : 1024), 0xffd8ea, { atmosfera: 0.04, especular: 0.0, terminador: 0.3, relieve: RELIEVE, altura: true, lunar: true, reflejo: 0x3a1c2c }));
   luna.position.set(R * 3.1, 18, 0);
   orbitaLuna.add(luna); orbitaLuna.rotation.x = 0.3;
   // Segunda luna, pequeña y más rápida, en otra órbita.
@@ -607,7 +607,7 @@ export function crearPlanetas({ scene, uScale, uPR }, fechaTexto) {
   const puente = crearRecorrido(arco, '#ffe0ef', { uScale, uPR, tam: 2.3, velocidad: 0.12, base: 0.55 }); puente.renderOrder = 2; azul.add(puente);
   // Luna con cráteres en órbita inclinada.
   const orbitaLunaAzul = new THREE.Group(); orbitaLunaAzul.rotation.set(0.5, 0, 0.25); orbitaAzul.add(orbitaLunaAzul);
-  const lunaAzul = new THREE.Mesh(new THREE.SphereGeometry(6.5, 64, 48), materialPlaneta(texLuna(['#3a3a3e', '#9a9aa0', '#f0f0f2'], 9, 220, 1, esMovil ? 768 : 1024, 4), 0xffffff, { atmosfera: 0.02, especular: 0.0, terminador: 0.3, sol: solTierra, relieve: RELIEVE, altura: true, lunar: true, reflejo: 0x101c2e }));
+  const lunaAzul = new THREE.Mesh(new THREE.SphereGeometry(6.5, 64, 48), materialPlaneta(texLuna(['#3a3a3e', '#9a9aa0', '#f0f0f2'], 9, 220, 1, texturasLigeras ? 768 : 1024, 4), 0xffffff, { atmosfera: 0.02, especular: 0.0, terminador: 0.3, sol: solTierra, relieve: RELIEVE, altura: true, lunar: true, reflejo: 0x101c2e }));
   lunaAzul.position.set(58, 0, 0); orbitaLunaAzul.add(lunaAzul);
   // Las dos estrellas de las orillas, encima del planeta.
   const dosEstrellas = crearDosEstrellas({ uScale, uPR });

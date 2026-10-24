@@ -12,7 +12,7 @@
 // Las galaxias son MENORES que Xiomara (ella es la mayor del universo); las nebulosas, de tamaño
 // moderado. Licencias artísticas declaradas.
 import * as THREE from 'three';
-import { esMovil } from '../util/dispositivo.js';
+import { texturasLigeras } from '../util/dispositivo.js';
 import { LLEGADA_GIGANTE, LEJANIA } from '../data/escalaCosmica.js';
 import { crearNube } from './nube.js';
 
@@ -114,7 +114,7 @@ function particulas(datos, { uScale, uPR, limite = 12, modo = 'luz', suaves = fa
 
 // ── El Ojo: nebulosa volumétrica con su imagen, la estrella central y unas estrellas azules cerca ──
 function crearOjo(R, o) {
-  const g = new THREE.Group(), lado = esMovil ? 384 : 512;
+  const g = new THREE.Group(), lado = texturasLigeras ? 384 : 512;
   const nube = crearNube(imagenOjo(lado), new THREE.Vector3(), R, 77, 1, 7);
   nube.position.set(0, 0, 0); nube.scale.set(R * 2.1, R * 2.1, R * 0.5); nube.userData.brilloPropio = true; g.add(nube);
   const a = azarSemilla(61), estrellas = [[0, 0, 0, C('#f4f8ff').multiplyScalar(3), R * 0.01]];
@@ -125,7 +125,7 @@ function crearOjo(R, o) {
 
 // ── La nube de fuego: volumen con su imagen, polvo oscuro por delante, bruma roja y estrellas ──
 function crearFuego(R, o) {
-  const g = new THREE.Group(), lado = esMovil ? 384 : 512, a = azarSemilla(1609);
+  const g = new THREE.Group(), lado = texturasLigeras ? 384 : 512, a = azarSemilla(1609);
   const nube = crearNube(imagenFuego(lado), new THREE.Vector3(), R, 91, 1, 7);
   nube.position.set(0, 0, 0); nube.scale.set(R * 2.4, R * 2.4, R * 0.9); nube.userData.brilloPropio = true; g.add(nube);
   const bruma = [], polvo = [], estrellas = [];
@@ -143,7 +143,7 @@ function crearFuego(R, o) {
 function crearEnana(R, o) {
   // Una nebulosa con volumen (como el Ojo): una nube irregular turquesa y dorada con burbujas rosas, sin
   // puntos sueltos.
-  const n = ruido2D(921), m = ruido2D(923), lado = esMovil ? 384 : 512;
+  const n = ruido2D(921), m = ruido2D(923), lado = texturasLigeras ? 384 : 512;
   const burbujas = Array.from({ length: 9 }, (_, k) => { const a = azarSemilla(930 + k); return [(a() - 0.5) * 0.9, (a() - 0.5) * 0.9, 0.06 + a() * 0.1]; });
   const img = textura(lado, (x, y) => {
     const wx = x + (n(x * 2 + 3, y * 2, 4) - 0.5) * 0.5, wy = y + (n(x * 2, y * 2 + 7, 4) - 0.5) * 0.5;

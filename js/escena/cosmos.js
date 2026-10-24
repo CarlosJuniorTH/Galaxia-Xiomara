@@ -4,7 +4,7 @@
 // el velo al visitar un lugar (index.js). Las galaxias lejanas evitan estas zonas (ZONAS_OCUPADAS).
 import * as THREE from 'three';
 const ejeCometa = new THREE.Vector3(), frenteCometa = new THREE.Vector3(), auxCometa = new THREE.Vector3();   // reutilizados por los cometas en cada cuadro
-import { esMovil } from '../util/dispositivo.js';
+import { texturasLigeras } from '../util/dispositivo.js';
 import { texBrillo, texDestello, texEstrellaGigante, texNebulosa } from './texturas.js';
 import { texturaPlaneta } from './fabricaTexturas.js';
 import { crearVelo } from './cometa.js';
@@ -142,7 +142,7 @@ export function crearCosmos({ uScale, uPR }) {
   const brillo = texBrillo(), destello = texDestello(), gigante = texEstrellaGigante();
 
   // Las nebulosas viven en la capa más lejana, en 3D (galaxiasLejanas.js).
-  const L = esMovil ? 320 : 400;
+  const L = texturasLigeras ? 320 : 400;
 
   // ── Estrellas reales: soles colosales muy lejos. Pequeños en el cielo, pero se nota que son
   // enormes: disco resuelto (no un punto) con pocas células de convección gigantes, centro

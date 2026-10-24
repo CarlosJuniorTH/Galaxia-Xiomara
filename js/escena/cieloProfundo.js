@@ -3,13 +3,14 @@
 // 6 imágenes (scripts/hornear-cielo.mjs): el juego solo las carga, sin calcular nada en el dispositivo (sin tirones,
 // también en el teléfono). Se dibuja detrás de todo acompañando a la cámara (está a distancia infinita).
 import * as THREE from 'three';
-import { Q, esMovil } from '../util/dispositivo.js';
+import { Q, texturasLigeras } from '../util/dispositivo.js';
 
 const CARAS = ['px', 'nx', 'py', 'ny', 'pz', 'nz'];
 
 export function crearCieloProfundo({ renderer, scene }) {
-  // Teléfonos y calidad reducida: caras de 1024; el resto, 2048.
-  const sufijo = esMovil || Q.cielo < 1024 ? 'media' : 'alta';
+  // Caras de 2048 (también en el móvil: su pantalla tiene tantos píxeles por grado como la del PC); de 1024 en el modo
+  // seguro o con calidad reducida.
+  const sufijo = texturasLigeras || Q.cielo < 1024 ? 'media' : 'alta';
   const uI = { value: 0 }, uVisible = { value: 0 };
   // Las imágenes se decodifican fuera del hilo principal (createImageBitmap) y se suben a la GPU nada más llegar,
   // mientras se presenta el universo: ningún congelón al decodificarlas.
