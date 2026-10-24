@@ -52,13 +52,20 @@ const suave = k => k * k * k * (k * (k * 6 - 15) + 10);
 // Avance de un viaje: primero casi quieto (mientras la mirada se vuelve hacia el destino),
 // acelera entre el 10 y el 30 %, navega y frena despacio en la segunda mitad hasta cero.
 // Integrado una vez en una tabla.
-const PERFIL = (() => {
-  const n = 400, ss = THREE.MathUtils.smootherstep, v = k => (0.04 * ss(k, 0, 0.06) + 0.96 * ss(k, 0.1, 0.3)) * (1 - ss(k, 0.55, 1));   // desde parado (antes arrancaba de golpe al 4 %) y sin cambios bruscos de aceleración
-  const tabla = new Float32Array(n + 1); let suma = 0;
+// Tabla de avance (fracción del recorrido según la del tiempo) a partir de una velocidad relativa v(k).
+const tablaAvance = v => {
+  const n = 400, tabla = new Float32Array(n + 1); let suma = 0;
   for (let i = 1; i <= n; i++) { suma += v((i - 0.5) / n); tabla[i] = suma; }
   for (let i = 0; i <= n; i++) tabla[i] /= suma;
   return k => { const x = Math.min(1, Math.max(0, k)) * n, i = Math.floor(x); return i >= n ? 1 : tabla[i] + (tabla[i + 1] - tabla[i]) * (x - i); };
-})();
+};
+const ss = THREE.MathUtils.smootherstep;
+// Desde parado (antes arrancaba de golpe al 4 %) y sin cambios bruscos de aceleración.
+const PERFIL = tablaAvance(k => (0.04 * ss(k, 0, 0.06) + 0.96 * ss(k, 0.1, 0.3)) * (1 - ss(k, 0.55, 1)));
+// Paso al sistema solar (o fuera de él), como un salto a la velocidad de la luz: hasta el corte la cámara se LANZA
+// acelerando (llega al corte a toda velocidad, sin frenar) y al otro lado aparece aún lanzada y frena hasta el lugar.
+// Antes se paraba en el brazo de la galaxia y arrancaba de nuevo tras el corte.
+const AVANCE = { lanzarse: tablaAvance(k => ss(k, 0, 0.8)), aterrizar: tablaAvance(k => 1 - ss(k, 0.12, 1)) };
 const v3 = a => new THREE.Vector3(...a);
 const EJE_Y = new THREE.Vector3(0, 1, 0);
 export async function crearEscena(canvas, { config, cantidadSecretas, encontradas, fechaTexto, consteladas, alConstelar, alViajar = () => {}, alProblema = () => {}, alProgreso = () => {} }) {
@@ -452,7 +459,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // Viajes con intención: la cámara recorre una curva por puntos de paso propios de cada
   // destino (rozar un anillo, pasar tras una luna, seguir la ruta postal…). Sin puntos de
   // paso, un arco con altura evita atravesar el núcleo.
-  function desplazar(hasta, objetivo, duracion = 4.8, alLlegar, { paso = [], mirarAntes = 1, corriente = 0.45, fija = false } = {}) {
+  let trasSalto = false;   // el próximo viaje sale del corte al sistema solar: empieza lanzado
+  function desplazar(hasta, objetivo, duracion = 4.8, alLlegar, { paso = [], mirarAntes = 1, corriente = 0.45, fija = false, avance = null } = {}) {
+    if (trasSalto) avance ??= 'aterrizar';
     vuelo?.resolver(false); if (vuelo?.plan) limpiarVuelo();
     let resolver;
     const promesa = new Promise(r => (resolver = r));
@@ -466,7 +475,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     const curva = esquivar(base, desde, hasta, [...OBSTACULOS, ...(desde.distanceTo(hasta) > 20000 ? [GALAXIA_OBSTACULO, ...cosmos.cuerpos().slice(1).map(c => ({ c: c.centro, r: c.radio }))] : [])], { porDistancia: true });
     vuelo = { curva, centroDesde, objetivo: objetivo.clone(), transcurrido: 0, duracion: fija ? duracion : duracionViaje(curva.getLength(), duracion), fija, distanciaTotal: curva.getLength(), llegada: hasta.distanceTo(objetivo), salida: Math.max(400, desde.distanceTo(centroDesde)), resolver, alLlegar, mirarAntes, corriente,
       // Al cometa se llega persiguiéndolo: el vuelo se desplaza con él mientras avanza.
-      cometaInicio: destinoActual === 'cometa' ? mundos.posicionCometa() : null, perfil: paso.length > 0 || corriente >= 1,
+      cometaInicio: destinoActual === 'cometa' ? mundos.posicionCometa() : null, perfil: paso.length > 0 || corriente >= 1, avance: avance && AVANCE[avance],
       // Con qué pantalla y qué encuadre ideal se trazó esta curva: si gira o cambia la interfaz
       // durante el vuelo, la llegada se corrige al aterrizar (correccionAlLlegar).
       vw: vista.ancho, vh: vista.alto, idealSalida: idealDelVuelo(hasta.distanceTo(objetivo)) };
@@ -780,7 +789,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     destinoActual = id; mundos.enfocar(id); alViajar(id); soltarCielo();
     if (haciaSolar) {
       const p = galaxia.puntoBrazo(), aviso = setTimeout(destellar, 3200);
-      const ok = await desplazar(p.clone().add(new THREE.Vector3(0, 3, 0)), p, 3.8, undefined, { corriente: 1, mirarAntes: 1.5 });
+      const ok = await desplazar(p.clone().add(new THREE.Vector3(0, 3, 0)), p, 3.8, undefined, { corriente: 1, mirarAntes: 1.5, avance: 'lanzarse' });
       clearTimeout(aviso);
       if (!ok || destinoActual !== id) return false;
       cambiarEscena('solar');
@@ -788,7 +797,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     } else {
       const fuera = camera.position.clone().setY(0).normalize().multiplyScalar(9500).add(new THREE.Vector3(0, 1800, 0));
       const aviso = setTimeout(destellar, 2700);
-      const ok = await desplazar(fuera, fuera.clone().multiplyScalar(2), 3.2, undefined, { corriente: 1 });
+      const ok = await desplazar(fuera, fuera.clone().multiplyScalar(2), 3.2, undefined, { corriente: 1, avance: 'lanzarse' });
       clearTimeout(aviso);
       if (!ok || destinoActual !== id) return false;
       cambiarEscena('principal');
@@ -796,7 +805,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       camera.position.copy(p).addScaledVector(sale, 30).add(new THREE.Vector3(0, 14, 0)); controls.target.copy(p).addScaledVector(sale, 600); camera.lookAt(controls.target);
     }
     camaraAntes.copy(camera.position);
-    return viajar(id, opciones);
+    trasSalto = true; const viaje = viajar(id, opciones); trasSalto = false;   // (lo usa el desplazamiento que viajar crea en el acto)
+    return viaje;
   }
   function viajar(id, { duracion = 4.8 } = {}) {
     // De dónde se sale: el objeto lejano que se visitaba y su distancia de llegada (se recuerda antes de
@@ -989,7 +999,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       // moverse) y después sale disparada; si el camino se curva, el punto de fuga se desplaza
       // y las estelas se curvan con él.
       const giro = lejos && vuelo.corriente >= 1 ? Math.min(0.2, 2.4 / vuelo.duracion) : 0, kv = giro ? Math.max(0, (k - giro) / (1 - giro)) : k;
-      const e = lejos ? avanceLogaritmico(kv, vuelo.distanciaTotal, vuelo.salida, vuelo.llegada) : vuelo.perfil ? PERFIL(k) : suave(k);
+      const e = vuelo.avance ? vuelo.avance(k) : lejos ? avanceLogaritmico(kv, vuelo.distanciaTotal, vuelo.salida, vuelo.llegada) : vuelo.perfil ? PERFIL(k) : suave(k);
       const punto = vuelo.curva.getPointAt(Math.min(1, Math.max(0, e)));
       const desvio = vuelo.cometaInicio ? mundos.posicionCometa().sub(vuelo.cometaInicio) : null;
       if (desvio) punto.addScaledVector(desvio, e);

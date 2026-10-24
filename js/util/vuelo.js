@@ -73,7 +73,7 @@ function* perfilViaje({ camino, longitud, cercania, interes, desde, salidaCentro
   const ld = Array.from(dist, Math.log), sm = new Float64Array(N + 1), W = 6;
   for (let i = 0; i <= N; i++) { let s = 0, n = 0; for (let j = Math.max(0, i - W); j <= Math.min(N, i + W); j++) { s += ld[j]; n++; } sm[i] = Math.exp(s / n); }
   const dEn = s => { const x = Math.min(N, Math.max(0, s / longitud * N)), i = Math.min(N - 1, Math.floor(x)), f = x - i; return sm[i] + (sm[i + 1] - sm[i]) * f; };
-  const dt = 1 / 120, TF = Math.min(tFrenada, duracion * 0.35), TA = Math.min(tArco, duracion * 0.3), A = longitud - lRecta;
+  const dt = 1 / 120, TF = Math.min(tFrenada, duracion * 0.35), TA = Math.min(tArco, duracion * 0.45), A = longitud - lRecta;
   // Frenada final: en cuanto lo que falta se recorre frenando en TF segundos (resto ≤ v·TF/2), la velocidad baja como
   // v0·(1 − 3x² + 2x³): empieza sin tirón, llega a cero y la deceleración también. Antes se frenaba solo en los últimos
   // 1,5 radios de llegada, que al volver a casa (radio pequeño, crucero rapidísimo) se cruzaban en dos cuadros: la cámara
@@ -198,9 +198,9 @@ export function planificarVuelo({ desde, miraDesde, hasta, mira, centro = mira, 
   }
   // ── Trayectoria del viaje: recta (crucero) + arco (llegada) ──
   const q = finRecta(salida), recta = new THREE.LineCurve3(salida.clone(), q), arco = arcoLlegada(q, hasta, centro);
-  // Tiempo del arco de llegada según cuánto rodea el destino (≈ 50°/s de media; nada si llega de frente). También con
+  // Tiempo del arco de llegada según cuánto rodea el destino (≈ 30°/s de media: un rodeo tranquilo; nada si llega de frente). También con
   // movimiento reducido: rodear deprisa es justo el movimiento que marea.
-  const giroArco = q.clone().sub(centro).angleTo(hasta.clone().sub(centro)), tArco = giroArco < 0.02 ? 0 : THREE.MathUtils.clamp(giroArco * 1.2, 0.6, 3.6);
+  const giroArco = q.clone().sub(centro).angleTo(hasta.clone().sub(centro)), tArco = giroArco < 0.02 ? 0 : THREE.MathUtils.clamp(giroArco * 2, 0.8, 6);
   // Recorrido por distancia real (la recta y el arco muestreado denso): con getPointAt de three el paso variaba hasta un 35 %
   // en el arco de llegada, justo mientras se frena (pequeños acelerones al llegar). Ahora el mismo avance es la misma distancia.
   const camino = new CurvaPorDistancia([salida, ...arco.getPoints(1500)]);
