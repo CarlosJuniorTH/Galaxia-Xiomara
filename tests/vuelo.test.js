@@ -135,3 +135,17 @@ test('el perfil del viaje se prepara a trozos (sin pausa al pulsar) y da exactam
   for (let i = 0; i <= 50; i++) { const t = entero.duracion * i / 50, a = entero.evaluar(t), b = trozos.evaluar(t);
     assert.ok(a.pos.distanceTo(b.pos) === 0 && a.mira.distanceTo(b.mira) === 0 && a.fase === b.fase, `instante ${t}`); }
 });
+
+test('las llegadas frenan hasta parar sin frenazo: velocidad que baja hasta cero y sin saltos entre cuadros', () => {
+  for (const nombre of Object.keys(ESCENARIOS)) for (const reducido of [false, true]) {
+    const plan = planear(nombre, { reducido }), T = plan.duracion, P = [];
+    for (let t = plan.ruptura[0]; t <= T + 1e-9; t += 1 / 60) P.push(plan.evaluar(t).pos);
+    const paso = P.slice(1).map((p, i) => p.distanceTo(P[i])), max = Math.max(...paso);
+    // En el último medio segundo la velocidad solo baja, y el último cuadro ya casi no se mueve.
+    const fin = paso.slice(-30); for (let i = 1; i < fin.length; i++) assert.ok(fin[i] <= fin[i - 1] * 1.001 + max * 1e-6, `${nombre}${reducido ? ' (reducido)' : ''}: acelera al llegar`);
+    assert.ok(fin.at(-1) < max * 0.002, `${nombre}${reducido ? ' (reducido)' : ''}: llega todavía a ${(fin.at(-1) / max * 100).toFixed(1)} % de la velocidad máxima`);
+    // Sin saltos de velocidad de un cuadro a otro (segunda diferencia relativa), una vez en marcha.
+    for (let i = 2; i < paso.length; i++) { const ref = Math.max(paso[i], paso[i - 1]); if (ref < max * 0.002) continue;
+      assert.ok(Math.abs(paso[i] - 2 * paso[i - 1] + paso[i - 2]) / ref < 0.16, `${nombre}${reducido ? ' (reducido)' : ''}: salto de velocidad a ${(T - plan.ruptura[0] - i / 60).toFixed(2)} s del final`); }
+  }
+});

@@ -52,3 +52,15 @@ test('salir de dentro (casa) y llegar a casa: solo se libra el tramo propio, no 
   const minimo = Math.min(...ruta.getSpacedPoints(3000).map(p => p.length()));
   assert.ok(minimo >= casa.length() * 0.95, `al salir de casa no se adentra en la galaxia (mínimo ${minimo.toFixed(0)} frente a ${casa.length().toFixed(0)})`);
 });
+
+test('recorrido por distancia: misma velocidad en toda la curva, también donde gira cerrado', () => {
+  // Recta y después un arco, como la llegada en órbita: en el paso de una a otro getPointAt de three variaba un 20–80 %.
+  const pts = [v(0, 0, 4000), v(0, 0, 1500), v(0, 0, 450), v(0, 0, 300), v(150, 0, 260), v(260, 0, 150), v(300, 0, 0)];
+  const base = new THREE.CatmullRomCurve3(pts, false, 'centripetal'), curva = esquivar(base, pts[0], pts[6], [], { porDistancia: true });
+  const n = 3000, P = curva.getSpacedPoints(n), paso = curva.getLength() / n;
+  let peor = 0; for (let i = 1; i <= n; i++) peor = Math.max(peor, Math.abs(P[i].distanceTo(P[i - 1]) - paso) / paso);
+  assert.ok(peor < 0.01, `paso desigual un ${(peor * 100).toFixed(1)} %`);
+  // Pasa por la misma curva (los extremos y cerca de ella en todo momento).
+  assert.ok(curva.getPointAt(0).distanceTo(pts[0]) < 1e-6 && curva.getPointAt(1).distanceTo(pts[6]) < 1e-6);
+  const Q = base.getPoints(4000); for (let i = 0; i <= 50; i++) { const p = curva.getPointAt(i / 50); assert.ok(Math.min(...Q.map(q => q.distanceTo(p))) < 2, `fuera de la curva en ${i / 50}`); }
+});

@@ -53,7 +53,7 @@ const suave = k => k * k * k * (k * (k * 6 - 15) + 10);
 // acelera entre el 10 y el 30 %, navega y frena despacio en la segunda mitad hasta cero.
 // Integrado una vez en una tabla.
 const PERFIL = (() => {
-  const n = 400, v = k => (0.04 + 0.96 * THREE.MathUtils.smoothstep(k, 0.1, 0.3)) * (1 - THREE.MathUtils.smoothstep(k, 0.55, 1));
+  const n = 400, ss = THREE.MathUtils.smootherstep, v = k => (0.04 * ss(k, 0, 0.06) + 0.96 * ss(k, 0.1, 0.3)) * (1 - ss(k, 0.55, 1));   // desde parado (antes arrancaba de golpe al 4 %) y sin cambios bruscos de aceleración
   const tabla = new Float32Array(n + 1); let suma = 0;
   for (let i = 1; i <= n; i++) { suma += v((i - 0.5) / n); tabla[i] = suma; }
   for (let i = 0; i <= n; i++) tabla[i] /= suma;
@@ -463,7 +463,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     const base = puntos.length === 3 && !paso.length ? new THREE.QuadraticBezierCurve3(...puntos) : new THREE.CatmullRomCurve3(puntos.length === 2 ? [puntos[0], puntos[0].clone().lerp(puntos[1], 0.5), puntos[1]] : puntos, false, 'centripetal');
     // Los viajes largos no atraviesan cuerpos: la galaxia y los objetos del cosmos (TON 618,
     // Sagitario A*, el cuásar, el púlsar, la supernova) son obstáculos con su radio real.
-    const curva = esquivar(base, desde, hasta, [...OBSTACULOS, ...(desde.distanceTo(hasta) > 20000 ? [GALAXIA_OBSTACULO, ...cosmos.cuerpos().slice(1).map(c => ({ c: c.centro, r: c.radio }))] : [])]);
+    const curva = esquivar(base, desde, hasta, [...OBSTACULOS, ...(desde.distanceTo(hasta) > 20000 ? [GALAXIA_OBSTACULO, ...cosmos.cuerpos().slice(1).map(c => ({ c: c.centro, r: c.radio }))] : [])], { porDistancia: true });
     vuelo = { curva, centroDesde, objetivo: objetivo.clone(), transcurrido: 0, duracion: fija ? duracion : duracionViaje(curva.getLength(), duracion), fija, distanciaTotal: curva.getLength(), llegada: hasta.distanceTo(objetivo), salida: Math.max(400, desde.distanceTo(centroDesde)), resolver, alLlegar, mirarAntes, corriente,
       // Al cometa se llega persiguiéndolo: el vuelo se desplaza con él mientras avanza.
       cometaInicio: destinoActual === 'cometa' ? mundos.posicionCometa() : null, perfil: paso.length > 0 || corriente >= 1,
