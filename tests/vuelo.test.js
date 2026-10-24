@@ -120,3 +120,18 @@ test('movimiento reducido: sin estelas ni ruptura y más corto', () => {
   assert.ok(red.duracion < normal.duracion);
   for (let t = 0; t <= red.duracion; t += red.duracion / 200) { const m = red.evaluar(t); assert.equal(m.corriente, 0); assert.equal(m.ruptura, 0); }
 });
+
+test('el perfil del viaje se prepara a trozos (sin pausa al pulsar) y da exactamente el mismo vuelo', () => {
+  const entero = planear('casa → supernova (100 Mal)'), trozos = planear('casa → supernova (100 Mal)');
+  assert.equal(trozos.listo, false, 'al planificar aún no se ha calculado el perfil');
+  // Antes de la ruptura no hace falta: la selección y la alineación se evalúan sin terminarlo.
+  trozos.evaluar(trozos.ruptura[0] * 0.5); assert.equal(trozos.listo, false);
+  let pasos = 0; while (!trozos.preparar(0.05)) pasos++;
+  assert.ok(pasos > 10, `repartido en varios cuadros (${pasos})`);
+  assert.ok(Math.abs(entero.duracion - trozos.duracion) < 1 / 60, 'la duración estimada mientras se prepara difiere menos de un cuadro');
+  entero.perfil;   // (se termina de golpe)
+  assert.equal(trozos.duracion, entero.duracion);
+  assert.deepEqual(trozos.tiempos, entero.tiempos);
+  for (let i = 0; i <= 50; i++) { const t = entero.duracion * i / 50, a = entero.evaluar(t), b = trozos.evaluar(t);
+    assert.ok(a.pos.distanceTo(b.pos) === 0 && a.mira.distanceTo(b.mira) === 0 && a.fase === b.fase, `instante ${t}`); }
+});

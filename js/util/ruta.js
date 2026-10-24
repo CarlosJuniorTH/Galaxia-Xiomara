@@ -15,7 +15,7 @@ import * as THREE from 'three';
 
 export const sinRepetidos = lista => lista.filter((p, i) => i === 0 || p.distanceTo(lista[i - 1]) > 2);
 
-const tmp = new THREE.Vector3(), ab = new THREE.Vector3();
+const tmp = new THREE.Vector3(), ab = new THREE.Vector3(), caja = new THREE.Box3();
 // Punto del segmento AB más cercano a C (en `fuera`) y su distancia.
 export function cercanoSegmento(a, b, c, fuera = new THREE.Vector3()) {
   ab.subVectors(b, a); const l2 = ab.lengthSq();
@@ -63,7 +63,11 @@ export function esquivar(curva, desde, hasta, obstaculos, { pasadas = 10, muestr
     const densos = actual.getSpacedPoints(1500);
     let cambiado = false;
     const pts = actual.getSpacedPoints(muestras + pasada * 60);
+    // Caja de la curva densa: los segmentos están dentro, así que un obstáculo a más de su radio de la caja no la toca
+    // (mismo resultado, sin medir los 1500 segmentos contra cada cuerpo lejano: el viaje arranca antes).
+    caja.setFromPoints(densos);
     for (const o of obstaculos) {
+      if (caja.distanceToPoint(o.c) >= o.r) continue;
       // Máxima aproximación (por segmentos) entre los tramos en los que aplica.
       let mejor = Infinity, enI = -1, cerca = new THREE.Vector3();
       for (let i = 1; i < densos.length; i++) { const d = cercanoSegmento(densos[i - 1], densos[i], o.c, q); if (d < mejor && aplica(o, q, desde, hasta)) { mejor = d; enI = i; cerca.copy(q); } }

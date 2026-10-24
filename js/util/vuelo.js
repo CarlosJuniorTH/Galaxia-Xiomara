@@ -51,7 +51,9 @@ function arcoLlegada(q, hasta, centro) {
 // Perfil de velocidad del viaje: v(s) = k·d(s)·rampa(t)·frenada(s), integrado en el tiempo.
 // d(s): distancia a lo más cercano (catálogo, punto de partida, destino). k se ajusta para que el
 // viaje dure lo pedido. Devuelve una tabla tiempo → recorrido.
-function perfilViaje({ camino, longitud, cercania, interes, desde, salidaCentro, centro, dLlegada, duracion, tRampa }) {
+// Es un generador: se calcula a trozos (cada `yield` es una pausa de menos de medio milisegundo) repartidos entre los
+// primeros cuadros del viaje, mientras la cámara aún se alinea, en vez de todo de golpe en el cuadro del clic.
+function* perfilViaje({ camino, longitud, cercania, interes, desde, salidaCentro, centro, dLlegada, duracion, tRampa }) {
   const N = 1600, dist = new Float64Array(N + 1), p = V();
   for (let i = 0; i <= N; i++) {
     camino.getPointAt(i / N, p);
@@ -61,6 +63,7 @@ function perfilViaje({ camino, longitud, cercania, interes, desde, salidaCentro,
     // arranque y la frenada. Raíz cuadrada: la velocidad acompaña al paisaje sin detenerse en él.
     const cerca = Math.max(cercania ? cercania(p) : Infinity, Math.min(4000, dLlegada * 0.5));
     dist[i] = Math.sqrt(Math.max(40, Math.min(cerca, dSalida, dDestino)));
+    if (i % 64 === 63) yield;
   }
   // Suavizado en escala logarítmica (sin esquinas en la velocidad al pasar de un objeto a otro).
   const ld = Array.from(dist, Math.log), sm = new Float64Array(N + 1), W = 6;
@@ -88,9 +91,10 @@ function perfilViaje({ camino, longitud, cercania, interes, desde, salidaCentro,
   // Estimación: sin arranque ni frenada, la duración sería Σ ds / (k·d(s)); con ellos es algo mayor (k algo mayor).
   let integral = 0; for (let i = 0; i < N; i++) integral += longitud / N / (0.5 * (sm[i] + sm[i + 1]));
   const guia = Math.log(integral / duracion), a = guia - 0.3, b = guia + 1.1;
-  if (tarda(a) > duracion && !(tarda(b) > duracion)) { lo = a; hi = b; pasos = 14; }
-  for (let i = 0; i < pasos; i++) { const mid = (lo + hi) / 2; if (tarda(mid) > duracion) lo = mid; else hi = mid; }
-  const k = Math.exp(hi), crudo = simular(k, true);
+  yield; const ta = tarda(a) > duracion; yield;
+  if (ta && !(tarda(b) > duracion)) { lo = a; hi = b; pasos = 14; }
+  for (let i = 0; i < pasos; i++) { yield; const mid = (lo + hi) / 2; if (tarda(mid) > duracion) lo = mid; else hi = mid; }
+  yield; const k = Math.exp(hi), crudo = simular(k, true); yield;
   // La velocidad se suaviza en el TIEMPO (gaussiana de ±0,45 s): a toda velocidad, en los vacíos, un
   // cuadro recorre más que la escala en la que cambia el perfil y la velocidad saltaba hasta un 37 %
   // entre cuadros. Después se reescala para llegar exactamente al final.
@@ -100,6 +104,7 @@ function perfilViaje({ camino, longitud, cercania, interes, desde, salidaCentro,
   for (let i = 0; i < n; i++) {
     let a = 0; for (let j = -WT; j <= WT; j++) { const kk = i + j; a += (kk < 0 || kk >= n ? 0 : vel[kk]) * g[j + WT]; }
     tabla.push(tabla[i] + a / sg * dt);
+    if (i % 128 === 127) yield;
   }
   const escala = longitud / tabla[n]; for (let i = 0; i <= n; i++) tabla[i] = Math.min(longitud, tabla[i] * escala);
   return { k, dt, tabla, duracion: n * dt, distancia: dEn };
@@ -129,7 +134,8 @@ export function planificarVuelo({ desde, miraDesde, hasta, mira, centro = mira, 
   // ── B: punto de maniobra ──
   let salida = desde.clone(), motivo = 'corredor libre desde la posición actual';
   if (desde.distanceTo(centro) <= rAprox * 1.05) motivo = 'ya cerca del destino';
-  else if (!corredorLibre(desde)) {
+  // (Saliendo de un gigante la salida es la de delante de él, más abajo: no se busca maniobra que se descartaría.)
+  else if (!salidaFrente && !corredorLibre(desde)) {
     const haciaDestino = centro.clone().sub(desde).normalize();
     const u = V().crossVectors(haciaDestino, new THREE.Vector3(0, 1, 0)); if (u.lengthSq() < 1e-6) u.set(1, 0, 0); u.normalize();
     const w = V().crossVectors(u, haciaDestino).normalize();
@@ -189,39 +195,50 @@ export function planificarVuelo({ desde, miraDesde, hasta, mira, centro = mira, 
   const finAlinear = Math.max(inicioAlinear + tAlinear, tSeleccion);
   const inicioViaje = finAlinear;
   const salidaCentro = Math.max(400, desde.distanceTo(miraDesde));
-  const perfil = perfilViaje({ camino, longitud: total, cercania, interes, desde: salida, salidaCentro, centro, dLlegada,
-    duracion: duracionPedida ?? duracionCrucero(total, { breve, reducido }), tRampa: reducido ? 1.4 : 1.6 });
-  const tViaje = perfil.duracion, duracion = inicioViaje + tViaje;
+  // El perfil del viaje (lo más costoso) no hace falta hasta la ruptura: se prepara a trozos con preparar(ms) en los
+  // cuadros de la selección y la alineación (al menos 0,6 s). Si algo lo pide antes de estar listo, se termina en el acto.
+  const duracionObjetivo = duracionPedida ?? duracionCrucero(total, { breve, reducido });
+  let perfil = null, nT = 0, desvio = null, sAprox = 0, tAprox = 0, tLlegada = 0, listo = false;
+  const preparacion = (function* () {
+    perfil = yield* perfilViaje({ camino, longitud: total, cercania, interes, desde: salida, salidaCentro, centro, dLlegada,
+      duracion: duracionObjetivo, tRampa: reducido ? 1.4 : 1.6 });
+    nT = perfil.tabla.length; desvio = new Float32Array(nT * 3);
+    yield* calcularDesvio();
+    // Instantes de cada fase del viaje (para la interfaz, las pruebas y saltar el viaje).
+    sAprox = Math.max(0, L - Math.min(L * 0.3, rAprox * 3)); const tiempoDe = s => { const i = perfil.tabla.findIndex(x => x >= s); return inicioViaje + (i < 0 ? perfil.tabla.length - 1 : i) * perfil.dt; };
+    tAprox = tiempoDe(sAprox); tLlegada = tiempoDe(L); listo = true;
+  })();
+  const asegurar = () => { while (!listo) preparacion.next(); };
   // Mirada al pasar: durante el crucero la vista se inclina con suavidad (como mucho 20°) hacia lo que
   // se está cruzando, para verlo pasar de lado; el avance (y el punto de fuga de las estelas) sigue
   // siendo la recta. Tabla por instante, suavizada en el tiempo (±0,7 s): sin tirones entre objetos.
-  const nT = perfil.tabla.length, desvio = new Float32Array(nT * 3);
-  if (interes && !reducido) {
-    const p = V(), w = V(), MAX = Math.tan(20 * Math.PI / 180), crudo = new Float32Array(nT * 3);
-    for (let i = 0; i < nT; i += 2) {
-      const s = perfil.tabla[i]; if (s > L) break;
-      camino.getPointAt(Math.min(1, s / total), p); const r = interes(p, dirCorredor);
-      if (!r?.pos || !(r.w > 0)) continue;
-      w.subVectors(r.pos, p).normalize(); const c = w.dot(dirCorredor); w.addScaledVector(dirCorredor, -c);
-      if (w.lengthSq() < 1e-8) continue;
-      const ang = Math.acos(THREE.MathUtils.clamp(c, -1, 1)), k = Math.min(Math.tan(ang * 0.5), MAX) * r.w;
-      w.normalize().multiplyScalar(k); for (let j = 0; j < 2 && i + j < nT; j++) crudo.set([w.x, w.y, w.z], (i + j) * 3);
+  function* calcularDesvio() {
+    if (interes && !reducido) {
+      const p = V(), w = V(), MAX = Math.tan(20 * Math.PI / 180), crudo = new Float32Array(nT * 3);
+      for (let i = 0; i < nT; i += 2) {
+        const s = perfil.tabla[i]; if (s > L) break;
+        camino.getPointAt(Math.min(1, s / total), p); const r = interes(p, dirCorredor);
+        if (!r?.pos || !(r.w > 0)) continue;
+        w.subVectors(r.pos, p).normalize(); const c = w.dot(dirCorredor); w.addScaledVector(dirCorredor, -c);
+        if (w.lengthSq() < 1e-8) continue;
+        const ang = Math.acos(THREE.MathUtils.clamp(c, -1, 1)), k = Math.min(Math.tan(ang * 0.5), MAX) * r.w;
+        w.normalize().multiplyScalar(k); for (let j = 0; j < 2 && i + j < nT; j++) crudo.set([w.x, w.y, w.z], (i + j) * 3);
+        if (i % 64 === 62) yield;
+      }
+      const ventana = Math.round(0.7 / perfil.dt), g = Array.from({ length: ventana * 2 + 1 }, (_, j) => Math.exp(-Math.pow((j - ventana) / (ventana * 0.5), 2))), sumaG = g.reduce((a, b) => a + b, 0);
+      // (Donde no hay nada en toda la ventana el resultado es cero: se salta sin calcular, mismo resultado.)
+      const usados = new Int32Array(nT + 1); for (let i = 0; i < nT; i++) usados[i + 1] = usados[i] + (crudo[i * 3] || crudo[i * 3 + 1] || crudo[i * 3 + 2] ? 1 : 0);
+      for (let i = 0; i < nT; i++) {
+        if (usados[Math.min(nT, i + ventana + 1)] === usados[Math.max(0, i - ventana)]) continue;
+        for (let c = 0; c < 3; c++) { let a = 0; for (let j = -ventana; j <= ventana; j++) { const k = Math.min(nT - 1, Math.max(0, i + j)); a += crudo[k * 3 + c] * g[j + ventana]; } desvio[i * 3 + c] = a / sumaG; }
+        if (i % 32 === 31) yield; }
     }
-    const ventana = Math.round(0.7 / perfil.dt), g = Array.from({ length: ventana * 2 + 1 }, (_, j) => Math.exp(-Math.pow((j - ventana) / (ventana * 0.5), 2))), sumaG = g.reduce((a, b) => a + b, 0);
-    // (Donde no hay nada en toda la ventana el resultado es cero: se salta sin calcular, mismo resultado.)
-    const usados = new Int32Array(nT + 1); for (let i = 0; i < nT; i++) usados[i + 1] = usados[i] + (crudo[i * 3] || crudo[i * 3 + 1] || crudo[i * 3 + 2] ? 1 : 0);
-    for (let i = 0; i < nT; i++) {
-      if (usados[Math.min(nT, i + ventana + 1)] === usados[Math.max(0, i - ventana)]) continue;
-      for (let c = 0; c < 3; c++) { let a = 0; for (let j = -ventana; j <= ventana; j++) { const k = Math.min(nT - 1, Math.max(0, i + j)); a += crudo[k * 3 + c] * g[j + ventana]; } desvio[i * 3 + c] = a / sumaG; } }
   }
   // La inclinación entra después de la ruptura (en 1,5 s): el salto siempre ocurre alineado con el corredor.
   const desvioEn = (tv, out) => { const i = Math.min(nT - 1, Math.max(0, Math.round(tv / perfil.dt))), k = THREE.MathUtils.smoothstep(tv, tRuptura, tRuptura + 1.5); return out.set(desvio[i * 3] * k, desvio[i * 3 + 1] * k, desvio[i * 3 + 2] * k); };
   const tmpDesvio = V();
   const distMira = Math.max(200, miraDesde.distanceTo(desde));
   const recorridoEn = tv => { const x = Math.max(0, tv) / perfil.dt, i = Math.min(perfil.tabla.length - 2, Math.floor(x)), f = Math.min(1, x - i); return perfil.tabla[i] + (perfil.tabla[i + 1] - perfil.tabla[i]) * f; };
-  // Instantes de cada fase del viaje (para la interfaz, las pruebas y saltar el viaje).
-  const sAprox = Math.max(0, L - Math.min(L * 0.3, rAprox * 3)), tiempoDe = s => { const i = perfil.tabla.findIndex(x => x >= s); return inicioViaje + (i < 0 ? perfil.tabla.length - 1 : i) * perfil.dt; };
-  const tAprox = tiempoDe(sAprox), tLlegada = tiempoDe(L);
 
   function evaluar(t) {
     const pos = V(), m = V();
@@ -243,6 +260,7 @@ export function planificarVuelo({ desde, miraDesde, hasta, mira, centro = mira, 
       m.copy(pos).addScaledVector(dir, THREE.MathUtils.lerp(distMira, pos.distanceTo(centro), ka));
       fase = t < tSeleccion && ks < 0.02 ? 'seleccion' : (tManiobra > 0 && t < finManiobra && t < inicioAlinear) ? 'maniobra' : 'alineacion';
     } else {
+      asegurar();
       const tv = t - inicioViaje, s = recorridoEn(tv);
       avance = s / total; velocidad = (recorridoEn(tv + 0.05) - recorridoEn(tv - 0.05)) / 0.1;
       camino.getPointAt(Math.min(1, avance), pos);
@@ -256,13 +274,21 @@ export function planificarVuelo({ desde, miraDesde, hasta, mira, centro = mira, 
     return { pos, mira: m, fase, corriente: reducido ? 0 : corriente, ruptura, avance, velocidad };
   }
   return {
-    duracion, evaluar, salida, finRecta: q, recta, arco, camino, motivo, rAprox, perfil,
-    tiempos: { seleccion: [0, tSeleccion], maniobra: [inicioManiobra, finManiobra], alineacion: [inicioAlinear, finAlinear], ruptura: [inicioViaje, inicioViaje + tRuptura], crucero: [inicioViaje + tRuptura, tAprox], aproximacion: [tAprox, tLlegada], llegada: [tLlegada, duracion], viaje: [inicioViaje, duracion] },
+    // Mientras se prepara, la duración es la pedida (la búsqueda del perfil la clava: difiere en menos de un cuadro).
+    get duracion() { return inicioViaje + (listo ? perfil.duracion : duracionObjetivo); },
+    get listo() { return listo; },
+    // Avanza la preparación durante `ms` como mucho (cada trozo es corto); devuelve si ya está lista.
+    preparar(ms = 2) { const fin = performance.now() + ms; while (!listo && performance.now() < fin) preparacion.next(); return listo; },
+    evaluar, salida, finRecta: q, recta, arco, camino, motivo, rAprox,
+    ruptura: [inicioViaje, inicioViaje + tRuptura],   // (sin esperar al perfil)
+    get perfil() { asegurar(); return perfil; },
+    get tiempos() { asegurar(); return { seleccion: [0, tSeleccion], maniobra: [inicioManiobra, finManiobra], alineacion: [inicioAlinear, finAlinear], ruptura: [inicioViaje, inicioViaje + tRuptura], crucero: [inicioViaje + tRuptura, tAprox], aproximacion: [tAprox, tLlegada], llegada: [tLlegada, inicioViaje + perfil.duracion], viaje: [inicioViaje, inicioViaje + perfil.duracion] }; },
     // Saltar el viaje: desde el instante t0, el resto del crucero se recorre en `segundos` y se sigue
     // normal desde la aproximación. La curva de Hermite (quíntica) va en DISTANCIA recorrida, de la
     // velocidad y aceleración actuales a las de la aproximación: sin tirones. (Comprimir el tiempo del plan comprimía también sus
     // cambios de velocidad entre encuentros y vacíos, y daba tirones.) Devuelve tiempo real → tiempo del plan.
     saltar(t0, segundos = 2.5) {
+      asegurar();
       if (t0 >= tAprox - 0.5) return null;
       const tv0 = Math.max(0, t0 - inicioViaje), s0 = recorridoEn(tv0), s1 = sAprox, T = segundos;
       // Velocidad y aceleración del plan en los dos extremos (Hermite quíntica: se igualan las dos).

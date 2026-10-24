@@ -637,7 +637,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     partida = null;
     const plan = planificarVuelo({ desde, miraDesde: centroDesde, hasta, mira, centro, obstaculos: obstaculosVuelo(), reducido: movimientoReducido, rAprox, cercania: cercaniaUniverso, breve: viajeBreve, salidaFrente });
     canvas.dataset.planMs = (performance.now() - t0Plan).toFixed(0);   // coste de planificar (diagnóstico)
-    vuelo = { plan, curva: plan.trayectoria(), centroDesde, objetivo: mira.clone(), transcurrido: 0, duracion: plan.duracion, distanciaTotal: plan.camino.getLength(), llegada: hasta.distanceTo(mira),
+    vuelo = { plan, curva: plan.trayectoria(), centroDesde, objetivo: mira.clone(), transcurrido: 0, get duracion() { return plan.duracion; }, distanciaTotal: plan.camino.getLength(), llegada: hasta.distanceTo(mira),
       salida: Math.max(400, desde.distanceTo(centroDesde)), resolver, corriente: 0, perfil: false, centroDestino: centro.clone(), rupturaHecha: false,
       vw: vista.ancho, vh: vista.alto, idealSalida: idealDelVuelo(hasta.distanceTo(mira)) };
     canvas.dataset.viaje = destinoActual; canvas.dataset.avance = '0'; canvas.dataset.fase = 'seleccion';
@@ -962,17 +962,19 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       if (!pausa) {
         vuelo.real = (vuelo.real ?? vuelo.transcurrido) + dt;
         // Saltar el viaje: el resto del crucero se recorre en unos segundos (vuelo.js, saltar).
-        if (vuelo.saltoPedido && vuelo.plan && vuelo.transcurrido >= vuelo.plan.tiempos.ruptura[0]) { vuelo.salto = vuelo.plan.saltar(vuelo.transcurrido, movimientoReducido ? 1.5 : 2.5); vuelo.salto0 = vuelo.real - dt; vuelo.saltoPedido = false; }   // salto0: el instante del cuadro anterior (sin un cuadro quieto)
+        if (vuelo.saltoPedido && vuelo.plan && vuelo.transcurrido >= vuelo.plan.ruptura[0]) { vuelo.salto = vuelo.plan.saltar(vuelo.transcurrido, movimientoReducido ? 1.5 : 2.5); vuelo.salto0 = vuelo.real - dt; vuelo.saltoPedido = false; }   // salto0: el instante del cuadro anterior (sin un cuadro quieto)
         vuelo.transcurrido = vuelo.salto ? vuelo.salto(vuelo.real - vuelo.salto0) : vuelo.transcurrido + dt;
       }
       const porcentaje = String(Math.min(100, Math.floor(vuelo.transcurrido / vuelo.duracion * 100))); if (!vuelo.fija && canvas.dataset.avance !== porcentaje) canvas.dataset.avance = porcentaje;
       const k = Math.min(1, vuelo.transcurrido / vuelo.duracion), lejos = vuelo.distanciaTotal > 20000 && !vuelo.fija;   // fija: recorrido contemplativo a ritmo uniforme
       if (vuelo.plan) {
-        // Vuelo por fases: posición y mirada planificadas; las estelas siguen la fase.
+        // Vuelo por fases: posición y mirada planificadas; las estelas siguen la fase. El perfil del viaje se termina de
+        // preparar a trozos en estos primeros cuadros (antes se calculaba entero en el cuadro del clic: una pausa al pulsar).
+        if (!vuelo.plan.listo) vuelo.plan.preparar(esMovil ? 3 : 2);
         const e = vuelo.plan.evaluar(vuelo.transcurrido);
         camera.position.copy(e.pos); controls.target.copy(e.mira); camera.lookAt(controls.target);
         vuelo.corriente = e.corriente; vuelo.fase = e.fase; if (canvas.dataset.fase !== e.fase) canvas.dataset.fase = e.fase; canvas.dataset.recorrido = e.avance.toFixed(3);
-        const [r0, r1] = vuelo.plan.tiempos.ruptura;
+        const [r0, r1] = vuelo.plan.ruptura;
         if (e.fase === 'ruptura' && !vuelo.rupturaHecha) { vuelo.rupturaHecha = true; campoVelocidad.impulsar(); }
         // Dónde estamos: región, encuentro a la vista y distancia recorrida (para la interfaz y las pruebas).
         if (cuadrosDibujados % 6 === 0) informarViaje(e);
