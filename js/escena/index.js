@@ -1143,7 +1143,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       cosmos.decor.traverse(o => { for (const m of [].concat(o.material || [])) { if (m.uniforms?.uOpacidad) { m.userData.base ??= m.uniforms.uOpacidad.value; m.uniforms.uOpacidad.value = m.userData.base * fs; } else if (m.opacity !== undefined) { m.userData.base ??= m.opacity; m.opacity = m.userData.base * fs; } } });
       cosmos.decor.visible = true; canvas.dataset.estrellasLocales = locales.toFixed(2);
     }
-    for (const p of partes) p.actualizar(tiempo, dt, ctx);
+    // En el sistema solar (Rosa, Azul, las cartas) solo se dibuja su escena: las piezas del universo principal no trabajan
+    // (antes se actualizaban en cada cuadro sin verse). Los mundos sí: el correo de la luna vive allí.
+    for (const p of partes) if (escenaActiva !== 'solar' || p === mundos) p.actualizar(tiempo, dt, ctx);
     // Lejos de casa (en los gigantes y en los viajes largos) lo de casa es un punto invisible: frases, el corazón de luz,
     // los lugares y el agujero negro de casa no se dibujan (la galaxia de Xiomara se queda como su punto de luz). Con
     // «Mirar hacia casa» (teleobjetivo) se vuelven a ver.

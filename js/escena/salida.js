@@ -49,8 +49,18 @@ const fragmentShader = /* glsl */`
   vec3 limpiar(vec3 c) { return min(max(c, vec3(0.0)), vec3(${LIMITE_HDR.toFixed(1)})); }
   vec3 aSrgb(vec3 c) { return mix(1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, c * 12.92, vec3(lessThanEqual(c, vec3(0.0031308)))); }
   vec3 muestra(vec2 uv) { return aSrgb(limpiar(texture2D(tDiffuse, uv).rgb)); }
+  // Ampliación bicúbica Catmull-Rom con 5 lecturas filtradas (la bilineal emborronaba bordes y estrellas al ampliar):
+  // conserva la nitidez de lo que se dibujó a menos resolución que la pantalla.
+  vec3 bicubica(vec2 uv) {
+    vec2 res = 1.0 / uTexel, p = uv * res - 0.5, f = fract(p), b = floor(p) + 0.5;
+    vec2 w0 = f * (-0.5 + f * (1.0 - 0.5 * f)), w1 = 1.0 + f * f * (-2.5 + 1.5 * f), w2 = f * (0.5 + f * (2.0 - 1.5 * f)), w3 = f * f * (-0.5 + 0.5 * f);
+    vec2 w12 = w1 + w2, t0 = (b - 1.0) * uTexel, t3 = (b + 2.0) * uTexel, t12 = (b + w2 / w12) * uTexel;
+    vec3 c = muestra(vec2(t12.x, t0.y)) * w12.x * w0.y + muestra(vec2(t0.x, t12.y)) * w0.x * w12.y + muestra(t12) * w12.x * w12.y
+           + muestra(vec2(t3.x, t12.y)) * w3.x * w12.y + muestra(vec2(t12.x, t3.y)) * w12.x * w3.y;
+    return c / (w12.x * w0.y + w0.x * w12.y + w12.x * w12.y + w3.x * w12.y + w12.x * w3.y);
+  }
   void main() {
-    vec3 c = muestra(vUv);
+    vec3 c = uNitidez > 0.0 ? max(bicubica(vUv), vec3(0.0)) : muestra(vUv);
     if (uNitidez > 0.0) {
       vec3 n = muestra(vUv + vec2(0.0, uTexel.y)), s = muestra(vUv - vec2(0.0, uTexel.y));
       vec3 e = muestra(vUv + vec2(uTexel.x, 0.0)), o = muestra(vUv - vec2(uTexel.x, 0.0));
