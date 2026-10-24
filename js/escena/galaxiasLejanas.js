@@ -121,6 +121,10 @@ export async function crearGalaxiasLejanas({ scene, uPR, uScale }) {
       return indiceCercania().distancia(p.x, p.y, p.z);
     },
     actualizar(t, dt, { camera }) {
+      // Ocultas (el teleobjetivo de «Mirar hacia casa» las apaga): sin trabajo. Con ese aumento todas parecían enormes y se
+      // creaban sus estrellas una tras otra sin verse (varios ms por cuadro en el móvil).
+      let raizCampo = campo.grupo; while (raizCampo.parent && !raizCampo.parent.isScene) raizCampo = raizCampo.parent;
+      if (!raizCampo.visible) return;
       campo.actualizar(camera);
       const f = vista.alto / (2 * Math.tan(camera.fov * Math.PI / 360)), ahora = performance.now();   // un solo reloj por cuadro
       for (const n of listaNubes) {

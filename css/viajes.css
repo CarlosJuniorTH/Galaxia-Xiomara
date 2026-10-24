@@ -14,6 +14,7 @@
 #marca-casa{position:fixed;left:0;top:0;z-index:20;pointer-events:none;opacity:0;transition:opacity .6s ease}
 #marca-casa.activa{opacity:1}
 #marca-casa i{position:absolute;left:calc(var(--r,30px) * -1);top:calc(var(--r,30px) * -1);width:calc(var(--r,30px) * 2);height:calc(var(--r,30px) * 2);border-radius:50%;border:1.5px solid #f3d7b9b3;box-shadow:0 0 0 4px #f3c9e012}   /* trazo nítido, sin halo difuso */
+#marca-casa.grande i{display:none}
 #marca-casa span{position:absolute;left:50%;top:calc(var(--r,30px) + 10px);transform:translateX(-50%);white-space:nowrap;font:400 1rem 'Cormorant Garamond',serif;color:#f6e4ec;text-shadow:0 0 8px #000}
 #viaje-visual button{font:500 .6rem 'Quicksand',sans-serif;background:transparent;border:0;color:#d6bdce;cursor:pointer;min-height:44px;padding:8px;white-space:nowrap}
 #viaje-visual button:focus-visible{outline:2px solid #e8c6a0;outline-offset:4px;border-radius:10px}

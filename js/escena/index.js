@@ -117,7 +117,11 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   const mundos = capa('mundos', () => crearMundos(nucleo, { consteladas, alConstelar }));
   for (const id of SOLARES) if (mundos.grupos.get(id)) solar.escena.add(mundos.grupos.get(id));
   await ceder();
-  const galaxia = capa('galaxia', () => crearGalaxia(nucleo));
+  // Escala de los puntos de la galaxia de casa: la de siempre, salvo con el teleobjetivo de «Mirar hacia casa», que la
+  // amplía como al resto de la imagen (si no, sus estrellas, calculadas para la vista normal, eran miles de veces pequeñas).
+  const uScaleCasa = { value: nucleo.uScale.value };
+  const nucleoCasa = { scene: nucleo.scene, renderer: nucleo.renderer, camera: nucleo.camera, uScale: uScaleCasa, uPR: nucleo.uPR, uTamGalaxia: nucleo.uTamGalaxia };   // para todo lo de casa
+  const galaxia = capa('galaxia', () => crearGalaxia(nucleoCasa));
   await ceder();
   const cosmos = capa('cosmos', () => { const c = crearCosmos(nucleo); nucleo.scene.add(c.raiz, c.decor); return c; });
   await ceder();
@@ -145,15 +149,15 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     capa('viaLactea', () => { const v = crearViaLactea(nucleo); return { ...v, actualizar: (t, dt, ctx) => v.actualizar(ctx.camera) }; }),
     cosmos,
     galaxia,
-    capa('amor', () => crearAmor(nucleo)),
+    capa('amor', () => crearAmor(nucleoCasa)),
     capa('agujeroNegro', () => crearAgujeroNegro(nucleo)),
-    capa('corazon', () => crearCorazon(nucleo)),
-    capa('nombre', () => crearNombre(nucleo, config.nombre)),
+    capa('corazon', () => crearCorazon(nucleoCasa)),
+    capa('nombre', () => crearNombre(nucleoCasa, config.nombre)),
     capa('frases', () => crearFrases(nucleo, config.frases))
   ];
   await ceder();
   const estrellas = capa('estrellas', () => crearEstrellas(nucleo));
-  let secretas = capa('secretas', () => crearEstrellasSecretas(nucleo, cantidadSecretas, encontradas));
+  let secretas = capa('secretas', () => crearEstrellasSecretas(nucleoCasa, cantidadSecretas, encontradas));
   const polvo = capa('polvo', () => crearPolvo(nucleo));
   partes.push(estrellas, secretas, mundos, polvo);
   // Marca del sistema solar en su brazo: una lucecita dorada que late (al tocarla se viaja allí).
@@ -525,12 +529,40 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   const raicesLejanas = scene.children.filter(o => o.userData.capa === 'galaxiasLejanas');
   let gruposGigantes = null;
   const raicesCasa = scene.children.filter(o => ['frases', 'amor', 'mundos', 'secretas', 'agujeroNegro'].includes(o.userData.capa));
+  // «Mirar hacia casa» desde un gigante: los gigantes están casi en el plano de la galaxia de Xiomara y se veía de canto (una
+  // raya). Mientras se mira, casa se inclina hacia la cámara (como una foto desde arriba, ~45°) solo al dibujar: antes del
+  // dibujo se gira alrededor de su centro y después vuelve a su sitio (la lógica de cada parte no lo nota).
+  const todaCasa = scene.children.filter(o => ['mundos', 'galaxia', 'amor', 'agujeroNegro', 'corazon', 'nombre', 'frases', 'secretas', 'polvo', 'marcaSolar'].includes(o.userData.capa) || o === marcaSolar);
+  const giroCasa = new THREE.Quaternion(), guardadoCasa = todaCasa.map(() => [new THREE.Vector3(), new THREE.Quaternion()]), ejeCasa = new THREE.Vector3(), haciaCamCasa = new THREE.Vector3();
+  let casaInclinada = false; const cosmosVisible = [true, true];
+  function inclinarCasa() {
+    if (!mirada) return;
+    const s = mirada.saliendo ? 1 - THREE.MathUtils.smootherstep(mirada.t, 0, 1) : THREE.MathUtils.smootherstep(mirada.t, 0.15, 0.9);
+    if (s <= 0.001) return;
+    haciaCamCasa.copy(camera.position).normalize();
+    const cos = haciaCamCasa.y, normal = Math.sign(cos) || 1, a0 = Math.acos(Math.min(1, Math.abs(cos))), delta = Math.max(0, a0 - 0.8) * s;
+    ejeCasa.set(0, normal, 0).cross(haciaCamCasa); giroCasa.identity(); if (delta > 1e-4 && ejeCasa.lengthSq() > 1e-12) giroCasa.setFromAxisAngle(ejeCasa.normalize(), delta);
+    todaCasa.forEach((o, i) => { guardadoCasa[i][0].copy(o.position); guardadoCasa[i][1].copy(o.quaternion); o.position.applyQuaternion(giroCasa); o.quaternion.premultiply(giroCasa); });
+    // Con el teleobjetivo ya cerrado sobre casa no se dibujan los gigantes ni los astros del cielo (cometas de nuestro entorno,
+    // soles lejanos): lo que quedaba en la línea de visión (la estrella Deneb, un cometa) se ampliaba miles de veces y cubría
+    // la vista de gris. Mientras gira hacia casa siguen ahí; vuelven al salir.
+    cosmosVisible[0] = cosmos.raiz.visible; cosmosVisible[1] = cosmos.decor.visible;
+    if (s > 0.6) cosmos.raiz.visible = cosmos.decor.visible = false;
+    casaInclinada = true;
+  }
+  function restaurarCasa() {
+    if (!casaInclinada) return;
+    todaCasa.forEach((o, i) => { o.position.copy(guardadoCasa[i][0]); o.quaternion.copy(guardadoCasa[i][1]); });
+    cosmos.raiz.visible = cosmosVisible[0]; cosmos.decor.visible = cosmosVisible[1];
+    casaInclinada = false;
+  }
   function mirarCasa(activar = !mirada || mirada.saliendo) {
     if (vuelo || tEntrada === null) return false;
     if (activar) {
       const d = camera.position.length(); if (d < 15000) return false;
-      // La espiral ocupa ~22 % del alto de la pantalla: fov = 2·atan(980 / (0,44·d)), con un mínimo.
-      const fov = Math.max(0.08, THREE.MathUtils.radToDeg(2 * Math.atan(980 / (0.44 * d))));
+      // La galaxia de casa llena la vista: ~85 % del ancho en una pantalla vertical, ~62 % del alto en una horizontal (antes,
+      // 22 % del alto y un tope de campo de visión: desde Deneb era un puntito en una pantalla negra).
+      const fov = Math.max(0.004, THREE.MathUtils.radToDeg(2 * Math.atan(980 / (d * Math.min(0.62, 0.85 * camera.aspect)))));
       mirada = { t: 0, desdeFov: camera.fov, aFov: Math.min(FOV_BASE, fov), desdeQ: camera.quaternion.clone(), aQ: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(camera.position, ORIGEN_CASA, camera.up)), objetivo: controls.target.clone(), saliendo: false, distanciaMal: aMal(d) };
       controls.enabled = false; controls.autoRotate = false; canvas.dataset.mirandoCasa = 'si';
     } else if (mirada) { mirada = { ...mirada, t: 0, saliendo: true, desdeFov: camera.fov, desdeQ: camera.quaternion.clone() }; }
@@ -554,7 +586,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     const x = (proyMarca.x + 1) / 2 * vista.ancho, y = (1 - proyMarca.y) / 2 * vista.alto, rpx = 980 / camera.position.length() * vista.alto / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
     marcaCasa.classList.toggle('activa', !mirada.saliendo && mirada.t > 0.6 && proyMarca.z < 1);
     const dpr = devicePixelRatio || 1, px = v => Math.round(v * dpr) / dpr;   // en píxeles exactos de la pantalla: nítido
-    marcaCasa.style.transform = `translate(${px(x)}px, ${px(y)}px)`; marcaCasa.style.setProperty('--r', `${px(Math.max(18, rpx * 1.25))}px`);
+    marcaCasa.style.transform = `translate(${px(x)}px, ${px(y)}px)`; marcaCasa.style.setProperty('--r', `${px(Math.max(18, rpx * (rpx > 60 ? 0.85 : 1.25)))}px`); marcaCasa.classList.toggle('grande', rpx > 60);   // si casa ya llena la vista, sin círculo (se salía de la pantalla): solo su nombre debajo
     const textoCasa = `Xiomara · ${mirada.distanciaMal < 10 ? mirada.distanciaMal.toFixed(1) : Math.round(mirada.distanciaMal)} millones de años luz`, rotulo = marcaCasa.querySelector('span');
     if (rotulo.textContent !== textoCasa) rotulo.textContent = textoCasa;   // solo si cambia (cada cambio rehace el texto de la página)
     if (mirada.saliendo && mirada.t >= 1) { cieloProfundo.ampliar(1); for (const o of raicesLejanas) o.visible = true; mirada = null; estrellasLocales = -1; controls.enabled = true; delete canvas.dataset.mirandoCasa; marcaCasa.classList.remove('activa'); camera.fov = FOV_BASE; camera.updateProjectionMatrix(); camera.lookAt(controls.target); }
@@ -893,7 +925,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // Motivo por el que se dibuja a ritmo de interacción (se informa en el diagnóstico).
     // La inercia del giro (y el final de un zoom) también son movimiento: a 60 hasta que se paran del todo. Antes, a los 4 s
     // sin tocar se pasaba a 30 aunque la vista siguiera deslizándose y el final del giro iba a frenitos.
-    const motivo = vuelo ? 'vuelo' : gesto ? 'gesto' : giro.moviendo || zoom.moviendo ? 'inercia' : pulso > 0.02 ? 'pulso' : captura ? 'captura'
+    const motivo = vuelo ? 'vuelo' : gesto ? 'gesto' : giro.moviendo || zoom.moviendo ? 'inercia' : mirada && mirada.t < 1 ? 'mirada' : pulso > 0.02 ? 'pulso' : captura ? 'captura'
       : document.body.classList.contains('celebrando') || document.body.classList.contains('reuniendo') ? 'celebracion' : tEntrada !== null && tiempo - tEntrada < 12 ? 'entrada'
       : Math.abs(desplazamientoMeta - desplazamiento) > 0.5 ? 'encuadre' : '';
     const activo = !!motivo;
@@ -1009,7 +1041,11 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     const distanciaCamara = camera.position.distanceTo(controls.target);
     // Tamaño de los puntos y símbolos de la galaxia según lo lejos que está la galaxia, no el
     // objetivo (al mirar hacia un destino lejano no deben hincharse).
-    const distanciaGalaxia = Math.min(distanciaCamara, camera.position.length());
+    // Con el teleobjetivo de «Mirar hacia casa», casa se ve como desde su distancia APARENTE (la real dividida por el aumento):
+    // corazón, nombre y estrellas como desde cerca (antes se apagaban por estar a millones de unidades).
+    const aumentoTele = mirada ? Math.tan(FOV_BASE * Math.PI / 360) / Math.tan(camera.fov * Math.PI / 360) : 1;
+    uScaleCasa.value = nucleo.uScale.value * aumentoTele;
+    const distanciaGalaxia = (mirada ? camera.position.length() : Math.min(distanciaCamara, camera.position.length())) / aumentoTele;
     ctx.escala = escalaSimbolos(distanciaGalaxia);
     // Los símbolos de casa (su nombre, el corazón) son dedicatoria, no cuerpos del universo: se
     // leen desde casa y se desvanecen al alejarse (no se agrandan para seguir viéndose de lejos).
@@ -1193,7 +1229,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       acompanar();
     }
     if (escenaActiva !== 'solar') { capaVolumen.dibujar(camera); telarana.dibujarGalaxias(renderer, camera); }   // capas a menor resolución: gas volumétrico (capaVolumen.js) y galaxias de la telaraña (telarana.js)
-    seguirLuces();
+    seguirLuces(); inclinarCasa();
     try { if (document.body.dataset.supernovaAislada === 'true') conFocoSupernova(scene, cosmos.raiz, cosmos.supernova.grupo, () => composer.render()); else composer.render(); } catch (e) { suspendida = true; alProblema('No se ha podido dibujar el universo. Conservamos tu progreso; vuelve a intentarlo en 3D.'); console.error(e); }
     // El sistema solar se prepara (shaders y texturas) en un momento tranquilo tras la entrada,
     // no durante la carga: así se entra antes y el móvil trabaja menos al principio.
@@ -1202,6 +1238,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       const preparar = () => { (paralela ? renderer.compileAsync(solar.escena, camera) : Promise.resolve(renderer.compile(solar.escena, camera))).catch(() => {}).then(() => subirTexturas(solar.escena)); };
       (window.requestIdleCallback || (f => setTimeout(f, 300)))(preparar);
     }
+    restaurarCasa();
     if (temporal) { camera.position.copy(camaraGuardada.pos); camera.quaternion.copy(camaraGuardada.rot); camera.updateMatrixWorld(); }
     if (captura) { const pendiente = captura; captura = null; clearTimeout(pendiente.timer); pendiente.resolver(renderer.domElement); }
     // La resolución dinámica mide a 60 FPS: en interacción y, ahora que el reposo también va a 60, en reposo.
@@ -1393,7 +1430,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     reiniciarEstrellas() { secretas.reiniciar(); },
     actualizarEstrellas(cantidad, encontradas) {
       const indice = partes.indexOf(secretas); secretas.destruir();
-      secretas = capa('secretas', () => crearEstrellasSecretas(nucleo, cantidad, encontradas)); partes[indice] = secretas;
+      secretas = capa('secretas', () => crearEstrellasSecretas(nucleoCasa, cantidad, encontradas)); partes[indice] = secretas;
     },
     capturar() {
       if (suspendida || document.hidden) return Promise.reject(new Error('Vuelve al universo para guardar la postal.'));
