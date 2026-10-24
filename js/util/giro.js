@@ -6,15 +6,18 @@
 // arriba (como THREE.Spherical).
 import * as THREE from 'three';
 
-// Retraso con el que se lee el dedo (ms): lo justo para tener siempre un aviso a cada lado del instante del cuadro.
-const RETRASO = 12;
+// Retraso con el que se lee el dedo (ms): lo justo para tener siempre un aviso a cada lado del instante del cuadro. Se
+// adapta al ritmo real de los avisos del aparato (pantallas de 120 Hz: ~8 ms; ratones, paneles táctiles o un navegador
+// ocupado: 16–30 ms). Con uno fijo de 12 ms, si los avisos llegaban cada 30 ms la vista se paraba esperando el siguiente
+// y avanzaba a tirones (frenones).
+const RETRASO = 12, RETRASO_MAX = 45;
 
 export function crearGiro({ canvas, camera, controls, sensibilidad = 1, alEmpezar = () => {}, alTerminar = () => {} }) {
   const esfera = new THREE.Spherical(), desp = new THREE.Vector3();
   const punteros = new Map();   // dedos en la pantalla y su última posición
   // Tras un pellizco no se gira hasta levantar todos los dedos: si no, el dedo que se levanta el último giraba la vista
   // (y la lanzaba con inercia) al terminar de acercar o alejar.
-  let id = null, x = 0, y = 0, arrastrando = false, trasPellizco = false;
+  let id = null, x = 0, y = 0, arrastrando = false, trasPellizco = false, intervalo = 8, ultimoAviso = 0;
   let objT = 0, objP = 0, camT = 0, camP = 0, velT = 0, velP = 0, resT = 0, resP = 0, sincronizado = false;
   const muestras = [];   // [tiempo, theta objetivo, phi objetivo] del dedo
   const limitar = p => THREE.MathUtils.clamp(p, controls.minPolarAngle, controls.maxPolarAngle);
@@ -24,7 +27,7 @@ export function crearGiro({ canvas, camera, controls, sensibilidad = 1, alEmpeza
   function empezar(pid, px, py) {
     leerCamara(); objT = camT; objP = camP; velT = velP = 0; sincronizado = true;
     arrastrando = true; id = pid; x = px; y = py;
-    muestras.length = 0; muestras.push([performance.now() - RETRASO, objT, objP]);
+    muestras.length = 0; muestras.push([performance.now() - RETRASO, objT, objP]); ultimoAviso = 0;
     alEmpezar();
   }
   function soltar(e) {
@@ -68,7 +71,10 @@ export function crearGiro({ canvas, camera, controls, sensibilidad = 1, alEmpeza
     for (const ev of (e.getCoalescedEvents?.() || []).length ? e.getCoalescedEvents() : [e]) {
       objT -= (ev.clientX - x) * k; objP = limitar(objP - (ev.clientY - y) * k);
       x = ev.clientX; y = ev.clientY;
-      muestras.push([ev.timeStamp || performance.now(), objT, objP]);
+      const t = ev.timeStamp || performance.now(); muestras.push([t, objT, objP]);
+      // Ritmo de los avisos (media móvil; los saltos muy largos —el dedo quieto— no cuentan).
+      if (ultimoAviso && t - ultimoAviso < 80) intervalo += (Math.max(4, t - ultimoAviso) - intervalo) * 0.2;
+      ultimoAviso = t;
     }
     const ahora = performance.now(); while (muestras.length > 2 && ahora - muestras[0][0] > 160) muestras.shift();
   }, { passive: true });
@@ -91,7 +97,7 @@ export function crearGiro({ canvas, camera, controls, sensibilidad = 1, alEmpeza
         // Con el dedo: la posición del dedo en ESTE instante (un poco en el pasado), interpolada entre sus avisos con su hora
         // real. Los avisos llegan a otro ritmo que los cuadros (1, 2 o 3 por cuadro en una pantalla de 120 Hz) y seguirlos
         // tal cual daba un avance a saltitos («raspaba»); así cada cuadro avanza lo que el dedo avanzó en ese tiempo.
-        const t = performance.now() - RETRASO; let rT = objT, rP = objP;
+        const t = performance.now() - Math.min(RETRASO_MAX, Math.max(RETRASO, intervalo * 1.3 + 2)); let rT = objT, rP = objP;
         for (let i = muestras.length - 1; i > 0; i--) {
           const a = muestras[i - 1], b = muestras[i];
           if (a[0] <= t) { if (t < b[0]) { const f = (t - a[0]) / Math.max(1e-3, b[0] - a[0]); rT = a[1] + (b[1] - a[1]) * f; rP = a[2] + (b[2] - a[2]) * f; } break; }

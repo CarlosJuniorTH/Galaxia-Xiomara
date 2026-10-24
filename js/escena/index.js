@@ -355,7 +355,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   let aligerado = 0;
   const aligerar = () => { if (aligerado >= ESCALONES.length) return; ESCALONES[aligerado][0](); aligerado++; canvas.dataset.aligerado = String(aligerado); };
   const recuperar = () => { if (!aligerado) return false; aligerado--; ESCALONES[aligerado][1](); canvas.dataset.aligerado = String(aligerado); return true; };
-  const regular = crearReguladorResolucion({ minimo: esMovil ? Math.min(1.5, nucleo.resolucion) : 1, maximo: esMovil ? Math.min(nucleo.prMaximo, Math.max(nucleo.resolucion, 1.75 - (nivelSeguro >= 2 ? 0.5 : 0))) : nucleo.prMaximo, inicial: nucleo.resolucion, alAgotar: aligerar, alRecuperar: recuperar });
+  const regular = crearReguladorResolucion({ minimo: esMovil ? Math.min(1.5, nucleo.resolucion) : 1, maximo: esMovil ? Math.min(nucleo.prMaximo, Math.max(nucleo.resolucion, 2.5 - (nivelSeguro >= 2 ? 1 : nivelSeguro ? 0.5 : 0))) : nucleo.prMaximo, inicial: nucleo.resolucion, alAgotar: aligerar, alRecuperar: recuperar });
   // El cambio de resolución rehace los búferes de la imagen (en un móvil, una pausa visible): nunca en mitad de un gesto
   // o de un viaje; espera a que se suelte el dedo o se llegue.
   let resolucionPendiente = null;
@@ -534,7 +534,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // dibujo se gira alrededor de su centro y después vuelve a su sitio (la lógica de cada parte no lo nota).
   const todaCasa = scene.children.filter(o => ['mundos', 'galaxia', 'amor', 'agujeroNegro', 'corazon', 'nombre', 'frases', 'secretas', 'polvo', 'marcaSolar'].includes(o.userData.capa) || o === marcaSolar);
   const giroCasa = new THREE.Quaternion(), guardadoCasa = todaCasa.map(() => [new THREE.Vector3(), new THREE.Quaternion()]), ejeCasa = new THREE.Vector3(), haciaCamCasa = new THREE.Vector3();
-  let casaInclinada = false; const cosmosVisible = [true, true];
+  let casaInclinada = false; const cosmosVisible = [true, true, true, true], camaraTele = { pos: new THREE.Vector3(), fov: 60, escala: 1, activa: false };
   function inclinarCasa() {
     if (!mirada) return;
     const s = mirada.saliendo ? 1 - THREE.MathUtils.smootherstep(mirada.t, 0, 1) : THREE.MathUtils.smootherstep(mirada.t, 0.15, 0.9);
@@ -546,14 +546,26 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // Con el teleobjetivo ya cerrado sobre casa no se dibujan los gigantes ni los astros del cielo (cometas de nuestro entorno,
     // soles lejanos): lo que quedaba en la línea de visión (la estrella Deneb, un cometa) se ampliaba miles de veces y cubría
     // la vista de gris. Mientras gira hacia casa siguen ahí; vuelven al salir.
-    cosmosVisible[0] = cosmos.raiz.visible; cosmosVisible[1] = cosmos.decor.visible;
+    cosmosVisible[0] = cosmos.raiz.visible; cosmosVisible[1] = cosmos.decor.visible; cosmosVisible[2] = telarana.raiz.visible; cosmosVisible[3] = capaVolumen.compuesto.visible;
     if (s > 0.6) cosmos.raiz.visible = cosmos.decor.visible = false;
+    // Sin temblor: con el teleobjetivo cerrado, casa queda a decenas de millones de unidades y la GPU (precisión simple) solo
+    // sitúa cada estrella en pasos de ~1 unidad; con la galaxia girando y un aumento de miles de veces, temblaba. Para este
+    // dibujo la cámara se acerca a casa en la misma dirección y el campo de visión se abre en la misma proporción: la misma
+    // imagen, con números pequeños y precisos. (Lo que no es casa ya no se dibuja en este encuadre.)
+    if (s > 0.6 && camera.fov < 1) {
+      camaraTele.pos.copy(camera.position); camaraTele.fov = camera.fov; camaraTele.escala = uScaleCasa.value;
+      const fov = 1, k = Math.tan(camera.fov * Math.PI / 360) / Math.tan(fov * Math.PI / 360);
+      camera.position.multiplyScalar(k); camera.fov = fov; camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+      uScaleCasa.value = nucleo.uScale.value * Math.tan(FOV_BASE * Math.PI / 360) / Math.tan(fov * Math.PI / 360);
+      telarana.raiz.visible = false; capaVolumen.compuesto.visible = false; camaraTele.activa = true;
+    }
     casaInclinada = true;
   }
   function restaurarCasa() {
     if (!casaInclinada) return;
     todaCasa.forEach((o, i) => { o.position.copy(guardadoCasa[i][0]); o.quaternion.copy(guardadoCasa[i][1]); });
     cosmos.raiz.visible = cosmosVisible[0]; cosmos.decor.visible = cosmosVisible[1];
+    if (camaraTele.activa) { camera.position.copy(camaraTele.pos); camera.fov = camaraTele.fov; camera.updateProjectionMatrix(); camera.updateMatrixWorld(); uScaleCasa.value = camaraTele.escala; telarana.raiz.visible = cosmosVisible[2]; capaVolumen.compuesto.visible = cosmosVisible[3]; camaraTele.activa = false; }
     casaInclinada = false;
   }
   function mirarCasa(activar = !mirada || mirada.saliendo) {

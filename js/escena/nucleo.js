@@ -32,7 +32,7 @@ export function crearNucleo(canvas) {
   //    así que en móvil empieza en DPR 2 y la resolución dinámica de index.js la ajusta.
   //    La pasada de salida la reescala a la nativa con un enfoque adaptativo (salida.js).
   const prMaximo = Math.min(devicePixelRatio, Q.pr);
-  let pr = esMovil ? Math.min(prMaximo, nivelSeguro >= 2 ? 1.25 : 1.75) : prMaximo;   // 1,75 en el móvil: en una pantalla de DPR 3 no se distingue de 2 y el teléfono se calienta menos
+  let pr = esMovil ? Math.min(prMaximo, nivelSeguro >= 2 ? 1.25 : 2) : prMaximo;   // 2 en el móvil (a 1,75 se veía pixelado en una pantalla de DPR 3); la resolución dinámica sube hasta 2,5 si el aparato va sobrado y baja si se calienta
   renderer.setPixelRatio(pr);
   canvas.dataset.resolucion3d = String(pr);
   renderer.setSize(innerWidth, innerHeight);
@@ -112,7 +112,11 @@ export function crearNucleo(canvas) {
   // directamente en el lienzo, que entonces sigue a la resolución interna. En el móvil, como mucho 2: la escena ya se
   // calcula a 2 o menos, y pintar la pasada final a la nativa de un iPhone (3, unos 3 Mpx) no añadía nada visible pero
   // costaba mucho a la GPU en cada cuadro (y iOS tenía que componer esos 3 Mpx). El texto y la interfaz son HTML: nítidos igual.
-  const prLienzo = () => post ? (esMovil ? Math.min(prMaximo, 2) : prMaximo) : pr;
+  // El lienzo, a la resolución nativa de la pantalla: la escena se amplía una sola vez (en la pasada de salida, con su enfoque);
+  // con el lienzo a 2 en una pantalla de DPR 3 se ampliaba dos veces (y el navegador sin enfoque) y se veía borroso.
+  // Lienzo del móvil a 2,5 como mucho (lo máximo que alcanza la escena con la resolución dinámica): la escena nunca se reduce
+  // para volver a ampliarse, y la pasada de salida (con su enfoque) hace la ampliación.
+  const prLienzo = () => post ? (esMovil ? Math.min(prMaximo, 2.5) : prMaximo) : pr;
   renderer.setPixelRatio(prLienzo());
   renderer.setSize(innerWidth, innerHeight);
   canvas.dataset.lienzo3d = String(prLienzo());
