@@ -94,13 +94,16 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aCol', new THREE.BufferAttribute(c, 3)); g.setAttribute(tamPorPunto, new THREE.BufferAttribute(tam, 1));
     return g;
   };
-  const uniformes = { uPR, uScale, uCamL: { value: new THREE.Vector3() }, uGigA: { value: Array.from({ length: 6 }, () => new THREE.Vector4(0, 0, 1, 2)) }, uGigB: { value: Array.from({ length: 6 }, () => new THREE.Vector4(0, 0, 0, 0)) }, uCasa: { value: 1 }, uRes: { value: new THREE.Vector2(1, 1) }, uF: { value: 800 } };
+  const uniformes = { uPR, uScale, uCamL: { value: new THREE.Vector3() }, uGigA: { value: Array.from({ length: 6 }, () => new THREE.Vector4(0, 0, 1, 2)) }, uGigB: { value: Array.from({ length: 6 }, () => new THREE.Vector4(0, 0, 0, 0)) }, uCasa: { value: 1 }, uT: { value: 0 }, uRes: { value: new THREE.Vector2(1, 1) }, uF: { value: 800 } };
   // En el móvil se dibuja el 45 % de los puntos de la telaraña y cada uno lleva la luz de los que no se dibujan (uComp): la
   // misma luz total con menos de la mitad de trabajo para la GPU (en un iPhone la telaraña completa bajaba a ~10 FPS).
   // La compensación es suave (1/√f, no 1/f): con todo concentrado en menos puntos, cada uno se pasaba del umbral del
   // resplandor y la telaraña se volvía una niebla blanca. La exposición automática equilibra la luz total.
-  const MUESTRA = esMovil ? (nivelSeguro ? 0.3 : 0.45) : (nivelSeguro ? 0.6 : 1), uComp = { value: 1 / Math.sqrt(MUESTRA) }; let muestraActual = MUESTRA;
-  const uPRgal = { value: esMovil ? 0.6 : 1 };   // las galaxias se pintan en su propia capa a resolución CSS (1 píxel de capa = 1 px CSS)
+  // En el móvil, el polvo y las nubes de los filamentos al 70 % (al 45 % los filamentos eran cadenitas de puntos sueltos) y
+  // las galaxias en su proporción de antes (45 %): son lo que más cuesta dibujar (su capa).
+  const MUESTRA = esMovil ? (nivelSeguro ? 0.45 : 0.7) : (nivelSeguro ? 0.6 : 1), uComp = { value: 1 / Math.sqrt(MUESTRA) }; let muestraActual = MUESTRA;
+  const PROP_GAL = esMovil ? 0.45 / 0.7 : 1;   // fracción de galaxias respecto a la del polvo
+  const uPRgal = { value: esMovil ? 0.8 : 1 };   // las galaxias se pintan en su propia capa a resolución CSS (1 píxel de capa = 1 px CSS)
   const matGalaxias = new THREE.ShaderMaterial({ uniforms: { ...uniformes, uPR: uPRgal, uComp, uBrazos: { value: texturaBrazos() } },
     vertexShader: /* glsl */`uniform float uPR, uScale, uCasa, uComp; ${OCULTO} attribute vec3 aCol; attribute float aBrillo; varying vec3 vC; varying float vA, vRes, vAng, vInc, vBrazos, vTipo;
       float h(vec3 p){ p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
@@ -119,7 +122,8 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
         vTipo = h(position * 0.0017 + 5.5);
         gl_PointSize = min(tam * uPR, lim);
         vA = ocultoGig(position) * k * (0.35 + 0.65 * aBrillo) * uCasa * (0.03 + 0.7 * smoothstep(6.0, 24.0, tam)) * (1.0 - smoothstep(lim * 0.7, lim, tam * uPR)) * step(0.0, -mv.z);
-        vA *= uComp;
+        // Sin compensar por dibujar menos (en el móvil): cada galaxia con su brillo de siempre. Compensada, cada una brillaba
+        // un 49 % más y en el móvil se veían manchas amarillas que deslumbraban y tapaban la zona.
         vAng = h(position * 0.001) * 6.2832; vInc = 0.25 + 0.75 * h(position * 0.0013 + 3.1); vBrazos = step(0.45, h(position * 0.0007 + 7.7));
         vC = aCol; }`,
     fragmentShader: /* glsl */`uniform sampler2D uBrazos; varying vec3 vC; varying float vA, vRes, vAng, vInc, vBrazos, vTipo;
@@ -144,24 +148,36 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
   // Polvo luminoso de los cúmulos (1–2 px).
   const matNubes = new THREE.ShaderMaterial({ uniforms: { ...uniformes, uComp },
-    vertexShader: /* glsl */`uniform float uPR, uCasa, uComp; attribute vec3 aCol; attribute float aBrillo; varying vec3 vC; varying float vA;
+    vertexShader: /* glsl */`uniform float uPR, uCasa, uComp, uT; attribute vec3 aCol; attribute float aBrillo; varying vec3 vC; varying float vA;
       void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv; float d = length(mv.xyz);
-        vA = aBrillo * clamp(pow(3000000.0 / d, 0.5), 0.4, 1.5) * uCasa * uComp * step(0.0, -mv.z); vC = aCol; gl_PointSize = (1.0 + aBrillo) * uPR; }`,
+        float h = fract(sin(dot(position.xy, vec2(12.9898, 78.233)) * 0.0001) * 43758.5);
+        vA = aBrillo * clamp(pow(3000000.0 / d, 0.5), 0.4, 1.5) * uCasa * uComp * step(0.0, -mv.z); vC = aCol; gl_PointSize = (1.0 + aBrillo) * uPR;
+        // Vida: cada mota titila despacio a su ritmo y unas ondas de luz lentas recorren la red (como pulsos que viajan por
+        // los filamentos y los cúmulos). Sin brillos difusos: solo cambia la luz de cada mota.
+        float h2 = fract(h * 91.7 + 0.37), titileo = 0.78 + 0.22 * sin(uT * (0.6 + h2 * 1.6) + h * 40.0);
+        float onda = pow(0.5 + 0.5 * sin(dot(position, vec3(2.1e-6, 1.3e-6, -1.7e-6)) - uT * 0.35), 8.0) + pow(0.5 + 0.5 * sin(dot(position, vec3(-1.2e-6, 1.9e-6, 1.5e-6)) - uT * 0.27 + 2.0), 8.0);
+        vA *= titileo * (0.75 + 0.9 * onda);
+      }`,
     fragmentShader: /* glsl */`varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; if (d > 1.0) discard; float a = exp(-d * d * 3.0) * vA; gl_FragColor = vec4(vC * a, a); }`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
   // Polvo de los filamentos: motas finas (1–2,5 px), con un leve titileo.
   const matPolvo = new THREE.ShaderMaterial({ uniforms: { ...uniformes, uComp },
-    vertexShader: /* glsl */`uniform float uPR, uCasa, uComp; ${OCULTO} attribute vec3 aCol; attribute float aBrillo; varying vec3 vC; varying float vA;
+    vertexShader: /* glsl */`uniform float uPR, uCasa, uComp, uT; ${OCULTO} attribute vec3 aCol; attribute float aBrillo; varying vec3 vC; varying float vA;
       void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv; float d = length(mv.xyz);
         float h = fract(sin(dot(position.xy, vec2(12.9898, 78.233)) * 0.0001) * 43758.5);
         vA = aBrillo * 3.2 * clamp(pow(4500000.0 / d, 0.5), 0.6, 2.0) * uCasa * step(0.0, -mv.z) * smoothstep(60000.0, 250000.0, d) * ocultoGig(position) * uComp; vC = aCol;
+        // Vida: cada mota titila despacio a su ritmo y unas ondas de luz lentas recorren la red (como pulsos que viajan por
+        // los filamentos y los cúmulos). Sin brillos difusos: solo cambia la luz de cada mota.
+        float h2 = fract(h * 91.7 + 0.37), titileo = 0.78 + 0.22 * sin(uT * (0.6 + h2 * 1.6) + h * 40.0);
+        float onda = pow(0.5 + 0.5 * sin(dot(position, vec3(2.1e-6, 1.3e-6, -1.7e-6)) - uT * 0.35), 8.0) + pow(0.5 + 0.5 * sin(dot(position, vec3(-1.2e-6, 1.9e-6, 1.5e-6)) - uT * 0.27 + 2.0), 8.0);
+        vA *= titileo * (0.75 + 0.9 * onda);
         gl_PointSize = (1.2 + aBrillo * 1.0 + h * 0.5) * uPR; }`,
     fragmentShader: /* glsl */`varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; if (d > 1.0) discard; float a = (1.0 - smoothstep(0.35, 1.0, d)) * vA; gl_FragColor = vec4(vC * a, a); }`,   // motas nítidas, sin halo
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
   // Las tres nubes grandes de puntos (más de un millón en total), en bloques: solo se dibuja lo que está a la vista.
   // (Las cintas, los resplandores y la niebla de gas ya no se construyen: estaban ocultos para siempre —sin líneas ni
   // degradados—; sus datos se siguen calculando para que el azar, y por tanto el universo, no cambie.)
-  const bloquesGalaxias = enBloques(datos.galaxias, matGalaxias, O, MUESTRA), bloquesNubes = enBloques(datos.nubes, matNubes, O, MUESTRA), bloquesPolvo = enBloques(datos.polvo, matPolvo, O, MUESTRA);
+  const bloquesGalaxias = enBloques(datos.galaxias, matGalaxias, O, MUESTRA * PROP_GAL), bloquesNubes = enBloques(datos.nubes, matNubes, O, MUESTRA), bloquesPolvo = enBloques(datos.polvo, matPolvo, O, MUESTRA);
   raiz.add(bloquesNubes, bloquesPolvo);
   // Partículas a baja resolución, como en los juegos: las galaxias de la telaraña (manchas suaves de luz, cientos de miles)
   // se pintan en una capa aparte a la resolución CSS de la pantalla y se suman a la escena. En el móvil (retina) son 4
@@ -185,7 +201,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   });
   compuesto.frustumCulled = false; compuesto.renderOrder = -1.5; raiz.add(compuesto);
   const colorPrevio = new THREE.Color();
-  let escalaCapa = esMovil ? 0.6 : 1;   // en el móvil, la capa de galaxias (luces suaves) al 60 %: medido en un iPhone caliente, +10 FPS
+  let escalaCapa = esMovil ? 0.8 : 1;   // en el móvil, la capa de galaxias al 80 % (al 60 % se veían pixeladas); si el teléfono se calienta, la calidad automática la baja
   function dibujarGalaxias(renderer, camera) {
     const w = Math.max(1, Math.round(vista.ancho * escalaCapa)), h = Math.max(1, Math.round(vista.alto * escalaCapa));
     if (rtGalaxias.width !== w || rtGalaxias.height !== h) rtGalaxias.setSize(w, h);
@@ -243,16 +259,16 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   return {
     raiz, web, galaxias: bloquesGalaxias, nubes: bloquesNubes, cercano, polvoFil: bloquesPolvo, capaGalaxias, dibujarGalaxias,
     escalarCapaGalaxias(k) { escalaCapa = k; uPRgal.value = k; },
-    escalaCapaInicial: esMovil ? 0.6 : 1, muestraInicial: MUESTRA,
+    escalaCapaInicial: esMovil ? 0.8 : 1, muestraInicial: MUESTRA,
     // Fracción de puntos que se dibuja en cada bloque (barajados), con la luz compensada.
-    fijarMuestra(f) { muestraActual = f; for (const grupo of [bloquesGalaxias, bloquesNubes, bloquesPolvo]) for (const t of grupo.children) { const b = t.userData.bloque; t.geometry.setDrawRange(b.a, Math.max(1, Math.ceil(b.n * f))); } uComp.value = 1 / Math.sqrt(f); },
+    fijarMuestra(f) { muestraActual = f; for (const grupo of [bloquesGalaxias, bloquesNubes, bloquesPolvo]) for (const t of grupo.children) { const b = t.userData.bloque; t.geometry.setDrawRange(b.a, Math.max(1, Math.ceil(b.n * f * (grupo === bloquesGalaxias ? PROP_GAL : 1)))); } uComp.value = 1 / Math.sqrt(f); },
     get escalaCapaGalaxias() { return escalaCapa; },
     // Unidos dibujan todos los puntos (no la muestra): la luz de cada uno vuelve a ser la normal.
     get densidadWeb() { return densidadWeb; }, get expoAuto() { return expoAuto; },
     unirBloques(si) { for (const [grupo, p] of unidos) { grupo.visible = !si; p.visible = si; } uComp.value = si ? 1 : 1 / Math.sqrt(muestraActual); },
     // Gigantes que tapan la telaraña: [{ centro, radio }] (coordenadas del mundo).
     fijarGigantes(lista) { gigantes = lista.slice(0, 6).map(g => ({ c: new V(g.centro.x - O.x, g.centro.y - O.y, g.centro.z - O.z), r: g.radio })); },
-    actualizar(t, dt, ctx) { const { camera } = ctx;
+    actualizar(t, dt, ctx) { const { camera } = ctx; uniformes.uT.value = t;
       // En casa, más discreta: el cielo de Xiomara ya es rico; lejos de ella, la telaraña es el cielo.
       // Exposición automática de la telaraña (como el ojo o una cámara): se estima cuánta luz de la telaraña cae en la
       // pantalla —puntos dentro de la vista por su brillo a esa distancia, por píxel CSS— y si se amontona demasiado (mirar
@@ -265,7 +281,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
           const b = t.userData.bloque; esfera.center.set(b.centro[0] + O.x, b.centro[1] + O.y, b.centro[2] + O.z); esfera.radius = b.radio;
           if (!frustum.intersectsSphere(esfera)) continue;
           const d = Math.max(1, esfera.center.distanceTo(camera.position) - b.radio * 0.5);
-          const l = t.geometry.drawRange.count * uComp.value * peso * Math.min(2, Math.max(0.5, Math.sqrt(ref / d)));
+          const l = t.geometry.drawRange.count * (grupo === bloquesGalaxias ? 1 : uComp.value) * peso * Math.min(2, Math.max(0.5, Math.sqrt(ref / d)));
           // Solo la parte del bloque que cae dentro de la vista (por cada plano del encuadre, la fracción de su esfera
           // que queda dentro): contando el bloque entero, una pantalla estrecha (el móvil) medía casi la misma luz que una ancha.
           let dentro = 1; for (let i = 0; i < 4; i++) dentro *= Math.min(1, Math.max(0, (frustum.planes[i].distanceToPoint(esfera.center) + b.radio) / (2 * b.radio)));
