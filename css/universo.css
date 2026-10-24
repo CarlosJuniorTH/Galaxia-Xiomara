@@ -348,3 +348,8 @@ body.faro-en-curso #titulo,body.faro-en-curso #mensaje,body.faro-en-curso #btn-m
    sus botones siguen respondiendo. En el móvil cubre buena parte de la mitad de abajo. */
 .lugar{pointer-events:none;}
 .lugar button,.lugar a,.lugar .lugar-extra{pointer-events:auto;}
+/* Cabecera legible sobre cualquier fondo (el disco brillante del cuásar, la telaraña, una nebulosa): contorno oscuro fino y
+   una sombra oscura corta pegada a las letras; el brillo rosa del título se mantiene por fuera. */
+.marca-universo,.horarios,#contador,#contador-sub{text-shadow:0 1px 2px #08020fe6,0 0 6px #08020fb3}
+#titulo-texto{text-shadow:0 1px 2px #08020fe6,0 0 8px #08020fb3,0 0 28px #be5c9d55}
+#contador-sub,.marca-universo small,.horarios small{text-shadow:0 1px 2px #08020f,0 0 6px #08020fe6,0 0 12px #08020fb3}
