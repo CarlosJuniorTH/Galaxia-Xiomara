@@ -96,7 +96,7 @@ export function* construirTon618({ uScale, uPR, R, grupo }) {
         vec3 pl = vec3(cos(th) * r, aDisco.z * r, sin(th) * r);
         vec3 c = temperatura((r - ${R_DENTRO.toFixed(2)}) / ${(R_FUERA - R_DENTRO).toFixed(2)});
         float g = doppler(r, th, pl, c);
-        float brillo = pow(${R_DENTRO.toFixed(2)} / r, 0.5) * clamp(pow(g, 0.75), 0.3, 1.35) * latido(r) * inclinacion(pl * uR) * smoothstep(0.0, 0.05, x) * (1.0 - smoothstep(0.88, 1.0, x)) * 0.62;
+        float brillo = pow(${R_DENTRO.toFixed(2)} / r, 0.5) * clamp(pow(g, 0.75), 0.3, 1.35) * latido(r) * inclinacion(pl * uR) * smoothstep(0.0, 0.05, x) * (1.0 - smoothstep(0.88, 1.0, x)) * 0.8;
         ${GLSL_FINAL}
       }`));
   }
@@ -247,7 +247,7 @@ export function* construirTon618({ uScale, uPR, R, grupo }) {
       if (!escena) { tocado = false; distanciaInicio = 0; }
     },
     // Deriva de la cámara durante la escena: rodea el agujero muy despacio alrededor del eje del disco, baja hasta mirar el
-    // disco casi de canto (7,5°: la sombra con la imagen curvada encima y debajo) y se acerca un poco. Si la persona toca
+    // disco casi de canto (7,5°: la sombra con la imagen curvada encima y debajo) y se acerca un poco (más en vertical). Si la persona toca
     // la cámara, se deja de mover sola hasta la próxima escena. Sin memoria nueva por cuadro.
     derivar(camera, objetivo, dt, escena, tocando) {
       if (tocando) tocado = true;
@@ -261,7 +261,7 @@ export function* construirTon618({ uScale, uPR, R, grupo }) {
       const e = Math.asin(THREE.MathUtils.clamp(rel.dot(n) / d, -1, 1)), meta = (Math.sign(e) || 1) * 0.13;
       const eje = qa; eje.setFromAxisAngle(tmp2.crossVectors(rel, n).normalize(), (meta - e) * Math.min(1, dt * 0.22) * w);
       rel.applyQuaternion(eje);
-      rel.multiplyScalar(1 + (distanciaInicio * 0.9 / d - 1) * Math.min(1, dt * 0.06) * w);
+      rel.multiplyScalar(1 + (distanciaInicio * (camera.aspect < 0.95 ? 0.72 : 0.88) / d - 1) * Math.min(1, dt * 0.06) * w);   // en vertical se llega más lejos: se acerca más
       camera.position.copy(centro).add(rel); camera.lookAt(objetivo);
       return true;
     }
