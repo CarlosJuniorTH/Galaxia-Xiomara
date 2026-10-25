@@ -41,19 +41,13 @@ const momento = (otros = {}) => ({ archivo: null, duracion: null, volumen: 0.9, 
 const estancia = (archivo, volumen = 0.9) => ({ archivo, volumen });
 
 export const MOMENTOS = {
-  // Canción de la portada: suena desde el toque «Toca para empezar ♡» y la animación sigue su reloj. Las marcas son los
-  // segundos del fragmento en los que deben caer los hitos de la portada (js/ui/portada.js, HITOS):
-  //   encuentro  las dos luces se encuentran          corazon  el corazón de luz late
-  //   galaxia    la galaxia empieza a desplegarse      tarjeta  aparece la tarjeta con el botón para entrar
-  //   voz        (opcional) entra la voz: la primera frase de la presentación
-  // (sin marcas, la animación va a su ritmo de siempre: encuentro a los 4,6 s, tarjeta a los 8,9 s).
-  // pulso: segundos entre latidos del corazón de luz, al compás (con 0 en un primer tiempo); null = su latido de siempre.
-  // El destello del encuentro dura dos latidos, a tiempo real (no se estira con la animación).
-  // «Maps» (Maroon 5), el estribillo: 117,5 BPM, compases de 2,0 s desde el 0. Entra la voz a 1,17 («Oh, say, say, say»);
-  // primer «Wait, they don't love you like I love you» a 10,9 (las luces se encuentran) hasta 14,1 (el corazón, al final de
-  // «…like I love you»); segundo «Wait» a 15,7 (se despliega la galaxia, durante toda la frase); último «…like I love you»
-  // a 27,3 (la tarjeta).
-  inicio: momento({ archivo: 'inicio.m4a', duracion: 32, pulso: 1.0, marcas: { voz: 1.17, encuentro: 10.9, corazon: 14.1, galaxia: 15.7, tarjeta: 27.3 } }),
+  // Canción de la intro: «Maps» (Maroon 5), el estribillo: 32 s a ~117,5 BPM, un compás cada ~2,0 s desde el 0. Suena al
+  // terminar la carga, a la vez que el videoclip (js/ui/portada.js), que sigue su reloj. Las marcas son los segundos del
+  // fragmento en los que deben caer los hitos del clip (HITOS de portada.js, que explica cada uno: las dos luces con las
+  // primeras llamadas de la voz, los dos golpes de la letra a 10,9 y 15,7, el encuentro en el compás de 20,0, el salto en
+  // el de 28,0 y la tarjeta en el de 30,0); con este fragmento coinciden y el clip va a 1:1. Sin archivo (o si no carga),
+  // el clip va con su propio reloj de 32 s.
+  inicio: momento({ archivo: 'inicio.m4a', duracion: 32, marcas: { luzCarlos: 1.17, luzXiomara: 3.25, mapa: 5.11, ruta: 7.13, espera: 10.91, respuesta: 15.73, encuentro: 19.99, nombres: 22.01, cielo: 24.03, salto: 27.98, tarjeta: 30 } }),
   // Instrumental de los viajes («Duvet», bôa): 15 s, lo que dura el viaje más largo, sin bucle. hastaLlegar: al despegar
   // empieza en el segundo 15 − duración del viaje, para que su final caiga justo en la llegada (allí se funde con la canción
   // del destino o con el ambiente).
@@ -91,7 +85,7 @@ export const MOMENTOS = {
 export const PRUEBA = {
   carpeta: 'assets/musica/prueba/',
   momentos: {
-    inicio: momento({ archivo: 'inicio.m4a', pulso: 1.0, marcas: { encuentro: 6, corazon: 7.5, galaxia: 10, tarjeta: 18 } }),
+    inicio: momento({ archivo: 'inicio.m4a', marcas: { ...MOMENTOS.inicio.marcas } }),
     viajes: momento({ archivo: 'viajes.m4a', duracion: 15, volumen: 0.75, hastaLlegar: true }),
     hogar: momento({ archivo: 'hogar.m4a', estancia: estancia('hogar-estancia.m4a') })
   }

@@ -4,8 +4,9 @@ import { reescalar, marcasCruzadas, momentoReposo } from '../js/util/sincronia.j
 import { MOMENTOS, PRUEBA, FASES_SUPERNOVA, configuracionActiva } from '../js/data/bandaSonora.js';
 import { faseSupernova, TIEMPOS_AMOR } from '../js/util/supernovaAmor.js';
 import { DESTINOS, LEJANOS } from '../js/data/universo.js';
+import { HITOS as HITOS_INTRO, DURACION as DURACION_INTRO, PULSOS } from '../js/ui/portada.js';
 
-// Los mismos hitos que js/ui/portada.js (no se importa: portada.js usa el DOM al crear la animación).
+// Hitos de ejemplo (los de la portada anterior) para probar el reescalado.
 const HITOS = { encuentro: 4.6, corazon: 5.1, galaxia: 6.1, tarjeta: 8.9 };
 
 test('la portada reescalada pone cada hito en su marca y sigue al ritmo normal después', () => {
@@ -48,9 +49,11 @@ test('la configuración tiene todos los momentos, con ids reales, y solo los aud
   for (const id of ['supernova', 'pulsar', 'deneb', 'cuasar', 'ton618', 'sagitario', 'gigante']) { assert.ok(MOMENTOS[id], id); assert.ok(ids.has(id), `${id} existe en universo.js`); }
   assert.ok(MOMENTOS.inicio && MOMENTOS.viajes && MOMENTOS.mes[10]);
   assert.equal(MOMENTOS.viajes.bucle, false); assert.equal(MOMENTOS.viajes.hastaLlegar, true); assert.equal(MOMENTOS.viajes.duracion, 15);
-  // «Maps»: las marcas de la portada en orden y dentro del fragmento de 32 s.
-  const mi = MOMENTOS.inicio.marcas; assert.ok(mi.voz < mi.encuentro && mi.encuentro < mi.corazon && mi.corazon < mi.galaxia && mi.galaxia < mi.tarjeta && mi.tarjeta < 32);
-  for (const k of ['encuentro', 'corazon', 'galaxia', 'tarjeta']) assert.ok(k in MOMENTOS.inicio.marcas, k);
+  // «Maps»: una marca por hito del videoclip de la intro (js/ui/portada.js), en orden y dentro del fragmento de 32 s.
+  const mi = MOMENTOS.inicio.marcas, orden = Object.keys(HITOS_INTRO).sort((a, b) => HITOS_INTRO[a] - HITOS_INTRO[b]);
+  for (const k of orden) assert.ok(Number.isFinite(mi[k]), k);
+  for (let i = 1; i < orden.length; i++) assert.ok(mi[orden[i - 1]] < mi[orden[i]], orden[i]);
+  assert.ok(mi.tarjeta < DURACION_INTRO && MOMENTOS.inicio.duracion === DURACION_INTRO);
   // Cada momento con canción usa su archivo con su nombre; las estancias, «<lugar>-estancia.m4a». Nada en bucle.
   const activos = configuracionActiva('').momentos;
   for (const n of ['inicio', 'viajes', 'supernova', 'pulsar', 'deneb', 'cuasar', 'ton618', 'sagitario', 'hogar']) assert.equal(activos[n].archivo, `${n}.m4a`, n);
@@ -71,4 +74,13 @@ test('las marcas de la supernova caen en las fases de su ceremonia', () => {
   const fase = s => s < TIEMPOS_AMOR.espera ? faseSupernova('inestable', 0, TIEMPOS_AMOR.espera - s) : faseSupernova('estallido', s - TIEMPOS_AMOR.espera);
   for (const [nombre, s] of Object.entries(FASES_SUPERNOVA)) assert.equal(fase(s + 0.01), nombre, `${nombre} a los ${s} s`);
   assert.deepEqual(MOMENTOS.supernova.marcas, { ...FASES_SUPERNOVA });
+});
+
+test('el videoclip de la intro va a 1:1 con «Maps» y sus hitos de imagen caen en compás o en la voz', () => {
+  const mi = MOMENTOS.inicio.marcas;
+  for (const [k, h] of Object.entries(HITOS_INTRO)) assert.ok(Math.abs(reescalar(h, mi, HITOS_INTRO) - h) < 1e-9, k);
+  // Encuentro, nombres, cielo, salto y tarjeta, en el primer tiempo de un compás (cada cuatro pulsos).
+  for (const k of ['encuentro', 'nombres', 'cielo', 'salto', 'tarjeta']) { const i = PULSOS.indexOf(HITOS_INTRO[k]); assert.ok(i >= 0 && i % 4 === 0, k); }
+  // Los pulsos, crecientes y a ~0,5 s (120 BPM) de 0 a 32.
+  for (let i = 1; i < PULSOS.length; i++) assert.ok(Math.abs(PULSOS[i] - PULSOS[i - 1] - 0.5) < 0.06, `pulso ${i}`);
 });

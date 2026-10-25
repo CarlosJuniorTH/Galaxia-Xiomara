@@ -1,10 +1,10 @@
 // Banda sonora con audios de prueba (?pruebaAudio): tonos y ruido rosa generados con ffmpeg y preparados con
-// scripts/preparar-audio.mjs (no es música). Comprueba la pantalla «Toca para empezar ♡», que la descarga empieza antes
-// del toque y cuenta en los MB de la carga, que tras el toque suena (contexto en «running» y el reloj avanza), que la
-// tarjeta para entrar no aparece antes de la marca «tarjeta», que el vuelo de entrada no corta la canción, que al terminar
-// se funde con el ambiente, que al viajar se funde a «viajes» y al llegar se vuelve, el botón de música, y que en la
-// segunda visita ya se puede saltar. Si faltan las canciones (404, como en GitHub Pages), ni pantalla de toque ni
-// espera: todo como antes. La música de los viajes (15 s, sin bucle) entra en 15 − duración del viaje y acaba al llegar.
+// scripts/preparar-audio.mjs (no es música). Comprueba el flujo de la intro: «Toca para empezar ♡» (la descarga empieza
+// antes y cuenta en los MB de la carga), el toque solo desbloquea el sonido y da paso a la carga (sin canción aún); al
+// 100 % empiezan a la vez el videoclip y la canción (contexto en «running», el reloj avanza); la tarjeta para entrar no
+// aparece antes de la marca «tarjeta»; el vuelo de entrada no corta la canción; al terminar se funde con el ambiente; al
+// viajar se funde a «viajes» y al llegar se vuelve; el botón de música; y que en la segunda visita tampoco se puede
+// saltar. Si faltan las canciones (404, como en GitHub Pages), ni pantalla de toque: la carga y el clip con su reloj. La música de los viajes (15 s, sin bucle) entra en 15 − duración del viaje y acaba al llegar.
 import { spawnSync } from 'child_process';
 import { existsSync, mkdirSync, readFileSync } from 'fs';
 import path from 'path';
@@ -42,9 +42,12 @@ export default async function ({ base, informe }) {
     await pagina.goto(`${base}/?calidad=alta#debug`);
     await pagina.waitForTimeout(2500);
     const sinArchivos = await pagina.evaluate(() => ({ toque: document.getElementById('toque').hidden, clases: document.getElementById('entrada').className, carga: getComputedStyle(document.getElementById('carga')).opacity }));
-    informe.comprobar(sinArchivos.toque && !/con-toque|cancion/.test(sinArchivos.clases) && sinArchivos.carga !== '0', 'si faltan las canciones (404), no hay pantalla de toque y la carga se ve como siempre', sinArchivos);
-    await pagina.waitForFunction(() => document.getElementById('entrada').classList.contains('formado'), null, { timeout: 120000 });
-    informe.comprobar(true, 'y la portada sigue su curso hasta la tarjeta');
+    informe.comprobar(sinArchivos.toque && !/con-toque/.test(sinArchivos.clases) && sinArchivos.carga !== '0', 'si faltan las canciones (404), no hay pantalla de toque y la carga se ve', sinArchivos);
+    await pagina.waitForFunction(() => window.__intro?.empezado, null, { timeout: 120000, polling: 100 });
+    informe.comprobar(await pagina.evaluate(() => !window.__intro.conCancion && document.getElementById('btn-entrar').classList.contains('preparado')), 'al 100 % empieza el clip, con su propio reloj');
+    await pagina.waitForFunction(() => document.getElementById('entrada').classList.contains('formado'), null, { timeout: 60000 });
+    const sinT = await pagina.evaluate(() => window.__intro.tiempo);
+    informe.comprobar(sinT >= 29.8 && sinT < 31, 'y la tarjeta sale al final de sus 32 s (en «tarjeta»)', sinT);
 
     // 1. Con canción: pantalla de toque y descarga desde el principio.
     pedidosAudio.length = 0;
@@ -52,7 +55,7 @@ export default async function ({ base, informe }) {
     await pagina.waitForSelector('#toque:not([hidden])', { timeout: 30000 });
     const toque = await pagina.evaluate(() => ({ texto: document.querySelector('.toque-texto').textContent, fuente: getComputedStyle(document.querySelector('.toque-texto')).fontFamily, carga: getComputedStyle(document.getElementById('carga')).opacity, frase: document.getElementById('portada-frase').textContent }));
     informe.comprobar(toque.texto === 'Toca para empezar ♡' && /Great Vibes/.test(toque.fuente), 'pantalla «Toca para empezar ♡» con la letra del proyecto', toque);
-    informe.comprobar(toque.carga === '0' && toque.frase === '', 'antes del toque no se ve la carga ni empieza la portada', toque);
+    informe.comprobar(toque.carga === '0' && toque.frase === '', 'antes del toque no se ve la carga ni empieza el clip', toque);
     // Que la descarga empiece sin esperar al toque (se espera un poco a propósito antes de tocar).
     await pagina.waitForTimeout(3000);
     const antesDelToque = pedidosAudio.filter(p => /inicio\.m4a$/.test(p.url)).length;
@@ -69,21 +72,25 @@ export default async function ({ base, informe }) {
     const antes = await estado();
     informe.comprobar(antes.contexto === null || antes.contexto !== 'running', 'sin toque, el audio no suena', antes.contexto);
 
-    // 2. El toque: suena.
+    // 2. El toque: da paso a la carga (sin canción aún); al 100 %, el clip y la canción a la vez.
     await pagina.click('#toque');
+    await pagina.waitForTimeout(900);
+    const trasToque = await pagina.evaluate(() => ({ preparado: document.getElementById('btn-entrar').classList.contains('preparado'), carga: getComputedStyle(document.getElementById('carga')).opacity, empezado: window.__intro.empezado, sonando: window.__bandaSonora.estado().pistas.inicio.sonando }));
+    if (!trasToque.preparado) informe.comprobar(trasToque.carga !== '0' && !trasToque.empezado && !trasToque.sonando, 'tras el toque, la pantalla de carga y aún sin canción', trasToque);
+    else informe.nota('la carga ya había terminado al tocar: el clip empezó con el toque');
+    await pagina.waitForFunction(() => window.__intro.empezado, null, { timeout: 120000, polling: 50 });
+    informe.comprobar(await pagina.evaluate(() => document.getElementById('btn-entrar').classList.contains('preparado') && window.__intro.conCancion), 'el clip empieza al 100 % y con la canción');
     await pagina.waitForTimeout(1500);
     const e1 = await estado(); await pagina.waitForTimeout(1000); const e2 = await estado();
     informe.comprobar(e2.contexto === 'running', 'tras el toque el AudioContext está en «running»', e2.contexto);
     informe.comprobar(e2.pistas.inicio.sonando && e2.pistas.inicio.tiempo - e1.pistas.inicio.tiempo > 0.7, 'la canción de la portada suena y su reloj avanza', [e1.pistas.inicio.tiempo, e2.pistas.inicio.tiempo]);
     informe.comprobar(e2.objetivo === 'inicio' && e2.pistas.inicio.ganancia > 0.3, 'su pista está en el aire (ganancia)', e2.pistas.inicio.ganancia);
-    const portada = await pagina.evaluate(() => ({ saltar: document.getElementById('portada-saltar').hidden, cancion: document.getElementById('entrada').classList.contains('cancion') }));
-    informe.comprobar(portada.saltar && portada.cancion, 'la primera vez no hay «Saltar» mientras suena la canción', portada);
+    informe.comprobar(await pagina.evaluate(() => !document.querySelector('#portada-saltar, .portada-saltar')), 'no hay forma de saltar el clip');
 
     // 3. La tarjeta, en la marca «tarjeta» (y no antes), aunque la carga acabe antes.
     await pagina.waitForFunction(() => window.__registroBanda.formado !== undefined, null, { timeout: 150000, polling: 200 });
     const R = await pagina.evaluate(() => window.__registroBanda);
     informe.comprobar(R.formado >= marcas.tarjeta - 0.15, `la tarjeta para entrar aparece en la marca «tarjeta» (${marcas.tarjeta} s), no antes`, R);
-    informe.nota(R.preparado !== undefined && R.preparado < marcas.tarjeta ? `la carga terminó antes (a los ${R.preparado.toFixed(1)} s de la canción) y la tarjeta esperó a su marca` : 'la carga terminó después de la marca: la tarjeta salió al terminar');
 
     // 4. Entrar: el vuelo de entrada no corta la canción; al acabar, se funde con el ambiente.
     await pagina.waitForTimeout(1400);
@@ -143,15 +150,16 @@ export default async function ({ base, informe }) {
     const otraVez = await estado();
     informe.comprobar(otraVez.activa && otraVez.ambiente.ganancia > 0.5, 'y lo vuelve a encender', otraVez.ambiente);
 
-    // 8. Segunda visita: ya se escuchó entera, así que se puede saltar.
+    // 8. Segunda visita: el clip tampoco se puede saltar; la tarjeta, otra vez en su marca.
     await pagina.reload();   // (goto a la misma dirección con # no recarga)
     await pagina.waitForSelector('#toque:not([hidden])', { timeout: 30000 });
-    await pagina.click('#toque'); await pagina.waitForTimeout(800);
-    informe.comprobar(await pagina.evaluate(() => !document.getElementById('portada-saltar').hidden), 'en la segunda visita aparece «Saltar la presentación»');
-    await pagina.waitForFunction(() => document.getElementById('btn-entrar').classList.contains('preparado'), null, { timeout: 90000 });
-    await pagina.click('#portada-saltar'); await pagina.waitForTimeout(600);
-    const salto = await pagina.evaluate(() => ({ formado: document.getElementById('entrada').classList.contains('formado'), sonando: window.__bandaSonora.estado().pistas.inicio.sonando }));
-    informe.comprobar(salto.formado && salto.sonando, '«Saltar» muestra la tarjeta y la canción sigue sonando', salto);
+    await pagina.click('#toque');
+    await pagina.waitForFunction(() => window.__intro.empezado, null, { timeout: 120000, polling: 50 });
+    await pagina.waitForTimeout(800);
+    informe.comprobar(await pagina.evaluate(() => !document.querySelector('#portada-saltar, .portada-saltar') && !document.getElementById('entrada').classList.contains('formado')), 'en la segunda visita tampoco se puede saltar');
+    await pagina.waitForFunction(() => document.getElementById('entrada').classList.contains('formado'), null, { timeout: 60000, polling: 100 });
+    const segunda = await pagina.evaluate(() => window.__bandaSonora.tiempo('inicio'));
+    informe.comprobar(segunda >= marcas.tarjeta - 0.15, 'y la tarjeta vuelve a salir en su marca', segunda);
     informe.comprobar(errores.length === 0, 'sin errores en la consola', errores.slice(0, 5));
   } finally { await navegador.close(); }
 }

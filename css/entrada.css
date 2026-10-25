@@ -8,21 +8,20 @@
 }
 #entrada.oculto{opacity:0;pointer-events:none;}
 
-/* Portada: el universo nace en un lienzo detrás de la tarjeta (js/ui/portada.js). */
+/* Intro: el videoclip se dibuja en un lienzo detrás de todo (js/ui/portada.js); el texto de la historia, arriba, nítido
+   (sin sombras ni halos). Durante el clip el fondo es negro; al final aparece el cielo del universo (#entrada::before,
+   en universo.css) detrás del corazón y la tarjeta. */
 #portada-lienzo{position:absolute;inset:0;width:100%;height:100%;}
+#entrada::before{transition:opacity 1.6s ease;}
+/* (casi invisible y no 0: así la imagen ya está decodificada y pintada cuando aparece, sin un tirón a los 30 s) */
+#entrada:not(.cielo)::before{opacity:.002;}
 .portada-frase{
-  position:absolute;left:24px;right:24px;top:62%;margin:0;text-align:center;pointer-events:none;
-  font-family:'Cormorant Garamond',serif;font-style:italic;font-size:clamp(1.25rem,4.6vw,1.7rem);line-height:1.4;
-  color:rgba(255,236,246,.94);text-shadow:0 0 18px rgba(255,120,190,.45);
-  opacity:0;transform:translateY(8px);transition:opacity 1s ease,transform 1.2s ease;
+  position:absolute;left:20px;right:20px;top:calc(var(--arriba) + max(28px, 6vh));margin:0;text-align:center;pointer-events:none;
+  font-family:'Cormorant Garamond',serif;font-style:italic;font-size:clamp(1.3rem,5vw,1.9rem);line-height:1.35;
+  color:#ffe6f2;opacity:0;transform:translateY(6px);transition:opacity .7s ease,transform .9s ease;
 }
 .portada-frase.visible{opacity:1;transform:none;}
-@media (orientation:landscape){.portada-frase{top:74%;}}
-.portada-saltar{
-  position:absolute;right:calc(16px + env(safe-area-inset-right));bottom:calc(var(--abajo) + 16px);z-index:2;
-  border:none;background:none;color:rgba(255,215,235,.62);font-size:.68rem;letter-spacing:1.5px;padding:10px 6px;cursor:pointer;
-}
-.portada-saltar[hidden]{display:none;}
+#entrada.formado .portada-frase,#entrada.cargando .portada-frase{opacity:0;}
 .tarjeta{
   position:relative;width:min(360px,100%);max-height:100%;overflow:auto;
   padding:20px 20px 22px;border-radius:30px;text-align:center;
@@ -31,7 +30,7 @@
   box-shadow:0 30px 80px rgba(255,40,140,.28),inset 0 1px 0 rgba(255,255,255,.25);
   -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
   /* Aparece cuando el universo de la portada ya se ha formado. */
-  opacity:0;transform:translateY(30px) scale(.96);pointer-events:none;
+  opacity:0;transform:translateY(30px) scale(.96);pointer-events:none;will-change:opacity,transform;
   transition:opacity 1.3s ease,transform 1.3s cubic-bezier(.2,.8,.2,1);
 }
 #entrada.formado .tarjeta{opacity:1;transform:none;pointer-events:auto;}
@@ -135,10 +134,9 @@
 .carga-pc{margin:6px 0 0;font:600 .8rem 'Quicksand',sans-serif;letter-spacing:2px;color:#f3c9dd;font-variant-numeric:tabular-nums;}
 @keyframes cargaBrillo{from{transform:translateX(-100%)}to{transform:translateX(340%)}}
 @keyframes cargaRespira{0%,100%{opacity:.55}50%{opacity:1}}
-#entrada.cargando .portada-saltar,#entrada.cargando .portada-frase{opacity:0;pointer-events:none;}
 
 /* Con canción de portada: «Toca para empezar ♡» antes de todo (el audio necesita un gesto). La descarga ya corre por
-   detrás; el toque arranca a la vez la canción y la animación, y la carga se queda abajo, discreta, hasta terminar. */
+   detrás; el toque da paso a la pantalla de carga, y al 100 % empiezan a la vez el clip y la canción. */
 .toque{
   position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
   padding:calc(var(--arriba) + 16px) 16px calc(var(--abajo) + 16px);border:none;background:none;color:inherit;cursor:pointer;
@@ -152,5 +150,3 @@
 .toque:focus-visible{outline:none;}
 .toque:focus-visible .toque-texto{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:8px;}
 #entrada.con-toque .carga{opacity:0;}
-#entrada.cancion .carga{top:auto;bottom:calc(var(--abajo) + 28px);transform:translateX(-50%);}
-#entrada.cancion.descargando:not(.formado) .carga{opacity:1;}

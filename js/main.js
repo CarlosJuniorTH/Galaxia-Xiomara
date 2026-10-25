@@ -142,8 +142,9 @@ try {
   await escena.listo;
   etapa = 'listo';
   cargaTerminada();   // la carga llegó al final: no hubo cierre
-  banda.cargaTerminada();   // las canciones de los destinos, en segundo plano
-  if (!paquetesDesdeElPrincipio) setTimeout(vigilarPaquetes, 4000);
+  // Las canciones de los destinos y los paquetes, en segundo plano cuando termina el videoclip de la intro (no le
+  // quitan cuadros mientras suena).
+  entrada.trasIntro(() => { banda.cargaTerminada(); if (!paquetesDesdeElPrincipio) setTimeout(vigilarPaquetes, 4000); });
   entrada.listo();
   crearMedidor(escena);
   if (location.hash === '#debug') window.__galaxia = { escena, recuerdos, interfaz, progreso, estrellas };

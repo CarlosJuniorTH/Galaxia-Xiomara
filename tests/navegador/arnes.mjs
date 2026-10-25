@@ -51,12 +51,13 @@ export async function lanzar(perfil = 'pc', { musica = false } = {}) {
   return { navegador, pagina, errores };
 }
 
-// toque: con canción de portada (?pruebaAudio) hay que pulsar «Toca para empezar ♡» antes; la tarjeta para entrar sale en
-// la marca «tarjeta» de la canción (no basta con que el botón esté preparado: hasta entonces la tarjeta no se ve).
+// La intro (toque, carga y videoclip de 32 s con su canción) es obligatoria para quien abre la página; las pruebas la
+// omiten con ?sinIntro (solo vale con #debug) salvo con toque: true, que pulsa «Toca para empezar ♡» (con canción: musica
+// o ?pruebaAudio) y espera a que el clip termine y salga la tarjeta (en la marca «tarjeta» de la canción).
 export async function abrir(base, perfil = 'pc', { espera = 2500, calidad = 'alta', consulta = '', toque = false, musica = false } = {}) {
   const { navegador, pagina, errores } = await lanzar(perfil, { musica });
-  await pagina.goto(`${base}/?calidad=${calidad}${consulta}#debug`);
-  if (toque) { await pagina.waitForSelector('#toque:not([hidden])', { timeout: 30000 }); await pagina.click('#toque'); await pagina.waitForFunction(() => document.getElementById('entrada').classList.contains('formado'), null, { timeout: 120000 }); await pagina.waitForTimeout(1400); }
+  await pagina.goto(`${base}/?calidad=${calidad}${consulta}${toque ? '' : '&sinIntro'}#debug`);
+  if (toque) { await pagina.waitForSelector('#toque:not([hidden])', { timeout: 30000 }); await pagina.click('#toque'); await pagina.waitForFunction(() => document.getElementById('entrada').classList.contains('formado'), null, { timeout: 150000 }); await pagina.waitForTimeout(1400); }
   await pagina.waitForFunction(() => document.getElementById('btn-entrar')?.classList.contains('preparado'), null, { timeout: 90000 });
   await pagina.click('#btn-entrar');
   await pagina.waitForFunction(() => window.__galaxia && !window.__galaxia.escena.viajando && document.body.classList.contains('dentro'), null, { timeout: 40000 });

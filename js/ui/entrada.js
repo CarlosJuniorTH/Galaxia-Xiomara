@@ -1,24 +1,19 @@
 import { descargas } from '../util/descargas.js';
-// Entrada: portada animada (dos luces que se encuentran y forman un universo), una breve
-// presentación y la tarjeta para entrar. Se ve en cada visita (se puede saltar) y quien
-// vuelve puede continuar donde lo dejó.
-// Con canción de portada (momento «inicio» de js/data/bandaSonora.js) hay antes una pantalla «Toca para empezar ♡»: los
-// navegadores (iOS, Chrome) solo dejan sonar audio tras un gesto. La descarga empieza ya al abrir la página, sin esperar
-// al toque; el toque arranca a la vez la canción y la animación, que sigue el reloj de la canción (sus hitos caen en las
-// marcas) mientras el universo termina de cargar. La primera vez se escucha entera (sin «Saltar») y la tarjeta para
-// entrar aparece en la marca «tarjeta», aunque la carga haya acabado antes; si la carga tarda más, la galaxia sigue
-// girando con la música y la tarjeta llega cuando esté todo listo.
+// Entrada, en tres tiempos y siempre igual (en cada visita, sin «Saltar»):
+//   1. «Toca para empezar ♡» (solo con canción de portada, momento «inicio» de js/data/bandaSonora.js): los navegadores
+//      (iOS, Chrome) solo dejan sonar audio tras un gesto. El toque solo desbloquea el sonido; no suena nada aún.
+//   2. La pantalla de carga, con el porcentaje y los MB descargados de los previstos. La descarga empieza al abrir la
+//      página (la canción, la primera), sin esperar al toque.
+//   3. Al llegar al 100 %, el videoclip de la intro (js/ui/portada.js) y la canción, a la vez y desde el principio. El clip
+//      sigue el reloj de la canción (sus hitos caen en las marcas); si no hay canción, falla o no arranca, va con su propio
+//      reloj de 32 s. En la marca «tarjeta» aparece la tarjeta para entrar sobre el cielo del universo.
+// Quien vuelve puede continuar donde lo dejó (desde la tarjeta).
 import { crearPortada, HITOS } from './portada.js';
 import { reescalar } from '../util/sincronia.js';
 import { DESTINOS } from '../data/universo.js';
 const $ = s => document.querySelector(s);
-
-const FRASES = [
-  { desde: 0.25, texto: 'Dos luces, muy lejos la una de la otra…' },
-  { desde: 2.4, texto: '…aprendieron a encontrarse.' },
-  { desde: 5.0, texto: 'Se convirtieron en amor…' },
-  { desde: 6.7, texto: '…y de ese amor nació un universo.' }
-];
+// Lo que se espera a la canción al terminar la carga (si aún se descarga) antes de empezar el clip sin ella.
+const ESPERA_CANCION = 15000;
 
 export function crearEntrada(config, { viaje, banda } = {}) {
   $('#entrada-nombre').textContent = config.nombre;
@@ -28,73 +23,95 @@ export function crearEntrada(config, { viaje, banda } = {}) {
   foto.onerror = () => { foto.onerror = null; foto.src = config.fotoRespaldo; };
   foto.src = config.foto;
 
-  const entrada = $('#entrada'), boton = $('#btn-entrar'), continuar = $('#btn-continuar'), saltar = $('#portada-saltar'), frase = $('#portada-frase');
-  let alEntrar = () => {}, preparado = false;
+  const entrada = $('#entrada'), boton = $('#btn-entrar'), continuar = $('#btn-continuar'), frase = $('#portada-frase'), toque = $('#toque');
+  let alEntrar = () => {}, trasIntro = [], introAcabada = false, preparado = false, tocado = false, empezado = false, conCancion = false;
   const reducido = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const yaVista = !!viaje?.portadaVista;
-  const toque = $('#toque');
-  // cancion: hay canción de portada Y su archivo está (se sabe en cuanto responde el servidor; si falta, por ejemplo en
-  // GitHub Pages, todo como siempre y sin pantalla de toque). decidido: promesa que se resuelve al saberlo.
-  // Con canción: la tarjeta espera a su marca (o, sin esa marca, a que se forme la galaxia); «libre», tras «Saltar».
-  let cancion = false, marcaTarjeta = false, libre = false, tocado = false;
-  const marcas = banda?.conInicio ? banda.marcas('inicio') : {}, pulso = banda?.conInicio ? banda.config('inicio').pulso : null;
-  // Latido y destello al compás: el corazón late con el pulso de la canción (fase 0–1, 0 en el primer tiempo) y el destello
-  // del encuentro dura dos latidos a tiempo real (estirado con la animación iba a cámara lenta).
-  const segundo = () => (cancion && !libre ? banda.tiempo('inicio') : null);
+  // cancion: hay canción de intro Y su archivo está (se sabe en cuanto responde el servidor; si falta, por ejemplo en
+  // GitHub Pages sin los audios, no hay pantalla de toque y el clip va con su propio reloj).
+  const conInicio = !!banda?.conInicio, marcas = conInicio ? banda.marcas('inicio') : {};
+  let cancion = false;
+  // Solo para las pruebas automáticas (?sinIntro con #debug): la tarjeta en cuanto carga, sin toque ni clip.
+  const sinIntro = location.hash === '#debug' && new URLSearchParams(location.search).has('sinIntro');
+
+  // Reloj del clip: el de la canción llevado al del clip (reescalar). Si la canción no avanza en 1,5 s de cuadros (no
+  // arrancó, se cortó), sigue con un reloj propio desde ese punto. El propio avanza con los cuadros (tope 0,1 s): con
+  // la pestaña oculta se para, igual que la canción.
+  let propio = null, ultimo = null, ultimoS = null, quieto = 0, ultimoT = 0, antes = 0, fijo = null;
+  function relojClip() { return ultimo = relojAhora(); }
+  function relojAhora() {
+    if (fijo !== null) return fijo;
+    if (!empezado) return null;
+    const ahora = performance.now(), dt = Math.min(0.1, Math.max(0, (ahora - antes) / 1000)); antes = ahora;
+    if (propio === null && conCancion) {
+      const s = banda.tiempo('inicio');
+      if (s !== null) {
+        if (s !== ultimoS) { ultimoS = s; quieto = 0; } else quieto += dt;
+        if (quieto < 1.5) return ultimoT = reescalar(s, marcas, HITOS);
+      }
+      propio = ultimoT;
+    }
+    if (propio === null) propio = 0;
+    return propio += dt;
+  }
 
   function mostrarTarjeta() {
-    entrada.classList.add('formado'); saltar.hidden = true; frase.classList.remove('visible');
+    entrada.classList.add('formado', 'cielo'); frase.classList.remove('visible');
     viaje?.marcarPortada();
-    if (cancion && !libre && banda.tiempo('inicio') !== null) viaje?.marcarInicio();
+    // Lo que espera al final del clip (descargas en segundo plano), cuando la tarjeta ya ha terminado de entrar.
+    setTimeout(() => { introAcabada = true; for (const fn of trasIntro.splice(0)) fn(); }, 2500);
   }
-  const intentarTarjeta = () => { if (preparado && marcaTarjeta && !entrada.classList.contains('formado')) mostrarTarjeta(); };
-  // Fase 1: carga de paquetes; la presentación espera a que todo esté listo (así corre sin pausas).
-  entrada.classList.add('cargando');
-  const portada = crearPortada($('#portada-lienzo'), { empezar: false,
-    // Reloj de la canción llevado al de la animación; null (sin canción, si no se pudo cargar o tras «Saltar»): a su ritmo.
-    reloj: () => { const s = segundo(); return s === null ? null : reescalar(s, marcas, HITOS); },
-    latido: () => { const s = segundo(); return s === null || !(pulso > 0) ? null : (s % pulso) / pulso; },
-    destello: () => { const s = segundo(); return s === null || !Number.isFinite(marcas.encuentro) ? null : (s - marcas.encuentro) * 1.6 / (2 * (pulso > 0 ? pulso : 1)); },
-    frases: FRASES, alFormarse: () => {
-      if (!cancion) { setTimeout(mostrarTarjeta, 900); return; }
-      // Sin marca «tarjeta» (o sin canción que suene), como siempre: 0,9 s después de formarse.
-      if (libre || !Number.isFinite(marcas.tarjeta) || banda.tiempo('inicio') === null) setTimeout(() => { marcaTarjeta = true; intentarTarjeta(); }, 900);
-    },
-    textoFrase: texto => {
+  const portada = crearPortada($('#portada-lienzo'), {
+    calma: reducido, reloj: relojClip, alFinal: mostrarTarjeta,
+    alFrase: texto => {
       frase.classList.remove('visible');
-      if (texto) setTimeout(() => { frase.textContent = texto; frase.classList.add('visible'); }, 260);
+      clearTimeout(alFraseEspera);
+      if (texto) alFraseEspera = setTimeout(() => { frase.textContent = texto; frase.classList.add('visible'); }, 280);
     }
   });
-  // La presentación se ve en cada visita (se puede saltar); solo el movimiento reducido la omite.
-  const empezarPresentacion = () => { if (reducido) { portada.saltar(); mostrarTarjeta(); } portada.empezar(); };
-  saltar.addEventListener('click', () => {
-    if (!cancion) { portada.saltar(); mostrarTarjeta(); return; }
-    // La canción sigue sonando; la animación deja su reloj y la tarjeta sale en cuanto la carga esté lista.
-    libre = true; portada.saltar(); marcaTarjeta = true; saltar.hidden = true; frase.classList.remove('visible'); intentarTarjeta();
-  });
+  let alFraseEspera = 0;
+
+  // Empieza el clip (y la canción desde el principio, si está lista). Se llama dentro del toque si la carga ya terminó.
+  function empezarClip(sonar) {
+    if (empezado) return;
+    empezado = true; antes = performance.now();
+    entrada.classList.remove('cargando', 'con-toque'); entrada.classList.add('clip');
+    conCancion = !!sonar;
+    if (conCancion) { banda.ir('inicio', { desde: 0 }); banda.activar(true); }
+  }
+  // Al terminar la carga: la canción ya debería estar (va la primera y cuenta en los MB); si aún llega, se la espera.
+  function cuandoCancion(fn) {
+    if (!cancion) { setTimeout(() => fn(false), 500); return; }
+    const t0 = performance.now();
+    const mirar = () => {
+      const estado = banda.estado().pistas.inicio?.estado;
+      if (estado === 'lista') return fn(true);
+      if (estado === 'fallo' || performance.now() - t0 > ESPERA_CANCION) return fn(false);
+      textoCarga.textContent = 'Preparando la canción…';
+      setTimeout(mirar, 120);
+    };
+    mirar();
+  }
+
+  entrada.classList.add('cargando');
   // Mientras se sabe si el archivo está (unos milisegundos; como mucho 2,5 s), ni carga ni toque: así no parpadea.
-  if (banda?.conInicio) entrada.classList.add('con-toque');
-  const decidido = !banda?.conInicio ? Promise.resolve(false) : Promise.race([banda.inicioDisponible, new Promise(r => setTimeout(() => r(false), 2500))]).then(hay => {
+  if (conInicio && !sinIntro) entrada.classList.add('con-toque');
+  const decidido = !conInicio ? Promise.resolve(false) : Promise.race([banda.inicioDisponible, new Promise(r => setTimeout(() => r(false), 2500))]).then(hay => {
     cancion = hay;
-    if (!hay) { entrada.classList.remove('con-toque'); return false; }
-    banda.alMarca(({ momento, marca }) => { if (momento === 'inicio' && marca === 'tarjeta') { marcaTarjeta = true; intentarTarjeta(); } });
+    if (!hay || sinIntro) { entrada.classList.remove('con-toque'); return hay; }
     toque.hidden = false;
     toque.addEventListener('click', () => {
       if (tocado) return; tocado = true;
-      // Todo síncrono dentro del toque: contexto de audio, desbloqueo de las pistas (iOS) y la canción desde el principio.
-      banda.desbloquear(); banda.activar(true); banda.ir('inicio', { desde: 0 });
+      // Síncrono dentro del toque: contexto de audio y desbloqueo de las pistas (iOS). La canción aún no suena.
+      banda.desbloquear();
       toque.classList.add('fuera'); setTimeout(() => { toque.hidden = true; }, 800);
-      entrada.classList.remove('con-toque', 'cargando'); entrada.classList.add('cancion');
-      if (!preparado) entrada.classList.add('descargando');
-      // La primera vez se escucha entera; en las siguientes se puede saltar, como siempre.
-      saltar.hidden = !viaje?.inicioEscuchado;
-      if (reducido) { libre = true; portada.saltar(); marcaTarjeta = true; saltar.hidden = true; }
-      portada.empezar(); intentarTarjeta();
+      entrada.classList.remove('con-toque');
+      if (preparado) cuandoCancion(empezarClip);
     }, { once: true });
     return true;
   });
 
-  // Para quien vuelve: descubrirlo todo de nuevo (la presentación ya se ve siempre).
+  // Para quien vuelve: descubrirlo todo de nuevo.
   if (yaVista) $('#entrada-opciones').hidden = false;
   $('#btn-desde-cero').addEventListener('click', () => $('#reinicio').showModal());
 
@@ -122,7 +139,8 @@ export function crearEntrada(config, { viaje, banda } = {}) {
   // retroceder. Cada paso dice dónde está (meta) y hasta dónde llegará (techo): el número alcanza la meta enseguida
   // y, mientras el paso trabaja, sigue subiendo despacio hacia su techo (nunca lo pasa): no parece parado.
   const textoCarga = $('#carga-texto'), barraCarga = document.querySelector('.carga-barra .carga-relleno'), pcCarga = $('#carga-pc');
-  // Megas descargados de los previstos (texturas horneadas y cielo): con una conexión lenta se ve que avanza y cuánto falta.
+  // Megas descargados de los previstos (la canción, texturas horneadas y cielo): con una conexión lenta se ve que avanza
+  // y cuánto falta.
   const textoInicial = textoCarga.textContent, mb = b => (b / 1048576).toFixed(1).replace('.', ',');
   descargas.escuchar(({ total, hechos }) => { if (!total || preparado) return; const t = hechos >= total ? textoInicial : `Descargando el universo · ${mb(hechos)} de ${mb(total)} MB`; if (textoCarga.textContent !== t) textoCarga.textContent = t; });
   let meta = 0, techo = 0, mostrado = 0, animando = false, anterior = 0, alCompletar = null;
@@ -137,20 +155,22 @@ export function crearEntrada(config, { viaje, banda } = {}) {
     else { animando = false; const fin = alCompletar; alCompletar = null; fin?.(); }
   };
   async function completar() {
-      await decidido;   // (casi siempre ya resuelto: la carga tarda mucho más que la respuesta del servidor)
-      preparado = true; boton.disabled = continuar.disabled = false; boton.classList.add('preparado');
-      // Con canción, la presentación ya empezó con el toque (o empezará con él): la tarjeta, en su marca.
-      if (cancion) { entrada.classList.remove('descargando'); intentarTarjeta(); return; }
-      // Fase 2: con todo cargado, la presentación (nada pesado a la vez).
-      entrada.classList.remove('cargando'); setTimeout(empezarPresentacion, 500);
+    await decidido;   // (casi siempre ya resuelto: la carga tarda mucho más que la respuesta del servidor)
+    preparado = true; boton.disabled = continuar.disabled = false; boton.classList.add('preparado');
+    if (sinIntro) { entrada.classList.remove('cargando'); mostrarTarjeta(); return; }
+    // Al 100 %: el clip y la canción (si ya se tocó; si no, empezarán con el toque).
+    if (!cancion || tocado) cuandoCancion(empezarClip);
   }
+  // Para las pruebas (#debug): fijar el clip en un instante (captura cuadro a cuadro) o soltarlo.
+  if (location.hash === '#debug') window.__intro = { fijar: t => { fijo = t; }, soltar: () => { fijo = null; }, get tiempo() { return ultimo; }, get empezado() { return empezado; }, get conCancion() { return conCancion; } };
   return {
     progreso(f, hasta = f) {
       f = Math.max(0, Math.min(1, f)); meta = Math.max(meta, f); techo = Math.max(meta, Math.min(1, hasta));
       if (!animando) { animando = true; anterior = performance.now(); requestAnimationFrame(avanzar); }
     },
-    // Todo cargado: el número termina de subir hasta 100 (rápido, sin saltar) y entonces empieza la presentación.
+    // Todo cargado: el número termina de subir hasta 100 (rápido, sin saltar) y entonces empieza el clip.
     listo() { alCompletar = completar; this.progreso(1); },
-    alEntrar(fn) { alEntrar = fn; }
+    alEntrar(fn) { alEntrar = fn; },
+    trasIntro(fn) { if (introAcabada) fn(); else trasIntro.push(fn); }
   };
 }
