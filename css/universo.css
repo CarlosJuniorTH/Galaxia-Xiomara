@@ -215,35 +215,55 @@ body:has(.brindis.visible) #mensaje{opacity:0;}
 .volver-centro[hidden]{display:none;}
 @media(max-width:600px){.volver-centro{font-size:.56rem;padding:8px 13px 8px 11px;margin-bottom:8px;}}
 
-/* Mapa de orientación: botón discreto y panel desplegable con la vista cenital. */
+/* «El mapa de nosotros»: botón discreto y panel con las tres zonas (sistema solar, galaxia y más allá). */
 .btn-mapa{position:fixed;z-index:16;left:30px;top:calc(var(--arriba) + 92px);width:40px;height:40px;border-radius:50%;display:grid;place-items:center;padding:0;cursor:pointer;
   border:1px solid var(--linea);background:#20132b99;color:#f1dcc4;transition:opacity 1.2s ease;}
 .btn-mapa svg{width:22px;height:22px;}
-.mapa{position:fixed;z-index:30;left:24px;top:calc(var(--arriba) + 142px);width:min(340px,calc(100vw - 32px));padding:14px 14px 10px;border-radius:22px;
-  background:#170f22f2;border:1px solid #e8c6a033;box-shadow:0 20px 60px #0009;color:#f4e2ef;}
+.mapa{position:fixed;z-index:30;left:24px;top:calc(var(--arriba) + 142px);width:min(420px,calc(100vw - 32px));padding:14px 14px 10px;border-radius:22px;
+  max-height:calc(100dvh - var(--arriba) - 158px);overflow-y:auto;overscroll-behavior:contain;
+  background:#170f22;border:1px solid #e8c6a033;box-shadow:0 20px 60px #0009;color:#f4e2ef;}
 .mapa[hidden]{display:none;}
-.mapa-cabecera{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;}
-.mapa-cabecera strong{font-family:'Cormorant Garamond',serif;font-weight:500;font-size:1.25rem;}
+.mapa-cabecera{display:flex;justify-content:space-between;align-items:flex-start;margin:0 2px 6px;}
+.mapa-cabecera strong{display:block;font-family:'Cormorant Garamond',serif;font-weight:500;font-size:1.45rem;line-height:1.15;}
 .mapa-cabecera button{border:none;background:none;color:#f4e2ef;font-size:1rem;padding:4px 6px;cursor:pointer;}
 #mapa-svg{width:100%;height:auto;display:block;}
-.mapa-camino{stroke:#e8c6a02a;stroke-width:1;stroke-dasharray:2 4;}
-.mapa-lugar{cursor:pointer;outline:none;}
+/* Zonas: encabezados como la ceja del resto de la interfaz, marcos y bordes de trazo fino. */
+/* Los textos llevan un contorno nítido del color del panel (no un halo): se leen sobre motas e hilos. */
+.mapa-zona,.mapa-nombre{paint-order:stroke;stroke:#170f22;stroke-width:2.4px;stroke-linejoin:round;}
+.mapa-zona{fill:#e8c6a0;font-family:'Quicksand',sans-serif;font-size:6.6px;font-weight:600;letter-spacing:1.9px;text-transform:uppercase;}
+.mapa-zona-arco{text-anchor:middle;}
+.mapa-zona-marco{fill:#ffffff04;stroke:#e8c6a024;stroke-width:.8;}
+.mapa-caja-solar{fill:#1d1229;stroke:#e8c6a055;stroke-width:.9;}
+.mapa-borde-galaxia{fill:#ff93c70a;stroke:#ff93c740;stroke-width:.8;stroke-dasharray:1.5 3;}
+.mapa-mota{fill:#ffc4df;opacity:.55;}
+.mapa-mota-lejana{fill:#e6dcff;opacity:.4;}
+.mapa-orbita{fill:none;stroke:#e8c6a030;stroke-width:.7;}
+.mapa-sol{fill:#ffd595;}
+.mapa-rayo{stroke:#ffd595;stroke-width:1.1;stroke-linecap:round;}
+.mapa-ampliacion{stroke:#e8c6a055;stroke-width:.8;stroke-dasharray:2 2.5;}
+.mapa-marca-solar{fill:none;stroke:#ffd595;stroke-width:1;}
+.mapa-camino{stroke:#e8c6a038;stroke-width:.8;stroke-dasharray:2 3;}
+.mapa-lugar{cursor:pointer;outline:none;-webkit-tap-highlight-color:transparent;}
+.mapa-toque{fill:transparent;}
 .mapa-punto{stroke:#fff8;stroke-width:1;}
+.mapa-aro{fill:none;stroke:#fff5;stroke-width:.7;}
 .mapa-lugar.pendiente .mapa-punto{stroke:#cdb8e8;stroke-dasharray:2 2;}
-.mapa-interrogante{fill:#cdb8e8;font-size:8px;text-anchor:middle;font-family:'Quicksand',sans-serif;}
-.mapa-nombre{fill:#f1dcc4;font-size:8.5px;text-anchor:middle;font-family:'Quicksand',sans-serif;letter-spacing:.3px;}
+.mapa-interrogante{fill:#cdb8e8;font-size:7.5px;text-anchor:middle;font-family:'Quicksand',sans-serif;}
+.mapa-nombre{fill:#f1dcc4;font-size:8px;text-anchor:middle;font-family:'Quicksand',sans-serif;letter-spacing:.2px;}
 .mapa-lugar.pendiente .mapa-nombre{fill:#cdb8e899;font-style:italic;}
 .mapa-lugar.aqui .mapa-nombre{fill:#fff;font-weight:700;}
+@media(hover:hover){.mapa-lugar:hover .mapa-punto{stroke:#fff;stroke-width:1.6;}.mapa-lugar:hover .mapa-nombre{fill:#fff;}}
 .mapa-aqui{fill:none;stroke:#ffe1b0;stroke-width:1.4;animation:latido-mapa 2s ease-in-out infinite;transform-box:fill-box;transform-origin:center;}
 @keyframes latido-mapa{50%{transform:scale(1.35);opacity:.5}}
 .mapa-lugar:focus-visible .mapa-punto{stroke:#fff;stroke-width:2;}
-.mapa-nota{margin:4px 2px 2px;font-size:.62rem;color:#d9c3d6aa;line-height:1.4;}
+.mapa-nota{margin:6px 2px 2px;font-size:.62rem;color:#d9c3d6aa;line-height:1.4;}
 div.contemplando .btn-mapa{opacity:0;pointer-events:none;}
 body.en-ruta .btn-mapa,body.en-calma .btn-mapa{display:none;}
 @media(max-width:600px){
   .btn-mapa{left:16px;top:calc(var(--arriba) + 176px);width:34px;height:34px;}
   .btn-mapa svg{width:19px;height:19px;}
-  .mapa{left:12px;right:12px;width:auto;top:calc(var(--arriba) + 220px);}
+  /* En el móvil, una hoja desde abajo: el lienzo es alto y así no se sale de la pantalla. */
+  .mapa{left:10px;right:10px;width:auto;top:auto;bottom:calc(var(--abajo) + 10px);max-height:calc(100dvh - var(--arriba) - var(--abajo) - 20px);padding:13px 10px 9px;}
 }
 @media(prefers-reduced-motion:reduce){.mapa-aqui{animation:none;}}
 

@@ -98,10 +98,10 @@
       <button id="btn-pista"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19l9-9"/><path d="M15.5 3.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/><path d="M19.5 12.5l.4 1.1 1.1.4-1.1.4-.4 1.1-.4-1.1-1.1-.4 1.1-.4z"/></svg></span>Una pista</button>
       <button id="btn-postal"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M3.5 16l5-4.5 3.5 3 3-2.5 5.5 4.5"/><circle cx="15.5" cy="9" r="1.4"/></svg></span>Postal</button>
     </nav>
-    <button id="btn-mapa" class="btn-mapa" aria-label="Ver el mapa del universo" aria-expanded="false" aria-controls="mapa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M14.8 9.2l-1.7 3.9-3.9 1.7 1.7-3.9z"/><circle cx="12" cy="12" r="0.6" fill="currentColor"/></svg></button>
-    <div id="mapa" class="mapa" hidden role="dialog" aria-label="Mapa del universo">
-      <div class="mapa-cabecera"><div><div class="ceja">TU MAPA</div><strong id="mapa-resumen"></strong></div><button id="mapa-cerrar" aria-label="Cerrar mapa">✕</button></div>
-      <svg id="mapa-svg" viewBox="0 0 300 240" role="group" aria-label="Lugares del universo"></svg>
+    <button id="btn-mapa" class="btn-mapa" aria-label="Ver el mapa de nosotros" aria-expanded="false" aria-controls="mapa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M14.8 9.2l-1.7 3.9-3.9 1.7 1.7-3.9z"/><circle cx="12" cy="12" r="0.6" fill="currentColor"/></svg></button>
+    <div id="mapa" class="mapa" hidden role="dialog" aria-labelledby="mapa-titulo">
+      <div class="mapa-cabecera"><div><div class="ceja" id="mapa-resumen"></div><strong id="mapa-titulo">El mapa de nosotros</strong></div><button id="mapa-cerrar" aria-label="Cerrar mapa">✕</button></div>
+      <svg id="mapa-svg" viewBox="0 0 320 422" role="group" aria-label="Lugares del universo: nuestro sistema solar, nuestra galaxia y más allá"></svg>
       <p class="mapa-nota">Toca un lugar para viajar. Los que aún no has visitado guardan su sorpresa.</p>
     </div>
     <div id="supernova-aviso" class="cometa-aviso supernova-aviso" hidden><button id="btn-supernova">♡ Nuestra luz sigue aquí <span>↗</span></button></div>

@@ -5,6 +5,7 @@ import { momentoDelDia } from '../util/sol.js';
 import { crearCieloNoche } from './cieloNoche.js';
 import { crearSupernovaAmor } from './supernovaAmor.js';
 import { crearFaroCuasar } from './faroCuasar.js';
+import { crearMapa } from './mapa.js';
 import { FRASE_SUPERNOVA } from '../util/supernovaAmor.js';
 const $ = id => document.getElementById(id);
 function el(tag, clase, texto) { const n = document.createElement(tag); if (clase) n.className = clase; if (texto !== undefined) n.textContent = texto; return n; }
@@ -85,45 +86,8 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
   $('reinicio-cancelar').addEventListener('click', () => $('reinicio').close());
   $('reinicio-confirmar').addEventListener('click', () => { if (progreso.reiniciar()) { viaje?.olvidar(); location.reload(); } else $('reinicio').close(); });
 
-  // ── Mapa de orientación ──
-  // Vista cenital (x, z) de los lugares: el actual con un anillo, los visitados con su
-  // nombre y los pendientes como siluetas sin desvelar.
-  const NS = 'http://www.w3.org/2000/svg';
-  const svg = (tag, attrs = {}, padre) => { const n = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); padre?.append(n); return n; };
-  function dibujarMapa() {
-    const lienzo = $('mapa-svg'); lienzo.replaceChildren();
-    const enMapa = d => d.mapa ? [d.mapa[0], 0, d.mapa[1]] : d.posicion;   // el sistema solar, junto a su brazo
-    const xs = DESTINOS.map(d => enMapa(d)[0]), zs = DESTINOS.map(d => enMapa(d)[2]);
-    const [x0, x1, z0, z1] = [Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)];
-    const px = x => 30 + (x - x0) / (x1 - x0) * 240, pz = z => 24 + (z - z0) / (z1 - z0) * 182;
-    const defs = svg('defs', {}, lienzo), grad = svg('radialGradient', { id: 'mapa-galaxia' }, defs);
-    svg('stop', { offset: '0', 'stop-color': '#ffb3d6', 'stop-opacity': '.55' }, grad); svg('stop', { offset: '1', 'stop-color': '#ffb3d6', 'stop-opacity': '0' }, grad);
-    // Hilos entre el centro y cada lugar: el universo como una red de caminos.
-    for (const d of DESTINOS.filter(d => d.id !== 'hogar')) svg('line', { x1: px(0), y1: pz(0), x2: px(enMapa(d)[0]), y2: pz(enMapa(d)[2]), class: 'mapa-camino' }, lienzo);
-    const visitados = progreso.estado.visitas;
-    const lugares = [...DESTINOS.map(d => ({ ...d, x: px(enMapa(d)[0]), y: pz(enMapa(d)[2]) }))];
-    if (escena.cometaVisible) { const c = escena.posicionCometa?.(); if (c) lugares.push({ id: 'cometa', nombre: 'El cometa', color: '#fff1d2', x: px(Math.max(x0, Math.min(x1, c.x))), y: pz(Math.max(z0, Math.min(z1, c.z))) }); }
-    for (const d of lugares) {
-      const aqui = d.id === actual, conocido = aqui || d.id === 'hogar' || d.id === 'cometa' || visitados.includes(d.id);
-      const g = svg('g', { class: `mapa-lugar${conocido ? '' : ' pendiente'}${aqui ? ' aqui' : ''}`, tabindex: '0', role: 'button', 'aria-label': conocido ? `Viajar a ${d.nombre}` : 'Viajar a un lugar por descubrir' }, lienzo);
-      if (d.id === 'hogar') svg('circle', { cx: d.x, cy: d.y, r: 22, fill: 'url(#mapa-galaxia)' }, g);
-      if (aqui) svg('circle', { cx: d.x, cy: d.y, r: 11, class: 'mapa-aqui' }, g);
-      svg('circle', { cx: d.x, cy: d.y, r: conocido ? 5 : 6, fill: conocido ? d.color : 'none', class: 'mapa-punto' }, g);
-      if (!conocido) svg('text', { x: d.x, y: d.y + 3, class: 'mapa-interrogante' }, g).textContent = '?';
-      const etiqueta = svg('text', { x: d.x, y: d.y + (d.y > 190 ? -12 : 17), class: 'mapa-nombre' }, g);
-      etiqueta.textContent = aqui ? 'Estás aquí' : conocido ? (d.id === 'hogar' ? 'Nuestra galaxia' : d.nombre) : 'Por descubrir';
-      const ir = () => { cerrarMapa(); if (!aqui) visitar(d.id); };
-      g.addEventListener('click', ir); g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ir(); } });
-    }
-    const n = DESTINOS.filter(d => d.id !== 'hogar' && visitados.includes(d.id)).length, total = DESTINOS.length - 1;
-    $('mapa-resumen').textContent = n === total ? 'Has visitado todos los lugares ♡' : `${n} de ${total} lugares descubiertos`;
-  }
-  function abrirMapa() { dibujarMapa(); $('mapa').hidden = false; $('btn-mapa').setAttribute('aria-expanded', 'true'); }
-  function cerrarMapa() { $('mapa').hidden = true; $('btn-mapa').setAttribute('aria-expanded', 'false'); }
-  $('btn-mapa').addEventListener('click', e => { e.stopPropagation(); $('mapa').hidden ? abrirMapa() : cerrarMapa(); });
-  $('mapa-cerrar').addEventListener('click', cerrarMapa);
-  document.addEventListener('pointerdown', e => { if (!$('mapa').hidden && !e.target.closest('#mapa, #btn-mapa')) cerrarMapa(); }, true);
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('mapa').hidden) cerrarMapa(); });
+  // ── Mapa de orientación: «El mapa de nosotros», en tres zonas (mapa.js) ──
+  crearMapa({ escena, progreso, actual: () => actual, visitar });
 
   function modoCalma(valor) {
     document.body.classList.toggle('en-calma', valor); $('salir-calma').hidden = !valor;
