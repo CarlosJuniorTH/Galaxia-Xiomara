@@ -10,6 +10,8 @@ for (const carpeta of ['assets','css','js']) await cp(carpeta,path.join(destino,
 // El taller es una herramienta local, separada de la experiencia publicada.
 for (const archivo of ['js/editor.js','css/editor.css']) await rm(path.join(destino,archivo),{force:true});
 await writeFile(path.join(destino,'.nojekyll'),'');
+// three.js minificado (la versión oficial de la misma r160, ~45 % menos): se publica en lugar del legible.
+{ const v = path.join(destino, 'assets/vendor/three'); await cp(path.join(v, 'three.module.min.js'), path.join(v, 'three.module.js')); await rm(path.join(v, 'three.module.min.js'), { force: true }); }
 // App sin conexión (solo se registra en HTTPS): lista exacta de archivos y versión
 // derivada de su contenido. Cada publicación usa una caché nueva y borra las viejas.
 async function listar(dir) {

@@ -5,6 +5,8 @@ const salida = path.resolve('assets/vendor/three');
 await rm(path.join(salida, 'addons'), { recursive: true, force: true });
 await mkdir(salida, { recursive: true });
 await copyFile('node_modules/three/build/three.module.js', path.join(salida, 'three.module.js'));
+// La versión minificada oficial (la misma r160): la publicación la usa en lugar de la legible (preparar-pages.mjs).
+await copyFile('node_modules/three/build/three.module.min.js', path.join(salida, 'three.module.min.js'));
 await copyFile('node_modules/three/LICENSE', path.join(salida, 'LICENSE'));
 const vistos = new Set();
 async function incluir(relativo) {
