@@ -81,7 +81,7 @@ export function crearEfectos() {
     // Como mucho a 60 por segundo (en una pantalla de 120 Hz se dibujaba y componía el doble de veces que el 3D). Con el
     // reloj del sistema (la marca del cuadro de algunos navegadores va por detrás de performance.now()).
     ahora = performance.now();
-    if (ahora - anterior < 14) return;
+    if (ahora - anterior < 11) return;   // filtra los 8,3 ms de 120 Hz sin saltarse cuadros de 60 Hz que llegan algo antes
     const paso = Math.min(2, Math.max(0, (ahora - anterior) / (1000 / 60))); anterior = ahora;
     try { dibujar(paso, ahora); } catch (e) { parts.length = 0; fugaces.length = 0; ctx.restore?.(); ctx.setTransform(Math.min(devicePixelRatio, 2), 0, 0, Math.min(devicePixelRatio, 2), 0, 0); ctx.clearRect(0, 0, W, H); console.warn('Efectos', e); }
   }

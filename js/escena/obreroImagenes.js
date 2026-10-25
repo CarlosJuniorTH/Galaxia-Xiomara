@@ -5,7 +5,8 @@ self.onmessage = async ({ data: { id, url, ancho, alto } }) => {
   try {
     if (typeof OffscreenCanvas !== 'function') throw new Error('sin OffscreenCanvas');
     const r = await fetch(url); if (!r.ok) throw new Error(url + ': ' + r.status);
-    const bmp = await createImageBitmap(await r.blob(), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
+    const blob = await r.blob(); self.postMessage({ id, recibida: true });   // ya descargada: desde aquí cuenta el plazo
+    const bmp = await createImageBitmap(blob, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
     lienzo ||= new OffscreenCanvas(ancho, alto);
     if (lienzo.width !== ancho || lienzo.height !== alto) { lienzo.width = ancho; lienzo.height = alto; }
     const ctx = lienzo.getContext('2d', { willReadFrequently: true }); ctx.clearRect(0, 0, ancho, alto); ctx.drawImage(bmp, 0, 0); bmp.close?.();

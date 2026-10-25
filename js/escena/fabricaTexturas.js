@@ -18,6 +18,7 @@ const contadas = new Set();
 const indiceHorneadas = !enNavegador ? Promise.resolve({}) : fetch('assets/texturas/indice.json').then(r => (r.ok ? r.json() : {})).catch(() => ({})).then(j => {
   const archivos = j.archivos || {}, propias = j.grupos?.[grupoAparato] || [];
   for (const n of propias) contadas.add(n);
+  descargas.horno = j.horno || 0;
   descargas.previsto(propias.reduce((a, n) => a + (archivos[n] || 0), 0) + (j.cielo?.[sufijoCielo] || 0) + (j.horno || 0));
   return archivos;
 });
@@ -37,7 +38,7 @@ function decodificadoresVivos() {
   try {
     for (let i = 0; i < 2; i++) {
       const w = new Worker(new URL('./obreroImagenes.js', import.meta.url));
-      w.onmessage = ({ data }) => { if (data.listo) { w.vivo = true; avisarArranque(); return; } const e = esperandoImagen.get(data.id); if (e) { esperandoImagen.delete(data.id); e(data); } };
+      w.onmessage = ({ data }) => { if (data.listo) { w.vivo = true; avisarArranque(); return; } const e = esperandoImagen.get(data.id); if (!e) return; if (data.recibida) { e.recibida(); return; } esperandoImagen.delete(data.id); e(data); };
       w.onerror = ev => { ev.preventDefault?.(); w.vivo = false; };
       decodificadores.push(w);
     }
@@ -50,8 +51,13 @@ async function decodificarFuera(nombre, ancho, alto) {
   const vivos = decodificadoresVivos(); if (!vivos.length) return null;
   const w = vivos[idImagen % vivos.length], id = ++idImagen;
   return new Promise(resolver => {
-    const plazo = setTimeout(() => { esperandoImagen.delete(id); resolver(null); }, 8000);
-    esperandoImagen.set(id, d => { clearTimeout(plazo); resolver(d.datos || null); });
+    // El plazo de 8 s cuenta desde que la imagen ha llegado (con datos móviles lentos la descarga sola puede tardar más):
+    // antes de eso solo se abandona si el obrero no da señales en 60 s.
+    const abandonar = () => { esperandoImagen.delete(id); resolver(null); };
+    let plazo = setTimeout(abandonar, 60000);
+    const e = d => { clearTimeout(plazo); resolver(d.datos || null); };
+    e.recibida = () => { clearTimeout(plazo); plazo = setTimeout(abandonar, 8000); };
+    esperandoImagen.set(id, e);
     w.postMessage({ id, url: new URL('assets/texturas/' + nombre, location.href).href, ancho, alto });
   });
 }
@@ -75,7 +81,7 @@ async function bajarImagen(nombre, ancho, alto, bytes) {
 // coge la siguiente cuando termina la suya, y si los obreros van lentos (en un iPhone tardaban ~25 s por textura), el hilo
 // principal también coge de la cola: nada se calcula dos veces y el que va más rápido hace más. Un obrero que no avisa de
 // que ha arrancado en 5 s, o que se queda más de 60 s con una textura, se descarta y su textura vuelve a la cola.
-let obreros = null;
+let obreros = null, vigilante = 0;
 const colaBloquea = [], colaResto = [], promesas = [], todas = [], enCurso = new Map(), errores = [];
 // Diagnóstico de la carga (main.js lo envía al PC en la red local): qué texturas faltan y qué ha fallado.
 let hechasAqui = 0, hechasObreros = 0;
@@ -126,7 +132,7 @@ function iniciarObreros() {
       obreros.push(w);
     }
     setTimeout(() => { for (const w of obreros.filter(o => !o.vivo)) descartar(w); }, 5000);
-    setInterval(() => { for (const w of (obreros || []).filter(o => o.pedido && performance.now() - o.desde > 60000)) descartar(w); }, 5000);
+    vigilante = setInterval(() => { for (const w of (obreros || []).filter(o => o.pedido && performance.now() - o.desde > 60000)) descartar(w); }, 5000);
   } catch { obreros = []; }
 }
 
@@ -179,15 +185,23 @@ export function texturaPlaneta(tipo, opciones, { claves = ['pixeles'], relleno =
       })).then(pares => pedido.resolver(Object.fromEntries(pares)), e => { errores.push('horneada: ' + (e.message || e)); enviar(); });
     });
   });
+  promesa.then(() => { promesa.lista = true; });
   if (bloquea) promesas.push(promesa);
   todas.push(promesa);
   return claves.length === 1 ? texturas[claves[0]] : texturas;
 }
 
 export const texturasListas = () => Promise.all(promesas);
+// Con todas las texturas listas ya no hacen falta: obreros, vigilante y lienzos de lectura (hasta ~8 MB cada uno en un iPhone).
+function soltarObreros() {
+  if (todas.some(p => !p.lista)) return;
+  for (const w of [...(obreros || []), ...(decodificadores || [])]) { try { w.terminate(); } catch {} }
+  obreros = []; decodificadores = []; clearInterval(vigilante);
+  if (lienzoLectura) { lienzoLectura.width = lienzoLectura.height = 0; lienzoLectura = null; }
+}
 // Todas, también las que no bloquean (nebulosas del viaje…): la carga completa espera a que estén calculadas, así
 // nada se genera ni se sube a la GPU durante un viaje. alAvance(hechas, total) informa del progreso.
 export function texturasTodas(alAvance = () => {}) {
   let hechas = 0; const total = todas.length;
-  return Promise.all(todas.map(p => p.then(() => alAvance(++hechas, total))));
+  return Promise.all(todas.map(p => p.then(() => alAvance(++hechas, total)))).then(r => { soltarObreros(); return r; });
 }

@@ -21,8 +21,9 @@ async function cargar() {
   try {
     if (typeof DecompressionStream !== 'function') return;
     const r = await fetch('assets/horno/paquete.bin.gz'); if (!r.ok || !r.body) return;
-    // Se cuentan los bytes según llegan (el total ya lo sabe la pantalla de carga por el índice de texturas).
-    const contar = new TransformStream({ transform(trozo, c) { descargas.hecho(trozo.byteLength); c.enqueue(trozo); } });
+    // Se cuentan los bytes según llegan (el total ya lo sabe la pantalla de carga por el índice de texturas), sin pasar
+    // del tamaño previsto (si el servidor lo entrega descomprimido llegan más).
+    const contar = new TransformStream({ transform(trozo, c) { const k = Math.max(0, Math.min(trozo.byteLength, (descargas.horno || Infinity) - contados)); contados += k; if (k) descargas.hecho(k); c.enqueue(trozo); } });
     const bruto = new Uint8Array(await new Response(r.body.pipeThrough(contar)).arrayBuffer());
     // Si el servidor ya lo entregó descomprimido (Content-Encoding: gzip), no se vuelve a descomprimir.
     const buf = bruto[0] === 0x1f && bruto[1] === 0x8b ? await new Response(new Blob([bruto]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer() : bruto.buffer;
@@ -31,8 +32,15 @@ async function cargar() {
     const revivir = v => (v && typeof v === 'object' ? (v.$t ? new TIPOS[v.$t](buf, base + v.o, v.n) : Array.isArray(v) ? v.map(revivir) : Object.fromEntries(Object.entries(v).map(([k, x]) => [k, revivir(x)]))) : v);
     for (const [k, v] of Object.entries(cabecera)) paquete.set(k, revivir(v));
   } catch (e) { paquete.clear(); console.warn('Paquete horneado', e); }
+  finally { cuadrar(); }
 }
-export const hornoListo = enNavegador && !grabando ? cargar() : Promise.resolve();
+// Lo que no llegó se descuenta del total: el contador de la pantalla de carga siempre termina.
+let contados = 0;
+const cuadrar = () => { if (descargas.horno > contados) { descargas.previsto(contados - descargas.horno); descargas.horno = contados; } };
+// Como mucho 10 s esperando el paquete (una conexión atascada no deja la carga parada): después se calcula lo que falte.
+export const hornoListo = enNavegador && !grabando ? Promise.race([cargar(), new Promise(r => setTimeout(r, 10000))]) : Promise.resolve();
+// Terminada la carga, el paquete ya no se necesita (7 MB en memoria).
+export function soltarHorno() { paquete.clear(); }
 
 // nombre: qué es (y sus parámetros); calcular: lo calcula; codigo: la función cuyo código entra en la clave.
 // (El cálculo no debe usar Math.random: saltárselo cambiaría lo que sale después con la semilla del universo.)
