@@ -9,6 +9,7 @@ import { crearGalaxiasLejanas } from './galaxiasLejanas.js';
 import { construirViaLactea } from './viaLactea.js';
 import { construirGalaxia, enBrazo } from './galaxia.js';
 import { construirSolar } from './solar.js';
+import { crearMarcaSolar, ESCALA_MARCA } from './marcaSolar.js';
 import { texBrillo, texDestello, texTexto, texEstrellaGigante } from './texturas.js';
 import { crearAgujeroNegro } from './agujeroNegro.js';
 import { crearCorazon } from './corazon.js';
@@ -176,14 +177,10 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   let secretas = capa('secretas', () => crearEstrellasSecretas(nucleoCasa, cantidadSecretas, encontradas));
   const polvo = capa('polvo', () => crearPolvo(nucleo));
   partes.push(estrellas, secretas, mundos, polvo);
-  // Marca del sistema solar en su brazo: una lucecita dorada que late (al tocarla se viaja allí).
-  const marcaSolar = new THREE.Group(); scene.add(marcaSolar);
-  const brilloMarca = new THREE.Sprite(new THREE.SpriteMaterial({ map: texBrillo(), color: '#ffd9a0', transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending }));
-  const destelloMarca = new THREE.Sprite(new THREE.SpriteMaterial({ map: texDestello(), color: '#fff1d8', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-  const nombreMarca = new THREE.Sprite(new THREE.SpriteMaterial({ map: texTexto('Nuestro sistema solar', { fuente: "600 64px 'Quicksand', sans-serif" }), transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending }));
-  brilloMarca.scale.setScalar(70); destelloMarca.scale.setScalar(46); nombreMarca.scale.set(190, 30, 1); nombreMarca.position.y = 46;
-  marcaSolar.add(brilloMarca, destelloMarca, nombreMarca);
-  // La misma galaxia 3D a cualquier distancia: sin otra espiral ni tamaño artificial.
+  // Marca del sistema solar en su brazo: el sistema solar en miniatura (marcaSolar.js), un punto dorado que late y que, al
+  // acercarse, muestra sus planetas y sus órbitas (al tocarlo se viaja allí).
+  const miniSolar = crearMarcaSolar({ uScale: nucleo.uScale, uPR: nucleo.uPR, etiqueta: texTexto('Nuestro sistema solar', { fuente: "600 64px 'Quicksand', sans-serif" }) });
+  const marcaSolar = miniSolar.grupo; scene.add(marcaSolar);
   marcaSolar.userData.capa = 'marcaSolar';
   // Luz no resuelta del corazón de la supernova: a 100 millones de años luz ocupa unos pocos píxeles y
   // el volumen apenas se dibuja; su luz (rosada, ∝ área, con la misma compresión perceptiva que las
@@ -413,7 +410,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // viaje: es un viaje entre lugares (dura lo que dice duracionViaje según la distancia); si no, un movimiento de cámara
   // con su duración propia (acercarse a la supernova, la vuelta alrededor de un lugar, el paseo contemplativo…).
   // giroMirada [a, b]: la mirada pasa de centroDesde (por defecto, lo que se miraba) al destino entre esas fracciones del recorrido.
-  function desplazar(hasta, objetivo, duracion = 4.8, alLlegar, { paso = [], mirarAntes = 1, corriente = 0.45, fija = false, avance = null, viaje = false, giroMirada = null, centroDesde: mirarDesde = null } = {}) {
+  function desplazar(hasta, objetivo, duracion = 4.8, alLlegar, { paso = [], mirarAntes = 1, corriente = 0.45, fija = false, avance = null, viaje = false, giroMirada = null, centroDesde: mirarDesde = null, seguir = null } = {}) {
     if (trasFundido) avance ??= 'posarse';
     vuelo?.resolver(false); if (vuelo?.plan) limpiarVuelo();
     let resolver;
@@ -427,8 +424,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // Sagitario A*, el cuásar, el púlsar, la supernova) son obstáculos con su radio real.
     const curva = esquivar(base, desde, hasta, [...OBSTACULOS, ...(desde.distanceTo(hasta) > 20000 ? [GALAXIA_OBSTACULO, ...cosmos.cuerpos().slice(1).map(c => ({ c: c.centro, r: c.radio }))] : [])], { porDistancia: true });
     vuelo = { curva, centroDesde, objetivo: objetivo.clone(), transcurrido: 0, duracion: viaje ? tramoRestante ?? duracionViaje(desde.distanceTo(hasta)) * (viajeBreve ? 0.7 : 1) : duracion, fija, distanciaTotal: curva.getLength(), llegada: hasta.distanceTo(objetivo), salida: Math.max(400, desde.distanceTo(centroDesde)), resolver, alLlegar, mirarAntes, corriente, giroMirada,
-      // Al cometa se llega persiguiéndolo: el vuelo se desplaza con él mientras avanza.
-      cometaInicio: destinoActual === 'cometa' ? mundos.posicionCometa() : null, continuacion: trasFundido, perfil: paso.length > 0 || corriente >= 1, avance: avance && AVANCE[avance],
+      // Al cometa se llega persiguiéndolo: el vuelo se desplaza con él mientras avanza. Igual al sistema solar en miniatura,
+      // que gira con la galaxia (seguir: dónde está ahora lo que se persigue).
+      seguir: seguir ??= destinoActual === 'cometa' ? () => mundos.posicionCometa() : null, seguirInicio: seguir ? seguir() : null, continuacion: trasFundido, perfil: paso.length > 0 || corriente >= 1, avance: avance && AVANCE[avance],
       // Con qué pantalla y qué encuadre ideal se trazó esta curva: si gira o cambia la interfaz
       // durante el vuelo, la llegada se corrige al aterrizar (correccionAlLlegar).
       vw: vista.ancho, vh: vista.alto, idealSalida: idealDelVuelo(hasta.distanceTo(objetivo)) };
@@ -717,12 +715,19 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // alrededor de Y lo que ha girado el punto del brazo desde el inicio (brazoInicial, con el que solar.js orienta el centro galáctico).
   const giroBrazo = () => { const p = galaxia.puntoBrazo(); return Math.atan2(p.x, p.z) - Math.atan2(brazoInicial.x, brazoInicial.z); };
   let entradaSolar = false;   // el próximo viaje sale del fundido al sistema solar: pasa primero hacia el Sol (viajar)
-  function colocarEntradaSolar(dirPrincipal) {
+  // Dónde aparece la cámara en el sistema solar (relativo al Sol) si llega al punto del brazo en la dirección dirPrincipal.
+  function posicionEntradaSolar(dirPrincipal) {
     const dir = dirPrincipal.clone().applyAxisAngle(EJE_Y, -giroBrazo());
     // Algo por encima (o por debajo) del plano de las órbitas, entre ~9° y ~40°: se ven las órbitas, ni de canto ni desde el polo.
     const h = Math.hypot(dir.x, dir.z), elev = Math.atan2(-dir.y, h), e = Math.sign(elev || 1) * THREE.MathUtils.clamp(Math.abs(elev), 0.15, 0.7);
     const horiz = h > 1e-4 ? new THREE.Vector3(dir.x / h, 0, dir.z / h) : ENTRADA_SOLAR.clone().setY(0).normalize().negate();
-    camera.position.copy(horiz).multiplyScalar(-Math.cos(e)).setY(Math.sin(e)).multiplyScalar(ENTRADA_SOLAR.length());
+    return horiz.multiplyScalar(-Math.cos(e)).setY(Math.sin(e)).multiplyScalar(ENTRADA_SOLAR.length());
+  }
+  // El mismo punto en la escena principal: junto al sistema solar en miniatura del brazo (marcaSolar.js), a la distancia
+  // equivalente. El primer tramo del viaje termina aquí, mirando al Sol en miniatura; tras el corte se ve lo mismo.
+  const puntoEntradaPrincipal = (dirPrincipal, brazo = galaxia.puntoBrazo()) => brazo.clone().add(posicionEntradaSolar(dirPrincipal).applyAxisAngle(EJE_Y, giroBrazo()).multiplyScalar(ESCALA_MARCA));
+  function colocarEntradaSolar(dirPrincipal) {
+    camera.position.copy(posicionEntradaSolar(dirPrincipal));
     controls.target.copy(ORIGEN); camera.lookAt(ORIGEN);
   }
   async function entrarOSalir(id, opciones) {
@@ -737,12 +742,15 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       if (camera.position.distanceTo(p) > 20000) {
         // Desde un gigante lejano: vuelo por fases hasta el brazo de la galaxia (llega frenando, ya tras el fundido).
         tramoRestante = Math.max(6, total - 4);
-        primero = volarCinematico(p.clone().addScaledVector(camera.position.clone().sub(p).normalize(), 500), p, { centro: p, rAprox: 9000 });
+        // El brazo gira con la galaxia (0,022 rad/s, galaxia.js): se apunta a donde estará el sistema solar al llegar.
+        const pFin = p.clone().applyAxisAngle(EJE_Y, 0.022 * tramoRestante);
+        primero = volarCinematico(puntoEntradaPrincipal(pFin.clone().sub(camera.position).normalize(), pFin), pFin, { centro: pFin, rAprox: 9000 });
         tramoRestante = null;
       } else {
-        // En recta hacia el punto del brazo, mirándolo: el Sol queda en el centro de la pantalla todo el tramo.
-        const haciaSol = p.clone().sub(camera.position).normalize();
-        primero = desplazar(p.clone().addScaledVector(haciaSol, -3), p, total * 0.42, undefined, { paso: recta(camera.position, p), corriente: 1, mirarAntes: 1.5, avance: 'acercarse' });
+        // En recta hacia el punto del brazo, mirándolo: el sistema solar en miniatura queda en el centro de la pantalla todo
+        // el tramo, crece, se ven sus órbitas y se llega a su borde, al punto equivalente al de la entrada (sin cambio de vista).
+        const llegada = puntoEntradaPrincipal(p.clone().sub(camera.position).normalize());
+        primero = desplazar(llegada, p, total * 0.42, undefined, { paso: recta(camera.position, llegada), corriente: 1, mirarAntes: 1.5, avance: 'acercarse', seguir: () => galaxia.puntoBrazo() });
       }
     } else {
       fuera = camera.position.clone().setY(0).normalize().multiplyScalar(9500).add(new THREE.Vector3(0, 1800, 0));
@@ -1061,7 +1069,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       const giro = lejos && vuelo.corriente >= 1 ? Math.min(0.2, 2.4 / vuelo.duracion) : 0, kv = giro ? Math.max(0, (k - giro) / (1 - giro)) : k;
       const e = vuelo.avance ? vuelo.avance(k) : lejos ? avanceLogaritmico(kv, vuelo.distanciaTotal, vuelo.salida, vuelo.llegada) : vuelo.perfil ? PERFIL(k) : suave(k);
       const punto = vuelo.curva.getPointAt(Math.min(1, Math.max(0, e)));
-      const desvio = vuelo.cometaInicio ? mundos.posicionCometa().sub(vuelo.cometaInicio) : null;
+      const desvio = vuelo.seguir ? vuelo.seguir().sub(vuelo.seguirInicio) : null;
       if (desvio) punto.addScaledVector(desvio, e);
       if (Number.isFinite(punto.x)) camera.position.copy(punto);
       const destinoMirada = desvio ? vuelo.objetivo.clone().add(desvio) : vuelo.objetivo;
@@ -1266,7 +1274,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     }
     // Las marcas de casa (el sistema solar) son interfaz de casa: lejos de Xiomara no se dibujan.
     marcaSolar.visible = camera.position.length() < 20000;
-    if (escenaActiva === 'principal') { marcaSolar.position.copy(galaxia.puntoBrazo()); const lat = 1 + Math.sin(tiempo * 2.2) * 0.18; brilloMarca.scale.setScalar(70 * lat); destelloMarca.material.rotation = tiempo * 0.2; }
+    if (escenaActiva === 'principal') miniSolar.actualizar(camera, galaxia.puntoBrazo(), giroBrazo(), tiempo);
     // El destello de la supernova ilumina la pantalla si se está mirando hacia ella.
     let flash = cosmos.supernova.destello;
     if (flash > 0.001) { proyectado.copy(cosmos.supernova.grupo.position).multiplyScalar(cosmos.raiz.scale.x).add(cosmos.raiz.position).project(camera); flash *= proyectado.z < 1 ? Math.max(0, 1 - Math.hypot(proyectado.x, proyectado.y) * 0.45) : 0; }

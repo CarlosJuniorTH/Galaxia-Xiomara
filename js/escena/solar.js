@@ -4,7 +4,8 @@
 // motas nítidas y un leve rastro del disco. El resto del universo no se ve desde aquí.
 import * as THREE from 'three';
 import { deUnTiron } from '../util/azarSemilla.js';
-import { texBrillo, texDestello, texEstrellaGigante } from './texturas.js';
+import { texBrillo, texDestello, texEstrellaGigante, texTexto } from './texturas.js';
+import { enBrazo } from './galaxia.js';
 
 const RUIDO = /* glsl */`
   float h3(vec3 p){ p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }   // sin senos: con fract(sin(x)·43758) cada GPU redondea distinto el mismo punto de la rejilla y el ruido salía a bloques de bordes rectos
@@ -26,7 +27,7 @@ export function* construirSolar({ haciaCentroGalactico, uPR = { value: 1 } }) {
   // un leve rastro del disco a los lados. Nada más: ni la banda difusa que rodeaba el cielo (era un degradado horneado en un
   // cubemap) ni sus estrellas una a una, ni el resto del universo (index.js ya no lo trae a esta escena).
   // Todo son motas nítidas de 1–2 px sumadas, sin halo: el núcleo brilla por acumulación de motas, y ninguna suma llega al
-  // umbral del resplandor (0,78), así no se difumina en mancha. Unos 16 500 puntos en una sola llamada: nada en el móvil.
+  // umbral del resplandor (0,78), así no se difumina en mancha. Con la banda de la galaxia y las vecinas, unos 27 000 puntos en una sola llamada: nada en el móvil.
   const centro = haciaCentroGalactico.clone().setY(0).normalize();
   {
     const azar = (() => { let s = 20251215; return () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; })();   // mulberry32
@@ -52,11 +53,39 @@ export function* construirSolar({ haciaCentroGalactico, uPR = { value: 1 } }) {
     // Núcleo: el corazón brillante, apretado en ~0,3°.
     for (let i = 0; i < 1500; i++) { const r = Math.abs(gauss()) * 0.3, a = azar() * Math.PI * 2; mota(r * Math.cos(a), r * Math.sin(a) * 0.6, crema, 0.1 + 0.06 * azar(), 1.3 + azar() * 0.9); }
     yield;
-    // Rastro del disco: una línea fina y tenue a ambos lados, cada vez más débil (hasta ±70°).
-    for (let i = 0; i < 6000; i++) {
-      const l = (azar() < 0.5 ? -1 : 1) * 70 * Math.pow(azar(), 1.6), f = Math.abs(l) / 70;
-      c.copy(rosa).lerp(violeta, f).lerp(oro, (1 - f) * (1 - f) * 0.5);
-      mota(l, gauss() * (0.25 + 0.8 * f), c, (0.03 + 0.045 * (1 - f) * (1 - f)) * (0.5 + 0.5 * azar()), 1 + azar() * 0.6);
+    // La galaxia de Xiomara vista desde dentro: sus estrellas, muestreadas como las de la galaxia 3D (galaxia.js: cinco
+    // brazos con la misma espiral, el disco entre ellos) y vistas desde donde está el Sol de verdad (el punto del brazo,
+    // enBrazo(1, 0,62)). Cada una se dibuja en su dirección, más brillante cuanto más cerca: forman la banda que cruza
+    // todo el cielo, con su estructura real (los brazos que se superponen, los huecos entre ellos, más luz hacia el centro
+    // y casi nada hacia el borde), y las vecinas del brazo del Sol salpican también lo alto del cielo. Motas de 1–2 px.
+    {
+      const sol = enBrazo(1, 0.62, 0), P = new THREE.Vector3(), rel = new THREE.Vector3();
+      const cB = new THREE.Color();
+      for (let i = 0; i < 15000; i++) {
+        if (i % 4000 === 0) yield;
+        let x, z, rad;
+        if (azar() < 0.14) { rad = 60 + Math.pow(azar(), 0.8) * 980 * 1.05; const a = azar() * Math.PI * 2; x = Math.cos(a) * rad; z = Math.sin(a) * rad; }
+        else ({ x, z, rad } = enBrazo(i % 5, Math.pow(azar(), 0.55), gauss() * 0.12 * (1 + 0.9 * azar())));
+        P.set(x, gauss() * (10 + 26 * Math.exp(-Math.abs(rad - 668) / 260)), z);   // el disco, algo más grueso cerca del Sol
+        rel.set(P.x - sol.x, P.y, P.z - sol.z); const d = rel.length(); if (d < 6) continue;
+        const l = Math.atan2(rel.dot(lado), rel.dot(centro)) / GRADO, b = Math.asin(THREE.MathUtils.clamp(rel.y / d, -1, 1)) / GRADO;
+        const nt = rad / 1050, joven = azar() < 0.07;
+        // Los colores de la galaxia 3D: centro dorado, brazos rosas que se vuelven magenta y lila hacia fuera, algunas jóvenes azules.
+        if (joven) cB.setHSL(0.6 + azar() * 0.05, 0.75, 0.72);
+        else if (nt < 0.14) cB.copy(crema).lerp(oro, azar());
+        else if (nt < 0.36) cB.setHSL(0.93 + azar() * 0.04, 1.0, 0.68);
+        else if (nt < 0.66) cB.setHSL(0.95 + azar() * 0.04, 1.0, 0.6);
+        else cB.copy(violeta).lerp(rosa, azar() * 0.6);
+        const luz = THREE.MathUtils.clamp(0.07 * Math.pow(420 / d, 1.15), 0.03, 0.34) * (0.55 + 0.45 * azar());
+        mota(l, b, cB, luz, d < 140 ? 1.6 + azar() * 0.6 : 1 + azar() * 0.7);
+      }
+    }
+    // Estrellas vecinas por todo el cielo (fuera de la banda también): pocas, nítidas y de colores reales.
+    const vecina = new THREE.Color();
+    for (let i = 0; i < 1600; i++) {
+      const l = azar() * 360 - 180, b = Math.asin(azar() * 2 - 1) / GRADO, k = azar();
+      vecina.setHSL(k < 0.15 ? 0.6 : k < 0.3 ? 0.1 : 0.95, k < 0.3 ? 0.7 : 0.25, 0.85);
+      mota(l, b, vecina, 0.05 + 0.2 * Math.pow(azar(), 4), 1 + azar() * (azar() < 0.1 ? 1.2 : 0.5));
     }
     // Tope de luz: donde las motas se apilan (el núcleo), cada celda de 1/15° (~1 px CSS) suma como mucho TOPE (luz × área de
     // cada mota en px). Así el núcleo es brillante pero ningún píxel pasa del umbral del resplandor (0,78) y no se difumina en
@@ -78,6 +107,40 @@ export function* construirSolar({ haciaCentroGalactico, uPR = { value: 1 } }) {
       transparent: false, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending }));
     nucleoGalactico.frustumCulled = false; nucleoGalactico.renderOrder = -900; nucleoGalactico.name = 'Centro galáctico'; escena.add(nucleoGalactico);
   }
+
+  yield;
+  // ── Los cinturones: el de asteroides (entre Marte, a 2900, y el gigante del corazón, a 4157) y el de Kuiper, más allá de
+  // Neptuno (8400). Motas nítidas de 1–2 px que giran despacio alrededor del Sol, las de dentro más deprisa (Kepler,
+  // calculado en la GPU: en cada cuadro solo cambia un uniforme). Unas 5000 en dos llamadas. ──
+  const uT = { value: 0 };
+  const cinturon = (n, rIn, rOut, espesor, colores, luz, semilla) => {
+    let k = semilla; const az = () => (k = (k * 16807) % 2147483647) / 2147483647;
+    const orb = new Float32Array(n * 4), col = new Float32Array(n * 3), tam = new Float32Array(n), c = new THREE.Color();
+    for (let i = 0; i < n; i++) {
+      // Más apretado hacia el centro del cinturón y con algunos huecos (como los de Kirkwood): no es un anillo liso.
+      let r; do r = rIn + (rOut - rIn) * (0.5 + (az() + az() + az() - 1.5) / 1.5 * 0.5); while (Math.abs(Math.sin(r / (rOut - rIn) * 9.0)) < 0.12 && az() < 0.7);
+      orb.set([r, az() * Math.PI * 2, (az() + az() - 1) * espesor, 0.016 * Math.pow(3000 / r, 1.5)], i * 4);
+      c.set(colores[Math.floor(az() * colores.length)]).multiplyScalar(luz * (0.45 + 0.55 * az())); col.set([c.r, c.g, c.b], i * 3);
+      tam[i] = 1 + az() * (az() < 0.08 ? 1.2 : 0.6);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3)); g.setAttribute('aOrb', new THREE.BufferAttribute(orb, 4)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setAttribute('aTam', new THREE.BufferAttribute(tam, 1));
+    const m = new THREE.Points(g, new THREE.ShaderMaterial({ uniforms: { uT, uPR },
+      vertexShader: /* glsl */`attribute vec4 aOrb; attribute vec3 color; attribute float aTam; uniform float uT, uPR; varying vec3 vC; varying float vT;
+        void main(){ float a = aOrb.y + uT * aOrb.w; vec4 mv = modelViewMatrix * vec4(cos(a) * aOrb.x, aOrb.z, sin(a) * aOrb.x, 1.0);
+          gl_Position = projectionMatrix * mv; vT = aTam * uPR; gl_PointSize = vT;
+          vC = color * clamp(-mv.z / 60.0, 0.0, 1.0); }`,   // la que pasa rozando la cámara se apaga (no un parpadeo enorme)
+      fragmentShader: 'varying vec3 vC; varying float vT; void main(){ vec2 q = gl_PointCoord - 0.5; if (vT >= 2.5 && dot(q, q) > 0.25) discard; gl_FragColor = vec4(vC, 1.0); }',
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    m.frustumCulled = false; escena.add(m); return m;
+  };
+  cinturon(2600, 3050, 3620, 45, ['#c9b8a4', '#a89a8c', '#e0c9a8', '#9d8f86'], 0.42, 4157);
+  cinturon(2600, 9000, 11600, 320, ['#c8d6ff', '#e4dcff', '#b9c9f0', '#f2e6ff'], 0.3, 1215);
+  // Un rótulo tenue en el cielo, junto al centro de la galaxia y siguiendo su banda: lo que se ve desde aquí es ella. Vivimos
+  // dentro de Xiomara. Letras nítidas (sin sombra difusa), a distancia infinita y de tamaño fijo en pantalla.
+  const rotulo = new THREE.Sprite(new THREE.SpriteMaterial({ map: texTexto('la galaxia de Xiomara', { fuente: "500 58px 'Quicksand', sans-serif", color: '#f3d2e4', sombra: 'rgba(0,0,0,0)' }), transparent: true, opacity: 0.42, depthTest: false, depthWrite: false, sizeAttenuation: false }));
+  rotulo.scale.set(0.3, 0.047, 1); rotulo.renderOrder = -899; rotulo.frustumCulled = false; escena.add(rotulo);
+  const dirRotulo = centro.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), 0).add(new THREE.Vector3(0, -0.075, 0)).normalize();   // un poco por debajo del núcleo
 
   yield;
   // ── El Sol: superficie hirviendo, corona y destellos; ilumina a los planetas ──
@@ -135,7 +198,8 @@ export function* construirSolar({ haciaCentroGalactico, uPR = { value: 1 } }) {
   return {
     escena, sol, radioSol: RADIO_SOL,
     actualizar(t, camera) {
-      superficie.material.uniforms.uT.value = t; corona.material.uniforms.uT.value = t; materialArco.uniforms.uT.value = t;
+      superficie.material.uniforms.uT.value = t; corona.material.uniforms.uT.value = t; materialArco.uniforms.uT.value = t; uT.value = t;
+      rotulo.position.copy(camera.position).addScaledVector(dirRotulo, 4000);
       for (const [i, a] of arcos.entries()) a.scale.setScalar(1 + Math.sin(t * 0.3 + i * 1.7) * 0.12);
       superficie.rotation.y = t * 0.01; corona.lookAt(camera.position);
       // Los brillos ópticos conservan su tamaño en el cielo al alejarse o acercarse.
