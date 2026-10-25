@@ -40,22 +40,32 @@ export default async function ({ base, informe }) {
       const m = await moverYMedir(pagina);
       informe.comprobar(m.nan === 0 && m.inf === 0, `${perfil}: zoom y giro en el sistema solar sin NaN ni infinitos en la escena (puntos negros)`, m);
 
-      // Red de seguridad: un cuadradito de 3×3 píxeles NaN en medio de una zona iluminada no sale negro.
+      // Red de seguridad: la pasada de salida, con una imagen gris que tiene un cuadradito de 3×3 píxeles NaN en el centro, no
+      // lo pinta negro (lo rellena con sus vecinos). Con y sin el reescalado con enfoque del móvil (uNitidez).
       const red = await pagina.evaluate(async () => {
-        const e = window.__galaxia.escena, i = e.interno, { THREE, renderer, nucleo, camera } = i; e.pausar(true);
+        const e = window.__galaxia.escena, i = e.interno, { THREE, renderer, nucleo } = i; e.pausar(true);
+        const W = 64, H = 64, entrada = new THREE.WebGLRenderTarget(W, H, { type: THREE.HalfFloatType }), salidaRt = new THREE.WebGLRenderTarget(W, H, { type: THREE.HalfFloatType });
         const plano = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ uniforms: { uCero: { value: 0 } }, depthTest: false, depthWrite: false,
           vertexShader: 'void main(){ gl_Position = vec4(position.xy, 0.0, 1.0); }',
-          // Gris medio en toda la pantalla y NaN (pow de un negativo, con un uniforme para que no se pliegue) en 3×3 píxeles del centro.
-          fragmentShader: 'uniform float uCero; uniform vec2 uC; void main(){ vec2 d = abs(gl_FragCoord.xy - uC); float n = pow(-1.0 - uCero, 1.3); gl_FragColor = vec4(max(d.x, d.y) <= 1.0 ? vec3(n) : vec3(0.3), 1.0); }' }));
-        const rt = nucleo.post.readBuffer; plano.material.uniforms.uC = { value: new THREE.Vector2(Math.floor(rt.viewport.z / 2) + 0.5, Math.floor(rt.viewport.w / 2) + 0.5) };
-        plano.frustumCulled = false; plano.renderOrder = 1e6; nucleo.escenaActiva.add(plano);
-        nucleo.lente.enabled = false; nucleo.post.render();
-        const gl = renderer.getContext(), W = gl.drawingBufferWidth, H = gl.drawingBufferHeight, px = new Uint8Array(4);
-        renderer.setRenderTarget(null); gl.readPixels(W >> 1, H >> 1, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
-        nucleo.escenaActiva.remove(plano); plano.material.dispose(); plano.geometry.dispose(); e.pausar(false);
-        return Array.from(px.slice(0, 3));
+          // Gris en todo y NaN (pow de un negativo, con un uniforme para que no se pliegue) en 3×3 píxeles del centro.
+          fragmentShader: 'uniform float uCero; void main(){ vec2 d = abs(gl_FragCoord.xy - 32.5); float n = pow(-1.0 - uCero, 1.3); gl_FragColor = vec4(max(d.x, d.y) <= 1.0 ? vec3(n) : vec3(0.3), 1.0); }' }));
+        plano.frustumCulled = false; const sola = new THREE.Scene(); sola.add(plano);
+        renderer.setRenderTarget(entrada); renderer.render(sola, i.camera);
+        const salida = nucleo.post.passes.at(-1), u = salida.material.uniforms, guardado = { b: u.uBrillo.value, n: u.uNitidez.value, z: u.uZona.value.clone(), t: u.uTexel.value.clone() };
+        const f = h => { const ex = (h >> 10) & 31, m = h & 1023; return ex === 31 ? NaN : +(ex ? Math.pow(2, ex - 15) * (1 + m / 1024) : Math.pow(2, -14) * m / 1024).toFixed(3); };
+        const res = {};
+        for (const nitidez of [0, 0.35]) {
+          u.tDiffuse.value = entrada.texture; u.uBrillo.value = 0; u.uNitidez.value = nitidez; u.uTexel.value.set(1 / W, 1 / H); u.uZona.value.set(1, 1, (W - 0.5) / W, (H - 0.5) / H);
+          renderer.setRenderTarget(salidaRt); salida.quad.render(renderer);
+          const px = new Uint16Array(4), ref = new Uint16Array(4); renderer.readRenderTargetPixels(salidaRt, 32, 32, 1, 1, px); renderer.readRenderTargetPixels(salidaRt, 50, 32, 1, 1, ref);
+          res[nitidez ? 'conEnfoque' : 'sinEnfoque'] = { centro: Array.from(px.slice(0, 3), f), referencia: Array.from(ref.slice(0, 3), f) };
+        }
+        renderer.setRenderTarget(null); u.uBrillo.value = guardado.b; u.uNitidez.value = guardado.n; u.uZona.value.copy(guardado.z); u.uTexel.value.copy(guardado.t);
+        entrada.dispose(); salidaRt.dispose(); plano.material.dispose(); plano.geometry.dispose(); e.pausar(false);
+        return res;
       });
-      informe.comprobar(Math.min(...red) > 40, `${perfil}: un píxel NaN en la escena no sale negro en la pantalla (se rellena con sus vecinos)`, { centro: red });
+      const igual = r => r.centro.every((v, k) => Math.abs(v - r.referencia[k]) < 0.03);
+      informe.comprobar(igual(red.sinEnfoque) && igual(red.conEnfoque), `${perfil}: un píxel NaN en la escena no sale negro en la pantalla (se rellena con sus vecinos)`, red);
 
       // Vista: solo el centro galáctico, en la dirección real, y sin cielo lejano; núcleo por debajo del umbral del resplandor.
       const vista = await pagina.evaluate(async () => {
