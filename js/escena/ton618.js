@@ -24,7 +24,7 @@ const GLSL_DISCO = /* glsl */`
   uniform vec3 uCamLocal;
   vec3 temperatura(float x){
     x = clamp(x, 0.0, 1.0);
-    vec3 c = mix(vec3(1.0, 0.97, 0.93), vec3(1.0, 0.84, 0.58), smoothstep(0.0, 0.14, x));
+    vec3 c = mix(vec3(1.0, 0.93, 0.82), vec3(1.0, 0.8, 0.52), smoothstep(0.0, 0.1, x));
     c = mix(c, vec3(1.0, 0.6, 0.34), smoothstep(0.12, 0.38, x));
     c = mix(c, vec3(0.98, 0.4, 0.46), smoothstep(0.34, 0.7, x));
     return mix(c, vec3(0.66, 0.2, 0.42), smoothstep(0.66, 1.0, x));
@@ -43,7 +43,8 @@ const GLSL_DISCO = /* glsl */`
     float rw = ${R_DENTRO.toFixed(2)} + uOnda * 3.2, ra = ${R_DENTRO.toFixed(2)} + uAcento * 2.1;
     float onda = exp(-pow((r - rw) / 0.2, 2.0)) * uOndaF * exp(-uOnda * 0.7);
     float acento = exp(-pow((r - ra) / 0.32, 2.0)) * uAcentoF * 1.5 * exp(-uAcento * 0.4);
-    return (1.0 + uLatido * (0.2 + 0.4 * (1.0 - smoothstep(1.3, 5.0, r)))) * (1.0 + 1.1 * (onda + acento));
+    // (El latido aviva sobre todo el disco de fuera: el de dentro ya está a tope y se quemaría sobre la sombra.)
+    return (1.0 + uLatido * (0.12 + 0.5 * smoothstep(1.8, 5.0, r))) * (1.0 + 0.8 * (onda + acento) * smoothstep(1.5, 2.5, r));
   }
   // De canto se ve mucho más disco en la misma línea de visión: la luz se compensa con la inclinación (brillo de
   // superficie constante), así el disco no se quema en blanco ni enciende el resplandor sobre la sombra.
@@ -60,7 +61,7 @@ const GLSL_FINAL = /* glsl */`
     if (im.w <= 0.001 || brillo <= 0.0005) { ${GLSL_OCULTA} }
     gl_Position = projectionMatrix * vec4(im.xyz, 1.0);
     float luz; gl_PointSize = tamanoMota(aTam * uUnidad, -im.z, luz);
-    vC = c; vA = brillo * luz * im.w;`;
+    vC = c; vA = brillo * luz * im.w * (aImagen > 0.5 ? 1.5 : 1.0);   // las imágenes curvadas, algo más vivas (se reparten en un arco fino)`;
 
 // grupo: el del agujero en el cosmos (su posición y su escala); aquí se le añaden las piezas.
 export function* construirTon618({ uScale, uPR, R, grupo }) {
@@ -243,7 +244,7 @@ export function* construirTon618({ uScale, uPR, R, grupo }) {
       const c = comunes.uCamLocal.value; tmp.set(c.z, 0, -c.x).normalize();          // dirección (en el disco) del lado que se acerca
       tmp.applyQuaternion(planoDisco.getWorldQuaternion(q)).applyQuaternion(anillo.getWorldQuaternion(qa).invert());
       anillo.material.uniforms.uLado.value.set(tmp.x, tmp.y).normalize();
-      anillo.material.uniforms.uLuz.value = (0.85 + 0.6 * s.revelar * w + 0.5 * comunes.uLatido.value) * (1 + 0.5 * s.fusion * w);
+      anillo.material.uniforms.uLuz.value = (0.8 + 0.45 * s.revelar * w + 0.25 * Math.min(1, comunes.uLatido.value)) * (1 + 0.3 * s.fusion * w);
       if (!escena) { tocado = false; distanciaInicio = 0; }
     },
     // Deriva de la cámara durante la escena: rodea el agujero muy despacio alrededor del eje del disco, baja hasta mirar el
