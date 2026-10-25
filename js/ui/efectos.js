@@ -52,8 +52,9 @@ export function crearEfectos() {
     despertar();
   }
 
-  function programarFugaces() {
-    setTimeout(() => { if (!document.hidden) estrellaFugaz(); programarFugaces(); }, azar(6000, 16000));
+  // permitida(): si ahora puede caer una (en las seis grandes no: allí no hay atmósfera que las encienda).
+  function programarFugaces(permitida = () => true) {
+    setTimeout(() => { if (!document.hidden && permitida()) estrellaFugaz(); programarFugaces(permitida); }, azar(6000, 16000));
   }
 
   // Pedir un deseo: una estrella fugaz grande y lenta nace donde se toca.

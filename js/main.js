@@ -107,16 +107,18 @@ try {
     else if (tocado?.tipo === 'nodo') interfaz.tocarNodo(tocado.id);
     else if (!escena.viajando) {
       // Tocar el cielo: la primera vez (y luego una de cada tres) cae una estrella fugaz para
-      // pedir un deseo; las demás, un beso.
-      if (toquesCielo++ % 3 === 0) {
+      // pedir un deseo; las demás, un beso. En las seis grandes no hay estrellas fugaces (son
+      // meteoros de la atmósfera): ahí siempre es el beso, sin el deseo ni sus frases.
+      if (interfaz.enLasGrandes) { efectos.explosion(x, y, 14); efectos.texto(x, y, elegir(CONFIG.toques)); escena.besar(); }
+      else if (toquesCielo++ % 3 === 0) {
         efectos.deseo(x, y); efectos.texto(x, y, 'Pide un deseo ✨'); escena.besar();
-        setTimeout(() => interfaz.avisar('Tu deseo ya viaja entre las estrellas. ♡'), 2600);
+        setTimeout(() => { if (!interfaz.enLasGrandes) interfaz.avisar('Tu deseo ya viaja entre las estrellas. ♡'); }, 2600);
       } else { efectos.explosion(x, y, 14); efectos.texto(x, y, elegir(CONFIG.toques)); escena.besar(); }
     }
   });
   entrada.alEntrar(({ continuar } = {}) => {
     // Continuar: el vuelo de entrada lleva directamente al lugar (o al paso del recorrido).
-    banda.entrar(); musica.reproducir(true); mensajes.iniciar(); setTimeout(efectos.programarFugaces, 4000);
+    banda.entrar(); musica.reproducir(true); mensajes.iniciar(); setTimeout(() => efectos.programarFugaces(() => !interfaz.enLasGrandes), 4000);
     if (continuar?.paso !== null && continuar?.paso !== undefined) { escena.iniciar('hogar', { duracion: 3 }); setTimeout(() => interfaz.iniciarRuta(continuar.paso), 2600); }
     else escena.iniciar(continuar?.destino || 'hogar');
     if (['render', 'completo'].includes(new URLSearchParams(location.search).get('diag'))) diagnosticoRender();

@@ -8,14 +8,17 @@ import { crearFaroCuasar } from './faroCuasar.js';
 import { crearMapa } from './mapa.js';
 import { crearEscenasGigantes } from './escenasGigantes.js';
 import { FRASE_SUPERNOVA } from '../util/supernovaAmor.js';
+import { crearAvisos } from './avisos.js';
 const $ = id => document.getElementById(id);
+// Las seis grandes (supernova, cuásar, púlsar, Deneb, TON 618 y Sagitario A*): los lejanos salvo el gigante del corazón.
+const GRANDES = new Set(LEJANOS.filter(d => d.id !== 'gigante').map(d => d.id));
 function el(tag, clase, texto) { const n = document.createElement(tag); if (clase) n.className = clase; if (texto !== undefined) n.textContent = texto; return n; }
 function boton(texto, clase, accion) { const b = el('button', clase, texto); b.type = 'button'; b.addEventListener('click', accion); return b; }
 
 export function crearInterfazUniverso({ config, escena, progreso, recuerdos, estrellas, efectos, musica, viaje, banda = null }) {
   const panel = $('panel-universo'), contenido = $('panel-contenido'), lectura = $('lectura');
   lectura.querySelector('.firma').textContent = config.firma;
-  let panelActual = '', actual = 'hogar', avisoT = 0, postalURL = null, celebrando = false, celebracionRevision = 0, constelacionElegida = 'hilo';
+  let panelActual = '', actual = 'hogar', postalURL = null, celebrando = false, celebracionRevision = 0, constelacionElegida = 'hilo';
   let tour = false, indiceRuta = 0, pausa = false, esperando = false, permanencia = 0, revision = 0, ultimo = performance.now();
   const ruta = [...DESTINOS.map(d => d.id), 'cometa'];
   const destinoCometa = { id: 'cometa', nombre: 'Un beso fuera de órbita', tipo: 'Una visita inesperada', texto: 'Este viajero no se queda para siempre. Se acerca un ratito, deja una pequeña sorpresa y sigue su camino entre las estrellas.', accion: 'Abrir la sorpresa del cometa' };
@@ -52,7 +55,21 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
       await esperarContemplando(llegado ? (ORDEN_CONTEMPLAR[i] === 'hogar' ? 20000 : 15000) : 1000, mia);
     }
   }
-  function avisar(texto) { clearTimeout(avisoT); $('brindis').textContent = texto; $('brindis').classList.add('visible'); avisoT = setTimeout(() => $('brindis').classList.remove('visible'), 5200); }
+  // Los avisos breves van en cola (avisos.js): de uno en uno, sin repetirse; los urgentes pasan delante.
+  let fraseT = 0;
+  const avisos = crearAvisos({
+    brindis: { duracion: 5200, salida: 700, mostrar(texto) { $('brindis').textContent = texto; $('brindis').classList.add('visible'); }, ocultar() { $('brindis').classList.remove('visible'); } },
+    cometa: {
+      duracion: 8000, salida: 1200,
+      mostrar(texto) { clearTimeout(fraseT); $('cometa-frase-texto').textContent = texto; const caja = $('cometa-frase'); caja.hidden = false; requestAnimationFrame(() => caja.classList.add('visible')); },
+      ocultar({ inmediato = false } = {}) { const caja = $('cometa-frase'); caja.classList.remove('visible'); clearTimeout(fraseT); fraseT = setTimeout(() => { caja.hidden = true; }, inmediato ? 0 : 1200); }
+    }
+  });
+  // urgente: pasa delante de la cola (la supernova que va a estallar).
+  function avisar(texto, { urgente = false } = {}) { avisos.poner(texto, { urgente }); }
+  // Las seis grandes: lejos de casa, con el universo a gran escala, no hay estrellas fugaces (son meteoros de la
+  // atmósfera) ni cometas. En casa y en nuestra galaxia, todo sigue igual.
+  const enLasGrandes = () => escena.lejosDeCasa || GRANDES.has(escena.destino);
   function cerrarPanel() { panel.close(); panelActual = ''; }
   function mostrarLectura(titulo, parrafos, ceja = 'PALABRAS QUE VIAJAN HASTA TI', { conCometa = false, sinFirma = false } = {}) {
     if (tour) pausarRuta(true);
@@ -465,14 +482,13 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     if (hoy !== ultimaFecha) { ultimaFecha = hoy; if (panelActual === 'capsulas') abrirPanel('capsulas'); }
   }
   relojes(); setInterval(relojes, 15000);
-  // Cada vez que el cometa aparece en el cielo deja una frase (una distinta en cada paso).
-  let cometaAntes = false, fraseT = 0;
+  // Cada vez que el cometa aparece en el cielo deja una frase (una distinta en cada paso), en la cola de avisos.
+  let cometaAntes = false;
+  const fraseVigente = () => escena.cometaVisible && !enLasGrandes() && actual !== 'cometa' && !tour && !celebrando && document.body.classList.contains('dentro');
   function fraseCometa() {
-    if (!FRASES_COMETA.length || celebrando || !document.body.classList.contains('dentro')) return;
+    if (!FRASES_COMETA.length || !fraseVigente()) return;
     let i = 0; try { i = (+localStorage.getItem('xiomara:frase-cometa') || 0) % FRASES_COMETA.length; localStorage.setItem('xiomara:frase-cometa', String(i + 1)); } catch {}
-    $('cometa-frase-texto').textContent = FRASES_COMETA[i];
-    const caja = $('cometa-frase'); caja.hidden = false; requestAnimationFrame(() => caja.classList.add('visible'));
-    clearTimeout(fraseT); fraseT = setTimeout(() => { caja.classList.remove('visible'); setTimeout(() => { caja.hidden = true; }, 1200); }, 8000);
+    avisos.poner(FRASES_COMETA[i], { tipo: 'cometa', vigente: fraseVigente });
   }
   let supernovaAntes = false;
   // Cuando a la estrella le llega la hora, se viaja hasta ella desde donde se esté (también desde
@@ -480,14 +496,16 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
   setInterval(() => {
     if (!escena.supernovaQuiereEstallar || !document.body.classList.contains('dentro')) return;
     if (celebrando || tour || contemplando || panel.open || escena.viajando || document.querySelector('dialog[open], .ventana.abierta')) { escena.aplazarSupernova(20); return; }
-    avisar('Dos luces están a punto de encontrarse. Hay algo hermoso esperándote. ♡');
+    // Este aviso sale estés donde estés y pasa delante de la cola: el viaje a la supernova empieza ya.
+    avisar('Dos luces están a punto de encontrarse. Hay algo hermoso esperándote. ♡', { urgente: true });
     visitar('supernova');
   }, 2000);
   $('btn-supernova').addEventListener('click', () => visitar('supernova'));
   setInterval(() => {
-    const visible = escena.cometaVisible;
+    // En las grandes no hay cometa (ni su aviso ni su frase).
+    const visible = escena.cometaVisible && !enLasGrandes();
     // Unos segundos después de aparecer (en la primera pasada, ya terminado el vuelo de entrada).
-    if (visible && !cometaAntes) setTimeout(() => { if (escena.cometaVisible && actual !== 'cometa' && !tour && !escena.viajando) fraseCometa(); }, 9000);
+    if (visible && !cometaAntes) setTimeout(() => { if (!escena.viajando) fraseCometa(); }, 9000);
     cometaAntes = visible;
     $('cometa-aviso').hidden = !visible || actual === 'cometa' || tour || document.body.classList.contains('en-calma');
     // Supernova: cuando una estrella estalla, se avisa y se puede viajar a verla.
@@ -509,5 +527,5 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
   }
   let tickActivo = false;
   const despertarTick = () => { if (tickActivo) return; tickActivo = true; ultimo = performance.now(); requestAnimationFrame(tick); };
-  return { get contemplando() { return contemplando || performance.now() - salidaContemplar < 700; }, contemplar, abrirCieloNoche: () => cieloNoche.abrir(), get celebrando() { return celebrando; }, actualizarAlbum() { if (panelActual === 'album') abrirPanel('album'); }, avisar, situar, visitar, alConstelar, tocarNodo, celebrar, abrirPanel, sorpresa, pausarRuta, iniciarRuta, get enRuta() { return tour; } };
+  return { get contemplando() { return contemplando || performance.now() - salidaContemplar < 700; }, contemplar, abrirCieloNoche: () => cieloNoche.abrir(), get celebrando() { return celebrando; }, actualizarAlbum() { if (panelActual === 'album') abrirPanel('album'); }, avisar, get enLasGrandes() { return enLasGrandes(); }, situar, visitar, alConstelar, tocarNodo, celebrar, abrirPanel, sorpresa, pausarRuta, iniciarRuta, get enRuta() { return tour; } };
 }
