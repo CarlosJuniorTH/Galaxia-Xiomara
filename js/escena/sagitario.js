@@ -112,7 +112,9 @@ export function* construirSagitario({ uScale, uPR, RS, grupo }) {
   }
   // Las dos primeras (las más brillantes: una rosada, como la protagonista, y otra blanca azulada) forman la pareja.
   const colores = [[1.0, 0.78, 0.86], [0.8, 0.88, 1.0]];
-  for (let i = 2; i < N_ESTRELLAS; i++) colores.push(al() < 0.7 ? [0.78, 0.86, 1.0] : [1.0, 0.92, 0.82]);
+  // El resto, en tres tonos que se alternan por el corazón: rosa, oro y blanco azulado (las estrellas S son azules y
+  // calientes; sus estelas toman el color del amanecer).
+  for (let i = 2; i < N_ESTRELLAS; i++) colores.push([[1.0, 0.6, 0.76], [1.0, 0.82, 0.58], [0.8, 0.87, 1.0]][i % 3]);
   let trazas;
   {
     const n = N_ESTRELLAS * N_TRAZA, est = new Float32Array(n * 2), tam = new Float32Array(n), col = new Float32Array(n * 3);
@@ -152,7 +154,7 @@ export function* construirSagitario({ uScale, uPR, RS, grupo }) {
         if (im.w <= 0.001) { ${GLSL_OCULTA} }
         gl_Position = projectionMatrix * vec4(im.xyz, 1.0);
         float luz; gl_PointSize = tamanoMota(aTam * uUnidad, -im.z, luz);
-        vC = mix(aColor, vec3(1.0), cabeza * 0.35); vA = brillo * luz * im.w * 0.75;
+        vC = mix(aColor, vec3(1.0), cabeza * 0.55); vA = brillo * luz * im.w * 0.75;
       }`));
     grupo.add(trazas);
   }

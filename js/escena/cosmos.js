@@ -491,6 +491,7 @@ export function* construirCosmos({ uScale, uPR }) {
     },
     // Hay animación de escena (el planificador dibuja a 60): mientras suena y mientras se funde al salir. En calma, no.
     get enEscenaAgujero() { return !!escenaG && (!escenaG.viva || escenaG.t < finEscena(escenaG.id)); },
+    agujeros: { ton618: piezasTon, sagitario: piezasSgr },   // (diagnóstico y pruebas)
     get escenaAgujeroEstado() { return escenaG ? { id: escenaG.id, t: escenaG.t, presencia: escenaG.presencia, viva: escenaG.viva, guion: { ...escenaG.guion } } : null; },
     // Deriva de la cámara durante la escena de TON 618 (index.js la llama si nadie toca la cámara: tocando = gesto o inercia).
     derivar(camera, objetivo, dt, tocando) { return escenaG?.id === 'ton618' && piezasTon.derivar(camera, objetivo, dt, escenaG, tocando); },

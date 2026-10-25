@@ -47,7 +47,7 @@ const GLSL_DISCO = /* glsl */`
   }
   // De canto se ve mucho más disco en la misma línea de visión: la luz se compensa con la inclinación (brillo de
   // superficie constante), así el disco no se quema en blanco ni enciende el resplandor sobre la sombra.
-  float inclinacion(vec3 p){ return mix(0.2, 1.0, abs(normalize(uCamLocal - p).y)); }`;
+  float inclinacion(vec3 p){ return mix(0.42, 1.0, sqrt(abs(normalize(uCamLocal - p).y))); }`;
 
 const cabecera = `attribute float aImagen, aTam, aFase; varying vec3 vC; varying float vA;
   ${GLSL_LENTE}
@@ -96,7 +96,7 @@ export function* construirTon618({ uScale, uPR, R, grupo }) {
         vec3 pl = vec3(cos(th) * r, aDisco.z * r, sin(th) * r);
         vec3 c = temperatura((r - ${R_DENTRO.toFixed(2)}) / ${(R_FUERA - R_DENTRO).toFixed(2)});
         float g = doppler(r, th, pl, c);
-        float brillo = pow(${R_DENTRO.toFixed(2)} / r, 0.5) * clamp(pow(g, 0.75), 0.3, 1.35) * latido(r) * inclinacion(pl * uR) * smoothstep(0.0, 0.05, x) * (1.0 - smoothstep(0.88, 1.0, x)) * 0.55;
+        float brillo = pow(${R_DENTRO.toFixed(2)} / r, 0.5) * clamp(pow(g, 0.75), 0.3, 1.35) * latido(r) * inclinacion(pl * uR) * smoothstep(0.0, 0.05, x) * (1.0 - smoothstep(0.88, 1.0, x)) * 0.62;
         ${GLSL_FINAL}
       }`));
   }
@@ -140,9 +140,9 @@ export function* construirTon618({ uScale, uPR, R, grupo }) {
       ${cabecera}
       void main(){
         if (uCorrientes <= 0.0) { ${GLSL_OCULTA} }
-        float u = aHebra.x, rh = mix(6.2, 1.8, uAvance), ext = (1.0 - uFusion) * mix(0.9, 0.35, uAvance);
+        float u = aHebra.x, rh = mix(5.4, 1.8, uAvance), ext = (1.0 - uFusion) * mix(0.9, 0.35, uAvance);
         float th = uCabeza - u * mix(2.7, 6.2832, uFusion);
-        float phi = u * 46.0 - uT * 2.3, sep = 0.15 * (1.0 - uFusion) * (1.0 - 0.45 * uAvance);
+        float phi = u * 22.0 - uT * 2.3, sep = 0.09 * (1.0 - uFusion) * (1.0 - 0.45 * uAvance);
         float r = rh + u * ext + aHebra.y * sep * cos(phi) + aHebra.z * 0.035 * (1.0 - 0.6 * uFusion);
         vec3 pl = vec3(cos(th) * r, aHebra.y * sep * 0.12 * sin(phi) + aHebra.z * 0.006, sin(th) * r);
         vec3 c = mix(aHebra.y > 0.0 ? vec3(1.0, 0.56, 0.74) : vec3(1.0, 0.8, 0.46), vec3(1.0, 0.87, 0.82), uFusion * 0.75);
@@ -174,7 +174,7 @@ export function* construirTon618({ uScale, uPR, R, grupo }) {
         float n = r * 14.0, i = floor(n), w = fwidth(n), borde = smoothstep(0.0, w, fract(n)) * smoothstep(0.0, w, 1.0 - fract(n));
         float banda = mix(0.25, 1.0, h(i)) * mix(1.0, borde, 1.0 - smoothstep(0.3, 0.9, w));
         vec3 c = mix(vec3(1.0, 0.9, 0.7), vec3(1.0, 0.55, 0.42), smoothstep(0.0, 0.45, x)); c = mix(c, vec3(0.7, 0.2, 0.4), smoothstep(0.45, 1.0, x));
-        float a = banda * pow(1.0 - x, 1.6) * smoothstep(0.0, 0.03, x) * smoothstep(0.0, 0.6, vDelante) * clamp(pow(vDoppler, 0.75), 0.3, 1.35) * (1.0 + uLatido * 0.4) * 0.2 * uLuz;
+        float a = banda * pow(1.0 - x, 1.6) * smoothstep(0.0, 0.03, x) * smoothstep(0.0, 0.6, vDelante) * clamp(pow(vDoppler, 0.75), 0.3, 1.35) * (1.0 + uLatido * 0.4) * 0.34 * uLuz;
         gl_FragColor = vec4(c * a, a); }`,
     transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending, side: THREE.DoubleSide
   }));
@@ -216,7 +216,7 @@ export function* construirTon618({ uScale, uPR, R, grupo }) {
   let giro = 0, flujo = 0, cabeza = 0, tocado = false, distanciaInicio = 0;
   const giroKepler = r => 1.0472 * Math.pow(r / R_DENTRO, -1.5);
   return {
-    planoDisco, sombra, base, anillo, discoEstrellas, R, rFuera: R_FUERA,
+    planoDisco, sombra, base, anillo, discoEstrellas, motasDisco, motasCaida, motasHebras, R, rFuera: R_FUERA,
     // El disco (y su galaxia de estrellas) contiene la dirección «hacia» y se inclina un poco sobre ella.
     orientar(hacia, inclinacion) { for (const o of [planoDisco, galaxia]) { o.lookAt(hacia); o.rotateX(inclinacion); } },
     // escena: null (reposo) o { guion, presencia } (js/escena/cosmos.js la mezcla con el reposo al entrar y al salir).
