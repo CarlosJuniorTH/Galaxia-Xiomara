@@ -283,6 +283,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   const tam = new THREE.Vector2(), aux = new V(); let gigantes = [];
   const frustum = new THREE.Frustum(), mProy = new THREE.Matrix4(), esfera = new THREE.Sphere();
   let cuadroExpo = 0, densidadWeb = 0, expoAuto = 1, luzCasa = null;
+  let penumbra = 1;   // las escenas del púlsar y de Deneb la atenúan un poco mientras duran (el gigante, en primer plano)
   const AREA_REF = 1440 * 900, TAN_REF = Math.tan(Math.PI / 6), CAL = 5.2, DENSIDAD_COMODA = 0.85;   // luz de telaraña por píxel CSS con la que se ve bien (la del PC en los gigantes: 0,7–1,1)
   return {
     raiz, web, galaxias: bloquesGalaxias, nubes: bloquesNubes, cercano, polvoFil: bloquesPolvo, capaGalaxias, dibujarGalaxias,
@@ -293,6 +294,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
     get escalaCapaGalaxias() { return escalaCapa; },
     // Unidos dibujan todos los puntos (no la muestra): la luz de cada uno vuelve a ser la normal.
     get densidadWeb() { return densidadWeb; }, get expoAuto() { return expoAuto; },
+    set penumbra(v) { penumbra = v; }, get penumbra() { return penumbra; },
     unirBloques(si) { for (const [grupo, p] of unidos) { grupo.visible = !si; p.visible = si; } uComp.value = si ? 1 : 1 / Math.sqrt(muestraActual); },
     // Gigantes que tapan la telaraña: [{ centro, radio }] (coordenadas del mundo).
     fijarGigantes(lista) { gigantes = lista.slice(0, 6).map(g => ({ c: new V(g.centro.x - O.x, g.centro.y - O.y, g.centro.z - O.z), r: g.radio })); },
@@ -328,7 +330,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
       // «¡pum!» al arrancar el viaje). Ahora sigue a la distancia con una constante de ~0,8 s (95 % en unos 2,5 s).
       const metaCasa = 0.22 + 0.78 * THREE.MathUtils.smoothstep(camera.position.length(), 20000, 400000);
       luzCasa = luzCasa === null ? metaCasa : luzCasa + (metaCasa - luzCasa) * Math.min(1, dt * 1.2);
-      uniformes.uCasa.value = luzCasa * expoAuto;
+      uniformes.uCasa.value = luzCasa * expoAuto * penumbra;
       const pr = uPR.value; uniformes.uRes.value.set(vista.ancho * pr * 0.5, vista.alto * pr * 0.5);
       uniformes.uF.value = vista.alto / (2 * Math.tan(camera.fov * Math.PI / 360));
       rehacerCercano(camera.position);

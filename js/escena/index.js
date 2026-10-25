@@ -218,6 +218,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // están más lejos: su brillo pasa por delante de ellas. Solo los soles con posición real (Deneb) están más cerca que las nebulosas remotas; los del
   // fondo óptico (acompañan a la cámara, «infinitamente» lejos) quedan detrás y no se adelantan.
   for (const g of cosmos.soles) if (g.parent === cosmos.raiz) g.traverse(o => { if (o.material?.transparent) o.renderOrder = -12.5; });
+  // Las motas de la escena del púlsar están dentro de su nebulosa: se dibujan tras la capa del gas volumétrico (−3),
+  // que si no las cubría con su alfa. Nítidas y por encima del gas, como las estrellas que hay en él.
+  for (const o of cosmos.sobreGas) o.renderOrder = -2.5;
   // El cielo profundo (estrellas, galaxias lejanas, nebulosas, soles gigantes, agujeros) está
   // tan lejos que nunca se acerca ni cambia de sitio al moverse: acompaña a la cámara, como el
   // cielo de verdad. Así se siente la distancia y nada se puede alcanzar ni solapar.
@@ -853,7 +856,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // La inercia del giro (y el final de un zoom) también son movimiento: a 60 hasta que se paran del todo. Antes, a los 4 s
     // sin tocar se pasaba a 30 aunque la vista siguiera deslizándose y el final del giro iba a frenitos.
     const motivo = vuelo ? 'vuelo' : gesto ? 'gesto' : giro.moviendo || zoom.moviendo ? 'inercia' : mirada && mirada.t < 1 ? 'mirada' : pulso > 0.02 ? 'pulso' : captura ? 'captura'
-      : document.body.classList.contains('celebrando') || document.body.classList.contains('reuniendo') ? 'celebracion' : tEntrada !== null && tiempo - tEntrada < 12 ? 'entrada'
+      : document.body.classList.contains('celebrando') || document.body.classList.contains('reuniendo') ? 'celebracion' : cosmos.escenas.animando ? 'escena' : tEntrada !== null && tiempo - tEntrada < 12 ? 'entrada'
       : Math.abs(desplazamientoMeta - desplazamiento) > 0.5 ? 'encuadre' : '';
     const activo = !!motivo;
     const modo = planificador.decidir(ahora, { reposo, quieto: pausa && !vuelo && !captura, activo });
@@ -1031,6 +1034,10 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     giroSuave += ((controls.autoRotate ? 1 : 0) - giroSuave) * Math.min(1, dt * 0.7);
     controls.autoRotateSpeed = giroBase * giroSuave;
     ctx.lejano = lejano ? lejano.id : null;
+    // Las escenas del púlsar y de Deneb terminan (suaves) en cuanto se elige otro destino.
+    if (destinoActual !== 'pulsar') cosmos.escenas.cancelar('pulsar');
+    if (destinoActual !== 'deneb') cosmos.escenas.cancelar('deneb');
+    telarana.penumbra = 1 - cosmos.escenas.foco;
     // Exposición automática (como en los juegos): la luz que se suma (telaraña, polvo) tiene puntos de tamaño fijo en
     // pantalla; al alejar la cámara de un gigante más allá de su encuadre normal (el del PC), se amontonan y se
     // quemaban en blanco, sobre todo en el móvil (pantalla vertical: la cámara ya está más lejos). Más allá de esa
@@ -1270,6 +1277,18 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
         seguir();
       });
     },
+    // Escena de llegada del púlsar o de Deneb (js/escena/escenasGigantes.js). reloj: segundos desde el inicio de
+    // su audio (bandaSonora.tiempo(id)); sin él, el tiempo propio desde ahora. La cámara deja de girar sola
+    // mientras dura. Devuelve true al terminar y false si se cancela (al irse a otro destino).
+    async escenaGigante(id, { reloj = null, config = null } = {}) {
+      if (!lejano || lejano.id !== id || vuelo || destinoActual !== id) return false;
+      controls.autoRotate = false;
+      const terminada = await cosmos.escenas.iniciar(id, { reloj, config });
+      if (destinoActual === id && !vuelo) controls.autoRotate = !pausa && giraSolo();
+      return terminada;
+    },
+    cancelarEscenaGigante: id => cosmos.escenas.cancelar(id),
+    get escenaGiganteEnCurso() { return cosmos.escenas.enCurso; },
     posicionCometa: () => mundos.posicionCometa(),
     besar() { pulso = 1; planificador.pedirCuadro(); },
     constelar() { mundos.constelar(); },

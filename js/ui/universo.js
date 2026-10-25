@@ -6,6 +6,7 @@ import { crearCieloNoche } from './cieloNoche.js';
 import { crearSupernovaAmor } from './supernovaAmor.js';
 import { crearFaroCuasar } from './faroCuasar.js';
 import { crearMapa } from './mapa.js';
+import { crearEscenasGigantes } from './escenasGigantes.js';
 import { FRASE_SUPERNOVA } from '../util/supernovaAmor.js';
 const $ = id => document.getElementById(id);
 function el(tag, clase, texto) { const n = document.createElement(tag); if (clase) n.className = clase; if (texto !== undefined) n.textContent = texto; return n; }
@@ -22,6 +23,8 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
   const cieloNoche = crearCieloNoche();
   crearPresentacionViajes({ canvas: $('galaxia'), escena, nombre: id => id === 'supernova' ? 'nuestra supernova' : id === 'hogar' ? 'nuestra galaxia' : datos(id).nombre, elegirDestino: () => abrirPanel('lugares') });
   const supernovaAmor = crearSupernovaAmor({ escena, progreso, musica, alDescubrir: () => { if (actual === 'supernova') situar('supernova'); } });
+  // El púlsar y Deneb: su escena al llegar (sincronizable con su audio: relojDe).
+  const escenasGigantes = crearEscenasGigantes({ escena });
   // El faro del cuásar: su recorrido con frases y la carta que espera al final.
   const faro = crearFaroCuasar({ escena, progreso, mostrarLectura, alCambiar: () => { if (actual === 'cuasar') situar('cuasar'); } });
   $('faro-carta').addEventListener('click', () => { if (actual === 'cuasar' && !escena.viajando) faro.abrirCarta(); });
@@ -134,6 +137,7 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     const llegado = await escena.viajar(id);
     // Si la estrella aún no ha estallado, al llegar empieza su cuenta atrás; el corazón ya nacido no.
     if (llegado && id === 'supernova' && actual === 'supernova' && !corazonNacido()) setTimeout(() => { if (actual === 'supernova' && !escena.viajando) accionLugar('supernova'); }, 2500);
+    if (llegado && escenasGigantes.tiene(id) && actual === id) escenasGigantes.abrir(id);
     if (llegado) { progreso.anotar('visitas', id); if (id === 'constelacion') avisar('La luz blanca te muestra por dónde empezar. Puedes tocar las luces o unirlas con el botón.'); }
   }
   // Cada lugar tiene su gesto propio antes de abrir su contenido: abrir un sobre, rodar
