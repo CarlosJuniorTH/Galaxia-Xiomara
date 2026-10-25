@@ -873,6 +873,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     const actual = camera.position.distanceTo(controls.target);
     if (!CERCA[destinoActual]) controls.minDistance *= r;
     controls.maxDistance = Math.max(controls.maxDistance * r, actual * r * 1.05);
+    // En un lugar lejano, nunca más de 3 veces su encuadre (antes podía ir engordando con encuadres viejos).
+    if (lejano) controls.maxDistance = Math.min(controls.maxDistance, Math.max(n.d * 3, actual * r * 1.05));
     ajuste = { t: 0, desdeMira: controls.target.clone(), aMira: n.mira ? n.mira.clone() : controls.target.clone(), desdeD: actual, aD: actual * r };
     planificador.pedirCuadro();   // en pausa el bucle duerme: el ajuste necesita cuadros
   }
@@ -1407,7 +1409,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       cosmos.supernova.orientar();
       const { posicion, objetivo, distancia } = encuadreCorazon();
       lejano.dist = distancia;
-      controls.maxDistance = Math.max(controls.maxDistance, distancia * 1.4);
+      controls.minDistance = distancia * LIMITES.min; controls.maxDistance = distancia * LIMITES.max;
       const ok = await desplazar(posicion, objetivo, movimientoReducido ? 2 : 7.5, undefined, { corriente: 0 });
       if (destinoActual === 'supernova') controls.autoRotate = false;
       return ok;
@@ -1450,7 +1452,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
               retrayendo = true;
               const { posicion, objetivo, distancia } = encuadreCorazon('lugar');   // el mismo encuadre que al llegar: al terminar no hay saltos
               lejano.dist = distancia;   // los límites del zoom al llegar son los del remanente, no los de la estrella
-              controls.maxDistance = Math.max(controls.maxDistance, distancia * 1.4);
+              controls.minDistance = distancia * LIMITES.min; controls.maxDistance = distancia * LIMITES.max;
               desplazar(posicion, objetivo, movimientoReducido ? 2 : 4.5, undefined, { corriente: 0 }).then(() => { if (destinoActual === 'supernova') controls.autoRotate = false; });
             }
             if (fase === 'recuerdo' && !vuelo) { resolve(true); return; }
