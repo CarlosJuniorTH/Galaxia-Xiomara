@@ -15,6 +15,9 @@ async function medir(pagina, { agujero, inclinacion = 0, esfera = null }) {
     const lado = new THREE.Vector3().crossVectors(eje, new THREE.Vector3(0, 1, 0)).normalize();
     eje.applyAxisAngle(lado, inclinacion);
     camera.position.copy(c.centro).addScaledVector(eje, c.radio * 4); controls.target.copy(c.centro); camera.lookAt(c.centro); camera.updateMatrixWorld();
+    // El plano cercano, el que pondría index.js en esta posición (0,002 × la distancia a lo que se mira): con la escena en
+    // pausa se quedaba el de casa (0,5) y a millones de unidades la profundidad no distinguía la esfera del disco.
+    const cerca = camera.near; camera.near = Math.max(0.5, c.radio * 4 * 0.002);
     let malla = null;
     if (esfera) {
       malla = new THREE.Mesh(new THREE.SphereGeometry(c.radio * esfera.radio, 32, 16), new THREE.MeshBasicMaterial({ color: 0x00ff00 }));
@@ -30,7 +33,7 @@ async function medir(pagina, { agujero, inclinacion = 0, esfera = null }) {
       const pm = new Uint8Array(W * H * 4); renderer.setRenderTarget(rt); renderer.setClearColor(0, 1); renderer.clear(); renderer.render(solo, camera); renderer.readRenderTargetPixels(rt, 0, 0, W, H, pm); renderer.setRenderTarget(null);
       mascara = Array.from({ length: W * H }, (_, k) => pm[k * 4] > 128 ? 1 : 0); scene.remove(malla);
     }
-    camera.aspect = aspecto; camera.updateProjectionMatrix(); rt.dispose(); e.pedirCuadro();
+    camera.aspect = aspecto; camera.near = cerca; camera.updateProjectionMatrix(); rt.dispose(); e.pedirCuadro();
     // Píxeles donde se ve la esfera: ¿son verde puro (tapa) o tienen luz del agujero encima?
     let dentro = 0, contaminados = 0, centroOscuro = 0;
     for (let k = 0; k < W * H; k++) {

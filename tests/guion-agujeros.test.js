@@ -12,22 +12,7 @@ test('las escenas usan las marcas de la banda sonora y terminan con su canción'
   assert.ok(Math.abs(COMPAS.ton618 - 1.778) < 0.01 && Math.abs(COMPAS.sagitario - 2.345) < 0.01, 'un compás cada 1,78 s y 2,34 s');
 });
 
-test('TON 618: la materia cae, las corrientes se funden en el último «tuyo» y queda en calma', () => {
-  const M = marcasDe('ton618'), g = t => ({ ...guionTon618(t, M) });
-  assert.equal(g(0).corrientes, 0); assert.equal(g(0).latido, 0);
-  assert.ok(g(M.serTuyo + 2.5).corrientes > 0.99, 'las corrientes aparecen con «quiero ser tuyo»');
-  assert.ok(g(M.ultimoTuyo - 2).fusion < 0.05 && g(M.ultimoTuyo + 1.3).fusion > 0.99, 'se funden en el último «tuyo»');
-  assert.ok(g(finEscena('ton618')).calma > 0.99 && g(120).calma === 1 && g(120).latido < 1e-6, 'después, calma sin repetirse');
-  assert.equal(g(120).deriva, 0, 'la cámara deja de moverse sola');
-  // Los latidos del estribillo caen en la rejilla de la canción (tiempos pares) y no antes del estribillo.
-  const P = PULSO.ton618.periodo; let max = 0, tMax = 0;
-  for (let t = M.estribillo + 2 * P * 3; t < M.estribillo + 2 * P * 4; t += 0.005) { const l = g(t).latido; if (l > max) { max = l; tMax = t; } }
-  const fase = ((tMax - PULSO.ton618.inicio) / (2 * P)) % 1;
-  assert.ok(fase < 0.12, `el latido cae justo después de un tiempo par (fase ${fase.toFixed(3)})`);
-  assert.ok(g(M.estribillo - 0.3).latido < 0.25, 'antes del estribillo, solo respiraciones suaves');
-  // Sin saltos en lo que se mueve (el reloj puede ir a trompicones: la imagen no).
-  for (const k of ['revelar', 'corrientes', 'avance', 'fusion', 'calma', 'deriva']) { let a = g(0)[k]; for (let t = 0; t < 45; t += 0.02) { const b = g(t)[k]; assert.ok(Math.abs(b - a) < 0.05, `${k} a ${t.toFixed(2)} s`); a = b; } }
-});
+// (TON 618: tests/guion-ton618.test.js)
 
 test('Sagitario A*: las órbitas se ordenan a compases, dibujan corazones en el estribillo y la pareja llega en la segunda frase', () => {
   const M = marcasDe('sagitario'), g = t => ({ ...guionSagitario(t, M) });
@@ -42,8 +27,6 @@ test('Sagitario A*: las órbitas se ordenan a compases, dibujan corazones en el 
 
 test('movimiento reducido: la misma escena, más tranquila', () => {
   const M = marcasDe('ton618');
-  let max = 0, maxR = 0; for (let t = 0; t < 40; t += 0.01) { max = Math.max(max, guionTon618(t, M).latido); const r = guionTon618(t, M, { reducido: true }); maxR = Math.max(maxR, r.latido); assert.equal(r.ondaFuerza, 0); }
-  assert.ok(maxR < max * 0.4, `latidos ${maxR.toFixed(2)} frente a ${max.toFixed(2)}`);
   assert.equal(guionSagitario(M.estribillo + 1, marcasDe('sagitario'), { reducido: true }).chispaFuerza, 0);
   assert.deepEqual(Object.keys(guionReposo('ton618')).sort(), Object.keys(guionTon618(3, M)).sort(), 'el reposo tiene los mismos campos');
 });

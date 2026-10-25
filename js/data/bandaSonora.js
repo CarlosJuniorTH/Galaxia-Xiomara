@@ -23,6 +23,7 @@
    ════════════════════════════════════════════════════════════════ */
 import { TIEMPOS_AMOR } from '../util/supernovaAmor.js';
 import { ESCENA_PULSAR, ESCENA_CUASAR, ESCENA_DENEB } from '../util/escenasGigantes.js';
+import { MARCAS_TON618 } from '../util/guionTon618.js';
 
 export const CARPETA = 'assets/musica/';
 export const FUNDIDO = 1.6;   // segundos del fundido entre dos momentos (1–2 s: ni corte ni espera)
@@ -68,11 +69,10 @@ export const MOMENTOS = {
   cuasar: momento({ archivo: 'cuasar.m4a', marcas: { ...ESCENA_CUASAR.marcas }, estancia: estancia('cuasar-estancia.m4a') }),
   // TON 618 («I Wanna Be Yours», 136 BPM) y Sagitario A* («Say Yes to Heaven», 103 BPM): su escena (js/escena/ton618.js,
   // js/escena/sagitario.js, js/util/guionAgujeros.js) empieza al llegar, con la canción, y cae en estas marcas.
-  //   ton618     secretos 1.ª frase · esconder 2.ª frase · serTuyo «quiero ser tuyo» (las dos corrientes aparecen) ·
-  //              estribillo (latidos del disco) · tuyo1/tuyo2 latidos grandes · estribillo2 · ultimoTuyo (las corrientes se
-  //              funden) · fundido (queda en calma)
+  //   ton618     las de su videoclip (js/util/guionTon618.js, MARCAS_TON618): la estrella que cae, pasa rozando en el
+  //              primer «yours» y enciende el disco en cada «yours» del estribillo; se ajustan allí
   //   sagitario  estribillo (las órbitas dibujan corazones) · segundaFrase (dos estrellas orbitan juntas) · fundido
-  ton618: momento({ archivo: 'ton618.m4a', marcas: { secretos: 1.4, esconder: 4.6, serTuyo: 8.0, estribillo: 10.7, tuyo1: 16.4, tuyo2: 20.4, estribillo2: 23.1, ultimoTuyo: 32.5, fundido: 35 }, estancia: estancia('ton618-estancia.m4a') }),
+  ton618: momento({ archivo: 'ton618.m4a', marcas: { ...MARCAS_TON618 }, estancia: estancia('ton618-estancia.m4a') }),
   sagitario: momento({ archivo: 'sagitario.m4a', marcas: { estribillo: 18.4, segundaFrase: 23.6, fundido: 35.6 }, estancia: estancia('sagitario-estancia.m4a') }),
   gigante: momento(),
   hogar: momento({ archivo: 'hogar.m4a', estancia: estancia('hogar-estancia.m4a') }),                    // «I Saw Your Face Today»
