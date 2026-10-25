@@ -9,8 +9,7 @@ const GIGANTES = new Set(['ton618', 'sagitario']);
 // Lo que se espera a que la canción empiece a sonar al llegar (descarga o arranque) antes de seguir con el reloj propio.
 const ESPERA_CANCION = 3000;
 
-export function crearEscenaAgujeros({ escena, banda = null }) {
-  const hoja = document.createElement('link'); hoja.rel = 'stylesheet'; hoja.href = new URL('../../css/agujeros.css', import.meta.url).href; document.head.append(hoja);
+export function crearEscenaAgujeros({ escena, banda = null, alRepetir = () => {} }) {
   const reducido = matchMedia('(prefers-reduced-motion: reduce)').matches;
   let actual = null, llegada = 0, t = 0, ultimo = 0, conReloj = false, vista = null, viajando = true, destino = null;
 
@@ -19,20 +18,19 @@ export function crearEscenaAgujeros({ escena, banda = null }) {
   function reloj() {
     const ahora = performance.now(), dt = Math.min(0.1, (ahora - ultimo) / 1000); ultimo = ahora;
     if (!conReloj && banda?.activa && banda.tiene(actual)) {
-      const s = banda.objetivo === actual ? banda.tiempo(actual) : 0;
+      const s = (banda.suena ? banda.suena(actual) : banda.objetivo === actual) ? banda.tiempo(actual) : 0;
       if (s > 0) { t = s; return t; }
       if (ahora - llegada < ESPERA_CANCION) return t;   // la canción aún no suena: la escena espera en su primer segundo
     }
     conReloj = true; t += dt; return t;
   }
-  // La escena no se puede saltar: mientras dura, la navegación se oculta (css/agujeros.css) y los toques en el cielo no
-  // viajan (main.js). Gancho común para el resto de la interfaz (el mismo que las escenas del púlsar, el cuásar y Deneb):
-  // body[data-escena-en-curso] = id y el aviso «escena-en-curso» ({ id, activa }) en document.
+  // La escena no se puede saltar: el bloqueo de la navegación es el común de la interfaz (universo.js, escenaEnCurso: la
+  // llegada lo abre con la duración de la canción; al volver a vivirla, alRepetir). Aquí solo el mismo gancho que las
+  // escenas del púlsar, el cuásar y Deneb: body[data-escena-en-curso] = id y el aviso «escena-en-curso» ({ id, activa }).
   let avisada = null;
   function enCurso(id) {
     if (avisada === id) return;
     const antes = avisada; avisada = id;
-    document.body.classList.toggle('agujero-en-escena', !!id);
     if (id) document.body.dataset.escenaEnCurso = id; else if (document.body.dataset.escenaEnCurso === antes) delete document.body.dataset.escenaEnCurso;
     document.dispatchEvent(new CustomEvent('escena-en-curso', { detail: { id: id || antes, activa: !!id } }));
   }
@@ -53,7 +51,7 @@ export function crearEscenaAgujeros({ escena, banda = null }) {
     cancelar();
     await new Promise(r => setTimeout(r, reducido ? 300 : 1400));
     if (escena.destino !== id || escena.viajando) return;
-    banda?.ceremonia(id); abrir(id);
+    banda?.ceremonia(id); alRepetir(id, banda?.duracion?.(id) || finEscena(id)); abrir(id);
   }
   // Llegadas y salidas (como la banda sonora: cada 120 ms). Se sale al viajar o al cambiar de destino.
   setInterval(() => {

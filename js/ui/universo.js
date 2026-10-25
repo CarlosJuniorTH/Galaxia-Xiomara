@@ -32,7 +32,7 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
   // El faro del cuásar: su recorrido con frases y la carta que espera al final.
   const faro = crearFaroCuasar({ escena, progreso, mostrarLectura, alCambiar: () => { if (actual === 'cuasar') situar('cuasar'); } });
   // TON 618 y Sagitario A*: su escena empieza sola al llegar, con su canción (js/ui/escenaAgujeros.js).
-  const escenaAgujeros = crearEscenaAgujeros({ escena, banda });
+  const escenaAgujeros = crearEscenaAgujeros({ escena, banda, alRepetir: (id, segundos) => escenaEnCurso(id, segundos) });
   $('faro-carta').addEventListener('click', () => { if (actual === 'cuasar' && !escena.viajando) faro.abrirCarta(); });
   // Tras el estallido, el corazón es un lugar más: misma tarjeta, y su gesto es volver a sentirlo.
   const corazonNacido = () => supernovaAmor.descubierta || escena.estadoSupernova === 'remanente';
