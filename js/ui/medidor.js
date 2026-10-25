@@ -12,12 +12,14 @@ export function crearMedidor(escena) {
   document.body.append(caja, boton, boton2);
   const lienzo = document.getElementById('galaxia'), gl = lienzo.getContext('webgl2') || lienzo.getContext('webgl');
   const info = gl?.getExtension('WEBGL_debug_renderer_info'), gpu = info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)).slice(0, 34) : '';
-  let antes = performance.now(), tiempos = [], ultimo = antes, informe = '';
+  let antes = performance.now(), tiempos = [], ultimo = antes, informe = '', lentos33 = 0;
   const paso = ahora => {
-    tiempos.push(ahora - antes); antes = ahora;
+    const dt = ahora - antes; tiempos.push(dt); antes = ahora;
+    if (dt > 33.5 && dt < 1000 && !document.hidden && lienzo.dataset.dibujo !== 'lectura') lentos33++;   // desde que se abrió el medidor
     if (ahora - ultimo > 1000) {
       const t = tiempos.slice().sort((a, b) => a - b), media = t.reduce((a, b) => a + b, 0) / t.length, d = lienzo.dataset;
-      caja.textContent = `${(1000 / media).toFixed(0)} FPS · peor ${t.at(-1).toFixed(0)} ms · >25ms: ${t.filter(x => x > 25).length}\nres ${d.resolucion3d} · lienzo ${d.lienzo3d} · aligerado ${d.aligerado || 0} · cambios ${d.cambiosResolucion || 0}\n${d.ritmo || ''} ${d.motivo || ''} · ${d.webgl || ''} ${d.brillo3d || ''} · seguro ${d.seguro || 0} · ${gpu}${informe}`;
+      const r = escena.rendimiento ?? {}, mem = performance.memory ? ` · JS ${(performance.memory.usedJSHeapSize / 1048576).toFixed(0)} MB` : '';
+      caja.textContent = `${(1000 / media).toFixed(0)} FPS · peor ${t.at(-1).toFixed(0)} ms · >25ms: ${t.filter(x => x > 25).length} · >33ms total: ${lentos33}\nres ${d.resolucion3d} · lienzo ${d.lienzo3d} · aligerado ${d.aligerado || 0} · cambios ${d.cambiosResolucion || 0} · reservas ${d.reservas3d || 0}\nprogramas ${r.programas ?? '?'} · geometrías ${r.geometrias ?? '?'} · texturas ${r.texturas ?? '?'}${mem} · pantalla ${r.hz ? r.hz.toFixed(0) + ' Hz' : '?'}\n${d.ritmo || ''} ${d.motivo || ''} · ${d.webgl || ''} ${d.brillo3d || ''} · seguro ${d.seguro || 0} · ${gpu}${informe}`;
       tiempos = []; ultimo = ahora;
     }
     requestAnimationFrame(paso);

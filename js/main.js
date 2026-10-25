@@ -26,7 +26,10 @@ document.getElementById('reintentar-3d').addEventListener('click', () => locatio
 document.getElementById('compatible-3d').addEventListener('click', () => { const url = new URL(location.href); url.searchParams.set('calidad', 'compatible'); location.href = url.href; });
 window.addEventListener('unhandledrejection', e => { console.error('Universo:', e.reason); });
 // Paquetes guardados en el dispositivo y actualizaciones (desde el principio: si hay una versión nueva, se aplica en la carga).
-vigilarPaquetes();
+// En la primera visita (aún sin nada guardado) espera a que el universo esté listo: descargar todos los paquetes a la vez
+// que la propia carga competía por la conexión y lo bajaba todo dos veces en el peor momento.
+const paquetesDesdeElPrincipio = !!navigator.serviceWorker?.controller;
+if (paquetesDesdeElPrincipio) vigilarPaquetes();
 try {
   await cargarContenido();
   if (location.hash === '#borrador') { const borrador = localStorage.getItem('xiomara:contenido-borrador'); if (borrador) aplicarContenido(JSON.parse(borrador)); }
@@ -125,6 +128,7 @@ try {
   await escena.listo;
   etapa = 'listo';
   cargaTerminada();   // la carga llegó al final: no hubo cierre
+  if (!paquetesDesdeElPrincipio) setTimeout(vigilarPaquetes, 4000);
   entrada.listo();
   crearMedidor(escena);
   if (location.hash === '#debug') window.__galaxia = { escena, recuerdos, interfaz, progreso, estrellas };

@@ -937,6 +937,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); delete canvas.dataset.viaje; suspendida = true; vuelo?.resolver(false); vuelo = null; alProblema('El navegador ha pausado los gráficos. Tu viaje está guardado. Podemos volver a encender las estrellas.'); });
   canvas.addEventListener('webglcontextrestored', () => { suspendida = false; prev = performance.now(); document.getElementById('problema-3d')?.setAttribute('hidden', ''); });
 
+  const tmpDir = new THREE.Vector3(), tmpProy = new THREE.Vector3();   // temporales del bucle (sin crear objetos en cada cuadro)
   function animar(ahora) {
     requestAnimationFrame(animar);
     // Estados: con una carta o panel abiertos se conserva la última imagen sin trabajo 3D
@@ -992,7 +993,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
         // Dónde estamos: región, encuentro a la vista y distancia recorrida (para la interfaz y las pruebas).
         if (cuadrosDibujados % 6 === 0) informarViaje(e);
         campoVelocidad.ruptura(e.ruptura, THREE.MathUtils.clamp((vuelo.transcurrido - r0) / Math.max(1e-3, r1 - r0), 0, 1)); vuelo.rupturaValor = movimientoReducido ? 0 : e.ruptura;
-        campoVelocidad.direccion(e.fase === 'ruptura' || e.fase === 'crucero' || e.fase === 'aproximacion' ? vuelo.plan.recta.v2.clone().sub(vuelo.plan.recta.v1) : null);
+        campoVelocidad.direccion(e.fase === 'ruptura' || e.fase === 'crucero' || e.fase === 'aproximacion' ? tmpDir.subVectors(vuelo.plan.recta.v2, vuelo.plan.recta.v1) : null);
         // Al romper, el campo de visión se abre un poco y vuelve en el crucero: sensación de aceleración.
         const fov = FOV_BASE + (movimientoReducido ? 0 : 9 * e.ruptura + 3 * (e.fase === 'crucero' ? 1 : 0) * Math.min(1, (vuelo.transcurrido - r1) / 1.5) * Math.max(0, 1 - e.avance * 1.1));
         if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
@@ -1058,7 +1059,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       // Mantiene la dirección actual de la cámara (su órbita) y cambia la distancia y el punto de mira.
       // El encuadre es interfaz, no animación del universo: avanza con tiempo real también en pausa.
       ajuste.t = Math.min(1, ajuste.t + dtInterfaz / 0.8); const s = THREE.MathUtils.smootherstep(ajuste.t, 0, 1);
-      const dir = camera.position.clone().sub(controls.target).normalize();
+      const dir = tmpDir.subVectors(camera.position, controls.target).normalize();
       controls.target.lerpVectors(ajuste.desdeMira, ajuste.aMira, s);
       camera.position.copy(controls.target).addScaledVector(dir, THREE.MathUtils.lerp(ajuste.desdeD, ajuste.aD, s)); camera.lookAt(controls.target);
       if (ajuste.t >= 1) ajuste = null;
@@ -1230,7 +1231,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
         let libre = 1;
         for (const c of cuerposLente.lista) {
           const dc = c.centro.distanceTo(camera.position); if (dc >= dist - c.visible || c.centro.distanceTo(l.centro) < 1) continue;
-          const p = c.centro.clone().project(camera); if (p.z > 1) continue; const rc = c.visible / (2 * dc * tanMedio);   // lo que tapa: su extensión visible densa
+          const p = tmpProy.copy(c.centro).project(camera); if (p.z > 1) continue; const rc = c.visible / (2 * dc * tanMedio);   // lo que tapa: su extensión visible densa
           const sep = Math.hypot((p.x - proyectado.x) * camera.aspect, p.y - proyectado.y) / 2;
           libre = Math.min(libre, THREE.MathUtils.smoothstep(sep, rc + alcance * 0.4, rc + alcance * 1.6));
         }
@@ -1291,6 +1292,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     iniciar(destino = 'hogar', { duracion = 7 } = {}) { if (tEntrada !== null) return; tEntrada = tiempo; return viajar(destino, { duracion }); },
     actividad: marcarActividad,
     pedirCuadro: () => planificador.pedirCuadro(),
+    // Para el medidor ?hud: programas de GPU compilados, geometrías y texturas en la GPU y frecuencia medida de la pantalla.
+    get rendimiento() { const i = renderer.info; return { programas: i.programs?.length ?? 0, geometrias: i.memory.geometries, texturas: i.memory.textures, hz: planificador.hz }; },
     get cuadrosDibujados() { return cuadrosDibujados; },
     viajar,
     cancelarViaje() { delete canvas.dataset.viaje; vuelo?.resolver(false); vuelo = null; limpiarVuelo(); controls.enabled = true; controls.autoRotate = false; },
