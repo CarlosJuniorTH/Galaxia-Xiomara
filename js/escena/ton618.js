@@ -65,7 +65,7 @@ const GLSL_FINAL = /* glsl */`
 // grupo: el del agujero en el cosmos (su posición y su escala); aquí se le añaden las piezas.
 export function* construirTon618({ uScale, uPR, R, grupo }) {
   const planoDisco = new THREE.Group(), galaxia = new THREE.Group(); grupo.add(planoDisco, galaxia);
-  const comunes = { uScale, uPR, uMaximo: { value: 4 }, uSombra: { value: R }, uR: { value: R }, uUnidad: { value: R }, uGiro: { value: 0 },
+  const comunes = { uScale, uPR, uMaximo: { value: 3 }, uSombra: { value: R }, uR: { value: R }, uUnidad: { value: R }, uGiro: { value: 0 },
     uLatido: { value: 0 }, uOnda: { value: 99 }, uOndaF: { value: 0 }, uAcento: { value: 99 }, uAcentoF: { value: 0 }, uCamLocal: { value: new THREE.Vector3(0, 0, 1e6) } };
   const al = azar(618);
 
