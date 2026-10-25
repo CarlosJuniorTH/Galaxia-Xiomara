@@ -317,7 +317,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // En pantallas táctiles, sin tocar (tras 4 s) se dibuja a 30 FPS y al tocar vuelve a 60: medido en un iPhone, a 60
   // continuos el teléfono se calentaba y a los pocos minutos bajaba su GPU a la mitad (28 FPS con TODO). ?ritmo=fluido: siempre 60.
   const ritmoAhorro = tactil && new URLSearchParams(location.search).get('ritmo') !== 'fluido';
-  const planificador = crearPlanificador({ interaccion: 60, contemplacion: ritmoAhorro ? 30 : 60, esperaMs: 4000 });
+  // En el PC con pantalla rápida, ~120 por segundo (planificador.js); en el móvil, 60 (calor y batería).
+  const planificador = crearPlanificador({ interaccion: 60, contemplacion: ritmoAhorro ? 30 : 60, alto: esMovil ? 0 : 120, esperaMs: 4000 });
   let gesto = false, modoAnterior = null, cuadrosDibujados = 0, finGesto = -Infinity;
   const AMORTIGUACION = controls.dampingFactor;   // la de 60 FPS (nucleo.js)
   const marcarActividad = () => planificador.actividad(performance.now());
@@ -1170,7 +1171,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     if (temporal) { camera.position.copy(camaraGuardada.pos); camera.quaternion.copy(camaraGuardada.rot); camera.updateMatrixWorld(); }
     if (captura) { const pendiente = captura; captura = null; clearTimeout(pendiente.timer); pendiente.resolver(renderer.domElement); }
     // La resolución dinámica mide a 60 FPS: en interacción y, ahora que el reposo también va a 60, en reposo.
-    if ((modo === 'interaccion' || (modo === 'contemplacion' && !ritmoAhorro)) && tEntrada !== null && entradaResuelta && dtReal < 0.5) regularResolucion(dtReal * 1000);
+    if ((modo === 'interaccion' || (modo === 'contemplacion' && !ritmoAhorro)) && tEntrada !== null && entradaResuelta && dtReal < 0.5 && document.hasFocus()) regularResolucion(dtReal * 1000);   // sin foco (ventana tapada o detrás), el navegador frena los cuadros: no es que el aparato no llegue
     if (medir && tEntrada !== null && entradaResuelta) {
       cuadros++; acumulado += dtReal; coste += performance.now() - inicioCuadro;
       if (acumulado > 4) {

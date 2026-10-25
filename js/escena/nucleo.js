@@ -38,7 +38,8 @@ export function crearNucleo(canvas) {
   let pr = esMovil ? Math.min(prMaximo, nivelSeguro >= 2 ? 1.25 : 2) : prMaximo;   // 2 en el móvil (a 1,75 se veía pixelado en una pantalla de DPR 3); la resolución dinámica sube hasta 2,5 si el aparato va sobrado y baja si se calienta
   // Lo más alto que puede llegar la escena con la resolución dinámica (index.js, regulador): los búferes se reservan a
   // este tamaño una sola vez y cambiar de resolución solo cambia la zona en la que se dibuja (zona.js).
-  const prTope = esMovil ? Math.min(prMaximo, Math.max(pr, 2.5 - (nivelSeguro >= 2 ? 1 : nivelSeguro ? 0.5 : 0))) : prMaximo;
+  // En el móvil, 2,25 como mucho: reservar a 2,5 eran ~25 MB más de memoria de la tarjeta gráfica en un iPhone.
+  const prTope = esMovil ? Math.min(prMaximo, Math.max(pr, 2.25 - (nivelSeguro >= 2 ? 1 : nivelSeguro ? 0.5 : 0))) : prMaximo;
   renderer.setPixelRatio(pr);
   canvas.dataset.resolucion3d = String(pr);
   renderer.setSize(innerWidth, innerHeight);
@@ -142,16 +143,13 @@ export function crearNucleo(canvas) {
   // Compensación de tamaño de las estrellas de la galaxia según la distancia (index.js).
   const uTamGalaxia = { value: 1 };
 
-  // Reserva de los búferes del compositor (y del resplandor, que los sigue): al tamaño máximo de la escena (prTope) y con
-  // el alto máximo de la pantalla en esta orientación, para que ni la resolución dinámica ni las barras del navegador
-  // obliguen a rehacerlos. Solo se rehacen si la pantalla crece más allá (girar el móvil, agrandar la ventana del PC) o
+  // Reserva de los búferes del compositor (y del resplandor, que los sigue): al tamaño máximo de la escena (prTope), para
+  // que la resolución dinámica no obligue a rehacerlos. Solo se rehacen si la pantalla crece más allá (girar el móvil, agrandar la ventana del PC) o
   // si se queda en menos de la mitad (para devolver la memoria).
   let reserva = { w: 0, h: 0, pr: 0 };
-  function altoMaximo() {
-    if (!esMovil || !screen?.width) return innerHeight;
-    const largo = Math.max(screen.width, screen.height), corto = Math.min(screen.width, screen.height);
-    return Math.min(Math.round(innerHeight * 1.3), Math.max(innerHeight, innerHeight >= innerWidth ? largo : corto));
-  }
+  // (Sin margen para las barras del navegador: la página no se desplaza, casi nunca cambian, y en un móvil ese margen eran
+  // un 20 % más de memoria en los búferes más grandes.)
+  const altoMaximo = () => innerHeight;
   function reservar(prReserva = Math.max(prTope, pr)) {
     reserva = { w: innerWidth, h: altoMaximo(), pr: prReserva };
     post?.setPixelRatio(prReserva); post?.setSize(reserva.w, reserva.h);

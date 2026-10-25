@@ -78,8 +78,7 @@ export function crearGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia }) {
       return col * densidad * 0.4 + vec3(1.0, 0.78, 0.66) * exp(-r / 150.0) * 0.22;
     }`;
   const texturaGas = new THREE.WebGLRenderTarget(1024, 1024, {
-    // Media precisión con cualquiera de las dos extensiones (un iPhone que solo ofrece la de media precisión caía a 8 bits: bandas).
-    type: renderer.capabilities.isWebGL2 && (renderer.extensions.has('EXT_color_buffer_float') || renderer.extensions.has('EXT_color_buffer_half_float')) ? THREE.HalfFloatType : THREE.UnsignedByteType,
+    type: renderer.capabilities.isWebGL2 && renderer.extensions.has('EXT_color_buffer_float') ? THREE.HalfFloatType : THREE.UnsignedByteType,
     generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false
   });
   {

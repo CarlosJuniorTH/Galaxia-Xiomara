@@ -34,7 +34,7 @@ function obtenerObrero() {
       for (let i = 0; i < NUM_OBREROS; i++) {
         const w = new Worker(new URL('./obreroTexturas.js', import.meta.url), { type: 'module' });
         w.onmessage = ({ data: { id, datos, error } }) => {
-          ultimaRespuesta = performance.now();
+          ultimaRespuesta = w.ultima = performance.now();
           const pedido = pendientes.get(id); if (!pedido) return;
           pendientes.delete(id);
           if (error) aqui(pedido); else pedido.resolver(datos);
@@ -74,11 +74,14 @@ export function texturaPlaneta(tipo, opciones, { claves = ['pixeles'], relleno =
     const enviar = () => {
       const w = obtenerObrero();
       if (!w) { aqui(pedido); return; }
-      const id = ++siguiente; pendientes.set(id, pedido);
+      const id = ++siguiente; pendientes.set(id, pedido); w.ultima ??= performance.now();
       w.postMessage({ id, tipo, opciones });
-      // Red de seguridad: si los obreros dejan de contestar (no solo van lentos: en un móvil ocupado tardan), se calcula aquí.
-      const vigilar = () => { if (!pendientes.has(id)) return; if (performance.now() - ultimaRespuesta < 15000) { setTimeout(vigilar, 5000); return; } pendientes.delete(id); aqui(pedido); };
-      setTimeout(vigilar, 25000);
+      // Red de seguridad: si SU obrero deja de contestar (muerto, no lento), se calcula aquí. Antes contaba la respuesta de
+      // cualquier obrero y esperaba solo 15 s: en un iPhone una textura grande tarda más, se repetía el cálculo en el hilo
+      // principal (la carga se congelaba en el 85 % y el teléfono se calentaba); y si un obrero moría mientras el otro
+      // seguía contestando, no saltaba nunca y la carga no terminaba.
+      const vigilar = () => { if (!pendientes.has(id)) return; if (performance.now() - w.ultima < 45000) { setTimeout(vigilar, 5000); return; } pendientes.delete(id); aqui(pedido); };
+      setTimeout(vigilar, 45000);
     };
     // El worker atiende los pedidos en orden: los que no bloquean la carga esperan a que
     // terminen los imprescindibles (así no retrasan la entrada).

@@ -265,14 +265,8 @@ export function crearCuasar({ uScale, uPR, texGigante, texBrillo, texNebulosa })
           gl_FragColor = vec4(fin * capa, alfa); }`;
   const LADO_REM = nivelSeguro ? 1024 : esMovilCuasar ? 2048 : 4096;   // tras un cierre por memoria, la textura del remolino más pequeña
   const rtRemolino = new THREE.WebGLRenderTarget(LADO_REM, LADO_REM, { generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter });
-  // En WebGL 2, 8 bits en sRGB (la GPU codifica al escribir y decodifica al leer: los sombreadores siguen viendo luz lineal):
-  // la misma memoria, pero la precisión se reparte como la ve el ojo y los degradados oscuros del remolino ya no salen en bandas.
   const texRemolino = rtRemolino.texture; texRemolino.colorSpace = THREE.NoColorSpace; texRemolino.anisotropy = 8;
-  let remolinoCreado = false;
   function hornearRemolino(renderer) {
-    // (Antes del primer dibujo: el búfer se crea entonces con ese formato.)
-    if (!remolinoCreado && renderer.capabilities.isWebGL2) texRemolino.colorSpace = THREE.SRGBColorSpace;
-    remolinoCreado = true;
     const m = new THREE.ShaderMaterial({ uniforms: { uT: { value: 0 }, uIn: { value: R_IN }, uOut: { value: R_OUT }, uH: { value: 0 } },
       vertexShader: 'varying vec2 vP; varying float vC; void main(){ vP = position.xy; vC = 1.0; gl_Position = vec4(position.xy / ' + R_OUT.toFixed(1) + ', 0.0, 1.0); }',
       fragmentShader: FRAG_REMOLINO, depthTest: false, depthWrite: false });

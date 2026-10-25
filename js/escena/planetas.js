@@ -4,7 +4,7 @@
 // La luz viene del centro de la galaxia. El halo y la atmósfera son discretos: la máxima
 // luminosidad se reserva para lo importante (la fecha, las ciudades, las estrellas).
 import * as THREE from 'three';
-import { texturasLigeras } from '../util/dispositivo.js';
+import { esMovil, texturasLigeras } from '../util/dispositivo.js';
 import { texTexto, texBrillo, texDestello } from './texturas.js';
 import { BARCELONA, BUENOS_AIRES } from './geografia.js';
 import { puntoSubsolar } from '../util/sol.js';
@@ -15,7 +15,7 @@ import { texturaPlaneta } from './fabricaTexturas.js';
 const RES = texturasLigeras ? 768 : 1024;
 // Los que llenan la pantalla de cerca (Rosa, el gigante): a 1024 se veía media textura (~512 px) ampliada ×2,5 en un
 // iPhone, borrosa. Su copia en memoria se suelta al subirla (liberable), así que solo ocupan la tarjeta gráfica.
-const RES_CERCA = texturasLigeras ? 1024 : 2048;
+const RES_CERCA = texturasLigeras || esMovil ? RES : 2048;   // en el móvil, como antes: a 2048 cada textura tardaba más de 15 s en un iPhone
 const RELIEVE = 16;   // fuerza del relieve de los cráteres
 const texGaseosa = (paleta, semilla, res = RES) => texturaPlaneta('gaseosa', { paleta, semilla, ancho: res, alto: res / 2 }, { relleno: [240, 170, 205], bloquea: false, liberable: true });
 // Resolución según el tamaño en pantalla: las lunas pequeñas no necesitan más de 512 px.
