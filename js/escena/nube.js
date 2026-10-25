@@ -9,19 +9,22 @@ const cache = new Map();
 // muestra del rayo). Es el mismo ruido de valor (interpolación suavizada en los tres ejes): mismos grumos y huecos,
 // mucho menos trabajo para la GPU del móvil. Funciona en WebGL 1 y 2.
 let tablaRuido = null;
+// ¿WebGL 2? (nucleo.js lo anota en el lienzo antes de crear el universo; fuera del navegador, no.)
+const usar3D = () => typeof document !== 'undefined' && typeof document.getElementById === 'function' && document.getElementById('galaxia')?.dataset?.webgl === 'webgl2';
 export const RUIDO_TABLA = /* glsl */`uniform sampler2D uRuido;
       float rn3(vec3 p){ vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); i = mod(i, 32.0);
-        vec2 xy = i.xy + f.xy + 0.5; float z1 = mod(i.z + 1.0, 32.0);
-        float a = texture2D(uRuido, (vec2(mod(i.z, 8.0), floor(i.z / 8.0)) * 33.0 + xy) / vec2(264.0, 132.0)).r;
-        float b = texture2D(uRuido, (vec2(mod(z1, 8.0), floor(z1 / 8.0)) * 33.0 + xy) / vec2(264.0, 132.0)).r;
-        return mix(a, b, f.z); }`;
+        vec2 xy = i.xy + f.xy + 0.5;
+        // Una sola lectura: el canal G guarda el corte siguiente (z + 1) en el mismo sitio, así que las dos capas del
+        // ruido llegan juntas con el mismo filtrado (antes, dos lecturas para el mismo resultado).
+        vec2 ab = texture2D(uRuido, (vec2(mod(i.z, 8.0), floor(i.z / 8.0)) * 33.0 + xy) / vec2(264.0, 132.0)).rg;
+        return mix(ab.x, ab.y, f.z); }`;
 export function texturaRuido() {
   if (tablaRuido) return tablaRuido;
   const L = 33, A = 8 * L, B = 4 * L, datos = new Uint8Array(A * B * 4);
   const h = (x, y, z) => { let n = (x * 73856093) ^ (y * 19349663) ^ (z * 83492791); n = Math.imul(n ^ (n >>> 13), 0x5bd1e995); n ^= n >>> 15; return (n >>> 0) / 4294967295; };
   for (let z = 0; z < 32; z++) for (let y = 0; y < L; y++) for (let x = 0; x < L; x++) {
     const v = Math.round(h(x % 32, y % 32, z) * 255), u = (z % 8) * L + x, w = Math.floor(z / 8) * L + y, k = (w * A + u) * 4;
-    datos[k] = datos[k + 1] = datos[k + 2] = v; datos[k + 3] = 255;
+    datos[k] = datos[k + 2] = v; datos[k + 1] = Math.round(h(x % 32, y % 32, (z + 1) % 32) * 255); datos[k + 3] = 255;   // G: el corte siguiente
   }
   const t = new THREE.DataTexture(datos, A, B, THREE.RGBAFormat); t.minFilter = t.magFilter = THREE.LinearFilter; t.needsUpdate = true;
   return (tablaRuido = t);
@@ -42,21 +45,34 @@ export function crearNube(textura, centro, tam, semilla, escala = 1, capas = 7, 
     // Densidad propia solo para las formas casi esféricas (cáscara, velos, nube suave); los pilares y la
     // nube oscura usan las formas generales: su silueta la dibuja la imagen y no debe recortarse.
     const a = crearAtlasNebulosa(forma, corazon, 32, ['cavidad', 'filamentos', 'reflexion'].includes(variante) ? variante : null);
-    const t = new THREE.DataTexture(a.datos, a.ancho, a.alto, THREE.RGBAFormat);
-    t.minFilter = t.magFilter = THREE.LinearFilter; t.needsUpdate = true; cache.set(clave, t);
+    let t;
+    if (usar3D()) {
+      // En WebGL 2, una textura 3D de verdad con los mismos 32 cortes: la GPU mezcla los dos cortes en una sola lectura
+      // (en el atlas, dos lecturas y la mezcla a mano). Mismo resultado: centros de los cortes y bordes iguales.
+      const L = a.lado, v = new Uint8Array(L * L * L * 4);
+      for (let z = 0; z < L; z++) for (let y = 0; y < L; y++) for (let x = 0; x < L; x++) {
+        const o = (((Math.floor(z / a.columnas) * L + y) * a.ancho) + (z % a.columnas) * L + x) * 4, d = ((z * L + y) * L + x) * 4;
+        v[d] = a.datos[o]; v[d + 1] = a.datos[o + 1]; v[d + 2] = a.datos[o + 2]; v[d + 3] = a.datos[o + 3];
+      }
+      t = new THREE.Data3DTexture(v, L, L, L); t.format = THREE.RGBAFormat; t.type = THREE.UnsignedByteType;
+      t.wrapS = t.wrapT = t.wrapR = THREE.ClampToEdgeWrapping;
+    } else t = new THREE.DataTexture(a.datos, a.ancho, a.alto, THREE.RGBAFormat);
+    t.minFilter = t.magFilter = THREE.LinearFilter; t.unpackAlignment = 1; t.needsUpdate = true; cache.set(clave, t);
   }
+  const es3D = cache.get(clave).isData3DTexture;
   const inversa = new THREE.Matrix4(), camaraLocal = new THREE.Vector3();
   const m = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.ShaderMaterial({
     uniforms: { uMapa: { value: textura }, uDensidad: { value: cache.get(clave) }, uRuido: { value: texturaRuido() }, uCamara: { value: camaraLocal }, uBrillo: { value: 1 }, uOpacidad: { value: 1 }, uMuestras: MUESTRAS },
     vertexShader: 'varying vec3 vP;void main(){vP=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
     fragmentShader: /* glsl */`
-      uniform sampler2D uMapa, uDensidad; uniform vec3 uCamara; uniform float uBrillo,uOpacidad,uMuestras; varying vec3 vP;
+      uniform sampler2D uMapa; ${es3D ? 'uniform highp sampler3D uDensidad;' : 'uniform sampler2D uDensidad;'} uniform vec3 uCamara; uniform float uBrillo,uOpacidad,uMuestras; varying vec3 vP;
       vec2 uvAtlas(vec3 p, float z){return (vec2(mod(z,8.0)*32.0,floor(z/8.0)*32.0)+0.5+p.xy*31.0)/vec2(256.0,128.0);}
       // Ruido de valor 3D anclado a la nube (detalle multiescala que rompe la extrusión de la imagen).
       // Ruido de valor desde la tabla (ver texturaRuido): el filtrado lineal hace la interpolación en x e y con los
       // pesos ya suavizados, y se mezclan dos cortes en z.
       ${RUIDO_TABLA}
-      vec3 densidad(vec3 p){float z=clamp(p.z,0.0,1.0)*31.0;return mix(texture2D(uDensidad,uvAtlas(p,floor(z))).rgb,texture2D(uDensidad,uvAtlas(p,min(31.0,floor(z)+1.0))).rgb,fract(z));}
+      ${es3D ? 'vec3 densidad(vec3 p){return texture(uDensidad,(0.5+clamp(p,0.0,1.0)*31.0)/32.0).rgb;}'
+        : 'vec3 densidad(vec3 p){float z=clamp(p.z,0.0,1.0)*31.0;return mix(texture2D(uDensidad,uvAtlas(p,floor(z))).rgb,texture2D(uDensidad,uvAtlas(p,min(31.0,floor(z)+1.0))).rgb,fract(z));}'}
       void main(){
         vec3 dir=normalize(vP-uCamara), segura=mix(vec3(0.0001),dir,step(vec3(0.0001),abs(dir)));
         vec3 a=(-0.5-uCamara)/segura,b=(0.5-uCamara)/segura;

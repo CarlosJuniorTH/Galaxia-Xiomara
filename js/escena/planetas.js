@@ -13,14 +13,17 @@ import { crearRuido } from '../util/ruido.js';
 import { texturaPlaneta } from './fabricaTexturas.js';
 // Las texturas se calculan en un Web Worker (texturasPlaneta.js); aquí solo se piden.
 const RES = texturasLigeras ? 768 : 1024;
+// Los que llenan la pantalla de cerca (Rosa, el gigante): a 1024 se veía media textura (~512 px) ampliada ×2,5 en un
+// iPhone, borrosa. Su copia en memoria se suelta al subirla (liberable), así que solo ocupan la tarjeta gráfica.
+const RES_CERCA = texturasLigeras ? 1024 : 2048;
 const RELIEVE = 16;   // fuerza del relieve de los cráteres
-const texGaseosa = (paleta, semilla) => texturaPlaneta('gaseosa', { paleta, semilla, ancho: RES, alto: RES / 2 }, { relleno: [240, 170, 205], bloquea: false });
+const texGaseosa = (paleta, semilla, res = RES) => texturaPlaneta('gaseosa', { paleta, semilla, ancho: res, alto: res / 2 }, { relleno: [240, 170, 205], bloquea: false, liberable: true });
 // Resolución según el tamaño en pantalla: las lunas pequeñas no necesitan más de 512 px.
-export const texCrateres = (paleta, semilla, cantidad = 46, mares = 0, ancho = 512, { relieve = false, rayos = 0 } = {}) => texturaPlaneta('crateres', { paleta, semilla, cantidad, mares, ancho, alto: ancho / 2, relieve, rayos }, { relleno: [150, 140, 175], bloquea: false });   // el sistema solar no retrasa la entrada
+export const texCrateres = (paleta, semilla, cantidad = 46, mares = 0, ancho = 512, { relieve = false, rayos = 0 } = {}) => texturaPlaneta('crateres', { paleta, semilla, cantidad, mares, ancho, alto: ancho / 2, relieve, rayos }, { liberable: true, relleno: [150, 140, 175], bloquea: false });   // el sistema solar no retrasa la entrada
 // Lunas con relieve de verdad (altura en el canal alfa) y rayos en los cráteres jóvenes.
 const texLuna = (paleta, semilla, cantidad, mares, ancho, rayos = 3) => { const t = texCrateres(paleta, semilla, cantidad, mares, ancho, { relieve: true, rayos }); t.colorSpace = THREE.SRGBColorSpace; return t; };
-const texTierra = semilla => texturaPlaneta('tierra', { semilla, ancho: texturasLigeras ? 1024 : 2048, alto: texturasLigeras ? 512 : 1024 }, { claves: ['superficie', 'mascara'], relleno: [40, 80, 150], bloquea: false });
-const texNubes = semilla => texturaPlaneta('nubes', { semilla, ancho: texturasLigeras ? 512 : 1024, alto: texturasLigeras ? 256 : 512 }, { relleno: [0, 0, 0], bloquea: false });
+const texTierra = semilla => texturaPlaneta('tierra', { semilla, ancho: texturasLigeras ? 1024 : 2048, alto: texturasLigeras ? 512 : 1024 }, { claves: ['superficie', 'mascara'], relleno: [40, 80, 150], bloquea: false, liberable: true });
+const texNubes = semilla => texturaPlaneta('nubes', { semilla, ancho: texturasLigeras ? 512 : 1024, alto: texturasLigeras ? 256 : 512 }, { relleno: [0, 0, 0], bloquea: false, liberable: true });
 
 // Opciones: sol (dirección de la luz en el mundo; por defecto, desde el centro de la galaxia),
 // relieve (cráteres con sombra a partir de la textura), reflejo (luz que el planeta vecino
@@ -414,8 +417,8 @@ function crearAsteroides(rIn, rOut, cantidad, { detalle = 1, tamMin = 0.8, tamMa
 export const CENTRO_GIGANTE = new THREE.Vector3(3200, -520, -2650), RADIO_GIGANTE = 150;
 function crearGigante(scene, { uScale, uPR }) {
   const grupo = new THREE.Group(); grupo.position.copy(CENTRO_GIGANTE); scene.add(grupo);
-  const textura = texturaPlaneta('gaseosa', { paleta: ['#d9c8ae', '#b8936a', '#8c5a38', '#6b4128', '#cdb596', '#7f5236', '#dcc29f'], semilla: 23, ancho: RES, alto: RES / 2 }, { relleno: [220, 190, 160], bloquea: false });
-  const esfera = new THREE.Mesh(new THREE.SphereGeometry(RADIO_GIGANTE, 96, 64), materialPlaneta(textura, 0xffd9b0, { deriva: 0.004, atmosfera: 0.35, especular: 0.03, terminador: 0.55, corazon: [0.62, 0.38, 0.075] }));
+  const textura = texturaPlaneta('gaseosa', { paleta: ['#d9c8ae', '#b8936a', '#8c5a38', '#6b4128', '#cdb596', '#7f5236', '#dcc29f'], semilla: 23, ancho: RES_CERCA, alto: RES_CERCA / 2 }, { relleno: [220, 190, 160], bloquea: false, liberable: true });
+  const esfera = new THREE.Mesh(new THREE.SphereGeometry(RADIO_GIGANTE, 160, 112), materialPlaneta(textura, 0xffd9b0, { deriva: 0.004, atmosfera: 0.35, especular: 0.03, terminador: 0.55, corazon: [0.62, 0.38, 0.075] }));
   esfera.rotation.z = 0.05; esfera.scale.y = 0.94;   // achatado por su giro rápido
   grupo.add(esfera);
   const plano = new THREE.Group(); plano.rotation.set(0.32, 0, 0.18); grupo.add(plano);
@@ -452,7 +455,7 @@ function crearOtrosPlanetas(scene, radiosOrbita) {
   for (const p of OTROS_PLANETAS) {
     const g = new THREE.Group(); g.position.copy(p.centro); g.rotation.z = p.inclinacion ?? 0.2; scene.add(g);
     const tex = p.tex(); tex.colorSpace = THREE.SRGBColorSpace;   // colores pensados como en una foto
-    const esfera = new THREE.Mesh(new THREE.SphereGeometry(p.radio, 64, 48), materialPlaneta(tex, p.borde ?? 0xffffff, { atmosfera: p.atmosfera ?? 0.3, especular: 0.02, terminador: 0.4, deriva: 0.003 }));
+    const esfera = new THREE.Mesh(new THREE.SphereGeometry(p.radio, 96, 64), materialPlaneta(tex, p.borde ?? 0xffffff, { atmosfera: p.atmosfera ?? 0.3, especular: 0.02, terminador: 0.4, deriva: 0.003 }));
     g.add(esfera); planetas.push([esfera, p.giro]);
     if (p.anillos) {
       // Anillos de Saturno: muchas bandas finas color arena, la división de Cassini y la sombra del planeta.
@@ -497,8 +500,8 @@ export function crearPlanetas({ scene, uScale, uPR }, fechaTexto) {
 
   const sombraAnillo = { normal: new THREE.Vector3(), centro: planeta.position.clone(), rIn: R * 1.35, rOut: R * 2.45 };
   const esfera = new THREE.Mesh(
-    new THREE.SphereGeometry(R, 96, 64),
-    materialPlaneta(texGaseosa(['#ffe1ee', '#f7b6d4', '#ef8dbd', '#d65d97', '#bf4f8c', '#f4a9cc', '#e2a2f2'], 7), 0xff9ccc, { deriva: 0.005, atmosfera: 0.4, especular: 0.06, diferencial: 0.45, sombraAnillo })
+    new THREE.SphereGeometry(R, 160, 112),
+    materialPlaneta(texGaseosa(['#ffe1ee', '#f7b6d4', '#ef8dbd', '#d65d97', '#bf4f8c', '#f4a9cc', '#e2a2f2'], 7, RES_CERCA), 0xff9ccc, { deriva: 0.005, atmosfera: 0.4, especular: 0.06, diferencial: 0.45, sombraAnillo })
   );
   esfera.rotation.z = 0.35;
   planeta.add(esfera);
@@ -543,12 +546,12 @@ export function crearPlanetas({ scene, uScale, uPR }, fechaTexto) {
   });
   // Lunita con cráteres
   const orbitaLuna = new THREE.Group(); planeta.add(orbitaLuna);
-  const luna = new THREE.Mesh(new THREE.SphereGeometry(14, 64, 48), materialPlaneta(texLuna(['#4c4650', '#a49aa6', '#efe7ee'], 3, 170, 1, texturasLigeras ? 768 : 1024), 0xffd8ea, { atmosfera: 0.04, especular: 0.0, terminador: 0.3, relieve: RELIEVE, altura: true, lunar: true, reflejo: 0x3a1c2c }));
+  const luna = new THREE.Mesh(new THREE.SphereGeometry(14, 128, 96), materialPlaneta(texLuna(['#4c4650', '#a49aa6', '#efe7ee'], 3, 170, 1, texturasLigeras ? 768 : 1024), 0xffd8ea, { atmosfera: 0.04, especular: 0.0, terminador: 0.3, relieve: RELIEVE, altura: true, lunar: true, reflejo: 0x3a1c2c }));
   luna.position.set(R * 3.1, 18, 0);
   orbitaLuna.add(luna); orbitaLuna.rotation.x = 0.3;
   // Segunda luna, pequeña y más rápida, en otra órbita.
   const orbitaLuna2 = new THREE.Group(); orbitaLuna2.rotation.set(-0.5, 0, 0.35); planeta.add(orbitaLuna2);
-  const luna2 = new THREE.Mesh(new THREE.SphereGeometry(7, 48, 32), materialPlaneta(texLuna(['#5a4a4e', '#b8a0a8', '#f4e2e8'], 13, 110, 0.6, 512, 1), 0xffd0e0, { atmosfera: 0.03, especular: 0, terminador: 0.3, relieve: RELIEVE, altura: true, lunar: true, reflejo: 0x2a1420 }));
+  const luna2 = new THREE.Mesh(new THREE.SphereGeometry(7, 96, 64), materialPlaneta(texLuna(['#5a4a4e', '#b8a0a8', '#f4e2e8'], 13, 110, 0.6, 512, 1), 0xffd0e0, { atmosfera: 0.03, especular: 0, terminador: 0.3, relieve: RELIEVE, altura: true, lunar: true, reflejo: 0x2a1420 }));
   luna2.position.set(-R * 3.55, 0, 0); orbitaLuna2.add(luna2);
 
   const etiqueta = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -607,7 +610,7 @@ export function crearPlanetas({ scene, uScale, uPR }, fechaTexto) {
   const puente = crearRecorrido(arco, '#ffe0ef', { uScale, uPR, tam: 2.3, velocidad: 0.12, base: 0.55 }); puente.renderOrder = 2; azul.add(puente);
   // Luna con cráteres en órbita inclinada.
   const orbitaLunaAzul = new THREE.Group(); orbitaLunaAzul.rotation.set(0.5, 0, 0.25); orbitaAzul.add(orbitaLunaAzul);
-  const lunaAzul = new THREE.Mesh(new THREE.SphereGeometry(6.5, 64, 48), materialPlaneta(texLuna(['#3a3a3e', '#9a9aa0', '#f0f0f2'], 9, 220, 1, texturasLigeras ? 768 : 1024, 4), 0xffffff, { atmosfera: 0.02, especular: 0.0, terminador: 0.3, sol: solTierra, relieve: RELIEVE, altura: true, lunar: true, reflejo: 0x101c2e }));
+  const lunaAzul = new THREE.Mesh(new THREE.SphereGeometry(6.5, 128, 96), materialPlaneta(texLuna(['#3a3a3e', '#9a9aa0', '#f0f0f2'], 9, 220, 1, texturasLigeras ? 768 : 1024, 4), 0xffffff, { atmosfera: 0.02, especular: 0.0, terminador: 0.3, sol: solTierra, relieve: RELIEVE, altura: true, lunar: true, reflejo: 0x101c2e }));
   lunaAzul.position.set(58, 0, 0); orbitaLunaAzul.add(lunaAzul);
   // Las dos estrellas de las orillas, encima del planeta.
   const dosEstrellas = crearDosEstrellas({ uScale, uPR });

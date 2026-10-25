@@ -230,7 +230,7 @@ export function crearMundos({ scene, uScale, uPR }, { alConstelar = () => {}, co
 
   // ── El correo de la luna ──
   const correo = grupos.get('cartas');
-  const luna = new THREE.Mesh(new THREE.SphereGeometry(80, 64, 48), new THREE.MeshStandardMaterial({ map: texCrateres(['#3d3c42', '#a3a2a8', '#f0eff2'], 21, 80, 1, 1024), roughness: 0.97, emissive: '#2c2a33', emissiveIntensity: 0.28, transparent: true }));
+  const luna = new THREE.Mesh(new THREE.SphereGeometry(80, 128, 96), new THREE.MeshStandardMaterial({ map: texCrateres(['#3d3c42', '#a3a2a8', '#f0eff2'], 21, 80, 1, 1024), roughness: 0.97, emissive: '#2c2a33', emissiveIntensity: 0.28, transparent: true }));
   luna.userData.destino = 'cartas'; correo.add(luna); tocables.push(luna);
   const luzLuna = new THREE.PointLight('#fff2f6', 90000, 800, 2); luzLuna.position.set(170, 170, 240); correo.add(luzLuna);
   // Ruta postal: un anillo inclinado de polvo de luz; los sobres viajan SOBRE él.

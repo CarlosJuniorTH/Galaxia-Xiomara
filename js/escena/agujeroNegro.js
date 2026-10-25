@@ -1,6 +1,6 @@
 // Agujero negro central: horizonte, anillo de fotones, halo, discos de acreción y chorros
 import * as THREE from 'three';
-import { materialPuntos } from './materiales.js';
+import { materialPuntos, materialSombra } from './materiales.js';
 
 function crearDisco(grupo, inner, outer, c1, c2, c3, op, rx) {
   const mat = new THREE.ShaderMaterial({
@@ -68,7 +68,7 @@ export function crearAgujeroNegro({ scene, uScale, uPR }) {
   // escribe su profundidad. Así tapa lo que está detrás (planetas, lugares) y queda tapada por
   // lo que está delante; antes usaba AlwaysDepth y se pintaba encima de cuerpos más cercanos.
   // El disco, el anillo de fotones y la luz curvada se dibujan después (orden 1).
-  const horizonte = new THREE.Mesh(new THREE.SphereGeometry(42, 64, 64), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, depthTest: true, depthFunc: THREE.LessEqualDepth, depthWrite: true }));
+  const horizonte = new THREE.Mesh(new THREE.SphereGeometry(42, 64, 64), materialSombra({ depthTest: true, depthFunc: THREE.LessEqualDepth, depthWrite: true }));
   horizonte.renderOrder = 0.5;
   grupo.add(horizonte);
 

@@ -385,7 +385,7 @@ export function crearCuasar({ uScale, uPR, texGigante, texBrillo, texNebulosa })
   disco.rotation.x = Math.PI / 2; grupo.add(disco); animados.push(disco);
 
   // ── Horizonte: la sombra y su anillo de fotones (mira siempre a la cámara) ──
-  const sombraMalla = new THREE.Mesh(new THREE.SphereGeometry(RS, 48, 32), new THREE.MeshBasicMaterial({ color: 0x000000 }));
+  const sombraMalla = new THREE.Mesh(new THREE.SphereGeometry(RS, 128, 96), new THREE.MeshBasicMaterial({ color: 0x000000 }));
   grupo.add(sombraMalla);
   // La sombra se ve siempre limpia (como en las imágenes de agujeros negros: la luz se curva a su alrededor): un
   // disco negro que mira a la cámara, dibujado encima del gas; el anillo de fotones y el destello, encima de ella.

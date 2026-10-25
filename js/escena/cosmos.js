@@ -14,6 +14,7 @@ import { crearAcrecion } from './acrecion.js';
 import { crearCuasar } from './cuasar.js';
 import { ESCALA_SUPERNOVA, PROGENITORA_RELATIVA, ESCALA_CUASAR, ESCALA_TON, ESCALA_PULSAR, ESCALA_DENEB, ESCALA_SGR } from '../data/escalaCosmica.js';
 import { SITIOS_DESTINO } from '../data/sitios.js';
+import { materialSombra } from './materiales.js';
 
 // Dirección en el cielo respecto a la vista inicial: acimut (grados, + a la derecha) y
 // elevación (grados, + hacia arriba). En vertical se ve |acimut| < 15° y elevación −15…−7°;
@@ -154,7 +155,7 @@ export function crearCosmos({ uScale, uPR }) {
     // Deneb se ve como lo que es desde aquí: un punto deslumbrante (su disco no se resuelve);
     // con un disco grande parecía una luna desde los otros lugares.
     const c = new THREE.Color(color), roja = c.r > c.b, r = tam * (nombre === 'Deneb' ? 0.006 : 0.07);
-    const superficie = new THREE.Mesh(new THREE.SphereGeometry(r, 48, 32), new THREE.ShaderMaterial({
+    const superficie = new THREE.Mesh(new THREE.SphereGeometry(r, 96, 64), new THREE.ShaderMaterial({
       // Las supergigantes rojas tienen unas pocas células enormes (como Betelgeuse); las azules, más finas.
       // uOpacidad: los soles del cielo de casa son estrellas locales y se apagan lejos de Xiomara.
       uniforms: { uT: { value: 0 }, uC: { value: c }, uCel: { value: roja ? 2.4 : 4.6 }, uOpacidad: { value: 1 } }, transparent: true,
@@ -309,7 +310,7 @@ export function crearCosmos({ uScale, uPR }) {
   }
   // La estrella de neutrones: una esfera diminuta y ardiente con dos puntos calientes en los
   // polos magnéticos (de ahí salen los haces), girando con ellos.
-  const estrellaNeutrones = new THREE.Mesh(new THREE.SphereGeometry(260, 64, 48),   // grande: tan inmensa como los agujeros negros
+  const estrellaNeutrones = new THREE.Mesh(new THREE.SphereGeometry(260, 128, 96),   // grande: tan inmensa como los agujeros negros
  new THREE.ShaderMaterial({
     uniforms: { uEje: { value: new THREE.Vector3(0, 1, 0) } },
     vertexShader: 'varying vec3 vN, vP; void main(){ vP = normalize(position); vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
@@ -350,7 +351,7 @@ export function crearCosmos({ uScale, uPR }) {
   // escribe (tapa lo que hay detrás). Las partes luminosas no escriben profundidad, así que entre
   // ellas manda el orden y no hay parpadeo. Antes usaban depthTest=false y se pintaban encima de
   // cualquier cuerpo que tuvieran delante.
-  const sombra = new THREE.Mesh(new THREE.SphereGeometry(R, 64, 48), new THREE.MeshBasicMaterial({ color: 0x000000 }));
+  const sombra = new THREE.Mesh(new THREE.SphereGeometry(R, 128, 96), new THREE.MeshBasicMaterial({ color: 0x000000 }));
   sombra.material.transparent = true;   // en la lista de transparentes, con orden propio
   for (const [o, orden] of [[resplandor, -1], [discoAtras, 0], [sombra, 1], [lente, 2], [discoDelante, 3]]) { o.material.depthTest = true; o.material.depthWrite = o === sombra; o.renderOrder = orden; }
   gigantesco.add(sombra);
@@ -397,7 +398,7 @@ export function crearCosmos({ uScale, uPR }) {
         float a = (fotones * 1.3 + emision + halo + punto) * (1.0 - smoothstep(2.2, 2.6, r));
         vec3 c = mix(vec3(0.95, 0.32, 0.07), vec3(1.0, 0.86, 0.58), clamp(media * 0.7 + fotones, 0.0, 1.0));
         gl_FragColor = vec4(c * a * 1.4, a); }`));
-  const sombraSgr = new THREE.Mesh(new THREE.SphereGeometry(RS, 48, 32), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true }));
+  const sombraSgr = new THREE.Mesh(new THREE.SphereGeometry(RS, 128, 96), materialSombra());
   // Igual que TON 618: orden interno fijo y prueba de profundidad frente al resto (el anillo mira a
   // la cámara, es un fenómeno aparente, pero un cuerpo opaco delante lo tapa).
   for (const [o, orden] of [[sombraSgr, 1], [anilloEHT, 2]]) { o.material.depthTest = true; o.material.depthWrite = o === sombraSgr; o.renderOrder = orden; sagitario.add(o); }

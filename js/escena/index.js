@@ -258,9 +258,13 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // muestra «Preparando tu universo». Antes ocurría al aparecer cada objeto en
   // pantalla por primera vez y provocaba tirones al girar la cámara.
   // Con KHR_parallel_shader_compile la compilación no congela la pantalla de carga.
+  const anisotropiaMax = renderer.capabilities.getMaxAnisotropy();
   const subirTexturas = (escena = scene) => escena.traverse(o => {
     for (const m of [].concat(o.material || [])) {
       for (const v of [...Object.values(m), ...Object.values(m.uniforms || {}).map(u => u.value)]) if (v?.isTexture) {
+        // Filtrado anisótropo al máximo del aparato en las que ya lo pedían (planetas, lunas, superficies): de lado, en el
+        // borde de un planeta, la textura se veía emborronada con 4 u 8.
+        if (v.anisotropy > 1 && v.anisotropy < anisotropiaMax) v.anisotropy = anisotropiaMax;
         renderer.initTexture(v);
         // Ya en la tarjeta gráfica: las imágenes que nadie vuelve a leer sueltan su copia en memoria (decenas de MB en un iPhone).
         if (v.userData.liberable && v.image?.data && v.version > 0) v.image = { width: v.image.width, height: v.image.height, data: null };
@@ -364,8 +368,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   const recuperar = () => { if (!aligerado) return false; aligerado--; ESCALONES[aligerado][1](); canvas.dataset.aligerado = String(aligerado); return true; };
   const regular = crearReguladorResolucion({ minimo: esMovil ? Math.min(1.5, nucleo.resolucion) : 1, maximo: nucleo.prTope,   // lo reservado (nucleo.js): subir hasta ahí no rehace nada
     inicial: nucleo.resolucion, alAgotar: aligerar, alRecuperar: recuperar });
-  // El cambio de resolución rehace los búferes de la imagen (en un móvil, una pausa visible): nunca en mitad de un gesto
-  // o de un viaje; espera a que se suelte el dedo o se llegue.
+  // (El cambio de resolución ya no rehace búferes, zona.js: se aplica en el acto.)
   let resolucionPendiente = null;
   function regularResolucion(ms) { const nueva = regular(ms); if (nueva !== null) resolucionPendiente = nueva; aplicarResolucionPendiente(); }
   // Cambiar de resolución ya no rehace ningún búfer (solo la zona en la que se dibuja, zona.js): se aplica en el acto.

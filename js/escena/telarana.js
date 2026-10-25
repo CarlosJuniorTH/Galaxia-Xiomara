@@ -106,7 +106,10 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   const PROP_GAL = esMovil ? 0.45 / 0.7 : 1;   // fracción de galaxias respecto a la del polvo
   // En un PC con pantalla 4K o Retina (DPR 2), la capa de galaxias a la resolución real de la pantalla (a la CSS salía a la mitad).
   const CAPA_PC = Math.min(2, Math.max(1, typeof devicePixelRatio === 'number' ? devicePixelRatio : 1));
-  const uPRgal = { value: esMovil ? 0.8 : CAPA_PC };   // las galaxias se pintan en su propia capa a resolución CSS (1 píxel de capa = 1 px CSS)
+  // En el móvil a 1,2 píxeles CSS (antes 0,8: un 27 % de la resolución nativa de un iPhone, se veía pixelada); el coste
+  // en la GPU es pequeño (0,03 → 0,06 ms en un PC) y si el aparato no llega, la calidad automática la baja.
+  const ESCALA_MOVIL = 1.2;
+  const uPRgal = { value: esMovil ? ESCALA_MOVIL : CAPA_PC };   // las galaxias se pintan en su propia capa a resolución CSS (1 píxel de capa = 1 px CSS)
   const matGalaxias = new THREE.ShaderMaterial({ uniforms: { ...uniformes, uPR: uPRgal, uComp, uBrazos: { value: texturaBrazos() } },
     vertexShader: /* glsl */`uniform float uPR, uScale, uCasa, uComp; ${OCULTO} attribute vec3 aCol; attribute float aBrillo; varying vec3 vC; varying float vA, vRes, vAng, vInc, vBrazos, vTipo;
       float h(vec3 p){ p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
@@ -205,7 +208,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   });
   compuesto.frustumCulled = false; compuesto.renderOrder = -1.5; raiz.add(compuesto);
   const colorPrevio = new THREE.Color();
-  let escalaCapa = esMovil ? 0.8 : CAPA_PC, escalaMax = escalaCapa;   // en el móvil, la capa de galaxias al 80 % (al 60 % se veían pixeladas); si el teléfono se calienta, la calidad automática la baja
+  let escalaCapa = esMovil ? ESCALA_MOVIL : CAPA_PC, escalaMax = escalaCapa;   // si el teléfono se calienta, la calidad automática la baja (solo cambia su zona: zona.js)
   function dibujarGalaxias(renderer, camera) {
     if (!raiz.visible) return;   // oculta (p. ej. «Mirar hacia casa»): su capa no se ve, no se dibuja
     // Reservada al tamaño de su escala más alta; bajar la escala (calidad automática) solo cambia la zona (zona.js).
@@ -266,7 +269,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   return {
     raiz, web, galaxias: bloquesGalaxias, nubes: bloquesNubes, cercano, polvoFil: bloquesPolvo, capaGalaxias, dibujarGalaxias,
     escalarCapaGalaxias(k) { escalaCapa = k; escalaMax = Math.max(escalaMax, k); uPRgal.value = k; },
-    escalaCapaInicial: esMovil ? 0.8 : CAPA_PC, muestraInicial: MUESTRA,
+    escalaCapaInicial: esMovil ? ESCALA_MOVIL : CAPA_PC, muestraInicial: MUESTRA,
     // Fracción de puntos que se dibuja en cada bloque (barajados), con la luz compensada.
     fijarMuestra(f) { muestraActual = f; for (const grupo of [bloquesGalaxias, bloquesNubes, bloquesPolvo]) for (const t of grupo.children) { const b = t.userData.bloque; t.geometry.setDrawRange(b.a, Math.max(1, Math.ceil(b.n * f * (grupo === bloquesGalaxias ? PROP_GAL : 1)))); } uComp.value = 1 / Math.sqrt(f); },
     get escalaCapaGalaxias() { return escalaCapa; },

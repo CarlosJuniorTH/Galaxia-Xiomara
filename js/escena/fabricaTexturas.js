@@ -60,12 +60,15 @@ function dataTextura(ancho, alto, relleno) {
 
 // claves: nombres de los resultados (p. ej. ['superficie', 'mascara']); por defecto uno solo.
 // bloquea = false: la carga no la espera (cielo de fondo: negro e invisible hasta que llega).
-export function texturaPlaneta(tipo, opciones, { claves = ['pixeles'], relleno = [120, 110, 140], bloquea = true } = {}) {
+// liberable: nadie vuelve a leer sus píxeles desde el procesador (los planetas): en cuanto la imagen definitiva llega a la
+// tarjeta gráfica se suelta su copia en memoria (decenas de MB en un móvil).
+const soltarCopia = t => { t.image = { width: t.image.width, height: t.image.height, data: null }; t.onUpdate = null; };
+export function texturaPlaneta(tipo, opciones, { claves = ['pixeles'], relleno = [120, 110, 140], bloquea = true, liberable = false } = {}) {
   const { ancho, alto } = opciones;
   const texturas = Object.fromEntries(claves.map(c => [c, dataTextura(ancho, alto, relleno)]));
   const promesa = new Promise(resolve => {
     const pedido = { tipo, opciones, resolver: datos => {
-      for (const c of claves) { texturas[c].image.data.set(datos[c]); texturas[c].needsUpdate = true; texturas[c].userData.lista = performance.now(); }
+      for (const c of claves) { texturas[c].image.data.set(datos[c]); texturas[c].needsUpdate = true; texturas[c].userData.lista = performance.now(); if (liberable) texturas[c].onUpdate = soltarCopia; }
       resolve();
     } };
     const enviar = () => {

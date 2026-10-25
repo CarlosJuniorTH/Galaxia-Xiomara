@@ -49,8 +49,10 @@ export function materialPuntos({ uScale, uPR, maximo = 6, aditivo = true, opacid
         float profundidad = max(0.1, -mv.z);
         float s = aSize * uTam * tw * uScale / profundidad;
         // Límite en píxeles CSS: los DPI del teléfono no agrandan el halo.
-        gl_PointSize = clamp(s, 1.0, uMaximo * uPR);
-        vF = min(s * s, 1.0) * smoothstep(18.0, 85.0, profundidad);
+        // Como mínimo 2 píxeles, con la misma luz (el brillo baja con el área: (s/2)²): las estrellas de 1 px saltaban de un
+        // píxel al siguiente al girar despacio (parpadeaban); repartidas en 2×2 se deslizan suaves.
+        gl_PointSize = clamp(s, 2.0, max(2.0, uMaximo * uPR));
+        vF = min(s * s * 0.25, 1.0) * smoothstep(18.0, 85.0, profundidad);
         #ifdef SILUETA
           // El agujero negro está en el origen. Se mide la distancia del punto al eje
           // cámara-horizonte y se compara con el radio del cono de la silueta a esa profundidad.
@@ -139,4 +141,15 @@ export function crearDestellos(lista, { map, uScale, uPR, maximoCss = 170, ondul
   const puntos = new THREE.Points(g, material);
   puntos.frustumCulled = false;
   return puntos;
+}
+
+// Sombra negra de un agujero negro con el borde suavizado en su último píxel (sin antialiasing en la escena, la silueta
+// salía en escalones): la opacidad sigue a cuánto mira la superficie hacia la cámara, medida en píxeles con fwidth.
+// Solo para sombras que ya se dibujan como transparentes (en orden con lo que las rodea).
+export function materialSombra(opciones = {}) {
+  return new THREE.ShaderMaterial({
+    vertexShader: 'varying vec3 vN, vV; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalMatrix * normal; vV = -mv.xyz; gl_Position = projectionMatrix * mv; }',
+    fragmentShader: 'varying vec3 vN, vV; void main(){ float c = abs(dot(normalize(vN), normalize(vV))); float a = smoothstep(0.0, fwidth(c) * 1.5 + 1e-4, c); gl_FragColor = vec4(0.0, 0.0, 0.0, a); }',
+    transparent: true, ...opciones
+  });
 }
