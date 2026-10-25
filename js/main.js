@@ -83,7 +83,8 @@ try {
     // Cada viaje despierta la interfaz: al llegar se ve la tarjeta del lugar y «Volver al centro».
     // La banda sonora funde a la música de los viajes al despegar y a la del destino (o al reposo) al llegar.
     alViajar: id => { interfaz?.situar(id); contemplacion?.despertar(); viaje.anotarDestino(id); banda.viajar(id, { viajando: () => !!escena?.viajando, restante: () => escena?.restanteViaje ?? 0, ceremoniaPendiente: d => d === 'supernova' && escena?.estadoSupernova !== 'remanente' }); },
-    alLlegar: id => banda.llegada(id), alProblema: problema,
+    // El viaje terminó (en este cuadro): la canción del destino y la escena del gigante empiezan a la vez.
+    alLlegar: id => { banda.llegada(id); interfaz?.llegada(id); }, alProblema: problema,
     alProgreso: (f, techo) => entrada.progreso(0.08 + 0.92 * f, 0.08 + 0.92 * techo)
   });
   etapa = 'recuerdos e interfaz';

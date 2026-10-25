@@ -377,3 +377,8 @@ body.faro-en-curso #titulo,body.faro-en-curso #mensaje,body.faro-en-curso #btn-m
 .marca-universo,.horarios,#contador,#contador-sub{text-shadow:0 1px 2px #08020fe6,0 0 6px #08020fb3}
 #titulo-texto{text-shadow:0 1px 2px #08020fe6,0 0 8px #08020fb3,0 0 28px #be5c9d55}
 #contador-sub,.marca-universo small,.horarios small{text-shadow:0 1px 2px #08020f,0 0 6px #08020fe6,0 0 12px #08020fb3}
+
+/* Escena de un gigante en curso (js/ui/universo.js, escenaEnCurso): no se puede saltar; los controles para irse a otro
+   sitio se apagan con un fundido y vuelven con otro al terminar. */
+body.escena-gigante :is(#muelle,#btn-mapa,#mapa,#btn-mirar-casa,#lugar-volver,#lugar-accion,#btn-tour,#supernova-aviso,#cometa-aviso){opacity:0 !important;pointer-events:none !important;transition:opacity .6s ease !important;}
+body.escena-volviendo :is(#muelle,#btn-mapa,#mapa,#btn-mirar-casa,#lugar-volver,#lugar-accion,#btn-tour,#supernova-aviso,#cometa-aviso){transition:opacity 1s ease !important;}

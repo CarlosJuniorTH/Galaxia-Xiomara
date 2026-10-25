@@ -242,6 +242,8 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
     tiene: nombre => pistas.has(nombre) && pistas.get(nombre).estado !== 'fallo',
     marcas: nombre => ({ ...(pistas.get(nombre)?.conf.marcas || {}) }),
     config: nombre => ({ ...(pistas.get(nombre)?.conf || {}) }),
+    // Lo que dura el fragmento de ese momento (0 si no tiene canción o su archivo falta): la escena de un gigante dura eso.
+    duracion: nombre => { const p = pistas.get(nombre); return p && p.estado !== 'fallo' ? duracionDe(p) : 0; },
     // El contexto de audio compartido (también el ambiente y la supernova sintética); se crea parado hasta un toque.
     contexto: crearContexto,
     entradaAmbiente() { crearContexto(); return ambiente.ganancia; },

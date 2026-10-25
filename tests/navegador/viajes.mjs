@@ -13,7 +13,9 @@ export default async function ({ base, informe }) {
     const resultados = [];
     for (const [desde, hacia] of VIAJES) {
       const r = await pagina.evaluate(async id => {
-        const e = window.__galaxia.escena, i = window.__galaxia.interfaz, t0 = performance.now();
+        const e = window.__galaxia.escena, i = window.__galaxia.interfaz;
+        i.terminarEscena();   // (la ceremonia de la supernova es una escena que no se salta: aquí solo se miden viajes)
+        const t0 = performance.now();
         let previsto = 0, fovMax = 0, fundidoMax = 0, peorCuadro = 0, antes = t0, cuadros = 0;
         const p = i.visitar(id);
         // Mientras dura: lo previsto, el campo de visión (sin salto no se abre), el fundido y el cuadro más largo.

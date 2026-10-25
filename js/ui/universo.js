@@ -7,7 +7,7 @@ import { crearSupernovaAmor } from './supernovaAmor.js';
 import { crearFaroCuasar } from './faroCuasar.js';
 import { crearMapa } from './mapa.js';
 import { crearEscenasGigantes } from './escenasGigantes.js';
-import { FRASE_SUPERNOVA } from '../util/supernovaAmor.js';
+import { FRASE_SUPERNOVA, TIEMPOS_AMOR } from '../util/supernovaAmor.js';
 import { crearAvisos } from './avisos.js';
 const $ = id => document.getElementById(id);
 // Las seis grandes (supernova, cuásar, púlsar, Deneb, TON 618 y Sagitario A*): los lejanos salvo el gigante del corazón.
@@ -15,7 +15,7 @@ const GRANDES = new Set(LEJANOS.filter(d => d.id !== 'gigante').map(d => d.id));
 function el(tag, clase, texto) { const n = document.createElement(tag); if (clase) n.className = clase; if (texto !== undefined) n.textContent = texto; return n; }
 function boton(texto, clase, accion) { const b = el('button', clase, texto); b.type = 'button'; b.addEventListener('click', accion); return b; }
 
-export function crearInterfazUniverso({ config, escena, progreso, recuerdos, estrellas, efectos, musica, viaje, banda = null }) {
+export function crearInterfazUniverso({ config, escena, progreso, recuerdos, estrellas, efectos, musica, banda, viaje }) {
   const panel = $('panel-universo'), contenido = $('panel-contenido'), lectura = $('lectura');
   lectura.querySelector('.firma').textContent = config.firma;
   let panelActual = '', actual = 'hogar', postalURL = null, celebrando = false, celebracionRevision = 0, constelacionElegida = 'hilo';
@@ -33,6 +33,38 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
   $('faro-carta').addEventListener('click', () => { if (actual === 'cuasar' && !escena.viajando) faro.abrirCarta(); });
   // Tras el estallido, el corazón es un lugar más: misma tarjeta, y su gesto es volver a sentirlo.
   const corazonNacido = () => supernovaAmor.descubierta || escena.estadoSupernova === 'remanente';
+  // Escena de un gigante (supernova, cuásar, púlsar, Deneb, TON 618, Sagitario A*): cada visita la dispara con su canción
+  // y NO se puede saltar. Mientras dura, los controles para irse a otro sitio (muelle, mapa, «Mirar hacia casa», «Volver al
+  // centro», el gesto del lugar, el recorrido) se ocultan con un fundido y los viajes se rechazan con un aviso; al terminar
+  // vuelven con otro fundido. Mecanismo común: la llegada la abre con la duración de su canción (o de la ceremonia de la
+  // supernova) y las escenas de cada gigante pueden abrirla, alargarla o cerrarla con escenaEnCurso(id, segundos) y
+  // terminarEscena(id). Solo la supernova que va a estallar pasa por encima (se viaja a ella a la fuerza).
+  const GIGANTES = new Set(['supernova', 'cuasar', 'pulsar', 'deneb', 'ton618', 'sagitario']);
+  let escenaActual = null, volviendoT = 0;
+  function escenaEnCurso(id, duracion) {
+    clearTimeout(escenaActual?.temporizador);
+    if (!(duracion > 0)) { terminarEscena(); return; }
+    escenaActual = { id, fin: performance.now() + duracion * 1000, temporizador: setTimeout(() => terminarEscena(id), duracion * 1000) };
+    clearTimeout(volviendoT); document.body.classList.remove('escena-volviendo'); document.body.classList.add('escena-gigante');
+    if (panel.open) cerrarPanel(); mapa.cerrar();
+    if (escena.mirandoCasa) escena.mirarCasa(false);
+    document.dispatchEvent(new CustomEvent('escena-gigante', { detail: { id, duracion, activa: true } }));
+  }
+  function terminarEscena(id) {
+    if (!escenaActual || (id && escenaActual.id !== id)) return;
+    const fin = escenaActual; clearTimeout(fin.temporizador); escenaActual = null;
+    document.body.classList.remove('escena-gigante'); document.body.classList.add('escena-volviendo');
+    clearTimeout(volviendoT); volviendoT = setTimeout(() => document.body.classList.remove('escena-volviendo'), 1200);
+    document.dispatchEvent(new CustomEvent('escena-gigante', { detail: { id: fin.id, duracion: 0, activa: false } }));
+    document.dispatchEvent(new Event('despertar-interfaz'));   // (si la interfaz se había dormido mirando, vuelve)
+  }
+  // Al terminar un viaje (en el mismo cuadro que la canción del destino): la escena de un gigante empieza ya.
+  function llegada(id) {
+    if (!GIGANTES.has(id)) { terminarEscena(); return; }
+    const ceremonia = id === 'supernova' && !corazonNacido();
+    const duracion = ceremonia ? TIEMPOS_AMOR.espera + TIEMPOS_AMOR.revelar + 4.5 : banda?.duracion(id) || 0;
+    if (duracion) escenaEnCurso(id, duracion);
+  }
   // Contemplar: un paseo lento y sin interfaz por todos los lugares; cualquier toque lo termina.
   let contemplando = false, revisionContemplar = 0, salidaContemplar = 0;
   const ORDEN_CONTEMPLAR = ['rosa', 'azul', 'constelacion', 'calma', 'capsulas', 'cartas', 'suenos', 'hogar'];
@@ -43,7 +75,7 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     document.body.classList.remove('paseo-contemplar'); situar(escena.destino);
   }
   async function contemplar() {
-    if (celebrando || tour || contemplando) return;
+    if (celebrando || tour || contemplando || escenaActual) return;
     if (panel.open) cerrarPanel();
     faro.cancelar(); contemplando = true; const mia = ++revisionContemplar;
     document.body.classList.add('paseo-contemplar'); musica?.reproducir?.(true);
@@ -107,7 +139,7 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
   $('reinicio-confirmar').addEventListener('click', () => { if (progreso.reiniciar()) { viaje?.olvidar(); location.reload(); } else $('reinicio').close(); });
 
   // ── Mapa de orientación: «El mapa de nosotros», en tres zonas (mapa.js) ──
-  crearMapa({ escena, progreso, actual: () => actual, visitar });
+  const mapa = crearMapa({ escena, progreso, actual: () => actual, visitar });
 
   function modoCalma(valor) {
     document.body.classList.toggle('en-calma', valor); $('salir-calma').hidden = !valor;
@@ -139,12 +171,19 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
   $('lugar-aislar').addEventListener('click', () => aislarCorazon(document.body.dataset.supernovaAislada !== 'true'));
   $('lugar-postal').addEventListener('click', () => postal({ supernova: true }));
   async function verSupernova() {
-    await supernovaAmor.abrir({ repetir: corazonNacido() });
+    // La ceremonia es la escena de la supernova (también al volver a sentirla): no se puede saltar ni irse a otro sitio.
+    const repetir = corazonNacido();
+    escenaEnCurso('supernova', (repetir ? 4 : 0) + TIEMPOS_AMOR.espera + TIEMPOS_AMOR.revelar + 4.5);
+    await supernovaAmor.abrir({ repetir });
+    terminarEscena('supernova');
     if (actual === 'supernova') situar('supernova');
   }
 
-  async function visitar(id) {
+  // forzado: el viaje de la supernova que va a estallar (pasa por encima de la escena de otro gigante).
+  async function visitar(id, { forzado = false } = {}) {
     if (celebrando) { avisar('Estamos reuniendo nuestras estrellas. Puedes ir directamente a la carta con el botón de arriba.'); return; }
+    if (escenaActual && !forzado) { avisar('Quédate un momento: esto está pasando solo para ti. ♡'); return; }
+    if (forzado) terminarEscena();
     if (panel.open) cerrarPanel();
     if (tour) terminarRuta(false, false);
     faro.cancelar();
@@ -497,9 +536,10 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
   setInterval(() => {
     if (!escena.supernovaQuiereEstallar || !document.body.classList.contains('dentro')) return;
     if (celebrando || tour || contemplando || panel.open || escena.viajando || document.querySelector('dialog[open], .ventana.abierta')) { escena.aplazarSupernova(20); return; }
-    // Este aviso sale estés donde estés y pasa delante de la cola: el viaje a la supernova empieza ya.
+    // Este aviso sale estés donde estés y pasa delante de la cola: el viaje a la supernova empieza ya (también durante la
+    // escena de otro gigante).
     avisar('Dos luces están a punto de encontrarse. Hay algo hermoso esperándote. ♡', { urgente: true });
-    visitar('supernova');
+    visitar('supernova', { forzado: true });
   }, 2000);
   $('btn-supernova').addEventListener('click', () => visitar('supernova'));
   setInterval(() => {
@@ -528,5 +568,5 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
   }
   let tickActivo = false;
   const despertarTick = () => { if (tickActivo) return; tickActivo = true; ultimo = performance.now(); requestAnimationFrame(tick); };
-  return { get contemplando() { return contemplando || performance.now() - salidaContemplar < 700; }, contemplar, abrirCieloNoche: () => cieloNoche.abrir(), get celebrando() { return celebrando; }, actualizarAlbum() { if (panelActual === 'album') abrirPanel('album'); }, avisar, get enLasGrandes() { return enLasGrandes(); }, situar, visitar, alConstelar, tocarNodo, celebrar, abrirPanel, sorpresa, pausarRuta, iniciarRuta, get enRuta() { return tour; } };
+  return { get contemplando() { return contemplando || performance.now() - salidaContemplar < 700; }, contemplar, abrirCieloNoche: () => cieloNoche.abrir(), get celebrando() { return celebrando; }, actualizarAlbum() { if (panelActual === 'album') abrirPanel('album'); }, avisar, get enLasGrandes() { return enLasGrandes(); }, situar, visitar, llegada, escenaEnCurso, terminarEscena, get escenaActual() { return escenaActual ? { id: escenaActual.id, restante: Math.max(0, (escenaActual.fin - performance.now()) / 1000) } : null; }, alConstelar, tocarNodo, celebrar, abrirPanel, sorpresa, pausarRuta, iniciarRuta, get enRuta() { return tour; } };
 }

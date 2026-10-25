@@ -50,7 +50,7 @@ export function crearSupernovaAmor({ escena, progreso, musica, alDescubrir = () 
     } catch (error) { console.warn('La supernova conserva su recuerdo:', error); }
     if (mia === revision) cerrar();
   }
-  document.addEventListener('keydown', e => { if (activa && e.key === 'Escape' && !document.querySelector('dialog[open]')) { e.preventDefault(); cerrar(); } });
+  // (La ceremonia no se puede saltar: es la escena de la supernova; ya no se cierra con Escape.)
   document.addEventListener('visibilitychange', () => { if (document.hidden) sonido?.silenciar(); });
   return { abrir, cerrar, get descubierta() { return descubierta; } };
 }
