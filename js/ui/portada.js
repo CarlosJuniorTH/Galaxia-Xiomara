@@ -63,9 +63,11 @@ export function crearPortada(lienzo, { alFormarse = () => {}, frases = [], texto
     id = requestAnimationFrame(cuadro);
     if (!empezada) { anterior = ahora; return; }   // espera a que termine la carga de paquetes
     const dt = Math.min(0.05, (ahora - (anterior || ahora)) / 1000); anterior = ahora;
-    // Ya formado, basta con 30 FPS para el giro lento (menos trabajo mientras carga el 3D).
-    if (formado && movil && (cuadro.salto = !cuadro.salto)) return;
-    t += formado && movil ? dt * 2 : dt;
+    // Ya formado y en su sitio, basta con 30 FPS para el giro lento (menos trabajo mientras carga el 3D). Mientras sube
+    // a su sitio, a 60: a 30 la subida se veía a saltos en el móvil.
+    const lento = formado && movil && aparte >= 1;
+    if (lento && (cuadro.salto = !cuadro.salto)) return;
+    t += lento ? dt * 2 : dt;
     if (formado) aparte = Math.min(1, aparte + dt * 0.7);
     const cx = centroX(), cy = centroY(), R = vertical() ? ancho * (0.47 - 0.03 * aparte) : escala * 0.42 + (Math.min(ancho * 0.32, alto * 0.34) - escala * 0.42) * suave(aparte);
     x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1;
