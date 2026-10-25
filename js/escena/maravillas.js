@@ -15,6 +15,7 @@ import * as THREE from 'three';
 import { texturasLigeras } from '../util/dispositivo.js';
 import { LLEGADA_GIGANTE, LEJANIA } from '../data/escalaCosmica.js';
 import { crearNube } from './nube.js';
+import { horneado } from '../util/horno.js';
 
 function azarSemilla(semilla) { let s = semilla >>> 0; return () => { s = (s + 0x6d2b79f5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 const gauss = a => { let u = 0; while (!u) u = a(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * a()); };
@@ -31,12 +32,16 @@ function ruido2D(semilla) {
     return (h(xi, yi) * (1 - u) + h(xi + 1, yi) * u) * (1 - v) + (h(xi, yi + 1) * (1 - u) + h(xi + 1, yi + 1) * u) * v; };
   return (x, y, oct = 5) => { let s = 0, amp = 0.5, f = 1; for (let i = 0; i < oct; i++) { s += amp * vn(x * f, y * f); f *= 2.03; amp *= 0.5; } return s; };
 }
-function textura(lado, pintar) {
-  const datos = new Uint8Array(lado * lado * 4);
-  for (let y = 0; y < lado; y++) for (let x = 0; x < lado; x++) {
-    const [r, g, b] = pintar(x / lado * 2 - 1, y / lado * 2 - 1), i = (y * lado + x) * 4;
-    datos[i] = Math.min(255, r * 255); datos[i + 1] = Math.min(255, g * 255); datos[i + 2] = Math.min(255, b * 255); datos[i + 3] = 255;
-  }
+// (Horneada: pintarla píxel a píxel tardaba segundos en un móvil sin compilador de JavaScript; viene ya hecha.)
+function textura(lado, pintar, nombre) {
+  const datos = horneado(`maravilla ${nombre} ${lado}`, () => {
+    const datos = new Uint8Array(lado * lado * 4);
+    for (let y = 0; y < lado; y++) for (let x = 0; x < lado; x++) {
+      const [r, g, b] = pintar(x / lado * 2 - 1, y / lado * 2 - 1), i = (y * lado + x) * 4;
+      datos[i] = Math.min(255, r * 255); datos[i + 1] = Math.min(255, g * 255); datos[i + 2] = Math.min(255, b * 255); datos[i + 3] = 255;
+    }
+    return datos;
+  }, pintar);
   const t = new THREE.DataTexture(datos, lado, lado, THREE.RGBAFormat); t.minFilter = t.magFilter = THREE.LinearFilter; t.needsUpdate = true; return t;
 }
 const mezcla = (p, q, t) => p.map((v, k) => v + (q[k] - v) * Math.min(1, Math.max(0, t)));
@@ -62,7 +67,7 @@ function imagenOjo(lado) {
     return [cr[0] * kAnillo + azul[0] * interior * 0.55 + 0.6 * vetas + 0.6 * halo,
             cr[1] * kAnillo + azul[1] * interior * 0.55 + 0.75 * vetas + 0.12 * halo,
             cr[2] * kAnillo + azul[2] * interior * 0.55 + 1.0 * vetas + 0.08 * halo];
-  });
+  }, 'ojo');
 }
 
 // Imagen de la nube de fuego (como una nebulosa de polvo iluminada desde dentro): nube alargada y
@@ -87,7 +92,7 @@ function imagenFuego(lado) {
     col = mezcla(col, [0.55, 0.12, 0.08], Math.min(1, carril * 1.2));   // polvo rojizo
     const k = (nube * (0.8 + 0.5 * fino) * (1 - Math.min(0.75, carril)) + nucleo) * 1.5;
     return [col[0] * k, col[1] * k, col[2] * k];
-  });
+  }, 'fuego');
 }
 
 // Partículas con tamaño real en el mundo. modo: 'luz' (aditivo) o 'polvo' (oscurece lo de detrás).
@@ -155,7 +160,7 @@ function crearEnana(R, o) {
     let rosa = 0; for (const [bx, by, br] of burbujas) { const d = Math.hypot(x - bx, y - by); rosa += Math.exp(-Math.pow((d - br) / (br * 0.18), 2)) * (0.6 + 0.6 * m(Math.atan2(y - by, x - bx) * 3, d * 20, 3)); }
     rosa *= forma;
     return [col[0] * k + 0.45 * rosa, col[1] * k + 0.18 * rosa, col[2] * k + 0.3 * rosa].map(v => v * 1.5);   // burbujas sutiles
-  });
+  }, 'enana');
   const g = new THREE.Group(), nube = crearNube(img, new THREE.Vector3(), R, 33, 1, 7);
   nube.position.set(0, 0, 0); nube.scale.set(R * 2.2, R * 2.4, R * 0.7); nube.userData.brilloPropio = true; g.add(nube);
   return { grupo: g, nube };

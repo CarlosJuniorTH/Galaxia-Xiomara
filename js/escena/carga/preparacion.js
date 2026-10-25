@@ -5,9 +5,13 @@ import * as THREE from 'three';
 
 export function crearPreparacion({ renderer, camera, scene, nucleo, solar, telarana, composer, obtenerCapaVolumen }) {
   const anisotropiaMax = renderer.capabilities.getMaxAnisotropy();
-  const subirTexturas = (escena = scene) => escena.traverse(o => {
-    for (const m of [].concat(o.material || [])) {
-      for (const v of [...Object.values(m), ...Object.values(m.uniforms || {}).map(u => u.value)]) if (v?.isTexture) {
+  // A trozos de ~25 ms, cediendo entre ellos: subirlas todas de golpe congelaba la animación de la portada ~1 s en un móvil.
+  const subirTexturas = async (escena = scene) => {
+    const lista = new Set(); escena.traverse(o => { for (const m of [].concat(o.material || [])) for (const v of [...Object.values(m), ...Object.values(m.uniforms || {}).map(u => u.value)]) if (v?.isTexture) lista.add(v); });
+    let t0 = performance.now();
+    for (const v of lista) {
+      if (performance.now() - t0 > 25) { await new Promise(r => setTimeout(r, 0)); t0 = performance.now(); }
+      {
         // Filtrado anisótropo al máximo del aparato en las que ya lo pedían (planetas, lunas, superficies): de lado, en el
         // borde de un planeta, la textura se veía emborronada con 4 u 8.
         if (v.anisotropy > 1 && v.anisotropy < anisotropiaMax) v.anisotropy = anisotropiaMax;
@@ -16,7 +20,7 @@ export function crearPreparacion({ renderer, camera, scene, nucleo, solar, telar
         if (v.userData.liberable && v.image?.data && v.version > 0) v.image = { width: v.image.width, height: v.image.height, data: null };
       }
     }
-  });
+  };
   const paralela = renderer.compileAsync && renderer.extensions.has('KHR_parallel_shader_compile');
   // Las texturas de los planetas llegan del Web Worker en paralelo a la compilación.
   // También lo que aún no se ve (el vecindario de la supernova, la otra galaxia, la explosión):
@@ -42,7 +46,8 @@ export function crearPreparacion({ renderer, camera, scene, nucleo, solar, telar
   // preparan programas, búferes y texturas igual, pero la GPU apenas pinta. Antes se dibujaba TODO a la vez a pantalla
   // completa en un único cuadro enorme: en un iPhone caliente o con poca batería tardaba tanto que iOS daba la página por
   // colgada y la cerraba. Después, un cuadro normal (con lo visible) prepara el resplandor y la pasada final.
-  const calentar = () => {
+  // Se dibuja objeto a objeto, cediendo cada ~25 ms: todo en un cuadro congelaba la portada ~1 s en un móvil.
+  const calentar = async () => {
     const capaVolumen = obtenerCapaVolumen();
     // Todo visible y sin descartar lo que queda fuera de la cámara: así cada geometría se sube ya a la tarjeta gráfica
     // (si no, la primera vez que entra en pantalla —al volver a casa, al llegar a un universo— se sube en pleno viaje).
@@ -51,7 +56,16 @@ export function crearPreparacion({ renderer, camera, scene, nucleo, solar, telar
     const ocultos = [], recortados = [], aparte = [scene, solar.escena, telarana.capaGalaxias].filter(Boolean);
     for (const esc of aparte) esc.traverse(o => { if (!o.visible) { ocultos.push(o); o.visible = true; } if (o.frustumCulled) { recortados.push(o); o.frustumCulled = false; } });
     const leer = nucleo.post?.readBuffer, rt = new THREE.WebGLRenderTarget(128, 128, { type: leer?.texture?.type ?? THREE.UnsignedByteType });
-    try { const previo = renderer.getRenderTarget(); renderer.setRenderTarget(rt); for (const esc of aparte) renderer.render(esc, camera); renderer.setRenderTarget(previo); } catch (e) { console.warn('Calentamiento', e); }
+    let t0 = performance.now();
+    for (const esc of aparte) {
+      const hijos = esc.children.slice();
+      for (const h of hijos) {
+        if (performance.now() - t0 > 25) { await new Promise(r => setTimeout(r, 0)); t0 = performance.now(); }
+        const visibles = hijos.map(o => o.visible); for (const o of hijos) o.visible = o === h;
+        try { const previo = renderer.getRenderTarget(); renderer.setRenderTarget(rt); renderer.render(esc, camera); renderer.setRenderTarget(previo); } catch (e) { console.warn('Calentamiento', e); }
+        hijos.forEach((o, i) => { o.visible = visibles[i]; });
+      }
+    }
     for (const o of ocultos) o.visible = false;
     for (const o of recortados) o.frustumCulled = true;
     rt.dispose();

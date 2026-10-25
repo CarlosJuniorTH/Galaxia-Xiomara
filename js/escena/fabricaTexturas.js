@@ -18,16 +18,49 @@ const contadas = new Set();
 const indiceHorneadas = !enNavegador ? Promise.resolve({}) : fetch('assets/texturas/indice.json').then(r => (r.ok ? r.json() : {})).catch(() => ({})).then(j => {
   const archivos = j.archivos || {}, propias = j.grupos?.[grupoAparato] || [];
   for (const n of propias) contadas.add(n);
-  descargas.previsto(propias.reduce((a, n) => a + (archivos[n] || 0), 0) + (j.cielo?.[sufijoCielo] || 0));
+  descargas.previsto(propias.reduce((a, n) => a + (archivos[n] || 0), 0) + (j.cielo?.[sufijoCielo] || 0) + (j.horno || 0));
   return archivos;
 });
 let bajando = 0; const esperando = [];
 const turnoDescarga = () => (bajando < 6 ? (bajando++, Promise.resolve()) : new Promise(r => esperando.push(r)));
 const finDescarga = () => { const s = esperando.shift(); if (s) s(); else bajando--; };
+// Se decodifican en dos obreros (obreroImagenes.js): en el hilo principal, leer los píxeles de cada imagen restaba
+// fluidez a la animación de la portada durante la carga. Si un obrero no arranca, falla o tarda más de 8 s con una
+// imagen, esa imagen (y las siguientes, si no arrancó) se decodifica aquí.
+let decodificadores = null, idImagen = 0, decodificadasFuera = 0, avisarArranque = null;
+const esperandoImagen = new Map();
+// Espera a que arranque alguno (como mucho 3 s; si no, se decodifica aquí).
+const arranque = new Promise(r => { avisarArranque = r; setTimeout(r, 3000); });
+function decodificadoresVivos() {
+  if (decodificadores) return decodificadores.filter(w => w.vivo);
+  decodificadores = [];
+  try {
+    for (let i = 0; i < 2; i++) {
+      const w = new Worker(new URL('./obreroImagenes.js', import.meta.url));
+      w.onmessage = ({ data }) => { if (data.listo) { w.vivo = true; avisarArranque(); return; } const e = esperandoImagen.get(data.id); if (e) { esperandoImagen.delete(data.id); e(data); } };
+      w.onerror = ev => { ev.preventDefault?.(); w.vivo = false; };
+      decodificadores.push(w);
+    }
+  } catch {}
+  return [];
+}
+if (enNavegador) decodificadoresVivos();   // arrancan ya, mientras llega el índice
+async function decodificarFuera(nombre, ancho, alto) {
+  await arranque;
+  const vivos = decodificadoresVivos(); if (!vivos.length) return null;
+  const w = vivos[idImagen % vivos.length], id = ++idImagen;
+  return new Promise(resolver => {
+    const plazo = setTimeout(() => { esperandoImagen.delete(id); resolver(null); }, 8000);
+    esperandoImagen.set(id, d => { clearTimeout(plazo); resolver(d.datos || null); });
+    w.postMessage({ id, url: new URL('assets/texturas/' + nombre, location.href).href, ancho, alto });
+  });
+}
 let lienzoLectura = null;
 async function bajarImagen(nombre, ancho, alto, bytes) {
   await turnoDescarga();
   try {
+    const fuera = await decodificarFuera(nombre, ancho, alto);
+    if (fuera) { decodificadasFuera++; descargas.hecho(bytes); return fuera; }
     const r = await fetch('assets/texturas/' + nombre); if (!r.ok) throw new Error(nombre + ': ' + r.status);
     const bmp = await createImageBitmap(await r.blob(), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
     lienzoLectura ||= typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(ancho, alto) : document.createElement('canvas');
@@ -46,7 +79,7 @@ let obreros = null;
 const colaBloquea = [], colaResto = [], promesas = [], todas = [], enCurso = new Map(), errores = [];
 // Diagnóstico de la carga (main.js lo envía al PC en la red local): qué texturas faltan y qué ha fallado.
 let hechasAqui = 0, hechasObreros = 0;
-if (typeof window !== 'undefined') window.__texturas = () => ({ faltan: [...enCurso.values()], enHiloPrincipal: hechasAqui, porObreros: hechasObreros, obreros: obreros ? obreros.length : null, errores: errores.slice(-3) });
+if (typeof window !== 'undefined') window.__texturas = () => ({ faltan: [...enCurso.values()], enHiloPrincipal: hechasAqui, porObreros: hechasObreros, obreros: obreros ? obreros.length : null, errores: errores.slice(-3), decodificadasFuera });
 // En el móvil, dos como mucho: junto con el obrero de la telaraña y el hilo principal no se satura el procesador.
 const movil = /Android|iPhone|iPad|Mobi/i.test(navigator.userAgent);
 const NUM_OBREROS = Math.max(1, Math.min(movil ? 2 : 4, (navigator.hardwareConcurrency || 2) - 1));
@@ -99,7 +132,7 @@ function iniciarObreros() {
 
 function dataTextura(ancho, alto, relleno) {
   const datos = new Uint8Array(ancho * alto * 4);
-  for (let i = 0; i < datos.length; i += 4) { datos[i] = relleno[0]; datos[i + 1] = relleno[1]; datos[i + 2] = relleno[2]; datos[i + 3] = 255; }
+  new Uint32Array(datos.buffer).fill(new Uint32Array(new Uint8Array([relleno[0], relleno[1], relleno[2], 255]).buffer)[0]);   // (de una vez: el bucle tardaba ~1 s en un móvil)
   const t = new THREE.DataTexture(datos, ancho, alto, THREE.RGBAFormat);
   // Filas de arriba abajo, como un lienzo: se voltean al subirlas (igual que CanvasTexture).
   t.flipY = true; t.wrapS = THREE.RepeatWrapping; t.anisotropy = 4;

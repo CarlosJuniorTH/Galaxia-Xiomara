@@ -74,15 +74,25 @@ export function crearEfectos() {
 
   function cuadro(ahora) {
     pendiente = 0;
-    // Como mucho a 60 por segundo (en una pantalla de 120 Hz se dibujaba y componía el doble de veces que el 3D).
-    if (ahora - anterior < 14 && (parts.length || fugaces.length)) { pendiente = requestAnimationFrame(cuadro); return; }
+    // Siempre se pide el siguiente cuadro primero: si algo fallara al dibujar, la animación sigue y nada se queda
+    // congelado en la pantalla (antes, un fallo a mitad dejaba la estrella fugaz quieta para siempre).
+    if (parts.length || fugaces.length) pendiente = requestAnimationFrame(cuadro);
+    else { ctx.clearRect(0, 0, W, H); return; }
+    // Como mucho a 60 por segundo (en una pantalla de 120 Hz se dibujaba y componía el doble de veces que el 3D). Con el
+    // reloj del sistema (la marca del cuadro de algunos navegadores va por detrás de performance.now()).
+    ahora = performance.now();
+    if (ahora - anterior < 14) return;
     const paso = Math.min(2, Math.max(0, (ahora - anterior) / (1000 / 60))); anterior = ahora;
-    if (!parts.length && !fugaces.length) { ctx.clearRect(0, 0, W, H); return; }
+    try { dibujar(paso, ahora); } catch (e) { parts.length = 0; fugaces.length = 0; ctx.restore?.(); ctx.setTransform(Math.min(devicePixelRatio, 2), 0, 0, Math.min(devicePixelRatio, 2), 0, 0); ctx.clearRect(0, 0, W, H); console.warn('Efectos', e); }
+  }
+  function dibujar(paso, ahora) {
     ctx.clearRect(0, 0, W, H);
 
     ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
     for (let i = fugaces.length - 1; i >= 0; i--) {
       const f = fugaces[i], [r, gr, b] = f.tono;
+      f.nacio ??= ahora;
+      if (ahora - f.nacio > 8000) { fugaces.splice(i, 1); continue; }   // ninguno dura tanto: por si acaso, nunca se queda
       if (!f.fin) {
         f.x += f.vx * paso; f.y += f.vy * paso; f.vida -= f.dec * paso;
         f.rastro.push({ x: f.x, y: f.y, edad: 0 });
@@ -133,8 +143,6 @@ export function crearEfectos() {
       trazarCorazon(ctx, 0, 0, p.s * (0.6 + 0.4 * p.vida)); ctx.fill();
       ctx.restore();
     }
-    // Limpiar también el último fotograma antes de dejar el lienzo en reposo.
-    pendiente = requestAnimationFrame(cuadro);
   }
 
   // Texto flotante (al tocar la pantalla)

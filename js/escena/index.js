@@ -30,6 +30,7 @@ import { crearRutas } from './camara/rutas.js';
 import { crearMaravillas } from './maravillas.js';
 import { crearPolvo } from './polvo.js';
 import { texturasListas, texturasTodas } from './fabricaTexturas.js';
+import { hornoListo } from '../util/horno.js';
 import { DESTINOS, LEJANOS } from '../data/universo.js';
 import { encuadreHogar, escalaSimbolos, desplazamientoZonaLibre, compensacionPuntos, distanciaDestino, correccionAlLlegar, cambioInterfazApreciable } from '../util/encuadre.js';
 import { esMovil } from '../util/dispositivo.js';
@@ -83,6 +84,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   const empiezaCapa = n => { window.__pasoCarga = 'capa ' + n; avance(enCapas(pesoHecho), enCapas(pesoHecho + pesoCapa(n))); };
   const terminaCapa = n => { pesoHecho += pesoCapa(n); avance(enCapas(pesoHecho)); };
   avance(0, 0.05);
+  await hornoListo;   // los cálculos horneados (se descargan desde el principio de la página, en paralelo con todo)
   // Todo el universo se construye con la misma semilla: el mapa no cambia entre cargas.
   const restaurarAzar = sembrarAzar(SEMILLA_UNIVERSO);
   // La construcción se reparte en pasos: entre capa y capa se cede el control al navegador para que la portada siga
@@ -291,9 +293,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     avance(0.88, 0.96);
     window.__pasoCarga = 'compilar'; await texturasListas(); await compilarTodo(scene); await compilarTodo(solar.escena);
     avance(0.96, 0.99);
-    window.__pasoCarga = 'subir'; subirTexturas(); subirTexturas(solar.escena); solarPreparado = true;
+    window.__pasoCarga = 'subir'; await subirTexturas(); await subirTexturas(solar.escena); solarPreparado = true;
     await new Promise(r => setTimeout(r, 0));
-    calentar(); avance(1);
+    await calentar(); avance(1);
   })();
   let vuelo = null, tiempo = 0, tEntrada = null, prev = performance.now(), pulso = 0, suspendida = false, cercaUniverso = Infinity, estrellasLocales = -1;
   const centroVia = cosmos.objetivo('sagitario')?.centro?.clone() ?? new THREE.Vector3();

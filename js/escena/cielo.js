@@ -8,6 +8,7 @@
 // carga y sin los ~33 MB del cubo en la tarjeta gráfica.
 import * as THREE from 'three';
 import { generador } from '../util/azarSemilla.js';
+import { horneado } from '../util/horno.js';
 
 // Ruido de valor 3D (el mismo hash que usaba el sombreador del cielo) para modular la densidad.
 const fr = x => x - Math.floor(x);
@@ -36,7 +37,17 @@ const CAPAS = [
 ];
 const PERFIL = 0.1678;   // ∫ del perfil del punto (pow(1 − 2d, 1,6) en el disco) sobre el cuadrado del punto
 
+// (Horneadas: en un móvil sin compilador de JavaScript generarlas tardaba más de un segundo; vienen ya hechas.)
 function crearEstrellas() {
+  const { pos, col, luz } = horneado('estrellas del cielo de casa', calcularEstrellas);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
+  g.setAttribute('aLuz', new THREE.BufferAttribute(luz, 1));
+  g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e9);
+  return g;
+}
+function calcularEstrellas() {
   const rnd = generador(37011), pos = [], col = [], luz = [], S = 3.7;
   for (const capa of CAPAS) {
     const omega = 1 / (capa.celdas * capa.celdas);   // ángulo sólido de una celda: la luz de cada estrella era su valor × esa área
@@ -54,12 +65,7 @@ function crearEstrellas() {
       pos.push(x, y, z); col.push(...capa.color); luz.push(capa.brillo(azarBrillo) * omega);
     }
   }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('aColor', new THREE.Float32BufferAttribute(col, 3));
-  g.setAttribute('aLuz', new THREE.Float32BufferAttribute(luz, 1));
-  g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e9);
-  return g;
+  return { pos: new Float32Array(pos), col: new Float32Array(col), luz: new Float32Array(luz) };
 }
 
 export function crearCielo({ scene, camera, uScale }) {

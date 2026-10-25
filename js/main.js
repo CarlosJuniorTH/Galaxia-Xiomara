@@ -7,6 +7,7 @@ import { crearContador } from './ui/contador.js';
 import { crearMensajes } from './ui/mensajes.js';
 import { crearCarta } from './ui/carta.js';
 import { crearRecuerdos } from './ui/recuerdos.js';
+import './util/horno.js';   // empieza a descargar los cálculos horneados en cuanto arranca la página
 import { crearEfectos } from './ui/efectos.js';
 import { escucharToques } from './ui/toques.js';
 import { crearProgreso } from './util/progreso.js';

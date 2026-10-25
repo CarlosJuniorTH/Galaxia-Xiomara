@@ -4,7 +4,12 @@
 // la Roseta), 'filamentos' (remanente antiguo: velos finos y rotos), 'reflexion' (nube suave),
 // 'oscura' (núcleo de polvo con borde brillante), 'pilares' (columnas con cabezas iluminadas).
 // Canales: R densidad del gas, G ruido, B polvo.
+import { horneado } from './horno.js';
+// (Horneado: en el móvil sin compilador de JavaScript tardaba segundos; viene ya calculado.)
 export function crearAtlasNebulosa(semilla = 1, corazon = false, lado = 32, variante = null) {
+  return horneado(`nebulosa ${semilla} ${corazon} ${lado} ${variante}`, () => calcularAtlas(semilla, corazon, lado, variante), calcularAtlas);
+}
+function calcularAtlas(semilla, corazon, lado, variante) {
   const columnas = 8, filas = Math.ceil(lado / columnas), ancho = lado * columnas, alto = lado * filas;
   const datos = new Uint8Array(ancho * alto * 4);
   const hash = (x, y, z) => { let h = Math.imul(x + semilla * 31, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(z, 2147483647); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967295; };

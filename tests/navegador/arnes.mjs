@@ -32,7 +32,7 @@ export async function arrancarServidor(puerto = Number(process.env.PUERTO_PRUEBA
 }
 export function pararServidor() { servidor?.kill(); servidor = null; }
 
-export async function abrir(base, perfil = 'pc', { espera = 2500, calidad = 'alta' } = {}) {
+export async function abrir(base, perfil = 'pc', { espera = 2500, calidad = 'alta', consulta = '' } = {}) {
   if (!existsSync(CHROME)) { console.error('No encuentro Chromium en ' + CHROME + ' (variable CHROME).'); process.exit(2); }
   const navegador = await chromium.launch({ executablePath: CHROME, headless: true, args: process.env.GL === 'sw' ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : ['--enable-gpu', '--ignore-gpu-blocklist', '--use-angle=vulkan', '--enable-features=Vulkan'] });
   const contexto = await navegador.newContext(PERFILES[perfil]);
@@ -40,7 +40,7 @@ export async function abrir(base, perfil = 'pc', { espera = 2500, calidad = 'alt
   const errores = [];
   pagina.on('console', m => { if (m.type() === 'error') errores.push(m.text()); });
   pagina.on('pageerror', e => errores.push('pageerror: ' + e.message));
-  await pagina.goto(`${base}/?calidad=${calidad}#debug`);
+  await pagina.goto(`${base}/?calidad=${calidad}${consulta}#debug`);
   await pagina.waitForFunction(() => document.getElementById('btn-entrar')?.classList.contains('preparado'), null, { timeout: 90000 });
   await pagina.click('#btn-entrar');
   await pagina.waitForFunction(() => window.__galaxia && !window.__galaxia.escena.viajando && document.body.classList.contains('dentro'), null, { timeout: 40000 });
