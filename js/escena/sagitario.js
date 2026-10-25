@@ -12,8 +12,9 @@ import * as THREE from 'three';
 import { GLSL_LENTE, GLSL_TAMANO, GLSL_OCULTA, geometriaMotas, materialMotas, crearAnilloFotones } from './curvaLuz.js';
 import { materialSombra } from './materiales.js';
 import { ESTRELLAS_S, reposoSagitario, segundosPorAno, marcasSagitario } from '../util/guionSagitario.js';
+import { atenuarFondo } from '../util/fondoEscena.js';
 
-const N_FLUJO = 6000, N_ESPIRAL = 16000, N_POLVO = 8000, N_GRUMO = 700;
+const N_FLUJO = 9000, N_ESPIRAL = 16000, N_POLVO = 8000, N_GRUMO = 700;
 // Motas de cada traza: S2 (la protagonista) más densa; el resto, en proporción a lo largo de su elipse.
 const N_S2 = 1800, N_OTRA = 820;
 // Compresión de las distancias (real en segundos de arco → radios de la sombra): R = K·r^0,4. S2 pasa a 1,75 radios de la
@@ -56,7 +57,7 @@ export function* construirSagitario({ uScale, uPR, RS, grupo }) {
   let flujo;
   {
     const d = new Float32Array(N_FLUJO * 3), tam = new Float32Array(N_FLUJO);
-    for (let i = 0; i < N_FLUJO; i++) { const r = 1.18 + Math.pow(al(), 1.4) * 1.7; d.set([r, al() * Math.PI * 2, (al() - 0.5) * 0.45], i * 3); tam[i] = 0.025 + al() * 0.025; }
+    for (let i = 0; i < N_FLUJO; i++) { const r = 1.18 + Math.pow(al(), 1.4) * 1.7; d.set([r, al() * Math.PI * 2, (al() - 0.5) * 0.45], i * 3); tam[i] = 0.03 + al() * 0.03; }
     flujo = new THREE.Points(geometriaMotas({ aFlujo: [d, 3], aTam: [tam, 1], position: [new Float32Array(N_FLUJO * 3), 3] }, RS * 3.5), materialMotas({
       ...comunes, uCamLocal: { value: new THREE.Vector3(0, 0, 1e6) }, uDestello: { value: 0 }, uMancha: { value: 0 }, uManchaAng: { value: 0 }, uAlimento: { value: 1 }
     }, /* glsl */`
@@ -75,7 +76,7 @@ export function* construirSagitario({ uScale, uPR, RS, grupo }) {
         c = mix(c, vec3(1.0, 0.97, 0.92), clamp(uDestello * 0.4 + mancha, 0.0, 1.0));
         // Hambriento (uAlimento bajo) el flujo es casi oscuro y rojizo; con cada grumo tragado se aviva.
         c = mix(vec3(0.85, 0.32, 0.2), c, uAlimento);
-        float brillo = clamp(dop, 0.2, 2.0) * (1.18 / r) * (uAlimento + uDestello * 2.2) * 0.9 + mancha * 3.2;
+        float brillo = clamp(dop, 0.2, 2.0) * (1.18 / r) * (uAlimento + uDestello * 1.8) * 1.35 + mancha * 3.2;
         vec4 im = imagenLente((modelViewMatrix * vec4(pl * uR, 1.0)).xyz, aImagen);
         if (im.w <= 0.001) { ${GLSL_OCULTA} }
         gl_Position = projectionMatrix * vec4(im.xyz, 1.0);
@@ -164,7 +165,7 @@ export function* construirSagitario({ uScale, uPR, RS, grupo }) {
         float cerca = smoothstep(1.5, 4.0, -mv.z / uUnidad);
         float e = eco(length(position) / uR), luzEco = e * 5.0 + uEncendido * 1.5;
         vC = mix(aColor, vec3(1.0, 0.86, 0.74), clamp(e * 0.6, 0.0, 0.7));
-        vA = luz * 0.3 * cerca * (0.8 + 0.2 * sin(uT * (0.5 + aFase * 0.5) + aFase * 30.0)) * (1.0 + luzEco);
+        vA = luz * 0.45 * cerca * (0.8 + 0.2 * sin(uT * (0.5 + aFase * 0.5) + aFase * 30.0)) * (1.0 + luzEco);
       }`));
     grupo.add(gas);
   }
@@ -190,7 +191,7 @@ export function* construirSagitario({ uScale, uPR, RS, grupo }) {
     let j = 0;
     for (let i = 0; i < N_EST; i++) for (let k = 0; k < cuantas[i]; k++, j++) {
       est.set([i, k / cuantas[i]], j * 2); col.set(color(i), j * 3);
-      tam[j] = k === 0 ? (i === 0 ? 0.13 : 0.1) : 0.042;
+      tam[j] = k === 0 ? (i === 0 ? 0.16 : 0.1) : i === 0 ? 0.06 : 0.042;
     }
     trazas = new THREE.Points(geometriaMotas({ aEst: [est, 2], aTam: [tam, 1], aColor: [col, 3], position: [new Float32Array(n * 3), 3] }, RS * 13), materialMotas({
       ...comunes,
@@ -222,7 +223,7 @@ export function* construirSagitario({ uScale, uPR, RS, grupo }) {
         float cabeza = step(k, 0.0001);
         // La traza: viva cerca de la estrella, tenue en el resto de la elipse; crece con la escena (uTraza).
         float largo = max(uTraza, 0.05), estela = mix(0.16, 1.0, pow(1.0 - min(k / largo, 1.0), 1.3)) * (1.0 - smoothstep(largo - 0.06, largo, k));
-        float foco = i == 0 ? 1.0 + 0.5 * uFoco : 1.0 - 0.6 * uFoco;
+        float foco = i == 0 ? 1.5 + 0.5 * uFoco : 1.0 - 0.6 * uFoco;   // S2, la protagonista, siempre más viva
         float brillo = mix(estela * 0.75, i == 0 ? 2.4 : 1.6, cabeza) * foco * (1.0 + eco(R) * 1.6);
         // S2 se sonroja al rozar el agujero (corrimiento al rojo gravitatorio).
         float roce = i == 0 ? 1.0 - smoothstep(1.8, 3.2, R) : 0.0;
@@ -231,6 +232,8 @@ export function* construirSagitario({ uScale, uPR, RS, grupo }) {
         if (im.w <= 0.001) { ${GLSL_OCULTA} }
         gl_Position = projectionMatrix * vec4(im.xyz, 1.0);
         float luz; gl_PointSize = tamanoMota(aTam * uUnidad, -im.z, luz);
+        // La cabeza de S2, un poco mayor que el resto de motas (hasta 4 px CSS): se distingue entre las demás estrellas.
+        if (i == 0 && cabeza > 0.5) gl_PointSize = min(gl_PointSize * 1.35, 4.0 * uPR);
         vC = c; vA = brillo * luz * im.w * (1.0 + roce * cabeza * 0.5);
       }`));
     grupo.add(trazas);
@@ -243,7 +246,7 @@ export function* construirSagitario({ uScale, uPR, RS, grupo }) {
   const tmp = new THREE.Vector3(), centro = new THREE.Vector3(), qa = new THREE.Quaternion(), qb = new THREE.Quaternion();
   // Anomalía media de cada estrella. S2 sin envolver (las vueltas cuentan para la roseta).
   const marcas = marcasSagitario(), spa = segundosPorAno(marcas), ritmo = estrellas.map(s => DOS_PI / (s.anos * spa));
-  let giro = 0, escenaVista = null, baseS2 = 0;
+  let giro = 0, escenaVista = null, baseS2 = 0, atenuando = false;
   const kepler = (M, e) => { let E = M; for (let n = 0; n < 6; n++) E -= (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E)); return E; };
   return {
     sombra, anillo, flujo, gas, trazas, grumos, RS,
@@ -281,6 +284,10 @@ export function* construirSagitario({ uScale, uPR, RS, grupo }) {
       uf.uDestello.value = s.destello * w; uf.uMancha.value = s.mancha * w; uf.uManchaAng.value = s.manchaAng;
       for (let i = 0; i < 4; i++) { comunes.uEcos.value.setComponent(i, s.ecos[i]); comunes.uEcosF.value.setComponent(i, s.ecosF[i] * w); }
       gas.material.uniforms.uEncendido.value = s.encendido * w;
+      // Las nebulosas del fondo (nubes rojas y moradas que llenaban el encuadre) se apagan mientras dura el clip: el
+      // protagonista es el agujero. En la calma vuelven a medias; al irse, del todo.
+      if (escena) { atenuando = true; atenuarFondo(centro.x, centro.y, centro.z, unidad * 60, w * (0.88 - 0.4 * s.calma)); }
+      else if (atenuando) { atenuando = false; atenuarFondo(0, 0, 0, 0, 0); }
       const alimento = 1 + (s.alimento - 1) * w, ug = grumos.material.uniforms;
       uf.uAlimento.value = alimento; ug.uTs.value = s.t; ug.uGrumos.value = w;
       ug.uIni.value.fromArray(s.grumosIni); ug.uFin.value.fromArray(s.grumosFin);
@@ -288,7 +295,7 @@ export function* construirSagitario({ uScale, uPR, RS, grupo }) {
       anillo.lookAt(camera.position);
       const c = uf.uCamLocal.value; tmp.set(c.z, 0, -c.x).normalize().applyQuaternion(planoFlujo.getWorldQuaternion(qa)).applyQuaternion(anillo.getWorldQuaternion(qb).invert());
       anillo.material.uniforms.uLado.value.set(tmp.x, tmp.y).normalize();
-      anillo.material.uniforms.uLuz.value = 0.9 * (0.3 + 0.7 * alimento) + (s.inspira + s.destello * 1.3) * w;
+      anillo.material.uniforms.uLuz.value = 1.6 * (0.3 + 0.7 * alimento) + (s.inspira + s.destello * 1.3) * w;
     }
   };
 }

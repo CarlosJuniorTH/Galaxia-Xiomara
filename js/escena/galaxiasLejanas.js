@@ -4,6 +4,7 @@
 // acompaña a la cámara (fondo óptico a distancia infinita: nada de lo que se descubre está ahí).
 import { crearIndiceEsferas } from '../util/indiceEsferas.js';
 import * as THREE from 'three';
+import { factorFondo } from '../util/fondoEscena.js';   // el videoclip de un gigante apaga las nebulosas de su encuadre
 import { esMovil, texturasLigeras } from '../util/dispositivo.js';
 import { azar } from '../util/dibujo.js';
 import { ceder, porTramos, cederSiToca } from '../util/azarSemilla.js';
@@ -140,8 +141,8 @@ export async function crearGalaxiasLejanas({ scene, uPR, uScale }) {
         // Por debajo de ~4 px el volumen no aporta forma y su polvo oscurecía un recuadro: no se dibuja.
         // Sin imagen aún, no se dibuja; al llegar, fundido. Se enciende muy despacio con su tamaño en pantalla (de 1,5 a 25 px): de lejos aparece tenue y va ganando
         // presencia al acercarse, sin encenderse de golpe.
-        if (n.malla) { const lista = n.tex.userData.lista, k = THREE.MathUtils.smoothstep(px, 1.5, 25) * (lista ? THREE.MathUtils.smoothstep(ahora - lista, 0, 2500) : 0); n.malla.visible = k > 0.002; n.malla.material.uniforms.uOpacidad.value = k * k; }
-        if (n.interior) { n.interior.visible = px > 20; n.interior.material.uniforms.uOpacidad.value = THREE.MathUtils.smoothstep(px, 20, 120); }
+        if (n.malla) { const lista = n.tex.userData.lista, k = THREE.MathUtils.smoothstep(px, 1.5, 25) * (lista ? THREE.MathUtils.smoothstep(ahora - lista, 0, 2500) : 0); n.malla.visible = k > 0.002; n.malla.material.uniforms.uOpacidad.value = k * k * factorFondo(n.pos.x, n.pos.y, n.pos.z); }
+        if (n.interior) { n.interior.visible = px > 20; n.interior.material.uniforms.uOpacidad.value = THREE.MathUtils.smoothstep(px, 20, 120) * factorFondo(n.pos.x, n.pos.y, n.pos.z); }
       }
     }
   };

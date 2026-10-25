@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { Q, texturasLigeras } from '../util/dispositivo.js';
 import { descargas } from '../util/descargas.js';   // MB en la pantalla de carga
+import { FONDO_ESCENA } from '../util/fondoEscena.js';   // el videoclip de un gigante apaga sus paredes de polvo
 
 const CARAS = ['px', 'nx', 'py', 'ny', 'pz', 'nz'];
 
@@ -45,7 +46,8 @@ export function crearCieloProfundo({ renderer, scene }) {
     ampliar(k) { ampliacion = k; uI.value = base * ampliacion; },
     actualizar() {
       // Aparece con un fundido suave cuando sus imágenes ya están en la GPU.
-      uVisible.value = listo ? Math.min(1, (performance.now() - listo) / 1500) : 0;
+      // Durante el videoclip de un gigante (js/util/fondoEscena.js) las paredes de polvo se atenúan: no le roban el encuadre.
+      uVisible.value = (listo ? Math.min(1, (performance.now() - listo) / 1500) : 0) * (1 - 0.92 * FONDO_ESCENA.k);
       fondo.visible = uVisible.value > 0 && uI.value > 0.003;
     }
   };

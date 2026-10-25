@@ -1,6 +1,6 @@
 // El universo propio de cada gigante: al acercarse a la supernova, al cuásar, a TON 618 o al púlsar
 // aparece otro cielo, con sus estrellas, su velo de color y sus constelaciones (dibujos nuestros:
-// un corazón, un infinito, una flecha de Cupido…). Son puntos con posición 3D fija alrededor del
+// el Cisne, la Tetera de Sagitario, los cuernos del Toro, una corona…). Son puntos con posición 3D fija alrededor del
 // destino: al girar cambia su perspectiva. Desde casa no se ven (están a millones de unidades y se
 // encienden solo al entrar en su región); allí, el cielo de casa se ha apagado (index.js, «locales»).
 // Las galaxias de fondo de cada destino están en el catálogo (js/data/catalogo.js, universosLlegada).
@@ -21,7 +21,12 @@ const PALETAS = {
 // Constelaciones: puntos en un plano (−1…1) y trazos entre ellos.
 const FIGURAS = {
   corazon: { curva: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], p: [[0.000, 0.394], [0.038, 0.524], [0.250, 0.749], [0.611, 0.776], [0.899, 0.523], [0.899, 0.140], [0.611, -0.224], [0.250, -0.540], [0.038, -0.795], [0.000, -0.900], [-0.038, -0.795], [-0.250, -0.540], [-0.611, -0.224], [-0.899, 0.140], [-0.899, 0.523], [-0.611, 0.776], [-0.250, 0.749], [-0.038, 0.524]], t: [] },
-  infinito: { curva: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], p: [[1.000, 0.000], [0.868, 0.322], [0.601, 0.424], [0.355, 0.345], [0.162, 0.185], [0.000, 0.000], [-0.162, -0.185], [-0.355, -0.345], [-0.601, -0.424], [-0.868, -0.322], [-1.000, -0.000], [-0.868, 0.322], [-0.601, 0.424], [-0.355, 0.345], [-0.162, 0.185], [-0.000, 0.000], [0.162, -0.185], [0.355, -0.345], [0.601, -0.424], [0.868, -0.322]], t: [] },
+  // Asterismos reales, simplificados: el Cisne (Deneb es su cola), la Tetera de Sagitario (Sgr A* está junto a su pico),
+  // los cuernos del Toro (el Cangrejo y su púlsar están en la punta de uno), y un faro de dos haces para el cuásar.
+  cisne: { p: [[0, 1], [0, 0.25], [0, -0.35], [0.05, -1], [-0.85, 0.42], [-0.42, 0.33], [0.42, 0.17], [0.85, 0.05]], t: [[0, 1], [1, 2], [2, 3], [4, 5], [5, 1], [1, 6], [6, 7]] },
+  tetera: { p: [[-0.85, 0.15], [-0.85, -0.5], [-0.25, -0.62], [0.25, -0.5], [0.85, -0.05], [0.25, 0.12], [-0.3, 0.2], [-0.05, 0.7]], t: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 3], [5, 6], [6, 0], [6, 7], [7, 5]] },
+  toro: { p: [[0, -0.55], [-0.28, -0.15], [-0.55, 0.25], [-1, 0.9], [0.28, -0.15], [0.55, 0.25], [0.95, 0.75], [0.1, -0.9]], t: [[0, 1], [1, 2], [2, 3], [0, 4], [4, 5], [5, 6], [0, 7]] },
+  faro: { p: [[0, 0], [0, 0.45], [0, 1], [0, -0.45], [0, -1], [-0.3, 0.15], [0.3, -0.15]], t: [[0, 1], [1, 2], [0, 3], [3, 4], [5, 0], [0, 6]] },
   estrella: { p: [[0, 1], [0.24, 0.32], [0.95, 0.3], [0.38, -0.12], [0.59, -0.81], [0, -0.38], [-0.59, -0.81], [-0.38, -0.12], [-0.95, 0.3], [-0.24, 0.32]], t: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8], [8, 9], [9, 0]] },
   flecha: { p: [[-1, -0.6], [-0.3, -0.18], [0.45, 0.27], [1, 0.6], [0.72, 0.62], [0.95, 0.32], [-0.85, -0.38], [-0.82, -0.75], [-0.6, -0.42]], t: [[0, 1], [1, 2], [2, 3], [3, 4], [3, 5], [0, 6], [0, 7], [1, 8]] },
   corona: { p: [[-0.9, -0.5], [-0.9, 0.35], [-0.45, -0.05], [0, 0.65], [0.45, -0.05], [0.9, 0.35], [0.9, -0.5]], t: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 0]] },
@@ -30,13 +35,13 @@ const FIGURAS = {
 // Constelaciones de cada destino: figura, ángulo respecto a la mirada de llegada (grados), giro
 // alrededor de ella y tamaño angular (grados). Las primeras se ven al llegar, en los bordes.
 const CIELOS = {
-  // La supernova, sin constelaciones con figura: su único corazón es el que nace de sus chispas (Carlos no quiere
-  // corazones ni infinitos hechos con estrellas en el cielo de los gigantes).
+  // Sin corazones ni infinitos de estrellas junto a los gigantes (Carlos no los quiere): cada uno, figuras de su cielo.
+  // La supernova, sin figuras: su único corazón es el que nace de sus chispas.
   supernova: [],
-  cuasar: [['corazon', 23, 140, 4.5], ['infinito', 24, 330, 4.5]],
-  ton618: [['corazon', 24, 320, 4.5], ['infinito', 24, 140, 4.5]],
-  pulsar: [['corazon', 23, 135, 4.5], ['infinito', 24, 315, 4.5]],
-  sagitario: [['flecha', 23, 45, 4.5], ['estrella', 24, 225, 4.5]],   // la flecha del arquero (Sagitario); sin corazones ni infinitos
+  cuasar: [['faro', 23, 140, 4.5], ['estrella', 24, 330, 4.5]],
+  ton618: [['corona', 24, 320, 4.5], ['luna', 24, 140, 4.5]],
+  pulsar: [['toro', 23, 135, 4.5], ['estrella', 24, 315, 4.5]],
+  sagitario: [['tetera', 23, 45, 4.5], ['flecha', 24, 225, 4.5]],   // la Tetera de Sagitario y la flecha del arquero
   deneb: []   // sin figuras de estrellas: su historia la cuenta la estrella que nace (deneb.js)
 };
 
@@ -101,7 +106,7 @@ export function* construirUniversoLocal({ scene, uPR, uScale, centros }) {
     }));
     velo.renderOrder = -30; velo.frustumCulled = false; grupo.add(velo);
     // ── Constelaciones: vistas de frente desde la llegada. Las estrellas principales brillan con su
-    // destello en cruz; los trazos son hilos de polvo de estrellas (curvos en el corazón, el infinito y
+    // destello en cruz; los trazos son hilos de polvo de estrellas (curvos en el corazón y
     // la luna) con un resplandor suave y un destello que recorre el dibujo. Se encienden al llegar. ──
     const puntosC = [], colC = [], tamC = [], hilo = [], colH = [], tamH = [], recorrido = [], espH = [];
     const u1 = new THREE.Vector3().crossVectors(eje, new THREE.Vector3(0, 1, 0)).normalize();
