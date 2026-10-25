@@ -18,6 +18,9 @@ function aCompases(t, a, b, compas) {
 // «I Wanna Be Yours» va a 136 BPM con aire de 68: un latido cada dos tiempos es un corazón en reposo.
 export const PULSO = Object.freeze({ ton618: { periodo: 0.4445, inicio: 0 }, sagitario: { periodo: 0.5862, inicio: 0 } });
 export const DURACION = Object.freeze({ ton618: 37.3, sagitario: 38.1 });
+// Pistas de cámara de sus videoclips (formato: js/util/directorCamara.js; segundos del fragmento, radios de encuadre).
+// null: sin pista (la cámara se queda en la llegada con los controles bloqueados; TON 618 deriva despacio).
+export const CAMARA_AGUJEROS = { ton618: null, sagitario: null };
 // Marcas por defecto (las mismas que js/data/bandaSonora.js; si allí faltan, la escena conserva su guion).
 const POR_DEFECTO = {
   ton618: { secretos: 1.4, esconder: 4.6, serTuyo: 8.0, estribillo: 10.7, tuyo1: 16.4, tuyo2: 20.4, estribillo2: 23.1, ultimoTuyo: 32.5, fundido: 35 },

@@ -7,6 +7,10 @@
 // revela con «I said ooh» (53,8, también en compás); queda el recuerdo (57,3) y la ceremonia se cierra con el fundido final.
 // espera: del principio al estallido; formar, formado, revelar y reposo: desde el estallido.
 export const TIEMPOS_AMOR = Object.freeze({ espera: 41.7, silencio: 0.85, formar: 4, formado: 12.12, revelar: 15.56, reposo: 20.6 });
+// Pista de cámara de la ceremonia (formato: js/util/directorCamara.js), en segundos de «Sparks» desde el principio de la
+// ceremonia (el estallido, en TIEMPOS_AMOR.espera) y en radios del encuadre del corazón ya nacido. null: sin pista (la
+// cámara se acerca a la estrella y se retira al corazón como siempre, index.js verEstallido).
+export const CAMARA_SUPERNOVA = null;
 
 // La animación se diseñó con otro reloj (14 s de espera; formar 4, formado 16, revelar 19, reposo 25) y se conserva tal
 // cual: solo se estira y se reparte. Estos tramos llevan el tiempo real de la ceremonia al de la animación.

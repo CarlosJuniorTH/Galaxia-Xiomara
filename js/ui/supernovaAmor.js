@@ -3,7 +3,7 @@ import { FRASE_SUPERNOVA, RECUERDO_SUPERNOVA } from '../util/supernovaAmor.js';
 // La ceremonia de la supernova: solo mientras la estrella estalla y nace el corazón. Sin botones:
 // unas pocas palabras sobre la escena y una penumbra suave. Al terminar, el corazón queda como
 // un lugar más, con la misma tarjeta que los demás (volver a sentirlo y volver a casa).
-export function crearSupernovaAmor({ escena, progreso, musica, alDescubrir = () => {} }) {
+export function crearSupernovaAmor({ escena, progreso, musica, banda = null, alDescubrir = () => {} }) {
   const hoja = document.createElement('link'); hoja.rel = 'stylesheet'; hoja.href = new URL('../../css/supernova.css', import.meta.url).href; document.head.append(hoja);
   const raiz = document.createElement('section'); raiz.id = 'supernova-amor'; raiz.hidden = true;
   raiz.setAttribute('aria-label', 'De tanta luz, nacimos nosotros');
@@ -45,7 +45,9 @@ export function crearSupernovaAmor({ escena, progreso, musica, alDescubrir = () 
     try {
       // El sonido (la canción de la supernova, o los tonos sintéticos sin ella) empieza con la cuenta atrás de la escena:
       // espera = lo que le falta para estallar (si ya había empezado, la canción entra por ese mismo segundo).
-      const terminado = await escena.verEstallido({ repetir, alEmpezar: espera => { if (activa && mia === revision) sonido = musica.supernova?.(espera); }, alFase: fase => { if (activa && mia === revision) mostrarFase(fase); } });
+      // El reloj del videoclip (director de cámara): el segundo de «Sparks» mientras suena.
+      const reloj = () => banda?.suena?.('supernova') ? banda.tiempo('supernova') : null;
+      const terminado = await escena.verEstallido({ repetir, reloj, alEmpezar: espera => { if (activa && mia === revision) sonido = musica.supernova?.(espera); }, alFase: fase => { if (activa && mia === revision) mostrarFase(fase); } });
       if (activa && mia === revision && terminado) { mostrarFase('recuerdo'); await new Promise(r => setTimeout(r, 4500)); }
     } catch (error) { console.warn('La supernova conserva su recuerdo:', error); }
     if (mia === revision) cerrar();

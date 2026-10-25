@@ -14,7 +14,19 @@
 //              del centro hacia fuera y todo late al compás;
 //  segunda     segunda vuelta del estribillo: aún más fuerte y con luz rosa y dorada;
 //  fin         en los dos últimos segundos vuelve a girar normal.
-export const ESCENA_PULSAR = { id: 'pulsar', duracion: 33.6, pulso: 60 / 108, compas: 4, desfase: 0, parada: 'bailar', marcas: { inicio: 0, bailar: 1.4, corazon: 4.9, quererte: 12.5, estribillo: 15, segunda: 28, fin: 33.6 } };
+// camara: el videoclip (formato: js/util/directorCamara.js; segundos del fragmento, distancias en radios de encuadre).
+// Pista de ejemplo, sencilla, a la espera de la del agente del púlsar: se acerca mientras se para, rodea el corazón
+// mientras late, un golpe de cámara en el estribillo y una vuelta lenta y abierta en la segunda.
+export const ESCENA_PULSAR = { id: 'pulsar', duracion: 33.6, pulso: 60 / 108, compas: 4, desfase: 0, parada: 'bailar', marcas: { inicio: 0, bailar: 1.4, corazon: 4.9, quererte: 12.5, estribillo: 15, segunda: 28, fin: 33.6 },
+  camara: [
+    { t: 0, pos: [0, 12, 1], curva: 'suave' },
+    { t: 4.9, pos: [-18, 16, 0.78], fov: 54, curva: 'suave' },
+    { t: 12.5, pos: [-62, 22, 0.66], fov: 50, curva: 'lineal' },
+    { t: 14.6, pos: [-74, 20, 0.62], fov: 48, curva: 'lineal' },
+    { t: 15, pos: [-80, 10, 0.5], fov: 44, curva: 'rapida' },
+    { t: 27.5, pos: [-150, 14, 0.62], fov: 50, curva: 'suave' },
+    { t: 33.6, pos: [-190, 18, 0.95], fov: 60, curva: 'suave' }
+  ] };
 
 // Cuásar → cuasar.m4a (31 s): una voz de hombre, íntima, cuenta cómo se enamoró. «El faro que siempre te encuentra»
 // se calma al llegar (su gas casi se para) y se va encendiendo con la historia hasta «es mi mujer ideal».
@@ -29,10 +41,17 @@ export const ESCENA_PULSAR = { id: 'pulsar', duracion: 33.6, pulso: 60 / 108, co
 //  ideal     «Es mi mujer ideal» (27,6–28,7): el clímax: la luz llega a la punta de los chorros, una onda de motas sale
 //            del disco y la luz del faro sube por ellos;
 //  fin       se serena y vuelve a su estado normal.
-// camara: el videoclip. En cada marca (más un desfase en segundos) la cámara hace un tramo del recorrido del faro
-// (index.js, faro: siempre por fuera, sin cruzar el disco ni los chorros): se acerca, un arco lento alrededor, a lo largo
-// de los chorros y el encuadre final, que queda quieto para «es mi mujer ideal». Con movimiento reducido no se mueve.
-export const ESCENA_CUASAR = { id: 'cuasar', duracion: 31, camara: [['inicio', 0, 'inicio'], ['salir', 0, 'arco'], ['otras', 0, 'chorros'], ['reir', 1.2, 'final']], marcas: { inicio: 0, vi: 3.2, salir: 4.4, novios: 8, increible: 10.6, otras: 14.5, otrasFin: 20.2, reir: 21, risaFin: 25.5, disfrutar: 26, ideal: 27.6, cima: 28.7, fin: 31 } };
+// camara: el videoclip (formato: js/util/directorCamara.js). El recorrido del faro de antes pasado a la pista: siempre
+// por fuera (elevación 23–30° sobre el disco, sin cruzar el disco ni los chorros): se acerca, un arco lento alrededor con
+// «le pedí que saliéramos», a lo largo de los chorros con las otras mujeres y el encuadre final, quieto para «es mi mujer
+// ideal». Con movimiento reducido no se mueve.
+export const ESCENA_CUASAR = { id: 'cuasar', duracion: 31, camara: [
+    { t: 0, pos: [0, 30, 1.04], curva: 'suave' },
+    { t: 4.4, pos: [0, 30, 1.04], curva: 'suave' },
+    { t: 14.4, pos: [100, 24, 1.0], curva: 'suave' },
+    { t: 22, pos: [118, 23, 0.99], curva: 'suave' },
+    { t: 27.7, pos: [138, 27, 0.97], curva: 'suave' }
+  ], marcas: { inicio: 0, vi: 3.2, salir: 4.4, novios: 8, increible: 10.6, otras: 14.5, otrasFin: 20.2, reir: 21, risaFin: 25.5, disfrutar: 26, ideal: 27.6, cima: 28.7, fin: 31 } };
 
 // Deneb → deneb.m4a (43,4 s): «Middle» (DJ Snake), a 103 BPM (un compás cada 2,33 s). La supergigante late suave con
 // cada pulso de la canción (más en el primero de cada compás) y, con la canción, nace a su alrededor un mundo nuevo con ella en el medio.

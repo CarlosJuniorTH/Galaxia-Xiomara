@@ -43,6 +43,8 @@ import { nivelSeguro } from '../util/dispositivo.js';
 import { esquivar, sinRepetidos } from '../util/ruta.js';
 import { planificarVuelo } from '../util/vuelo.js';
 import { TIEMPOS_AMOR, faltaReal, desdeAnimacion } from '../util/supernovaAmor.js';
+import { pistaDe, muestrearCamara, mezclarMuestras, crearMuestra, esfericasACartesianas, cartesianasAEsfericas, ENTRADA, SALIDA, LIMITES } from '../util/directorCamara.js';
+import { finEscena } from '../util/guionAgujeros.js';
 import { aMal, SEMIEJES_CORAZON, ESCALA_SUPERNOVA, PROGENITORA_RELATIVA, LLEGADA_GIGANTE } from '../data/escalaCosmica.js';
 const RADIO_ESTRELLA = 110 * ESCALA_SUPERNOVA * PROGENITORA_RELATIVA;
 import { resolucionPostal, crearCapturador } from '../util/captura.js';
@@ -861,7 +863,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   function idealDelVuelo(llegada) { const d = distanciaIdeal()?.d; return d > 0 && Math.abs(llegada / d - 1) < 0.25 ? d : undefined; }
   const fijarEncuadre = () => { const n = distanciaIdeal(); encuadre = n ? { ...n, vw: vista.ancho, vh: vista.alto } : null; };
   function reencuadrar({ interfaz = false } = {}) {
-    if (vuelo || !encuadre || tEntrada === null) return;
+    if (vuelo || clip || !encuadre || tEntrada === null) return;
     if (interfaz) { if (gesto || ajuste || giro.moviendo || zoom.moviendo) return; }   // nunca contra un gesto, en plena inercia ni encima de otro ajuste
     else if (vista.ancho === encuadre.vw && Math.abs(vista.alto - encuadre.vh) / encuadre.vh < 0.2) return;
     medirZonaLibre(); const n = distanciaIdeal(); if (!n) return;
@@ -873,6 +875,94 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     controls.maxDistance = Math.max(controls.maxDistance * r, actual * r * 1.05);
     ajuste = { t: 0, desdeMira: controls.target.clone(), aMira: n.mira ? n.mira.clone() : controls.target.clone(), desdeD: actual, aD: actual * r };
     planificador.pedirCuadro();   // en pausa el bucle duerme: el ajuste necesita cuadros
+  }
+  // ── Director de cámara de los videoclips de los gigantes (pistas y formato: js/util/directorCamara.js) ──
+  // Mientras un gigante tiene su clip en curso, la cámara la lleva su pista con el segundo de su canción (el de su escena),
+  // los controles están bloqueados y no hay giro automático. Sin pista (o con movimiento reducido) la cámara se queda
+  // donde está (o la mueve la propia escena), también bloqueada. Al terminar, un fundido suave a un encuadre normal del
+  // gigante (a su distancia de llegada, en la dirección en que quedó; la supernova, al encuadre de su corazón) y el control
+  // vuelve con límites de zoom sensatos (LIMITES: 0,3–2,5 radios), sin heredar los que hubiera. Si se va a otro destino,
+  // se suelta en el acto. Marco de cada gigante: centro, radio R (su distancia de encuadre) y ejes x (derecha), y (arriba),
+  // z (hacia casa).
+  let clip = null;
+  const muestraClip = crearMuestra(), cartClip = [0, 0, 0], matrizClip = new THREE.Matrix4(), arribaClip = new THREE.Vector3(), relClip = new THREE.Vector3();
+  function marcoClip(id) {
+    const centro = lejano.centro.clone(), casa = centro.clone().negate().normalize();
+    const arriba = id === 'cuasar' ? cosmos.ejeCuasar() : id === 'ton618' ? new THREE.Vector3(0, 1, 0).applyQuaternion(cosmos.agujeros.ton618.planoDisco.getWorldQuaternion(new THREE.Quaternion())) : EJE_Y.clone();
+    arriba.normalize(); if (arriba.dot(casa) < 0) arriba.negate();   // elevación positiva: del lado de casa
+    const z = casa.clone().projectOnPlane(arriba); if (z.lengthSq() < 1e-8) z.set(1, 0, 0).projectOnPlane(arriba); z.normalize();
+    const R = id === 'supernova' ? encuadreCorazon('lugar').distancia : lejano.dist;
+    return { centro, R, x: new THREE.Vector3().crossVectors(arriba, z).normalize(), y: arriba, z };
+  }
+  const aMundo = (v, m, salida) => salida.copy(m.centro).addScaledVector(m.x, v[0] * m.R).addScaledVector(m.y, v[1] * m.R).addScaledVector(m.z, v[2] * m.R);
+  const aMarco = (p, m, salida) => { relClip.subVectors(p, m.centro); salida[0] = relClip.dot(m.x) / m.R; salida[1] = relClip.dot(m.y) / m.R; salida[2] = relClip.dot(m.z) / m.R; return salida; };
+  function poseActual(m, s = crearMuestra()) { cartesianasAEsfericas(aMarco(camera.position, m, cartClip), s.pos); aMarco(controls.target, m, s.mira); s.fov = camera.fov; s.giro = 0; return s; }
+  // Coloca la cámara en la muestra s; kArriba: de la vertical del clip a la del universo (al devolver el control).
+  function colocarClip(s, m, desdeArriba, kArriba) {
+    aMundo(esfericasACartesianas(s.pos, cartClip), m, camera.position); aMundo(s.mira, m, controls.target);
+    arribaClip.copy(desdeArriba).lerp(EJE_Y, kArriba).normalize();
+    matrizClip.lookAt(camera.position, controls.target, arribaClip); camera.quaternion.setFromRotationMatrix(matrizClip);
+    if (s.giro) camera.rotateZ(s.giro * Math.PI / 180);
+    if (Math.abs(camera.fov - s.fov) > 1e-4) { camera.fov = s.fov; camera.updateProjectionMatrix(); }
+  }
+  // segundo(): el de la escena (null si aún no lo sabe); vivo(): sigue en curso. pista: la del gigante (o null).
+  function empezarClip(id, { segundo, vivo, pista = null }) {
+    if (clip) soltarClip(false);
+    if (!lejano || lejano.id !== id || destinoActual !== id) return;
+    const marco = marcoClip(id), conPista = pista && !movimientoReducido ? pista : null;
+    clip = { id, segundo, vivo, pista: conPista, marco, fase: 'clip', entrada: null, salida: null, arriba: conPista ? marco.y : EJE_Y };
+    if (conPista) {
+      muestrearCamara(conPista, 0, muestraClip);
+      if (conPista[0].curva !== 'corte') clip.entrada = { t: 0, dur: Math.min(ENTRADA, conPista[1] ? Math.max(0.4, conPista[1].t - conPista[0].t) : ENTRADA), desde: poseActual(marco) };
+    }
+    ajuste = null; controls.enabled = false; controls.autoRotate = false;
+    canvas.dataset.clip = id; canvas.dataset.clipFase = 'clip'; delete canvas.dataset.clipFin;
+    planificador.pedirCuadro();
+  }
+  function empezarSalida() {
+    const c = clip, m = c.marco, desde = poseActual(m), hasta = crearMuestra();
+    if (c.pista) desde.giro = muestraClip.giro;
+    if (c.id === 'supernova') { const e = encuadreCorazon('lugar'); cartesianasAEsfericas(aMarco(e.posicion, m, cartClip), hasta.pos); aMarco(e.objetivo, m, hasta.mira); }
+    else { hasta.pos[0] = desde.pos[0]; hasta.pos[1] = THREE.MathUtils.clamp(desde.pos[1], -30, 30); hasta.pos[2] = 1; }
+    c.fase = 'salida'; c.salida = { t: 0, dur: movimientoReducido ? 1 : SALIDA, desde, hasta };
+    canvas.dataset.clipFase = 'salida';
+  }
+  function avanzarClip(dt) {
+    const c = clip;
+    if (destinoActual !== c.id || !lejano || lejano.id !== c.id) { soltarClip(false); return; }
+    if (vuelo) return;   // un desplazamiento propio de la escena (la supernova sin pista) mueve la cámara
+    controls.enabled = false;
+    if (c.fase === 'clip' && !c.vivo()) empezarSalida();
+    if (c.fase === 'clip') {
+      if (!c.pista) return;
+      const s = c.segundo();
+      if (Number.isFinite(s)) muestrearCamara(c.pista, s, muestraClip);
+      if (c.entrada) {
+        c.entrada.t += dt; mezclarMuestras(c.entrada.desde, muestraClip, THREE.MathUtils.smootherstep(c.entrada.t, 0, c.entrada.dur), muestraClip);
+        if (c.entrada.t >= c.entrada.dur) c.entrada = null;
+      }
+      colocarClip(muestraClip, c.marco, c.arriba, 0);
+      return;
+    }
+    c.salida.t += dt;
+    const k = THREE.MathUtils.smootherstep(c.salida.t, 0, c.salida.dur);
+    colocarClip(mezclarMuestras(c.salida.desde, c.salida.hasta, k, muestraClip), c.marco, c.arriba, k);
+    if (c.salida.t >= c.salida.dur) soltarClip(true);
+  }
+  // completo: el clip terminó (encuadre normal y límites del zoom); si no, solo se devuelve lo bloqueado.
+  function soltarClip(completo) {
+    const c = clip; clip = null; if (!c) return;
+    delete canvas.dataset.clip; delete canvas.dataset.clipFase;
+    camera.up.copy(EJE_Y);
+    if (camera.fov !== FOV_BASE) { camera.fov = FOV_BASE; camera.updateProjectionMatrix(); }
+    if (vuelo) return;   // un viaje se ha llevado la cámara: él devuelve el control al llegar
+    controls.enabled = true; controls.autoRotate = false;
+    if (!completo || !lejano || lejano.id !== c.id) return;
+    lejano.dist = c.marco.R;
+    controls.minDistance = c.marco.R * LIMITES.min; controls.maxDistance = c.marco.R * LIMITES.max;
+    camera.lookAt(controls.target); controls.update();
+    fijarEncuadre(); ajuste = null;
+    canvas.dataset.clipFin = c.id;
   }
   // Cambios de interfaz sin redimensionar la ventana (una tarjeta que aparece o desaparece, otro
   // tamaño de texto, un panel): se observan las cajas que delimitan la franja libre.
@@ -922,7 +1012,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // sin tocar se pasaba a 30 aunque la vista siguiera deslizándose y el final del giro iba a frenitos.
     const motivo = vuelo ? 'vuelo' : gesto ? 'gesto' : giro.moviendo || zoom.moviendo ? 'inercia' : mirada && mirada.t < 1 ? 'mirada' : pulso > 0.02 ? 'pulso' : captura ? 'captura'
       : document.body.classList.contains('celebrando') || document.body.classList.contains('reuniendo') ? 'celebracion' : cosmos.escenas.animando ? 'escena' : tEntrada !== null && tiempo - tEntrada < 12 ? 'entrada'
-      : Math.abs(desplazamientoMeta - desplazamiento) > 0.5 ? 'encuadre' : cosmos.enEscenaAgujero ? 'escena' : '';
+      : Math.abs(desplazamientoMeta - desplazamiento) > 0.5 ? 'encuadre' : cosmos.enEscenaAgujero || clip ? 'escena' : '';
     const activo = !!motivo;
     const modo = planificador.decidir(ahora, { reposo, quieto: pausa && !vuelo && !captura, activo });
     if (modo === null) { if (reposo) prev = ahora; return; }
@@ -986,7 +1076,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       if (k >= 1) {
         delete canvas.dataset.viaje; delete canvas.dataset.fase; delete canvas.dataset.region; delete canvas.dataset.encuentro; delete canvas.dataset.distanciaMal; marca.classList.remove('activa'); campoVelocidad.direccion(null);
         if (camera.fov !== FOV_BASE) { camera.fov = FOV_BASE; camera.updateProjectionMatrix(); }
-        const fin = vuelo; vuelo = null; controls.enabled = true; controls.autoRotate = !pausa && giraSolo();
+        const fin = vuelo; vuelo = null; controls.enabled = !clip; controls.autoRotate = !pausa && giraSolo();
         // Encuadres cercanos con límites propios: explorar sin entrar en superficies.
         controls.minDistance = CERCA[destinoActual] ?? (lejano ? lejano.dist * 0.3 : 300);
         controls.maxDistance = destinoActual === 'hogar' ? 14000 : lejano ? lejano.dist * 3 : 4200;
@@ -1018,13 +1108,15 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       // Inercia de la cámara al soltar el dedo con tiempo real (como en los juegos): OrbitControls amortigua por cuadro;
       // el factor se ajusta a lo que ha durado este cuadro, así un cuadro más largo no frena el giro ni uno corto lo acelera.
       // OrbitControls (acercar/alejar) con su amortiguación ajustada al tiempo real; después, el giro propio (util/giro.js).
-      if (!mirada) { controls.dampingFactor = 1 - Math.pow(1 - AMORTIGUACION, THREE.MathUtils.clamp(dtReal * 60, 0.25, 4)); controls.update(dt); }
+      // (Con un clip que mueve la cámara, la lleva el director: avanzarClip, más abajo.)
+      const dirige = !!clip && (!!clip.pista || clip.fase === 'salida');
+      if (!mirada && !dirige) { controls.dampingFactor = 1 - Math.pow(1 - AMORTIGUACION, THREE.MathUtils.clamp(dtReal * 60, 0.25, 4)); controls.update(dt); }
       // Tope de 0,1 s (antes 0,05): tras un cuadro lento, la inercia avanza el tiempo que de verdad ha pasado (con un tope
       // menor se quedaba atrás y se notaba un frenito).
-      giro.actualizar(Math.min(0.1, dtReal), !mirada && !vuelo, ahora);
-      zoom.actualizar(Math.min(0.1, dtReal), !mirada && !vuelo);
+      giro.actualizar(Math.min(0.1, dtReal), !mirada && !vuelo && !dirige, ahora);
+      zoom.actualizar(Math.min(0.1, dtReal), !mirada && !vuelo && !dirige);
       // La escena de TON 618 mueve la cámara muy despacio (cosmos.derivar); si la persona la toca, deja de hacerlo.
-      if (!mirada && !movimientoReducido) cosmos.derivar(camera, controls.target, dt, gesto || giro.moviendo || zoom.moviendo);
+      if (!mirada && !movimientoReducido && !dirige) cosmos.derivar(camera, controls.target, dt, gesto || giro.moviendo || zoom.moviendo);
     }
     if (ajuste && !vuelo) {
       // Mantiene la dirección actual de la cámara (su órbita) y cambia la distancia y el punto de mira.
@@ -1036,6 +1128,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       if (ajuste.t >= 1) ajuste = null;
       else planificador.pedirCuadro();   // en pausa el planificador solo dibuja a petición
     }
+    if (clip) avanzarClip(dtInterfaz);
     actualizarMirada(dtInterfaz);
     pulso *= Math.exp(-dt * 4.3);
     ctx.pulso = pulso; ctx.tiempoDentro = tEntrada === null ? null : tiempo - tEntrada; ctx.destino = vuelo ? null : destinoActual;
@@ -1291,7 +1384,11 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // Solo en #debug: acceso a la escena para vistas de diagnóstico por capas.
     get interno() { return diagnosticar ? { THREE, scene, camera, controls, renderer, bloom, nucleo, telarana, capaVolumen, cosmos, galaxia, planetas, solar, get escenaActiva() { return escenaActiva; }, lento: v => { escalaTiempo = v; }, get encuadre() { return estadoEncuadre(); }, get tiempo() { return tiempo; }, get estelas() { return campoVelocidad.mesh.material.uniforms.uFuerza.value; }, nube: { MUESTRAS: muestrasNube }, get curvaVuelo() { return vuelo ? { curva: vuelo.curva, desde: vuelo.curva.getPoint(0), hasta: vuelo.curva.getPoint(1), duracion: vuelo.duracion, transcurrido: vuelo.transcurrido, real: vuelo.real ?? vuelo.transcurrido, plan: vuelo.plan } : null; }, lejanas, cercania: cercaniaUniverso, get lente() { return { activa: nucleo.lente.enabled, uL: nucleo.lente.uniforms.uL.value.map(v => v.toArray()) }; } } : null; },
     // Escenas de TON 618 y Sagitario A* (js/ui/escenaAgujeros.js): empezar con el reloj de su canción o terminar (sin él).
-    escenaAgujero: (id, opciones) => cosmos.escenaAgujero(id, opciones),
+    escenaAgujero(id, opciones) {
+      cosmos.escenaAgujero(id, opciones);
+      if (opciones?.reloj) empezarClip(id, { segundo: () => cosmos.segundoAgujero(id), vivo: () => { const s = cosmos.segundoAgujero(id); return s !== null && s < finEscena(id); }, pista: pistaDe(id) });
+      else if (clip && (!id || clip.id === id)) soltarClip(false);
+    },
     get enEscenaAgujero() { return cosmos.enEscenaAgujero; },
     get destino() { return destinoActual; },
     get viajando() { return !!vuelo; },
@@ -1315,10 +1412,14 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       if (destinoActual === 'supernova') controls.autoRotate = false;
       return ok;
     },
-    async verEstallido({ repetir = false, alFase = () => {}, alEmpezar = () => {} } = {}) {
+    // reloj(): segundo de «Sparks» (bandaSonora.tiempo('supernova')); sin él (o mientras no suena), el tiempo de la ceremonia.
+    // Con pista de cámara (CAMARA_SUPERNOVA, js/util/supernovaAmor.js) la cámara la lleva el director: sin acercarse a la
+    // estrella al repetir ni retirarse al corazón (la pista ya cuenta esos planos).
+    async verEstallido({ repetir = false, alFase = () => {}, alEmpezar = () => {}, reloj = null } = {}) {
       if (!lejano || lejano.id !== 'supernova' || vuelo) return false;
-      const sn = cosmos.supernova;
-      if (repetir) {
+      const sn = cosmos.supernova, pista = movimientoReducido ? null : pistaDe('supernova');
+      if (repetir && pista) { sn.reiniciar(); alFase('encuentro'); }
+      else if (repetir) {
         sn.reiniciar(); alFase('encuentro');
         const c = lejano.centro, dir = camera.position.clone().sub(c).normalize();
         const dist = cosmos.objetivo('supernova').distancia * ESCALA_CIELO * Math.max(1, Math.min(1.6, 0.95 / camera.aspect));
@@ -1333,8 +1434,12 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       alEmpezar(espera);
       // La interfaz serializa las repeticiones; los cambios de destino cancelan.
       const inicio = sn;
-      let ultima = '', retrayendo = false; const t0Estallido = performance.now();
-      return new Promise(resolve => {
+      let ultima = '', retrayendo = !!pista, acabada = false; const t0Estallido = performance.now();
+      // El clip de la supernova: su segundo es el de la canción (o el de la ceremonia: la canción entra por TIEMPOS_AMOR.espera − espera).
+      const propio = () => TIEMPOS_AMOR.espera - espera + (performance.now() - t0Estallido) / 1000;
+      empezarClip('supernova', { segundo: () => { const r = reloj?.(); return Number.isFinite(r) && r > 0 ? r : propio(); }, vivo: () => !acabada, pista });
+      return new Promise(fin => {
+        const resolve = v => { acabada = true; fin(v); };
         const seguir = () => {
           if (destinoActual !== 'supernova' || cosmos.supernova !== inicio) { resolve(false); return; }
           if (!document.hidden) {
@@ -1361,13 +1466,20 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     async escenaGigante(id, { reloj = null, config = null } = {}) {
       if (!lejano || lejano.id !== id || vuelo || destinoActual !== id) return false;
       controls.autoRotate = false;
-      const terminada = await cosmos.escenas.iniciar(id, { reloj, config });
+      const promesa = cosmos.escenas.iniciar(id, { reloj, config });
+      // El videoclip: la cámara sigue la pista de la escena con su segundo (el de su canción) mientras está en curso.
+      empezarClip(id, { segundo: () => cosmos.escenas.segundo(id), vivo: () => cosmos.escenas.enCurso === id, pista: pistaDe(id, config) });
+      const terminada = await promesa;
       if (destinoActual === id && !vuelo) controls.autoRotate = !pausa && giraSolo();
       return terminada;
     },
     cancelarEscenaGigante: id => cosmos.escenas.cancelar(id),
     segundoEscena: id => cosmos.escenas.segundo(id),
     get escenaGiganteEnCurso() { return cosmos.escenas.enCurso; },
+    // El videoclip en curso (director de cámara): gigante, fase ('clip' o 'salida'), si sigue una pista y su segundo; y los
+    // límites del zoom y la distancia de la cámara al punto mirado (pruebas y diagnóstico).
+    get clip() { return clip ? { id: clip.id, fase: clip.fase, pista: !!clip.pista, segundo: clip.segundo() } : null; },
+    get camaraZoom() { return { distancia: camera.position.distanceTo(controls.target), min: controls.minDistance, max: controls.maxDistance, encuadre: lejano?.dist ?? null, bloqueada: !controls.enabled, fov: camera.fov }; },
     posicionCometa: () => mundos.posicionCometa(),
     besar() { pulso = 1; planificador.pedirCuadro(); },
     constelar() { mundos.constelar(); },

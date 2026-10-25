@@ -1,6 +1,7 @@
 // Escenas de llegada del púlsar, del cuásar y de Deneb: empiezan solas en cada visita (como la de la supernova), no se
 // pueden saltar y se cancelan, suaves, solo si se va a otro destino (eso lo vigila la escena 3D en cada cuadro). Sin
-// textos: las cuenta su canción. Duración, marcas y recorrido de cámara: js/util/escenasGigantes.js.
+// textos: las cuenta su canción. Duración, marcas y pista de cámara: js/util/escenasGigantes.js (la cámara la lleva el
+// director de js/escena/index.js con el segundo de la escena: js/util/directorCamara.js).
 //
 // Mientras dura, body[data-escena-en-curso] = id y el aviso 'escena-en-curso' ({ id, activa }) en document: el gancho
 // para que la interfaz oculte los controles de navegación (el mecanismo común `escenaEnCurso` de la banda sonora).
@@ -37,24 +38,11 @@ export function crearEscenasGigantes({ escena, banda = null }) {
     if (activa) document.body.dataset.escenaEnCurso = id; else delete document.body.dataset.escenaEnCurso;
     document.dispatchEvent(new CustomEvent('escena-en-curso', { detail: { id, activa } }));
   }
-  // El videoclip: cada tramo de cámara de la escena al pasar su marca (se mira 10 veces por segundo; un tramo que
-  // llega con más de 1,5 s de retraso, por ejemplo con la página oculta, se salta).
-  function coreografia(id) {
-    const c = ESCENAS_GIGANTES[id], tramos = (c.camara || []).map(([marca, desfase, fase]) => [c.marcas[marca] + desfase, fase]);
-    if (!tramos.length) return () => {};
-    let siguiente = 0;
-    const vigia = setInterval(() => {
-      const s = escena.segundoEscena(id);
-      while (siguiente < tramos.length && s >= tramos[siguiente][0]) { const [cuando, fase] = tramos[siguiente++]; if (s - cuando < 1.5) escena.faro(fase); }
-    }, 100);
-    return () => clearInterval(vigia);
-  }
   async function abrir(id, opciones = {}) {
     if (!tiene(id)) return false;
     enCurso = id; avisar(id, true);
-    const parar = coreografia(id);
     try { return await escena.escenaGigante(id, { reloj: relojDe(id), ...opciones }); }
-    finally { parar(); if (enCurso === id) { enCurso = null; avisar(id, false); } }
+    finally { if (enCurso === id) { enCurso = null; avisar(id, false); } }
   }
   return {
     tiene, abrir,
