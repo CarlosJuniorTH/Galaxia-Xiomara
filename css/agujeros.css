@@ -1,0 +1,5 @@
+/* Escenas de TON 618 y Sagitario A* (js/ui/escenaAgujeros.js): no se pueden saltar. Mientras suena su canción no hay
+   avisos encima, el título se aparta y los controles de navegación se ocultan (lugar, recorrido, muelle, mapa); al
+   terminar vuelven solos. (Gancho común: body[data-escena-en-curso] y el evento «escena-en-curso».) */
+body.agujero-en-escena #brindis,body.agujero-en-escena #cometa-frase,body.agujero-en-escena #pista,body.agujero-en-escena #mensaje{display:none!important}
+body.agujero-en-escena #titulo,body.agujero-en-escena #lugar,body.agujero-en-escena #muelle,body.agujero-en-escena #btn-tour,body.agujero-en-escena #btn-carta,body.agujero-en-escena #mapa,body.agujero-en-escena #supernova-aviso,body.agujero-en-escena #cometa-aviso{opacity:0!important;visibility:hidden!important;pointer-events:none!important;transition:opacity 1.2s ease,visibility 0s linear 1.2s}

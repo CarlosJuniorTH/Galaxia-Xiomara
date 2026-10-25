@@ -9,6 +9,7 @@ import { crearMapa } from './mapa.js';
 import { crearEscenasGigantes } from './escenasGigantes.js';
 import { FRASE_SUPERNOVA, TIEMPOS_AMOR } from '../util/supernovaAmor.js';
 import { crearAvisos } from './avisos.js';
+import { crearEscenaAgujeros } from './escenaAgujeros.js';
 const $ = id => document.getElementById(id);
 // Las seis grandes (supernova, cuásar, púlsar, Deneb, TON 618 y Sagitario A*): los lejanos salvo el gigante del corazón.
 const GRANDES = new Set(LEJANOS.filter(d => d.id !== 'gigante').map(d => d.id));
@@ -30,6 +31,8 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
   const escenasGigantes = crearEscenasGigantes({ escena, banda });
   // El faro del cuásar: su recorrido con frases y la carta que espera al final.
   const faro = crearFaroCuasar({ escena, progreso, mostrarLectura, alCambiar: () => { if (actual === 'cuasar') situar('cuasar'); } });
+  // TON 618 y Sagitario A*: su escena empieza sola al llegar, con su canción (js/ui/escenaAgujeros.js).
+  const escenaAgujeros = crearEscenaAgujeros({ escena, banda });
   $('faro-carta').addEventListener('click', () => { if (actual === 'cuasar' && !escena.viajando) faro.abrirCarta(); });
   // Tras el estallido, el corazón es un lugar más: misma tarjeta, y su gesto es volver a sentirlo.
   const corazonNacido = () => supernovaAmor.descubierta || escena.estadoSupernova === 'remanente';
@@ -215,6 +218,7 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
       else if (id === 'cometa') sorpresa();
       else if (id === 'supernova') await verSupernova();
       else if (id === 'cuasar') { $('lugar-faro').hidden = true; await faro.iniciar(); if (actual === 'cuasar') situar('cuasar'); }
+      else if (escenaAgujeros.propia(id)) await escenaAgujeros.repetir(id);   // su gesto: volver a vivir su escena
       else if (LEJANOS.some(l => l.id === id)) await escena.accion(id);
       else if (id === 'cartas') { await abrirSobre(); abrirPanel('cartas'); }
       else if (id === 'azul') { await escena.accion('azul'); if (actual === 'azul') abrirPanel('horarios'); }

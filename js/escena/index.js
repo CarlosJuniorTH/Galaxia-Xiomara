@@ -893,7 +893,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // sin tocar se pasaba a 30 aunque la vista siguiera deslizándose y el final del giro iba a frenitos.
     const motivo = vuelo ? 'vuelo' : gesto ? 'gesto' : giro.moviendo || zoom.moviendo ? 'inercia' : mirada && mirada.t < 1 ? 'mirada' : pulso > 0.02 ? 'pulso' : captura ? 'captura'
       : document.body.classList.contains('celebrando') || document.body.classList.contains('reuniendo') ? 'celebracion' : cosmos.escenas.animando ? 'escena' : tEntrada !== null && tiempo - tEntrada < 12 ? 'entrada'
-      : Math.abs(desplazamientoMeta - desplazamiento) > 0.5 ? 'encuadre' : '';
+      : Math.abs(desplazamientoMeta - desplazamiento) > 0.5 ? 'encuadre' : cosmos.enEscenaAgujero ? 'escena' : '';
     const activo = !!motivo;
     const modo = planificador.decidir(ahora, { reposo, quieto: pausa && !vuelo && !captura, activo });
     if (modo === null) { if (reposo) prev = ahora; return; }
@@ -992,6 +992,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       // menor se quedaba atrás y se notaba un frenito).
       giro.actualizar(Math.min(0.1, dtReal), !mirada && !vuelo, ahora);
       zoom.actualizar(Math.min(0.1, dtReal), !mirada && !vuelo);
+      // La escena de TON 618 mueve la cámara muy despacio (cosmos.derivar); si la persona la toca, deja de hacerlo.
+      if (!mirada && !movimientoReducido) cosmos.derivar(camera, controls.target, dt, gesto || giro.moviendo || zoom.moviendo);
     }
     if (ajuste && !vuelo) {
       // Mantiene la dirección actual de la cámara (su órbita) y cambia la distancia y el punto de mira.
@@ -1039,7 +1041,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // brillo con suavidad; siguen ahí, con su forma y su color, pero no compiten con el protagonista.
     // Las nebulosas del catálogo se crean al acercarse: la lista se rehace de vez en cuando.
     if (!nubesFoco || cuadrosDibujados % 90 === 0) { nubesFoco = []; scene.traverse(o => { if (o.userData.volumen3D && !o.userData.brilloPropio && o.material.uniforms?.uBrillo) { o.userData.brilloBase ??= o.material.uniforms.uBrillo.value; nubesFoco.push({ o, base: o.userData.brilloBase }); } }); }
-    const centroFoco = lejano && !vuelo ? lejano.centro : null, metaFoco = centroFoco ? 0.78 : 1;
+    const centroFoco = lejano && !vuelo ? lejano.centro : null, metaFoco = centroFoco ? (cosmos.enEscenaAgujero ? 0.5 : 0.78) : 1;   // en la escena de un gigante, aún más
     focoNubes += (metaFoco - focoNubes) * Math.min(1, dtInterfaz * 1.2);
     if (Math.abs(focoNubes - 1) > 0.001 || focoAplicado) {
       for (const n of nubesFoco) { const propia = centroFoco && n.o.getWorldPosition(tmpFoco).distanceTo(centroFoco) < 6000; n.o.material.uniforms.uBrillo.value = n.base * (propia ? 1 : focoNubes); }
@@ -1255,6 +1257,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     detenerGiro(valor) { controls.autoRotate = !valor && !pausa && !vuelo && giraSolo(); },
     // Solo en #debug: acceso a la escena para vistas de diagnóstico por capas.
     get interno() { return diagnosticar ? { THREE, scene, camera, controls, renderer, bloom, nucleo, telarana, capaVolumen, cosmos, galaxia, planetas, solar, get escenaActiva() { return escenaActiva; }, lento: v => { escalaTiempo = v; }, get encuadre() { return estadoEncuadre(); }, get tiempo() { return tiempo; }, get estelas() { return campoVelocidad.mesh.material.uniforms.uFuerza.value; }, nube: { MUESTRAS: muestrasNube }, get curvaVuelo() { return vuelo ? { curva: vuelo.curva, desde: vuelo.curva.getPoint(0), hasta: vuelo.curva.getPoint(1), duracion: vuelo.duracion, transcurrido: vuelo.transcurrido, real: vuelo.real ?? vuelo.transcurrido, plan: vuelo.plan } : null; }, lejanas, cercania: cercaniaUniverso, get lente() { return { activa: nucleo.lente.enabled, uL: nucleo.lente.uniforms.uL.value.map(v => v.toArray()) }; } } : null; },
+    // Escenas de TON 618 y Sagitario A* (js/ui/escenaAgujeros.js): empezar con el reloj de su canción o terminar (sin él).
+    escenaAgujero: (id, opciones) => cosmos.escenaAgujero(id, opciones),
+    get enEscenaAgujero() { return cosmos.enEscenaAgujero; },
     get destino() { return destinoActual; },
     get viajando() { return !!vuelo; },
     // Segundos que le quedan al viaje en curso, de principio a fin (también el que cruza al sistema solar en dos tramos):

@@ -69,8 +69,14 @@ export const MOMENTOS = {
   deneb: momento({ archivo: 'deneb.m4a', marcas: { ...ESCENA_DENEB.marcas }, estancia: estancia('deneb-estancia.m4a') }),                    // «Middle»
   // (La voz del cuásar es un mensaje; su estancia es la instrumental de «I Saw Your Face Today».)
   cuasar: momento({ archivo: 'cuasar.m4a', marcas: { ...ESCENA_CUASAR.marcas }, estancia: estancia('cuasar-estancia.m4a') }),
-  ton618: momento({ archivo: 'ton618.m4a', estancia: estancia('ton618-estancia.m4a') }),                 // «I Wanna Be Yours»
-  sagitario: momento({ archivo: 'sagitario.m4a', estancia: estancia('sagitario-estancia.m4a') }),        // «Say Yes to Heaven»
+  // TON 618 («I Wanna Be Yours», 136 BPM) y Sagitario A* («Say Yes to Heaven», 103 BPM): su escena (js/escena/ton618.js,
+  // js/escena/sagitario.js, js/util/guionAgujeros.js) empieza al llegar, con la canción, y cae en estas marcas.
+  //   ton618     secretos 1.ª frase · esconder 2.ª frase · serTuyo «quiero ser tuyo» (las dos corrientes aparecen) ·
+  //              estribillo (latidos del disco) · tuyo1/tuyo2 latidos grandes · estribillo2 · ultimoTuyo (las corrientes se
+  //              funden) · fundido (queda en calma)
+  //   sagitario  estribillo (las órbitas dibujan corazones) · segundaFrase (dos estrellas orbitan juntas) · fundido
+  ton618: momento({ archivo: 'ton618.m4a', marcas: { secretos: 1.4, esconder: 4.6, serTuyo: 8.0, estribillo: 10.7, tuyo1: 16.4, tuyo2: 20.4, estribillo2: 23.1, ultimoTuyo: 32.5, fundido: 35 }, estancia: estancia('ton618-estancia.m4a') }),
+  sagitario: momento({ archivo: 'sagitario.m4a', marcas: { estribillo: 18.4, segundaFrase: 23.6, fundido: 35.6 }, estancia: estancia('sagitario-estancia.m4a') }),
   gigante: momento(),
   hogar: momento({ archivo: 'hogar.m4a', estancia: estancia('hogar-estancia.m4a') }),                    // «I Saw Your Face Today»
   // Una canción por mes (1 = enero … 12 = diciembre, en la hora de Argentina): suena en casa durante ese mes en lugar

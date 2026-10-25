@@ -98,7 +98,7 @@ try {
   });
   let toquesCielo = 0;
   escucharToques(document.getElementById('galaxia'), (x, y) => {
-    if (document.body.classList.contains('supernova-en-escena')) return;
+    if (document.body.classList.contains('supernova-en-escena') || document.body.classList.contains('agujero-en-escena')) return;   // las escenas no se saltan
     if (!document.body.classList.contains('dentro') || interfaz.enRuta || interfaz.celebrando || interfaz.contemplando) return;
     const tocado = escena.probarToque(x, y);
     // El toque que despierta la interfaz abre lo que toca (estrella, lugar, nodo),

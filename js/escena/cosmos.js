@@ -11,7 +11,9 @@ import { texturaPlaneta } from './fabricaTexturas.js';
 import { crearVelo } from './cometa.js';
 import { construirSupernova } from './supernova.js';
 import { crearNube } from './nube.js';
-import { crearAcrecion } from './acrecion.js';
+import { construirTon618 } from './ton618.js';
+import { construirSagitario } from './sagitario.js';
+import { guionTon618, guionSagitario, guionReposo, marcasDe, finEscena } from '../util/guionAgujeros.js';
 import { construirCuasar, CUASAR } from './cuasar.js';
 import { ESCALA_SUPERNOVA, PROGENITORA_RELATIVA, ESCALA_CUASAR, ESCALA_TON, ESCALA_PULSAR, ESCALA_DENEB, ESCALA_SGR } from '../data/escalaCosmica.js';
 import { SITIOS_DESTINO } from '../data/sitios.js';
@@ -99,45 +101,6 @@ function crearHaz({ radio, largo, colorA, colorB, intensidad = 1, nudos = 0 }) {
         gl_FragColor = vec4(mix(uB, uA, l) * f * uI * k, f * uI); }`));
   m.geometry.translate(0, -largo / 2, 0); m.geometry.rotateX(Math.PI);   // base en el origen, punta hacia +Y
   return m;
-}
-
-// Disco de acreción con brillo Doppler (un lado más brillante) y anillos turbulentos.
-// lado: 0 todo el disco; 1 solo la mitad más cercana a la cámara; −1 solo la más lejana.
-function crearDisco(rIn, rOut, colores, giroVel = 0.6, lado = 0) {
-  return new THREE.Mesh(new THREE.RingGeometry(rIn, rOut, 256, 4), aditivo(
-    { uT: { value: 0 }, uIn: { value: rIn }, uOut: { value: rOut }, uC1: { value: new THREE.Color(colores[0]) }, uC2: { value: new THREE.Color(colores[1]) }, uC3: { value: new THREE.Color(colores[2]) }, uV: { value: giroVel }, uLado: { value: lado }, uCentro: { value: new THREE.Vector3() } },
-    'varying vec2 vP; varying float vDelante; uniform vec3 uCentro; void main(){ vP = position.xy; vec4 m = modelMatrix * vec4(position, 1.0); vec3 c = cameraPosition - uCentro; vDelante = dot(m.xyz - uCentro, normalize(c)); gl_Position = projectionMatrix * viewMatrix * m; }',
-    /* glsl */`uniform float uT, uIn, uOut, uV, uLado; uniform vec3 uC1, uC2, uC3; varying vec2 vP; varying float vDelante;
-      float h(vec2 p){ vec3 q = fract(p.xyx * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
-      float rn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
-      void main(){
-        float r = length(vP), t = clamp((r - uIn) / (uOut - uIn), 0.0, 1.0), ang = atan(vP.y, vP.x);
-        vec3 c = t < 0.35 ? mix(uC1, uC2, t / 0.35) : mix(uC2, uC3, (t - 0.35) / 0.65);
-        float giro = ang * 4.0 + uT * uV;   // gira entero: su textura no se enrosca en anillos con el tiempo
-        float nit = 1.0 - smoothstep(0.3, 1.2, fwidth(r * 0.07)), nit2 = 1.0 - smoothstep(0.3, 1.2, fwidth(r * 0.02));   // sin moiré de lejos
-        float turb = mix(0.5, rn(vec2(giro, r * 0.02)), nit2) * 0.6 + mix(0.5, rn(vec2(giro * 3.0, r * 0.07)), nit) * 0.4;
-        if (uLado * vDelante < 0.0) discard;
-        float doppler = 0.55 + 0.45 * sin(ang);
-        // Brazos espirales de gas que giran (se ve el giro del disco).
-        float espiral = 0.6 + 0.4 * sin(ang * 3.0 - log(max(r, 1.0)) * 9.0 + uT * uV * 3.0) * (1.0 - smoothstep(0.3, 1.2, fwidth(log(max(r, 1.0)) * 9.0)));
-        float a = pow(1.0 - t, 1.3) * smoothstep(0.0, 0.04, t) * (0.6 + turb * 0.7) * (0.45 + doppler) * espiral;
-        gl_FragColor = vec4(c * a * 1.6, min(1.0, a * 1.3)); }`));
-}
-
-// Anillo de fotones e imagen curvada del disco tras la sombra (lente), mirando a la cámara.
-function crearLente(R, color) {
-  return new THREE.Mesh(new THREE.RingGeometry(R * 0.98, R * 2.6, 200, 4), aditivo(
-    { uT: { value: 0 }, uCanto: { value: 1 }, uR: { value: R }, uC: { value: new THREE.Color(color) } },
-    'varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    /* glsl */`uniform float uT, uCanto, uR; uniform vec3 uC; varying vec2 vP;
-      void main(){ float r = length(vP) / uR;
-        float anillo = exp(-pow((r - 1.04) * 22.0, 2.0)) * 1.2;
-        float d = (r - 1.36) / 0.36, vertical = pow(abs(vP.y) / max(length(vP), 1.0), 0.6);
-        // Visto de frente la imagen del disco es un anillo completo; de canto, arcos arriba y abajo.
-        float lente = exp(-d * d) * mix(0.75, vertical * mix(0.55, 1.0, step(0.0, vP.y)), uCanto);
-        float grano = 0.9 + 0.1 * sin(atan(vP.y, vP.x) * 12.0 + uT * 0.4);
-        vec3 c = mix(uC, vec3(1.0, 0.97, 0.92), 0.45) * (anillo + lente * 4.2 * grano);
-        gl_FragColor = vec4(c, max(anillo, lente)); }`));
 }
 
 // De un tirón; la carga usa construirCosmos, el mismo código como generador (yield entre pasos: ver porTramos).
@@ -367,100 +330,19 @@ export function* construirCosmos({ uScale, uPR }) {
   const rotacionCuasar = cuasar.quaternion.clone();
 
   yield;
-  // ── Agujero negro ultramasivo (como TON 618): lejos, pero enorme ──
+  // ── TON 618 (js/escena/ton618.js): lejos, pero enorme. Su enormidad se nota en lo que deforma: el disco de motas se
+  // curva sobre la sombra (lente en cada mota) y la lente de pantalla (lente.js) curva lo que hay detrás ──
   const gigantesco = new THREE.Group(); gigantesco.position.copy(direccionCielo(SITIO.agujero[0], SITIO.agujero[1], SITIO.agujero[2])); raiz.add(gigantesco);
-  yield;
-  // A 7 500 unidades y proporcionalmente menor: se ve igual de grande y lejano, pero queda
-  // delante de las estrellas del fondo (9 000–60 000), así su sombra las tapa de verdad.
-  // Lejos y a un tamaño prudente; su enormidad se nota en lo que deforma: la lente gravitacional
-  // de pantalla (lente.js) curva de verdad lo que hay detrás.
   const R = 215; gigantesco.scale.setScalar(0.55 * ESCALA_TON);
-  const planoDisco = new THREE.Group(); gigantesco.add(planoDisco);
-  planoDisco.lookAt(gigantesco.position.clone().multiplyScalar(-1)); planoDisco.rotateX(0.16);
-  const coloresDisco = ['#fff6e6', '#ffc37a', '#c2401a'];
-  const discoAtras = crearDisco(R * 1.25, R * 6.5, coloresDisco, 1.4, -1), discoDelante = crearDisco(R * 1.25, R * 6.5, coloresDisco, 1.4, 1);
-  for (const d of [discoAtras, discoDelante]) { d.rotation.x = Math.PI / 2; planoDisco.add(d); }
-  const lente = crearLente(R, '#ffcf8f'); gigantesco.add(lente);
-  const resplandor = sprite(brillo, '#ffb36b', R * 9, 0.12); gigantesco.add(resplandor);
+  const piezasTon = yield* construirTon618({ uScale, uPR, R, grupo: gigantesco });
+  // Disco casi de canto visto desde casa (contiene la dirección de casa, inclinado 9°).
+  piezasTon.orientar(gigantesco.position.clone().multiplyScalar(-1), 0.16);
 
   yield;
-  // Composición INTERNA por orden fijo: resplandor, mitad lejana del disco, sombra negra, lente
-  // y mitad cercana del disco. Relación con el RESTO del universo por profundidad: todas sus
-  // partes hacen la prueba de profundidad (un cuerpo opaco delante las tapa) y solo la sombra la
-  // escribe (tapa lo que hay detrás). Las partes luminosas no escriben profundidad, así que entre
-  // ellas manda el orden y no hay parpadeo. Antes usaban depthTest=false y se pintaban encima de
-  // cualquier cuerpo que tuvieran delante.
-  const sombra = new THREE.Mesh(new THREE.SphereGeometry(R, 128, 96), new THREE.MeshBasicMaterial({ color: 0x000000 }));
-  sombra.material.transparent = true;   // en la lista de transparentes, con orden propio
-  for (const [o, orden] of [[resplandor, -1], [discoAtras, 0], [sombra, 1], [lente, 2], [discoDelante, 3]]) { o.material.depthTest = true; o.material.depthWrite = o === sombra; o.renderOrder = orden; }
-  gigantesco.add(sombra);
-  let discoTON = null, hazTON = null;   // (para medidas())
-  yield;
-  // Su sistema: un disco enorme de estrellas que giran a su alrededor (como una galaxia entera
-  // alrededor del agujero) y dos chorros relativistas que salen de los polos.
-  {
-    const n = 4500, pos = new Float32Array(n * 3);
-    for (let i = 0; i < n; i++) { const r = R * (8 + Math.pow(Math.random(), 0.6) * 40), a = Math.random() * Math.PI * 2; pos.set([a, r, (Math.random() - 0.5) * R * 3 * (r / (R * 48))], i * 3); }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const discoEstrellas = new THREE.Points(g, aditivo({ uT: { value: 0 }, uScale, uPR },
-      `uniform float uT, uScale, uPR; varying vec3 vC; varying float vA;
-       void main(){ float r = position.y, ang = position.x + uT * 0.6 * pow(${(R * 8).toFixed(1)} / r, 1.5);
-         vec3 p = vec3(cos(ang) * r, position.z, sin(ang) * r);
-         vec4 mv = modelViewMatrix * vec4(p, 1.0); gl_Position = projectionMatrix * mv;
-         float t = clamp((r - ${(R * 8).toFixed(1)}) / ${(R * 40).toFixed(1)}, 0.0, 1.0);
-         vC = mix(vec3(1.0, 0.85, 0.6), vec3(0.7, 0.8, 1.0), t); vA = (1.0 - t * 0.6) * 0.75;
-         gl_PointSize = clamp(${(ESCALA_CIELO * 0.55 * ESCALA_TON * 16).toFixed(1)} * uScale / max(1.0, -mv.z), 1.0, 2.5 * uPR); }`,
-      'varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5); float k = pow(max(1.0 - d * 2.0, 0.0), 1.6) * vA; gl_FragColor = vec4(vC * k, k); }'));
-    discoEstrellas.frustumCulled = false; planoDisco.add(discoEstrellas); animar.push(discoEstrellas); discoTON = discoEstrellas;
-    for (const lado of [1, -1]) { const h = crearHaz({ radio: R * 1.2, largo: R * 60, colorA: '#f4f2ff', colorB: '#8aa6ff', intensidad: 0.9, nudos: 1.2 }); if (lado < 0) h.rotation.x = Math.PI; planoDisco.add(h); animar.push(h); hazTON = h; }
-  }
-
-  yield;
-  // ── Sagitario A*: abajo, en el centro de la Vía Láctea. Anillo anaranjado con una media luna
-  // brillante (como la imagen del Telescopio del Horizonte de Sucesos); la luz de lo que hay
-  // detrás la curva la lente gravitacional de pantalla (lente.js) ──
+  // ── Sagitario A* (js/escena/sagitario.js): abajo, en el centro de la Vía Láctea; sus estrellas S, su gas y su flujo ──
   const sagitario = new THREE.Group(); sagitario.position.copy(direccionCielo(...SITIO.sagitario)); sagitario.scale.setScalar(0.7 * ESCALA_SGR); raiz.add(sagitario);
   const RS = 170;
-  yield;
-  // Anillo como en la imagen del Event Horizon Telescope: un anillo fino de fotones pegado a la
-  // sombra, la emisión ancha con su media luna brillante (el lado que viene hacia nosotros),
-  // filamentos de gas que se arremolinan y un resplandor tenue hacia fuera. Mira siempre a la
-  // posición de la cámara (como la sombra, que es redonda desde cualquier lado).
-  const anilloEHT = new THREE.Mesh(new THREE.RingGeometry(RS * 0.92, RS * 2.6, 192, 6), aditivo({ uT: { value: 0 }, uR: { value: RS } },
-    'varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    /* glsl */`uniform float uT, uR; varying vec2 vP;
-      void main(){ float r = length(vP) / uR, ang = atan(vP.y, vP.x);
-        float giro = ang + 1.2 / max(r, 0.5) - uT * 0.35;                          // espiral: el gas gira más rápido dentro
-        float fil = 0.5 + 0.22 * sin(giro * 5.0 + r * 6.0 + sin(giro * 3.0) * 1.3) + 0.18 * sin(giro * 11.0 - r * 9.0 + uT * 0.4) + 0.1 * sin(giro * 23.0 + r * 17.0);   // periódico: sin costura
-        float media = 0.32 + 0.68 * pow(0.5 + 0.5 * cos(ang + 1.9 + sin(uT * 0.2) * 0.4), 2.2);  // media luna brillante
-        float fotones = exp(-pow((r - 1.04) / 0.035, 2.0)) * (0.7 + 0.3 * media);    // anillo de fotones, finísimo
-        float emision = exp(-pow((r - 1.32) / 0.22, 2.0)) * media * (0.75 + 0.7 * fil) * 1.25;
-        float halo = exp(-(r - 1.0) * 2.1) * smoothstep(0.95, 1.1, r) * 0.18 * (0.6 + 0.8 * fil);
-        float punto = exp(-pow(mod(ang - uT * 0.9, 6.2831853) - 3.1416, 2.0) * 7.0) * exp(-pow((r - 1.25) / 0.12, 2.0)) * 0.6;   // destello que orbita
-        float a = (fotones * 1.3 + emision + halo + punto) * (1.0 - smoothstep(2.2, 2.6, r));
-        vec3 c = mix(vec3(0.95, 0.32, 0.07), vec3(1.0, 0.86, 0.58), clamp(media * 0.7 + fotones, 0.0, 1.0));
-        gl_FragColor = vec4(c * a * 1.4, a); }`));
-  const sombraSgr = new THREE.Mesh(new THREE.SphereGeometry(RS, 128, 96), materialSombra());
-  yield;
-  // Igual que TON 618: orden interno fijo y prueba de profundidad frente al resto (el anillo mira a
-  // la cámara, es un fenómeno aparente, pero un cuerpo opaco delante lo tapa).
-  for (const [o, orden] of [[sombraSgr, 1], [anilloEHT, 2]]) { o.material.depthTest = true; o.material.depthWrite = o === sombraSgr; o.renderOrder = orden; sagitario.add(o); }
-  const materiaSgr = crearAcrecion({ radio: RS, escala: ESCALA_CIELO * 0.7 * ESCALA_SGR, uScale, uPR, cantidad: 900 }); sagitario.add(materiaSgr); animar.push(materiaSgr);
-  const materiaTON = crearAcrecion({ radio: R, escala: ESCALA_CIELO * 0.55 * ESCALA_TON, uScale, uPR, cantidad: 1100 }); planoDisco.add(materiaTON); animar.push(materiaTON);
-  const haloSgr = sprite(brillo, '#ff9a4a', RS * 7, 0.08); sagitario.add(haloSgr);
-  yield;
-  // Las estrellas S: giran alrededor del agujero en elipses muy alargadas (como S2, observada
-  // durante décadas), aceleran al pasar cerca de él; sus órbitas se ven muy tenues.
-  const orbitasS = [[2.6, 0.88, 0.4, 0.2, 1.2], [3.2, 0.7, 1.4, -0.6, 0.9], [4, 0.8, -0.9, 1.0, 0.7], [4.8, 0.55, 2.2, 0.3, 0.55], [5.6, 0.75, -1.8, -1.2, 0.45], [3.6, 0.93, 0.9, 1.6, 0.8], [6.4, 0.6, 2.8, -0.2, 0.35]].map(([a, e, inc, giro, vel]) => {
-    const plano = new THREE.Group(); plano.rotation.set(inc, giro, 0); sagitario.add(plano);
-    const pts = Array.from({ length: 160 }, (_, i) => { const E = i / 160 * Math.PI * 2; return new THREE.Vector3(RS * a * (Math.cos(E) - e), 0, RS * a * Math.sqrt(1 - e * e) * Math.sin(E)); });
-    // La estrella existe siempre; la guía de su órbita es una ayuda visual: solo al visitarlo.
-    const guia = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: '#9fc4ff', transparent: true, opacity: 0.16, depthWrite: false, blending: THREE.AdditiveBlending }));
-    guia.visible = false; plano.add(guia);
-    const estrella = sprite(brillo, '#d6e6ff', RS * 0.45, 0.95); plano.add(estrella);
-    return { a, e, vel, estrella, plano, guia, fase: Math.random() * 6 };
-  });
-
+  const piezasSgr = yield* construirSagitario({ uScale, uPR, RS, grupo: sagitario });
   yield;
   // ── La estrella que va a estallar (supernova.js), en una zona libre del cielo ──
   const sn = yield* construirSupernova({ uScale, uPR, escala: ESCALA_CIELO * ESCALA_SUPERNOVA });
@@ -472,8 +354,10 @@ export function* construirCosmos({ uScale, uPR }) {
   // Todo el cielo profundo se dibuja antes que las galaxias lejanas y la galaxia central: la
   // sombra tapa su propio disco y lo que hay detrás, pero no lo que queda delante.
   raiz.traverse(o => { o.renderOrder -= 20; }); decor.traverse(o => { o.renderOrder -= 20; });
-  const camLocal = new THREE.Vector3(), normal = new THREE.Vector3(), vista = new THREE.Vector3(), cuaternion = new THREE.Quaternion(), base = new THREE.Matrix4();
-  let listaGrupos = null, discos = null;   // listas fijas para el cuadro (se crean una vez)
+  const camLocal = new THREE.Vector3(), base = new THREE.Matrix4();
+  let listaGrupos = null;   // lista fija para el cuadro (se crea una vez)
+  // Escena de TON 618 o de Sagitario A* en curso: { id, reloj, marcas, reducido, viva, presencia, t, guion }.
+  let escenaG = null;
 
   // ── Escenas de llegada del púlsar y de Deneb (js/util/escenasGigantes.js: duración, marcas y curvas) ──
   // Cada una con su director: su segundo (del reloj que se le pase: el del audio, o el tiempo propio desde la
@@ -538,7 +422,9 @@ export function* construirCosmos({ uScale, uPR }) {
     // Agujeros con lente: centro (espacio de la raíz), radio que no se deforma, fuerza y alcance.
     lentes() {
       const k = raiz.scale.x;
-      return [[sagitario, RS * sagitario.scale.x * 1.95, RS * sagitario.scale.x * 2.4, 6], [gigantesco, R * gigantesco.scale.x * 6.7, R * gigantesco.scale.x * 3.2, 3.2]].filter(([o]) => o.visible)
+      // (La de Sagitario A* se atenúa mientras sus órbitas dibujan corazones: no los deforma. La de TON 618 empieza por
+      // fuera de su disco de motas, que ya se curva por sí mismo.)
+      return [[sagitario, RS * sagitario.scale.x * 1.95, RS * sagitario.scale.x * 2.4 * piezasSgr.atenuacionLente, 6], [gigantesco, R * gigantesco.scale.x * 7, R * gigantesco.scale.x * 3.2, 3.2]].filter(([o]) => o.visible)
         .map(([o, dentro, fuerza, alcance]) => ({ id: o === sagitario ? 'sagitario' : 'ton618', centro: o.position.clone().multiplyScalar(k).add(raiz.position), dentro: dentro * k, fuerza: fuerza * k, alcance }));
     },
     // Medidas reales (geometría × escalas de todos los padres), para contrastar la tabla de
@@ -558,10 +444,11 @@ export function* construirCosmos({ uScale, uPR }) {
       const r = x => Math.round(x);
       const tam = sn.cajaCorazon.getSize(new THREE.Vector3()).multiplyScalar(0.5 * e(sn.corazon));
       const progenitora = 110 * e(sn.superficie), eyecta = sn.radioEyecta * e(sn.grupo);
-      const ton = { distancia: d(gigantesco), cuerpo: r(esfera(sombra)), disco: r(anillo(discoAtras)), lente: r(anillo(lente)), materia: r(materiaTON.material.uniforms.uRadio.value * 6.3 * e(planoDisco)),
-        estrellas: r(maxAtributo(discoTON, 1) * e(planoDisco)), chorro: r(cono(hazTON)), halo: r(spriteR(resplandor)) };
+      const ton = { distancia: d(gigantesco), cuerpo: r(esfera(piezasTon.sombra)), disco: r(anillo(piezasTon.base)), lente: r(anillo(piezasTon.anillo)), materia: r(R * piezasTon.rFuera * e(piezasTon.planoDisco)),
+        estrellas: r(maxAtributo(piezasTon.discoEstrellas, 1) * e(piezasTon.discoEstrellas)), chorro: 0, halo: 0 };
       ton.navegacion = Math.max(ton.disco, ton.lente);
-      const sgr = { distancia: d(sagitario), cuerpo: r(esfera(sombraSgr)), anillo: r(anillo(anilloEHT)), materia: r(materiaSgr.material.uniforms.uRadio.value * 6.3 * e(sagitario)), halo: r(spriteR(haloSgr)) };
+      // materia: lo luminoso denso de Sagitario A* (el flujo y las órbitas de las estrellas S, hasta ≈ 7,3 RS en su apocentro).
+      const sgr = { distancia: d(sagitario), cuerpo: r(esfera(piezasSgr.sombra)), anillo: r(anillo(piezasSgr.anillo)), materia: r(RS * 7.3 * e(sagitario)), halo: 0 };
       sgr.navegacion = Math.max(sgr.anillo, sgr.materia);
       const cua = { distancia: d(cuasar), disco: r(anillo(piezasCuasar.disco)), toro: r(toroExt(piezasCuasar.toro)), chorro: r(cono(piezasCuasar.haz)), anfitriona: r(piezasCuasar.medidas.anfitriona * e(cuasar)) };
       cua.navegacion = Math.max(cua.disco, cua.toro);
@@ -596,7 +483,18 @@ export function* construirCosmos({ uScale, uPR }) {
       const [objeto, distancia, alto] = tabla[id] || [];
       return objeto ? { centro: objeto.position.clone(), distancia, alto } : null;
     },
-    actualizar(t, dt, { camera, destino }) {
+    // Empieza (con reloj) o termina (sin él: se funde con el reposo) la escena de un gigante. reloj(): segundo de su canción.
+    escenaAgujero(id, opciones) {
+      const reloj = opciones?.reloj, reducido = !!opciones?.reducido;
+      if (reloj) escenaG = { id, reloj, marcas: marcasDe(id), reducido, viva: true, presencia: escenaG?.id === id ? escenaG.presencia : 0, t: 0, guion: guionReposo(id) };
+      else if (escenaG && (!id || escenaG.id === id)) escenaG.viva = false;
+    },
+    // Hay animación de escena (el planificador dibuja a 60): mientras suena y mientras se funde al salir. En calma, no.
+    get enEscenaAgujero() { return !!escenaG && (!escenaG.viva || escenaG.t < finEscena(escenaG.id)); },
+    get escenaAgujeroEstado() { return escenaG ? { id: escenaG.id, t: escenaG.t, presencia: escenaG.presencia, viva: escenaG.viva, guion: { ...escenaG.guion } } : null; },
+    // Deriva de la cámara durante la escena de TON 618 (index.js la llama si nadie toca la cámara: tocando = gesto o inercia).
+    derivar(camera, objetivo, dt, tocando) { return escenaG?.id === 'ton618' && piezasTon.derivar(camera, objetivo, dt, escenaG, tocando); },
+    actualizar(t, dt, { camera }) {
       // El cielo acompaña a la cámara (index.js): en el espacio de la raíz, la cámara está aquí.
       const camara = camLocal.copy(camera.position).sub(raiz.position).divideScalar(raiz.scale.x);
       sn.actualizar(t, camara, camera.position);
@@ -673,21 +571,19 @@ export function* construirCosmos({ uScale, uPR }) {
       else if (!dC.activa && acentoEscena) { piezasCuasar.acento(-1); acentoEscena = false; }
       // El cuásar no cambia de orientación (antes precesaba y al volver se veía distinto).
       cuasar.quaternion.copy(rotacionCuasar);   // orientación fija: se ve igual siempre (lo que gira es su gas, en los shaders)
-      discoAtras.material.uniforms.uT.value = t; discoDelante.material.uniforms.uT.value = t; for (const { superficie, late, fase } of superficies) { superficie.material.uniforms.uT.value = t; if (late) superficie.scale.setScalar(1 + 0.03 * Math.sin(t * 0.25 + fase)); }   // las rojas laten despacio
+      for (const { superficie, late, fase } of superficies) { superficie.material.uniforms.uT.value = t; if (late) superficie.scale.setScalar(1 + 0.03 * Math.sin(t * 0.25 + fase)); }   // las rojas laten despacio
       for (const e of envolturas) e.material.uniforms.uT.value = t;
       delante.material.uniforms.uT.value = t;
-      for (const d of (discos ??= [discoAtras, discoDelante])) d.material.uniforms.uCentro.value.copy(gigantesco.position).multiplyScalar(raiz.scale.x).add(raiz.position);
-      // El anillo mira a la cámara (a su posición, no a su orientación: no «persigue» la pantalla).
-      // El anillo mira a la posición de la cámara (no a su orientación: no «persigue» la pantalla).
-      anilloEHT.lookAt(camera.position); anilloEHT.material.uniforms.uT.value = t;
-      // Kepler: anomalía media → excéntrica (unas iteraciones de Newton).
-      for (const o of orbitasS) { o.guia.visible = destino === 'sagitario'; const M = t * o.vel * 0.18 + o.fase; let E = M; for (let k = 0; k < 4; k++) E -= (E - o.e * Math.sin(E) - M) / (1 - o.e * Math.cos(E));
-        o.estrella.position.set(RS * o.a * (Math.cos(E) - o.e), 0, RS * o.a * Math.sqrt(1 - o.e * o.e) * Math.sin(E)); }
-      // Lente del gigante: mira a la cámara; la imagen curvada se ve más cuanto más de canto.
-      lente.lookAt(camera.position);
-      normal.set(0, 1, 0).applyQuaternion(planoDisco.getWorldQuaternion(cuaternion));
-      vista.copy(camara).sub(gigantesco.position).normalize();
-      lente.material.uniforms.uCanto.value = Math.pow(1 - Math.min(1, Math.abs(normal.dot(vista)) / 0.6), 1.3);
+      // TON 618 y Sagitario A*, con su escena si la hay (js/ui/escenaAgujeros.js da el reloj de la canción). Al salir a
+      // mitad, el reloj se queda quieto y la escena se funde con el reposo en 1,8 s (sin cortes).
+      if (escenaG) {
+        if (escenaG.viva) { escenaG.t = escenaG.reloj(); escenaG.presencia = Math.min(1, escenaG.presencia + dt / 0.8); }
+        else escenaG.presencia = Math.max(0, escenaG.presencia - dt / 1.8);
+        (escenaG.id === 'ton618' ? guionTon618 : guionSagitario)(escenaG.t, escenaG.marcas, escenaG, escenaG.guion);
+        if (!escenaG.viva && escenaG.presencia <= 0) escenaG = null;
+      }
+      piezasTon.actualizar(t, dt, camera, escenaG?.id === 'ton618' ? escenaG : null);
+      piezasSgr.actualizar(t, dt, camera, escenaG?.id === 'sagitario' ? escenaG : null);
     }
   };
 }
