@@ -13,7 +13,8 @@ export const DESTINOS = [
   { id: 'azul', mapa: [-640, -430], icono: '☾', nombre: 'Dos orillas, un cielo', tipo: 'España y Argentina', posicion: [1650, -100, 1600], foco: [0, 22, 0], distancia: 225, color: '#adc8ff', texto: 'Puede que mi tarde y tu mañana no empiecen a la vez. Pero hay algo que compartimos a cualquier hora: estas ganas de encontrarnos.', detalle: 'Dos pequeñas luces se buscan y vuelven a encontrarse, una y otra vez.', accion: 'Rodar con su luna' },
   { id: 'calma', icono: '༄', nombre: 'Aquí, contigo', tipo: 'Un refugio sin prisa', posicion: [120, 1450, -3200], distancia: 540, color: '#c9c2f5', texto: 'No tienes que encontrar nada. No tienes que terminar nada. Quédate un ratito: este pedacito de universo también sabe acompañarte en silencio.', detalle: 'El cielo gira despacio. Lo demás puede esperar.', accion: 'Quedarme aquí contigo' }
 ];
-// Más allá de nuestra galaxia: objetos lejanos que se visitan sin acercarlos. La cámara viaja
+// Objetos que se visitan sin acercarlos (los seis grandes, más allá de nuestra galaxia, y el gigante del corazón, que
+// vive en el sistema solar: ver ZONAS_LUGARES). La cámara viaja
 // hasta donde están de verdad en el cielo (el cielo deja de acompañarla durante el viaje).
 export const LEJANOS = [
   { id: 'gigante', icono: '◍', nombre: 'El gigante del corazón', tipo: 'Un mundo de tormentas', color: '#e9c9a0', texto: 'Un planeta tan grande que dentro cabrían mil Tierras. Sus vientos dibujan bandas que giran a distinta velocidad y, en medio, una tormenta con forma de corazón que lleva siglos sin apagarse.', accion: 'Rodear el gigante' },
@@ -22,9 +23,24 @@ export const LEJANOS = [
   { id: 'cuasar', icono: '✹', nombre: 'Desde la primera vez que te vi', tipo: 'Un cuásar: el faro que siempre te encuentra', color: '#ffd9b0', texto: 'La luz más intensa del universo empezó con una sola mirada. Desde entonces atraviesa distancias inmensas y siempre encuentra una forma de llegar a ti.', accion: 'Déjame llevarte esta luz' },
   // TON 618 («I Wanna Be Yours») y Sagitario A* («Say Yes to Heaven»): nombre propio y, como subtítulo, el científico.
   { id: 'ton618', icono: '◎', nombre: 'Todo cae hacia ti', tipo: 'TON 618 · uno de los agujeros negros más grandes', color: '#ffcf8f', texto: 'Su sombra es tan grande que dentro cabría nuestro sistema solar muchas veces. Nada se le resiste: la luz, el gas y las estrellas caen despacio hacia él, como yo hacia ti.', accion: 'Dejarme caer otra vez' },
-  { id: 'sagitario', icono: '◉', nombre: 'Donde el cielo dice sí', tipo: 'Sagitario A* · el corazón de la Vía Láctea', color: '#ff9a4a', texto: 'El agujero negro alrededor del que gira toda nuestra galaxia, también el Sol y la Tierra. Sus estrellas más cercanas lo rodean una y otra vez, como quien no se cansa de volver.', accion: 'Volver a decir que sí' },
+  { id: 'sagitario', icono: '◉', nombre: 'Donde el cielo dice sí', tipo: 'Sagitario A* · el corazón de la Vía Láctea', color: '#ff9a4a', texto: 'El agujero negro alrededor del que gira toda la Vía Láctea, la galaxia vecina de la nuestra. Sus estrellas más cercanas lo rodean una y otra vez, como quien no se cansa de volver.', accion: 'Volver a decir que sí' },
   { id: 'supernova', icono: '♡', nombre: 'De tanta luz, nacimos nosotros', tipo: 'Nuestra supernova de amor', color: '#f5b7ca', texto: 'Dos luces empiezan a latir juntas. Acércate: esta estrella guarda algo que todavía no has visto. Cuando se abra, su luz encontrará una forma de quedarse contigo.', accion: 'Ver nacer nuestra luz' }
 ];
+// Dónde está de verdad cada lugar, en tres niveles (el mapa y el panel Explorar los agrupan así):
+//  · solar: dentro de nuestro sistema solar (la escena del Sol, en un brazo de la galaxia de Xiomara), de dentro afuera
+//    por el radio de su órbita: el planeta rosa (1601), la luna del correo (1991), la Tierra (2298) y el gigante del
+//    corazón (4157). El gigante está en LEJANOS solo porque se visita sin acercarlo; vive en el sistema solar.
+//  · galaxia: en la galaxia de Xiomara, fuera del sistema solar (casa es la galaxia entera; el cometa también va por aquí).
+//  · fuera: más allá de la galaxia de Xiomara. Los seis grandes están a ~1000 millones de años luz de ella (Deneb, al
+//    triple: js/data/sitios.js), cada uno en su dirección. Sagitario A* es el corazón de la Vía Láctea, OTRA galaxia
+//    (viaLactea.js, con su centro en él), y Deneb, en este universo, una supergigante lejana: los dos, fuera.
+export const ZONAS_LUGARES = Object.freeze({
+  solar: Object.freeze(['rosa', 'cartas', 'azul', 'gigante']),
+  galaxia: Object.freeze(['hogar', 'constelacion', 'suenos', 'capsulas', 'calma']),
+  fuera: Object.freeze(LEJANOS.map(l => l.id).filter(id => id !== 'gigante'))
+});
+export const lugarPorId = id => DESTINOS.find(d => d.id === id) || LEJANOS.find(d => d.id === id) || null;
+export const lugaresDeZona = zona => ZONAS_LUGARES[zona].map(lugarPorId);
 // El faro del cuásar: las frases de su recorrido (una cada vez) y la carta que espera al final.
 export const FARO_CUASAR = {
   frases: [

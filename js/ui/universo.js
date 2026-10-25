@@ -1,5 +1,5 @@
 import { crearPresentacionViajes } from './presentacionViajes.js';
-import { DESTINOS, LEJANOS, CARTAS, CAPSULAS, SUENOS, SORPRESAS, ZONAS, CONSTELACIONES, FRASES_COMETA } from '../data/universo.js';
+import { DESTINOS, LEJANOS, lugaresDeZona, CARTAS, CAPSULAS, SUENOS, SORPRESAS, ZONAS, CONSTELACIONES, FRASES_COMETA } from '../data/universo.js';
 import { relojZona, fechaBonita, capsulaAbierta, partesEnZona } from '../util/tiempo.js';
 import { momentoDelDia } from '../util/sol.js';
 import { crearCieloNoche } from './cieloNoche.js';
@@ -289,11 +289,14 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
       contenido.append(boton('✧ Empezar el recorrido completo', 'primario ancho', () => { cerrarPanel(); iniciarRuta(); }));
       contenido.append(boton('☾ Contemplar el universo, sin prisa', 'secundario ancho', () => { cerrarPanel(); contemplar(); }));
       contenido.append(boton('✦ El cielo de la noche en que empezó todo', 'secundario ancho', () => { cerrarPanel(); cieloNoche.abrir(); })); separar();
-      for (const d of DESTINOS) contenido.append(tarjeta(d, () => visitar(d.id), `${d.tipo}${progreso.tiene('visitas', d.id) ? ' · visitado' : ''}`));
-      separar(); contenido.append(boton('☄ Seguir al cometa viajero', 'secundario ancho', () => visitar('cometa')));
+      // Tres niveles, de lo más cercano a lo más lejano, según dónde está cada lugar de verdad (ZONAS_LUGARES).
+      const sub = d => `${d.tipo}${progreso.tiene('visitas', d.id) ? ' · visitado' : ''}`;
+      const zona = (titulo, texto, ids) => { contenido.append(el('h3', 'capitulo-titulo zona-titulo', titulo)); if (texto) intro(texto); for (const d of lugaresDeZona(ids)) contenido.append(tarjeta(d, () => visitar(d.id), sub(d))); };
+      zona('Dentro de nuestro sistema solar', 'Nuestro Sol y sus mundos, en un brazo de la galaxia de Xiomara.', 'solar');
+      separar(); zona('En la galaxia de Xiomara', 'Fuera del sistema solar, entre sus estrellas.', 'galaxia');
+      contenido.append(boton('☄ Seguir al cometa viajero', 'secundario ancho', () => visitar('cometa')));
       // Más allá: la cámara viaja hasta donde están de verdad (no se acercan).
-      separar(); intro('Más allá de nuestra galaxia. Están muy lejos: la cámara viajará hasta ellos.');
-      for (const d of LEJANOS) contenido.append(tarjeta(d, () => visitar(d.id), `${d.tipo}${progreso.tiene('visitas', d.id) ? ' · visitado' : ''}`));
+      separar(); zona('Más allá de la galaxia de Xiomara', 'Muy lejos, a cientos de millones de años luz: la cámara viajará hasta ellos.', 'fuera');
     } else if (tipo === 'constelaciones') {
       intro('Cada figura guarda una idea de nuestra historia. Elige una y toca sus luces blancas en orden, o deja que el hilo se teja solo.');
       for (const c of CONSTELACIONES) contenido.append(tarjeta(c, () => { constelacionElegida = c.id; escena.elegirConstelacion(c.id); $('lugar-nombre').textContent = c.nombre; $('lugar-texto').textContent = c.texto; cerrarPanel(); tejer(); }, `${c.texto}${progreso.tiene('constelaciones', c.id) ? ' · descubierta' : ''}`));

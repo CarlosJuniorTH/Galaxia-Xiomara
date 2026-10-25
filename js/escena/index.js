@@ -31,7 +31,7 @@ import { construirMaravillas } from './maravillas.js';
 import { crearPolvo } from './polvo.js';
 import { texturasListas, texturasTodas } from './fabricaTexturas.js';
 import { hornoListo, soltarHorno } from '../util/horno.js';
-import { DESTINOS, LEJANOS } from '../data/universo.js';
+import { DESTINOS, LEJANOS, ZONAS_LUGARES } from '../data/universo.js';
 import { encuadreHogar, escalaSimbolos, desplazamientoZonaLibre, compensacionPuntos, distanciaDestino, correccionAlLlegar, cambioInterfazApreciable } from '../util/encuadre.js';
 import { esMovil } from '../util/dispositivo.js';
 import { crearPlanificador } from '../util/planificador.js';
@@ -124,7 +124,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // Nuestro sistema solar, dentro de un brazo de la galaxia: una escena aparte con el Sol en el
   // centro. La Tierra, el planeta rosa, la luna del correo y el gigante viven allí; se llega
   // lanzándose a la velocidad de la luz hacia ese punto del brazo (entrarOSalir).
-  const SOLARES = new Set(['rosa', 'azul', 'cartas', 'gigante']);
+  const SOLARES = new Set(ZONAS_LUGARES.solar);
   const brazoInicial = enBrazo(1, 0.62, 0);
   await ceder();
   const solar = await porTramos(construirSolar({ haciaCentroGalactico: new THREE.Vector3(-brazoInicial.x, 0, -brazoInicial.z), renderer, uPR: nucleo.uPR }));
