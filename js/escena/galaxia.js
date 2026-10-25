@@ -78,7 +78,8 @@ export function crearGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia }) {
       return col * densidad * 0.4 + vec3(1.0, 0.78, 0.66) * exp(-r / 150.0) * 0.22;
     }`;
   const texturaGas = new THREE.WebGLRenderTarget(1024, 1024, {
-    type: renderer.capabilities.isWebGL2 && renderer.extensions.has('EXT_color_buffer_float') ? THREE.HalfFloatType : THREE.UnsignedByteType,
+    // Media precisión con cualquiera de las dos extensiones (un iPhone que solo ofrece la de media precisión caía a 8 bits: bandas).
+    type: renderer.capabilities.isWebGL2 && (renderer.extensions.has('EXT_color_buffer_float') || renderer.extensions.has('EXT_color_buffer_half_float')) ? THREE.HalfFloatType : THREE.UnsignedByteType,
     generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false
   });
   {
@@ -272,7 +273,7 @@ export function crearGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia }) {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aColor', new THREE.BufferAttribute(colr, 3)); g.setAttribute('aTam', new THREE.BufferAttribute(tam, 1));
     const puntosLejos = new THREE.Points(g, new THREE.ShaderMaterial({ uniforms: uLejos,
       vertexShader: 'attribute vec3 aColor; attribute float aTam; uniform float uOp, uPR; varying vec3 vC; void main(){ vC = aColor * uOp; gl_PointSize = aTam * uPR; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-      fragmentShader: 'varying vec3 vC; void main(){ float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; float a = pow(1.0 - d * 2.0, 1.6); gl_FragColor = vec4(vC * a, a); }',
+      fragmentShader: 'varying vec3 vC; void main(){ float d = length(gl_PointCoord - 0.5); float a = pow(max(1.0 - d * 2.0, 0.0), 1.6); gl_FragColor = vec4(vC * a, a); }',
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
     puntosLejos.frustumCulled = false; puntosLejos.renderOrder = 2; lejos.add(puntosLejos);
   }
@@ -288,7 +289,7 @@ export function crearGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia }) {
   const uPunto = { uI: { value: 0 }, uPR }, TAM_PUNTO = 3.0;
   const puntoLuz = new THREE.Points(gPunto, new THREE.ShaderMaterial({ uniforms: uPunto,
     vertexShader: `uniform float uPR; void main(){ gl_PointSize = ${TAM_PUNTO.toFixed(1)} * uPR; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-    fragmentShader: 'uniform float uI; void main(){ float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; float a = pow(1.0 - d * 2.0, 1.6) * uI; gl_FragColor = vec4(vec3(1.0, 0.78, 0.92) * a, a); }',
+    fragmentShader: 'uniform float uI; void main(){ float d = length(gl_PointCoord - 0.5); float a = pow(max(1.0 - d * 2.0, 0.0), 1.6) * uI; gl_FragColor = vec4(vec3(1.0, 0.78, 0.92) * a, a); }',
     transparent: true, premultipliedAlpha: true, depthWrite: false, blending: THREE.AdditiveBlending }));
   puntoLuz.frustumCulled = false; puntoLuz.visible = false; grupo.add(puntoLuz);
   // Su halo rosado de lejos (licencia, para reconocerla entre las demás): un brillo suave y estable de
@@ -296,7 +297,7 @@ export function crearGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia }) {
   const uHalo = { uI: { value: 0 }, uPR };
   const haloLuz = new THREE.Points(gPunto, new THREE.ShaderMaterial({ uniforms: uHalo,
     vertexShader: 'uniform float uPR; void main(){ gl_PointSize = 34.0 * uPR; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    fragmentShader: 'uniform float uI; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; if (d > 1.0) discard; float a = (exp(-d * d * 9.0) * 0.8 + exp(-d * 3.0) * 0.2) * (1.0 - d) * uI; gl_FragColor = vec4(vec3(1.0, 0.55, 0.8) * a, a); }',
+    fragmentShader: 'uniform float uI; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; float a = (exp(-d * d * 9.0) * 0.8 + exp(-d * 3.0) * 0.2) * max(1.0 - d, 0.0) * uI; gl_FragColor = vec4(vec3(1.0, 0.55, 0.8) * a, a); }',
     transparent: true, premultipliedAlpha: true, depthWrite: false, blending: THREE.AdditiveBlending }));
   haloLuz.frustumCulled = false; haloLuz.visible = false; grupo.add(haloLuz);
   const mediaTextura = (t, porDefecto) => { try { const d = t.image?.data || t.image?.getContext?.('2d')?.getImageData(0, 0, t.image.width, t.image.height).data; if (!d) return porDefecto; let s = 0; for (let j = 0; j < d.length; j += 4) s += (0.2126 * d[j] + 0.7152 * d[j + 1] + 0.0722 * d[j + 2]) * d[j + 3] / 255; const m = s / (d.length / 4) / 255; return m > 1e-4 ? m : porDefecto; } catch { return porDefecto; } };

@@ -133,7 +133,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
         vAng = h(position * 0.001) * 6.2832; vInc = 0.25 + 0.75 * h(position * 0.0013 + 3.1); vBrazos = step(0.45, h(position * 0.0007 + 7.7));
         vC = aCol; }`,
     fragmentShader: /* glsl */`uniform sampler2D uBrazos; varying vec3 vC; varying float vA, vRes, vAng, vInc, vBrazos, vTipo;
-      void main(){ vec2 q = gl_PointCoord - 0.5; float d = length(q) * 2.0; if (d > 1.0) discard;
+      void main(){ vec2 q = gl_PointCoord - 0.5; float d = length(q) * 2.0;   // sin discard (ver materiales.js): fuera del círculo, ×0 al final
         float punto = exp(-d * d * 4.0);
         // Forma: disco elíptico girado e inclinado, núcleo brillante y, en unas, dos brazos.
         float c = cos(vAng), s = sin(vAng); vec2 r = vec2(c * q.x - s * q.y, s * q.x + c * q.y) * 2.0; r.y /= vInc;
@@ -150,7 +150,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
         vec3 oro = mix(vec3(1.0, 0.72, 0.38), vec3(1.0, 0.86, 0.6), fract(vTipo * 13.0));
         vec3 colForma = mix(mix(brazo, oro, eliptica), mix(oro, vec3(1.0, 0.93, 0.8), 0.5), exp(-rr * 5.0));
         vec3 col = mix(vC, colForma, vRes);
-        float a = mix(punto, forma, vRes) * vA; gl_FragColor = vec4(col * a, a); }`,
+        float a = mix(punto, forma, vRes) * vA * step(d, 1.0); gl_FragColor = vec4(col * a, a); }`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
   // Polvo luminoso de los cúmulos (1–2 px).
   const matNubes = new THREE.ShaderMaterial({ uniforms: { ...uniformes, uComp },
@@ -164,7 +164,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
         float onda = pow(0.5 + 0.5 * sin(dot(position, vec3(2.1e-6, 1.3e-6, -1.7e-6)) - uT * 0.35), 8.0) + pow(0.5 + 0.5 * sin(dot(position, vec3(-1.2e-6, 1.9e-6, 1.5e-6)) - uT * 0.27 + 2.0), 8.0);
         vA *= titileo * (0.75 + 0.9 * onda);
       }`,
-    fragmentShader: /* glsl */`varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; if (d > 1.0) discard; float a = exp(-d * d * 3.0) * vA; gl_FragColor = vec4(vC * a, a); }`,
+    fragmentShader: /* glsl */`varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; float a = exp(-d * d * 3.0) * vA * step(d, 1.0); gl_FragColor = vec4(vC * a, a); }`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
   // Polvo de los filamentos: motas finas (1–2,5 px), con un leve titileo.
   const matPolvo = new THREE.ShaderMaterial({ uniforms: { ...uniformes, uComp },
@@ -178,7 +178,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
         float onda = pow(0.5 + 0.5 * sin(dot(position, vec3(2.1e-6, 1.3e-6, -1.7e-6)) - uT * 0.35), 8.0) + pow(0.5 + 0.5 * sin(dot(position, vec3(-1.2e-6, 1.9e-6, 1.5e-6)) - uT * 0.27 + 2.0), 8.0);
         vA *= titileo * (0.75 + 0.9 * onda);
         gl_PointSize = (1.2 + aBrillo * 1.0 + h * 0.5) * uPR; }`,
-    fragmentShader: /* glsl */`varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; if (d > 1.0) discard; float a = (1.0 - smoothstep(0.35, 1.0, d)) * vA; gl_FragColor = vec4(vC * a, a); }`,   // motas nítidas, sin halo
+    fragmentShader: /* glsl */`varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; float a = (1.0 - smoothstep(0.35, 1.0, d)) * vA; gl_FragColor = vec4(vC * a, a); }`,   // motas nítidas, sin halo
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
   // Las tres nubes grandes de puntos (más de un millón en total), en bloques: solo se dibuja lo que está a la vista.
   // (Las cintas, los resplandores y la niebla de gas ya no se construyen: estaban ocultos para siempre —sin líneas ni

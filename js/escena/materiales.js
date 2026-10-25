@@ -13,8 +13,9 @@ const FORMA_CORAZON = /* glsl */`
   gl_FragColor = vec4(vC * (a * 1.15 + nucleo * 0.6), a * uOp * vF);`;
 
 const FORMA_REDONDA = /* glsl */`
+  // Sin discard: fuera del círculo color y alfa ya son 0 (con depthWrite desactivado da lo mismo), y en las GPU de
+  // teselas del móvil (PowerVR, Apple) descartar fragmentos impide sus optimizaciones de relleno.
   float d = length(gl_PointCoord - 0.5);
-  if (d > 0.5) discard;
   float a = pow(max(1.0 - d * 2.0, 0.0), 1.6);
   float nucleo = 1.0 - smoothstep(0.0, 0.18, d);
   gl_FragColor = vec4(vC * (a + nucleo * 0.8), a * uOp * vF);`;

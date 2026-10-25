@@ -305,7 +305,7 @@ export function crearCosmos({ uScale, uPR }) {
          vec3 p = vec3(cos(position.x) * r, lado * f * 2100.0, sin(position.x) * r);
          vec4 mv = modelViewMatrix * vec4(p, 1.0); gl_Position = projectionMatrix * mv; vA = (1.0 - f) * smoothstep(0.0, 0.05, f);
          gl_PointSize = clamp(9.0 * ${ESCALA_CIELO.toFixed(1)} * uScale / max(1.0, -mv.z), 1.0, 3.5 * uPR); }`,
-      'varying float vA; void main(){ float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; float k = pow(1.0 - d * 2.0, 2.0) * vA; gl_FragColor = vec4(vec3(0.8, 0.9, 1.0) * k, k); }'));
+      'varying float vA; void main(){ float d = length(gl_PointCoord - 0.5); float k = pow(max(1.0 - d * 2.0, 0.0), 2.0) * vA; gl_FragColor = vec4(vec3(0.8, 0.9, 1.0) * k, k); }'));
     flujo.frustumCulled = false; magnetico.add(flujo); animar.push(flujo);
   }
   // La estrella de neutrones: una esfera diminuta y ardiente con dos puntos calientes en los
@@ -370,7 +370,7 @@ export function crearCosmos({ uScale, uPR }) {
          float t = clamp((r - ${(R * 8).toFixed(1)}) / ${(R * 40).toFixed(1)}, 0.0, 1.0);
          vC = mix(vec3(1.0, 0.85, 0.6), vec3(0.7, 0.8, 1.0), t); vA = (1.0 - t * 0.6) * 0.75;
          gl_PointSize = clamp(${(ESCALA_CIELO * 0.55 * ESCALA_TON * 16).toFixed(1)} * uScale / max(1.0, -mv.z), 1.0, 2.5 * uPR); }`,
-      'varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; float k = pow(1.0 - d * 2.0, 1.6) * vA; gl_FragColor = vec4(vC * k, k); }'));
+      'varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5); float k = pow(max(1.0 - d * 2.0, 0.0), 1.6) * vA; gl_FragColor = vec4(vC * k, k); }'));
     discoEstrellas.frustumCulled = false; planoDisco.add(discoEstrellas); animar.push(discoEstrellas); discoTON = discoEstrellas;
     for (const lado of [1, -1]) { const h = crearHaz({ radio: R * 1.2, largo: R * 60, colorA: '#f4f2ff', colorB: '#8aa6ff', intensidad: 0.9, nudos: 1.2 }); if (lado < 0) h.rotation.x = Math.PI; planoDisco.add(h); animar.push(h); hazTON = h; }
   }

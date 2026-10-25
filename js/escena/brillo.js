@@ -24,6 +24,10 @@ export class BrilloEficiente extends UnrealBloomPass {
       .replace('vec4 texel = texture2D( tDiffuse, vUv );', `vec4 texel = min( max( texture2D( tDiffuse, enZona( vUv, uZona ) ), vec4( 0.0 ) ), vec4( ${LIMITE_HDR.toFixed(1)} ) );`);
   }
 
+  // escala: fracción del búfer de la escena a la que se calcula el primer nivel (UnrealBloomPass usa ½). Con ¼ cuesta
+  // la cuarta parte y, como es una luz muy difuminada, se ve igual (index/nucleo.js lo eligen según el aparato).
+  setSize(width, height) { super.setSize(Math.max(2, Math.round(width * (this.escalaBrillo ?? 0.5) * 2)), Math.max(2, Math.round(height * (this.escalaBrillo ?? 0.5) * 2))); }
+
   getSeperableBlurMaterial(radio) {
     const { pesos, pares, total } = nucleoGaussiano(radio);
     const numero = n => n.toPrecision(12);
