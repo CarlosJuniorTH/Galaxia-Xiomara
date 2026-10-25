@@ -1,0 +1,130 @@
+{
+  "cuasar-estancia.m4a": {
+    "bytes": 1053663,
+    "duracion": 64.714,
+    "origen": "no_vocals.wav",
+    "desde": 55.751,
+    "hasta": 120.465,
+    "lufs": -20
+  },
+  "cuasar.m4a": {
+    "bytes": 506734,
+    "duracion": 31,
+    "origen": "Galaxia-Analizar.mp3",
+    "desde": 0,
+    "hasta": 31,
+    "lufs": -16
+  },
+  "deneb-estancia.m4a": {
+    "bytes": 1091559,
+    "duracion": 66.664,
+    "origen": "no_vocals.wav",
+    "desde": 0,
+    "hasta": 66.664,
+    "lufs": -20
+  },
+  "deneb.m4a": {
+    "bytes": 713530,
+    "duracion": 43.444,
+    "origen": "Deneb-Galaxia",
+    "desde": 155.806,
+    "hasta": 199.25,
+    "lufs": -16
+  },
+  "hogar-estancia.m4a": {
+    "bytes": 655431,
+    "duracion": 40.24,
+    "origen": "no_vocals.wav",
+    "desde": 120.465,
+    "hasta": 160.705,
+    "lufs": -20
+  },
+  "hogar.m4a": {
+    "bytes": 507102,
+    "duracion": 31.138,
+    "origen": "Galaxia-Analizar3",
+    "desde": 23.057,
+    "hasta": 54.195,
+    "lufs": -16
+  },
+  "inicio.m4a": {
+    "bytes": 522883,
+    "duracion": 31.997,
+    "origen": "Intro-Galaxia",
+    "desde": 62.624,
+    "hasta": 94.621,
+    "lufs": -16
+  },
+  "pulsar-estancia.m4a": {
+    "bytes": 1269582,
+    "duracion": 77.694,
+    "origen": "no_vocals.wav",
+    "desde": 0,
+    "hasta": 77.694,
+    "lufs": -20
+  },
+  "pulsar.m4a": {
+    "bytes": 549032,
+    "duracion": 33.646,
+    "origen": "Galaxia-Analizar1",
+    "desde": 95.643,
+    "hasta": 129.289,
+    "lufs": -16
+  },
+  "sagitario-estancia.m4a": {
+    "bytes": 807263,
+    "duracion": 49.528,
+    "origen": "no_vocals.wav",
+    "desde": 0,
+    "hasta": 49.528,
+    "lufs": -20
+  },
+  "sagitario.m4a": {
+    "bytes": 619916,
+    "duracion": 38.104,
+    "origen": "Galaxia-Analizar2",
+    "desde": 145.241,
+    "hasta": 183.345,
+    "lufs": -16
+  },
+  "supernova-estancia.m4a": {
+    "bytes": 1202081,
+    "duracion": 73.236,
+    "origen": "no_vocals.wav",
+    "desde": 0,
+    "hasta": 73.236,
+    "lufs": -20
+  },
+  "supernova.m4a": {
+    "bytes": 1022724,
+    "duracion": 62.338,
+    "origen": "Supernova-Galaxia",
+    "desde": 114.962,
+    "hasta": 177.3,
+    "lufs": -16
+  },
+  "ton618-estancia.m4a": {
+    "bytes": 938435,
+    "duracion": 57.168,
+    "origen": "no_vocals.wav",
+    "desde": 0,
+    "hasta": 57.168,
+    "lufs": -20
+  },
+  "ton618.m4a": {
+    "bytes": 607215,
+    "duracion": 37.337,
+    "origen": "Galaxia-Analizar4",
+    "desde": 101.634,
+    "hasta": 138.971,
+    "lufs": -16
+  },
+  "viajes.m4a": {
+    "bytes": 255235,
+    "duracion": 15,
+    "origen": "Viaje-Galaxia",
+    "desde": 95.48,
+    "hasta": 110.48,
+    "lufs": -16
+  }
+}
