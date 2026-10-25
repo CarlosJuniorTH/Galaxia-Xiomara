@@ -891,7 +891,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
         if (e.fase === 'ruptura' && !vuelo.rupturaHecha) { vuelo.rupturaHecha = true; campoVelocidad.impulsar(); }
         // Dónde estamos: región, encuentro a la vista y distancia recorrida (para la interfaz y las pruebas).
         if (cuadrosDibujados % 6 === 0) informarViaje(e);
-        campoVelocidad.ruptura(e.ruptura, THREE.MathUtils.clamp((vuelo.transcurrido - r0) / Math.max(1e-3, r1 - r0), 0, 1)); vuelo.rupturaValor = movimientoReducido ? 0 : e.ruptura;
+        campoVelocidad.ruptura(e.ruptura, THREE.MathUtils.clamp((vuelo.transcurrido - r0) / Math.max(1e-3, r1 - r0), 0, 1));
         campoVelocidad.direccion(e.fase === 'ruptura' || e.fase === 'crucero' || e.fase === 'aproximacion' ? tmpDir.subVectors(vuelo.plan.recta.v2, vuelo.plan.recta.v1) : null);
         // Al romper, el campo de visión se abre un poco y vuelve en el crucero: sensación de aceleración.
         const fov = FOV_BASE + (movimientoReducido ? 0 : 9 * e.ruptura + 3 * (e.fase === 'crucero' ? 1 : 0) * Math.min(1, (vuelo.transcurrido - r1) / 1.5) * Math.max(0, 1 - e.avance * 1.1));
@@ -1098,8 +1098,10 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // El destello de la supernova ilumina la pantalla si se está mirando hacia ella.
     let flash = cosmos.supernova.destello;
     if (flash > 0.001) { proyectado.copy(cosmos.supernova.grupo.position).multiplyScalar(cosmos.raiz.scale.x).add(cosmos.raiz.position).project(camera); flash *= proyectado.z < 1 ? Math.max(0, 1 - Math.hypot(proyectado.x, proyectado.y) * 0.45) : 0; }
-    // La ruptura del salto también se siente en el brillo: un golpe breve de luz (sin pantalla blanca).
-    bloom.strength = BRILLO_BASE + pulso * 0.22 + flash * 1.4 + (vuelo?.rupturaValor ?? 0) * 0.55;
+    // La ruptura del salto ya no golpea el brillo: subía el resplandor de 0,45 a ~0,95 durante 0,7 s y toda la telaraña
+    // (y el gigante de origen) se encendía con halos al arrancar el viaje. La aceleración la cuentan las estelas, sus anillos
+    // nítidos y el campo de visión.
+    bloom.strength = BRILLO_BASE + pulso * 0.22 + flash * 1.4;
     // La luz anuncia aceleración y llegada, sin desplazar ni desenfocar un píxel.
     if (nucleo.salto) {
       nucleo.salto.uniforms.uFuerza.value = 0;

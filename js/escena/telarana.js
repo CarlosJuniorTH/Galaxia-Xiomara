@@ -178,8 +178,12 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
         float onda = pow(0.5 + 0.5 * sin(dot(position, vec3(2.1e-6, 1.3e-6, -1.7e-6)) - uT * 0.35), 8.0) + pow(0.5 + 0.5 * sin(dot(position, vec3(-1.2e-6, 1.9e-6, 1.5e-6)) - uT * 0.27 + 2.0), 8.0);
         vA *= titileo * (0.75 + 0.9 * onda);
         gl_PointSize = (1.2 + aBrillo * 1.0 + h * 0.5) * uPR; }`,
-    fragmentShader: /* glsl */`varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; float a = (1.0 - smoothstep(0.35, 1.0, d)) * vA; gl_FragColor = vec4(vC * a, a); }`,   // motas nítidas, sin halo
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+    // Motas nítidas, sin halo. Se suman en «trama» (pantalla: c + fondo·(1 − c)) y no en suma pura: donde las hebras se
+    // amontonan en la línea de visión (al viajar por dentro de la red, mirando a lo largo de los filamentos) la suma pasaba
+    // de 2–3 veces el umbral del resplandor y salían manchas azules y moradas saturadas y con halo; así la luz se satura
+    // suave hacia 1 y la mota suelta queda exactamente igual (c = color·a², lo mismo que daba la mezcla aditiva con SRC_ALPHA).
+    fragmentShader: /* glsl */`varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; float a = (1.0 - smoothstep(0.35, 1.0, d)) * vA; /* fuera del círculo a = 0: no suma nada (sin discard) */ gl_FragColor = vec4(min(vC * a * a, vec3(1.0)), a); }`,
+    transparent: true, depthWrite: false, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcColorFactor, blendEquation: THREE.AddEquation });
   // Las tres nubes grandes de puntos (más de un millón en total), en bloques: solo se dibuja lo que está a la vista.
   // (Las cintas, los resplandores y la niebla de gas ya no se construyen: estaban ocultos para siempre —sin líneas ni
   // degradados—; sus datos se siguen calculando para que el azar, y por tanto el universo, no cambie.)
@@ -264,7 +268,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   raiz.updateMatrixWorld(true); raiz.matrixWorldAutoUpdate = false;
   const tam = new THREE.Vector2(), aux = new V(); let gigantes = [];
   const frustum = new THREE.Frustum(), mProy = new THREE.Matrix4(), esfera = new THREE.Sphere();
-  let cuadroExpo = 0, densidadWeb = 0, expoAuto = 1;
+  let cuadroExpo = 0, densidadWeb = 0, expoAuto = 1, luzCasa = null;
   const AREA_REF = 1440 * 900, TAN_REF = Math.tan(Math.PI / 6), CAL = 5.2, DENSIDAD_COMODA = 0.85;   // luz de telaraña por píxel CSS con la que se ve bien (la del PC en los gigantes: 0,7–1,1)
   return {
     raiz, web, galaxias: bloquesGalaxias, nubes: bloquesNubes, cercano, polvoFil: bloquesPolvo, capaGalaxias, dibujarGalaxias,
@@ -305,7 +309,12 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
       }
       const metaAuto = Math.min(1, Math.pow(DENSIDAD_COMODA / Math.max(1e-9, densidadWeb), 0.85));
       expoAuto += (Math.max(0.12, metaAuto) - expoAuto) * Math.min(1, dt * 3);
-      uniformes.uCasa.value = (0.22 + 0.78 * THREE.MathUtils.smoothstep(camera.position.length(), 20000, 400000)) * expoAuto;
+      // El paso de la luz de casa (22 %) a la de fuera se hace en el TIEMPO, no solo por la distancia: al saltar, la cámara
+      // cruza de 20 000 a 400 000 unidades en ~0,3 s y la telaraña entera subía ×4,5 de golpe justo tras la ruptura (el
+      // «¡pum!» al arrancar el viaje). Ahora sigue a la distancia con una constante de ~0,8 s (95 % en unos 2,5 s).
+      const metaCasa = 0.22 + 0.78 * THREE.MathUtils.smoothstep(camera.position.length(), 20000, 400000);
+      luzCasa = luzCasa === null ? metaCasa : luzCasa + (metaCasa - luzCasa) * Math.min(1, dt * 1.2);
+      uniformes.uCasa.value = luzCasa * expoAuto;
       const pr = uPR.value; uniformes.uRes.value.set(vista.ancho * pr * 0.5, vista.alto * pr * 0.5);
       uniformes.uF.value = vista.alto / (2 * Math.tan(camera.fov * Math.PI / 360));
       rehacerCercano(camera.position);
