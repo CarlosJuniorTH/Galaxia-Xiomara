@@ -32,7 +32,8 @@ export async function arrancarServidor(puerto = Number(process.env.PUERTO_PRUEBA
 }
 export function pararServidor() { servidor?.kill(); servidor = null; }
 
-export async function abrir(base, perfil = 'pc', { espera = 2500, calidad = 'alta', consulta = '' } = {}) {
+// Chromium con una página en blanco (sin abrir aún el universo).
+export async function lanzar(perfil = 'pc') {
   if (!existsSync(CHROME)) { console.error('No encuentro Chromium en ' + CHROME + ' (variable CHROME).'); process.exit(2); }
   const navegador = await chromium.launch({ executablePath: CHROME, headless: true, args: process.env.GL === 'sw' ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : ['--enable-gpu', '--ignore-gpu-blocklist', '--use-angle=vulkan', '--enable-features=Vulkan'] });
   const contexto = await navegador.newContext(PERFILES[perfil]);
@@ -40,7 +41,15 @@ export async function abrir(base, perfil = 'pc', { espera = 2500, calidad = 'alt
   const errores = [];
   pagina.on('console', m => { if (m.type() === 'error') errores.push(m.text()); });
   pagina.on('pageerror', e => errores.push('pageerror: ' + e.message));
+  return { navegador, pagina, errores };
+}
+
+// toque: con canción de portada (?pruebaAudio) hay que pulsar «Toca para empezar ♡» antes; la tarjeta para entrar sale en
+// la marca «tarjeta» de la canción (no basta con que el botón esté preparado: hasta entonces la tarjeta no se ve).
+export async function abrir(base, perfil = 'pc', { espera = 2500, calidad = 'alta', consulta = '', toque = false } = {}) {
+  const { navegador, pagina, errores } = await lanzar(perfil);
   await pagina.goto(`${base}/?calidad=${calidad}${consulta}#debug`);
+  if (toque) { await pagina.waitForSelector('#toque:not([hidden])', { timeout: 30000 }); await pagina.click('#toque'); await pagina.waitForFunction(() => document.getElementById('entrada').classList.contains('formado'), null, { timeout: 120000 }); await pagina.waitForTimeout(1400); }
   await pagina.waitForFunction(() => document.getElementById('btn-entrar')?.classList.contains('preparado'), null, { timeout: 90000 });
   await pagina.click('#btn-entrar');
   await pagina.waitForFunction(() => window.__galaxia && !window.__galaxia.escena.viajando && document.body.classList.contains('dentro'), null, { timeout: 40000 });

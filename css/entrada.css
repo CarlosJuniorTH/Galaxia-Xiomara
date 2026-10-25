@@ -136,3 +136,21 @@
 @keyframes cargaBrillo{from{transform:translateX(-100%)}to{transform:translateX(340%)}}
 @keyframes cargaRespira{0%,100%{opacity:.55}50%{opacity:1}}
 #entrada.cargando .portada-saltar,#entrada.cargando .portada-frase{opacity:0;pointer-events:none;}
+
+/* Con canción de portada: «Toca para empezar ♡» antes de todo (el audio necesita un gesto). La descarga ya corre por
+   detrás; el toque arranca a la vez la canción y la animación, y la carga se queda abajo, discreta, hasta terminar. */
+.toque{
+  position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  padding:calc(var(--arriba) + 16px) 16px calc(var(--abajo) + 16px);border:none;background:none;color:inherit;cursor:pointer;
+  transition:opacity .8s ease;-webkit-tap-highlight-color:transparent;
+}
+.toque[hidden]{display:none;}
+.toque.fuera{opacity:0;pointer-events:none;}
+.toque-ceja{font:600 .62rem 'Quicksand',sans-serif;letter-spacing:5px;text-transform:uppercase;color:#f3c9dd;}
+.toque-texto{font-family:'Great Vibes',cursive;font-size:clamp(2.6rem,12vw,3.6rem);line-height:1.2;color:#ffd1e6;animation:cargaRespira 2.6s ease-in-out infinite;}
+.toque-nota{font:italic 1rem 'Cormorant Garamond',serif;color:rgba(255,210,230,.6);}
+.toque:focus-visible{outline:none;}
+.toque:focus-visible .toque-texto{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:8px;}
+#entrada.con-toque .carga{opacity:0;}
+#entrada.cancion .carga{top:auto;bottom:calc(var(--abajo) + 28px);transform:translateX(-50%);}
+#entrada.cancion.descargando:not(.formado) .carga{opacity:1;}

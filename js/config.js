@@ -11,6 +11,7 @@ export const CONFIG = {
   fechaInicio: '2025-12-15',
 
   // ── Música ──
+  // La banda sonora por momentos (portada, viajes, destinos, canción del mes) va en js/data/bandaSonora.js.
   // Pon la canción en assets/musica/ con el nombre "cancion.mp3".
   // Escribe su ruta en cancion; vacía = música ambiental original generada en el dispositivo.
   cancion: '',

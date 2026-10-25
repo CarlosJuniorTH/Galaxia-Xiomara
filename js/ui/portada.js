@@ -12,7 +12,14 @@ function brillo(color, tam) {
   x.fillStyle = g; x.fillRect(0, 0, tam, tam); return c;
 }
 
-export function crearPortada(lienzo, { alFormarse = () => {}, frases = [], textoFrase = () => {}, empezar = true } = {}) {
+// Hitos de la animación (segundos de su reloj t): las dos luces se encuentran, el corazón late, la galaxia se despliega
+// y aparece la tarjeta (se forma a los 3,4 s del encuentro y la tarjeta entra 0,9 s después, js/ui/entrada.js). Con
+// canción en la portada, su reloj se reescala para que cada hito caiga en la marca del mismo nombre (js/util/sincronia.js).
+const ENCUENTRO = 4.6;
+export const HITOS = Object.freeze({ encuentro: ENCUENTRO, corazon: ENCUENTRO + 0.5, galaxia: ENCUENTRO + 1.5, tarjeta: ENCUENTRO + 3.4 + 0.9 });
+
+// reloj(): si devuelve un número, es el tiempo t de la animación (guiado por la canción); null = a su ritmo, por cuadros.
+export function crearPortada(lienzo, { alFormarse = () => {}, frases = [], textoFrase = () => {}, empezar = true, reloj = null } = {}) {
   let empezada = empezar;
   const x = lienzo.getContext('2d');
   const movil = matchMedia('(pointer:coarse)').matches;
@@ -48,8 +55,7 @@ export function crearPortada(lienzo, { alFormarse = () => {}, frases = [], texto
   const centroY = () => vertical() ? alto * (0.4 - 0.235 * suave(aparte)) : alto * (0.47 - 0.29 * suave(aparte));
   // Recorridos de las dos luces: arcos desde lados opuestos hasta el centro (t de 0 a 3,2 s).
   // Las dos luces se acercan girando una alrededor de la otra (como dos estrellas en una danza que se cierra): cada
-  // vuelta más juntas y más rápido, hasta encontrarse en el centro.
-  const ENCUENTRO = 4.6;
+  // vuelta más juntas y más rápido, hasta encontrarse en el centro (ENCUENTRO, arriba).
   function luz(lado, k) {
     const cx = centroX(), cy = centroY(), e = Math.min(1, k);
     const R0 = Math.min(ancho, alto) * (vertical() ? 0.42 : 0.4), r = R0 * Math.pow(1 - e, 0.75);
@@ -67,7 +73,9 @@ export function crearPortada(lienzo, { alFormarse = () => {}, frases = [], texto
     // a su sitio, a 60: a 30 la subida se veía a saltos en el móvil.
     const lento = formado && movil && aparte >= 1;
     if (lento && (cuadro.salto = !cuadro.salto)) return;
-    t += lento ? dt * 2 : dt;
+    // Con canción, el reloj es el suyo (la animación no se adelanta ni se retrasa aunque se pierdan cuadros).
+    const r = reloj?.();
+    if (r !== null && r !== undefined) t = r; else t += lento ? dt * 2 : dt;
     if (formado) aparte = Math.min(1, aparte + dt * 0.7);
     const cx = centroX(), cy = centroY(), R = vertical() ? ancho * (0.47 - 0.03 * aparte) : escala * 0.42 + (Math.min(ancho * 0.32, alto * 0.34) - escala * 0.42) * suave(aparte);
     x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1;

@@ -1,0 +1,127 @@
+// Banda sonora con audios de prueba (?pruebaAudio): tonos y ruido rosa generados con ffmpeg y preparados con
+// scripts/preparar-audio.mjs (no es música). Comprueba la pantalla «Toca para empezar ♡», que la descarga empieza antes
+// del toque y cuenta en los MB de la carga, que tras el toque suena (contexto en «running» y el reloj avanza), que la
+// tarjeta para entrar no aparece antes de la marca «tarjeta», que el vuelo de entrada no corta la canción, que al terminar
+// se funde con el ambiente, que al viajar se funde a «viajes» y al llegar se vuelve, el botón de música, y que en la
+// segunda visita ya se puede saltar. Sin ?pruebaAudio, ni pantalla de toque ni descargas de audio (todo como antes).
+import { spawnSync } from 'child_process';
+import { existsSync, mkdirSync, readFileSync } from 'fs';
+import path from 'path';
+import { lanzar } from './arnes.mjs';
+import { PRUEBA } from '../../js/data/bandaSonora.js';
+
+const CARPETA = PRUEBA.carpeta, ORIGEN = '.pruebas/audio-origen', FFMPEG = process.env.FFMPEG || '/usr/bin/ffmpeg';
+function prepararAudios() {
+  if (existsSync(CARPETA + 'inicio.m4a') && existsSync(CARPETA + 'viajes.m4a') && existsSync(CARPETA + 'indice.json')) return;
+  mkdirSync(ORIGEN, { recursive: true });
+  const ff = (...a) => { const r = spawnSync(FFMPEG, ['-hide_banner', '-loglevel', 'error', '-y', ...a]); if (r.status) throw Error(String(r.stderr)); };
+  // «inicio»: un tono que sube de nota en cada marca, sobre ruido rosa suave (36 s de origen → fragmento de 30 s).
+  ff('-f', 'lavfi', '-i', "aevalsrc='0.3*sin(2*PI*(220+110*gte(t,8)+110*gte(t,12)+110*gte(t,20))*t)':s=44100:d=36", '-f', 'lavfi', '-i', 'anoisesrc=c=pink:a=0.04:d=36', '-filter_complex', 'amix=inputs=2', '-ac', '2', ORIGEN + '/inicio.wav');
+  // «viajes»: ruido rosa con un pulso lento.
+  ff('-f', 'lavfi', '-i', "anoisesrc=c=pink:a=0.2:d=24", '-af', "volume='0.6+0.4*sin(2*PI*0.5*t)':eval=frame", '-ac', '2', ORIGEN + '/viajes.wav');
+  for (const [n, ini, fin] of [['inicio', '2', '32'], ['viajes', '1', '21']]) {
+    const r = spawnSync('node', ['scripts/preparar-audio.mjs', `${ORIGEN}/${n}.wav`, '--inicio', ini, '--fin', fin, '--nombre', n, '--destino', CARPETA], { encoding: 'utf8' });
+    if (r.status) throw Error(r.stderr); console.log('  · ' + r.stdout.trim());
+  }
+}
+
+export default async function ({ base, informe }) {
+  prepararAudios();
+  const indice = JSON.parse(readFileSync(CARPETA + 'indice.json', 'utf8'));
+  const marcas = PRUEBA.momentos.inicio.marcas;
+  const { navegador, pagina, errores } = await lanzar('pc');
+  const estado = () => pagina.evaluate(() => window.__bandaSonora.estado());
+  try {
+    // 0. Sin ?pruebaAudio: como siempre (los momentos están en null).
+    const pedidosAudio = [];
+    pagina.on('request', r => { if (r.url().includes('/assets/musica/')) pedidosAudio.push({ url: r.url(), t: Date.now() }); });
+    await pagina.goto(`${base}/?calidad=alta#debug`);
+    await pagina.waitForTimeout(2500);
+    informe.comprobar(await pagina.evaluate(() => document.getElementById('toque').hidden), 'sin canción configurada, no hay pantalla de toque');
+    informe.comprobar(pedidosAudio.length === 0, 'sin canción configurada, no se descarga ningún audio', pedidosAudio.map(p => p.url));
+
+    // 1. Con canción: pantalla de toque y descarga desde el principio.
+    pedidosAudio.length = 0;
+    await pagina.goto(`${base}/?calidad=alta&pruebaAudio#debug`);
+    await pagina.waitForSelector('#toque:not([hidden])', { timeout: 30000 });
+    const toque = await pagina.evaluate(() => ({ texto: document.querySelector('.toque-texto').textContent, fuente: getComputedStyle(document.querySelector('.toque-texto')).fontFamily, carga: getComputedStyle(document.getElementById('carga')).opacity, frase: document.getElementById('portada-frase').textContent }));
+    informe.comprobar(toque.texto === 'Toca para empezar ♡' && /Great Vibes/.test(toque.fuente), 'pantalla «Toca para empezar ♡» con la letra del proyecto', toque);
+    informe.comprobar(toque.carga === '0' && toque.frase === '', 'antes del toque no se ve la carga ni empieza la portada', toque);
+    // Que la descarga empiece sin esperar al toque (se espera un poco a propósito antes de tocar).
+    await pagina.waitForTimeout(3000);
+    const antesDelToque = pedidosAudio.filter(p => /inicio\.m4a$/.test(p.url)).length;
+    informe.comprobar(antesDelToque > 0, 'la canción de la portada se descarga antes del toque');
+    const previstos = await pagina.evaluate(() => { const p = window.__bandaSonora.estado().pistas; return { inicio: p.inicio.previsto, viajes: p.viajes.previsto }; });
+    informe.comprobar(previstos.inicio === indice['inicio.m4a'].bytes && previstos.viajes === indice['viajes.m4a'].bytes, 'los bytes de «inicio» y «viajes» (del índice) cuentan en el total de MB de la carga', previstos);
+    // Registro, en la propia página, del segundo de la canción en que la tarjeta aparece y en que la carga termina.
+    await pagina.evaluate(() => {
+      const R = window.__registroBanda = {}, banda = window.__bandaSonora;
+      new MutationObserver(() => { if (!R.formado && document.getElementById('entrada').classList.contains('formado')) R.formado = banda.tiempo('inicio'); }).observe(document.getElementById('entrada'), { attributes: true });
+      new MutationObserver(() => { if (!R.preparado && document.getElementById('btn-entrar').classList.contains('preparado')) R.preparado = banda.tiempo('inicio'); }).observe(document.getElementById('btn-entrar'), { attributes: true });
+      if (document.getElementById('btn-entrar').classList.contains('preparado')) R.preparado = 0;
+    });
+    const antes = await estado();
+    informe.comprobar(antes.contexto === null || antes.contexto !== 'running', 'sin toque, el audio no suena', antes.contexto);
+
+    // 2. El toque: suena.
+    await pagina.click('#toque');
+    await pagina.waitForTimeout(1500);
+    const e1 = await estado(); await pagina.waitForTimeout(1000); const e2 = await estado();
+    informe.comprobar(e2.contexto === 'running', 'tras el toque el AudioContext está en «running»', e2.contexto);
+    informe.comprobar(e2.pistas.inicio.sonando && e2.pistas.inicio.tiempo - e1.pistas.inicio.tiempo > 0.7, 'la canción de la portada suena y su reloj avanza', [e1.pistas.inicio.tiempo, e2.pistas.inicio.tiempo]);
+    informe.comprobar(e2.objetivo === 'inicio' && e2.pistas.inicio.ganancia > 0.3, 'su pista está en el aire (ganancia)', e2.pistas.inicio.ganancia);
+    const portada = await pagina.evaluate(() => ({ saltar: document.getElementById('portada-saltar').hidden, cancion: document.getElementById('entrada').classList.contains('cancion') }));
+    informe.comprobar(portada.saltar && portada.cancion, 'la primera vez no hay «Saltar» mientras suena la canción', portada);
+
+    // 3. La tarjeta, en la marca «tarjeta» (y no antes), aunque la carga acabe antes.
+    await pagina.waitForFunction(() => window.__registroBanda.formado !== undefined, null, { timeout: 150000, polling: 200 });
+    const R = await pagina.evaluate(() => window.__registroBanda);
+    informe.comprobar(R.formado >= marcas.tarjeta - 0.15, `la tarjeta para entrar aparece en la marca «tarjeta» (${marcas.tarjeta} s), no antes`, R);
+    informe.nota(R.preparado !== undefined && R.preparado < marcas.tarjeta ? `la carga terminó antes (a los ${R.preparado.toFixed(1)} s de la canción) y la tarjeta esperó a su marca` : 'la carga terminó después de la marca: la tarjeta salió al terminar');
+
+    // 4. Entrar: el vuelo de entrada no corta la canción; al acabar, se funde con el ambiente.
+    await pagina.waitForTimeout(1400);
+    await pagina.click('#btn-entrar');
+    await pagina.waitForFunction(() => window.__galaxia?.escena.viajando, null, { timeout: 10000, polling: 50 }).catch(() => {});
+    await pagina.waitForTimeout(800);
+    const vuelo = await estado();
+    if (vuelo.pistas.inicio.tiempo < 28) informe.comprobar(vuelo.objetivo === 'inicio', 'el vuelo de entrada no corta la canción de la portada', vuelo.objetivo);
+    await pagina.waitForFunction(() => window.__galaxia && !window.__galaxia.escena.viajando && document.body.classList.contains('dentro'), null, { timeout: 60000 });
+    await pagina.waitForFunction(() => window.__bandaSonora.estado().objetivo === 'ambiente', null, { timeout: 40000, polling: 200 }).catch(() => {});
+    await pagina.waitForTimeout(2500);
+    const fin = await estado();
+    informe.comprobar(fin.objetivo === 'ambiente' && fin.ambiente.encendido && fin.ambiente.ganancia > 0.5 && !fin.pistas.inicio.sonando, 'al terminar la canción de la portada, se funde con el ambiente', { objetivo: fin.objetivo, ambiente: fin.ambiente, inicio: fin.pistas.inicio });
+
+    // 5. Un viaje: funde a «viajes» y, al llegar a un lugar sin canción propia, vuelve al ambiente.
+    await pagina.evaluate(() => { window.__galaxia.interfaz.visitar('rosa'); });   // (sin esperar a la llegada)
+    await pagina.waitForFunction(() => window.__galaxia.escena.viajando, null, { timeout: 5000, polling: 30 });
+    await pagina.waitForTimeout(400);
+    const v1 = await estado(); await pagina.waitForTimeout(1400); const v2 = await estado();
+    const subiendo = v2.pistas.viajes.ganancia > v1.pistas.viajes.ganancia || v2.pistas.viajes.ganancia > 0.6;
+    informe.comprobar(v2.objetivo === 'viajes' && v2.pistas.viajes.sonando && subiendo && v2.pistas.viajes.ganancia > 0.4, 'al empezar un viaje se funde a «viajes»', { objetivo: v2.objetivo, viajes: [v1.pistas.viajes.ganancia, v2.pistas.viajes.ganancia] });
+    informe.comprobar(v2.ambiente.ganancia < v1.ambiente.ganancia || v2.ambiente.ganancia < 0.1, 'y el ambiente baja a la vez (fundido cruzado)', [v1.ambiente.ganancia, v2.ambiente.ganancia]);
+    await pagina.waitForFunction(() => !window.__galaxia.escena.viajando, null, { timeout: 60000, polling: 100 });
+    await pagina.waitForTimeout(2600);
+    const llegada = await estado();
+    informe.comprobar(llegada.objetivo === 'ambiente' && llegada.pistas.viajes.ganancia < 0.05 && !llegada.pistas.viajes.sonando && llegada.ambiente.ganancia > 0.5, 'al llegar se vuelve al ambiente y «viajes» se pausa', { objetivo: llegada.objetivo, viajes: llegada.pistas.viajes, ambiente: llegada.ambiente });
+
+    // 6. El botón de música apaga y vuelve a encender.
+    await pagina.click('#btn-musica'); await pagina.waitForTimeout(900);
+    const mudo = await estado();
+    informe.comprobar(!mudo.activa && mudo.ambiente.ganancia < 0.02, 'el botón de música lo silencia todo', mudo.ambiente);
+    await pagina.click('#btn-musica'); await pagina.waitForTimeout(1500);
+    const otraVez = await estado();
+    informe.comprobar(otraVez.activa && otraVez.ambiente.ganancia > 0.5, 'y lo vuelve a encender', otraVez.ambiente);
+
+    // 7. Segunda visita: ya se escuchó entera, así que se puede saltar.
+    await pagina.reload();   // (goto a la misma dirección con # no recarga)
+    await pagina.waitForSelector('#toque:not([hidden])', { timeout: 30000 });
+    await pagina.click('#toque'); await pagina.waitForTimeout(800);
+    informe.comprobar(await pagina.evaluate(() => !document.getElementById('portada-saltar').hidden), 'en la segunda visita aparece «Saltar la presentación»');
+    await pagina.waitForFunction(() => document.getElementById('btn-entrar').classList.contains('preparado'), null, { timeout: 90000 });
+    await pagina.click('#portada-saltar'); await pagina.waitForTimeout(600);
+    const salto = await pagina.evaluate(() => ({ formado: document.getElementById('entrada').classList.contains('formado'), sonando: window.__bandaSonora.estado().pistas.inicio.sonando }));
+    informe.comprobar(salto.formado && salto.sonando, '«Saltar» muestra la tarjeta y la canción sigue sonando', salto);
+    informe.comprobar(errores.length === 0, 'sin errores en la consola', errores.slice(0, 5));
+  } finally { await navegador.close(); }
+}

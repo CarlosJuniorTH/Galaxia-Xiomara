@@ -6,3 +6,6 @@ node_modules/
 dist/
 __pycache__/
 audios-originales/
+
+# Audios de prueba de la banda sonora (los genera tests/navegador/banda.mjs con ffmpeg)
+assets/musica/prueba/

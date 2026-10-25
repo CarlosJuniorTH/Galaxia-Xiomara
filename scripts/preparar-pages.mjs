@@ -6,7 +6,7 @@ const destino = path.resolve('dist');
 await rm(destino, {recursive:true,force:true});
 await mkdir(destino,{recursive:true});
 for (const archivo of ['index.html','manifest.webmanifest','favicon.ico']) await cp(archivo,path.join(destino,archivo));
-for (const carpeta of ['assets','css','js']) await cp(carpeta,path.join(destino,carpeta),{recursive:true,filter:src=>!path.basename(src).startsWith('.')});
+for (const carpeta of ['assets','css','js']) await cp(carpeta,path.join(destino,carpeta),{recursive:true,filter:src=>!path.basename(src).startsWith('.')&&!/assets[\\/]musica[\\/]prueba/.test(src)});   // (los audios de prueba no se publican)
 // El taller es una herramienta local, separada de la experiencia publicada.
 for (const archivo of ['js/editor.js','css/editor.css']) await rm(path.join(destino,archivo),{force:true});
 await writeFile(path.join(destino,'.nojekyll'),'');

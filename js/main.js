@@ -3,6 +3,7 @@ import { leerFecha, fechaCorta } from './util/fechas.js';
 import { elegir } from './util/dibujo.js';
 import { crearEntrada } from './ui/entrada.js';
 import { crearMusica } from './ui/musica.js';
+import { crearBandaSonora } from './ui/bandaSonora.js';
 import { crearContador } from './ui/contador.js';
 import { crearMensajes } from './ui/mensajes.js';
 import { crearCarta } from './ui/carta.js';
@@ -29,6 +30,10 @@ window.addEventListener('unhandledrejection', e => { console.error('Universo:', 
 // Paquetes guardados en el dispositivo y actualizaciones (desde el principio: si hay una versión nueva, se aplica en la carga).
 // En la primera visita (aún sin nada guardado) espera a que el universo esté listo: descargar todos los paquetes a la vez
 // que la propia carga competía por la conexión y lo bajaba todo dos veces en el peor momento.
+// Banda sonora (js/data/bandaSonora.js): sus canciones de la carga empiezan a descargarse ya, antes que nada (sin archivos
+// configurados no hace nada). CONFIG.volumen se lee al sonar (el contenido puede cambiarlo).
+const banda = crearBandaSonora({ volumen: () => CONFIG.volumen });
+if (location.hash === '#debug' || new URLSearchParams(location.search).has('pruebaAudio')) window.__bandaSonora = banda;
 const paquetesDesdeElPrincipio = !!navigator.serviceWorker?.controller;
 if (paquetesDesdeElPrincipio) vigilarPaquetes();
 try {
@@ -42,7 +47,7 @@ try { almacen = localStorage; } catch { almacen = { getItem() { return null; }, 
 const progreso = crearProgreso(almacen, texto => interfaz?.avisar(texto));
 const estrellas = estrellasDisponibles(CONFIG.fechaInicio);
 const viaje = crearViaje(almacen);
-const entrada = crearEntrada(CONFIG, { viaje }), musica = crearMusica(CONFIG), mensajes = crearMensajes(CONFIG), efectos = crearEfectos();
+const entrada = crearEntrada(CONFIG, { viaje, banda }), musica = crearMusica(CONFIG, banda), mensajes = crearMensajes(CONFIG), efectos = crearEfectos();
 crearContador(CONFIG, inicio); crearCarta(CONFIG);
 document.getElementById('saludo-entrada').textContent = saludoMomento();
 const numero = estrellas.filter(s => progreso.tiene('estrellas', s.id)).length;
@@ -76,7 +81,8 @@ try {
     fechaTexto: inicio ? `♡ ${fechaCorta(inicio)} ♡` : '♡',
     alConstelar: id => interfaz?.alConstelar(id),
     // Cada viaje despierta la interfaz: al llegar se ve la tarjeta del lugar y «Volver al centro».
-    alViajar: id => { interfaz?.situar(id); contemplacion?.despertar(); viaje.anotarDestino(id); }, alProblema: problema,
+    // La banda sonora funde a la música de los viajes al despegar y a la del destino (o al reposo) al llegar.
+    alViajar: id => { interfaz?.situar(id); contemplacion?.despertar(); viaje.anotarDestino(id); banda.viajar(id, { viajando: () => !!escena?.viajando, ceremoniaPendiente: d => d === 'supernova' && escena?.estadoSupernova !== 'remanente' }); }, alProblema: problema,
     alProgreso: (f, techo) => entrada.progreso(0.08 + 0.92 * f, 0.08 + 0.92 * techo)
   });
   etapa = 'recuerdos e interfaz';
@@ -110,7 +116,7 @@ try {
   });
   entrada.alEntrar(({ continuar } = {}) => {
     // Continuar: el vuelo de entrada lleva directamente al lugar (o al paso del recorrido).
-    musica.reproducir(true); mensajes.iniciar(); setTimeout(efectos.programarFugaces, 4000);
+    banda.entrar(); musica.reproducir(true); mensajes.iniciar(); setTimeout(efectos.programarFugaces, 4000);
     if (continuar?.paso !== null && continuar?.paso !== undefined) { escena.iniciar('hogar', { duracion: 3 }); setTimeout(() => interfaz.iniciarRuta(continuar.paso), 2600); }
     else escena.iniciar(continuar?.destino || 'hogar');
     if (['render', 'completo'].includes(new URLSearchParams(location.search).get('diag'))) diagnosticoRender();
@@ -132,6 +138,7 @@ try {
   await escena.listo;
   etapa = 'listo';
   cargaTerminada();   // la carga llegó al final: no hubo cierre
+  banda.cargaTerminada();   // las canciones de los destinos, en segundo plano
   if (!paquetesDesdeElPrincipio) setTimeout(vigilarPaquetes, 4000);
   entrada.listo();
   crearMedidor(escena);
