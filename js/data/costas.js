@@ -6,6 +6,18 @@
 // Las dos orillas: Carlos en España (Madrid) y Xiomara en Argentina (Buenos Aires).
 export const ORILLAS = Object.freeze({ carlos: [-3.7, 40.4], xiomara: [-58.4, -34.6] });
 
+// Islas del Atlántico demasiado pequeñas para un contorno: cada una es una mota suelta en el mapa de la intro (las que
+// pasan junto al camino de los dos: Canarias, Madeira, Azores, Cabo Verde, San Pedro y San Pablo en el ecuador,
+// Fernando de Noronha, Ascensión, Santa Elena, Tristán de Acuña, Bermudas, las Georgias del Sur…). [longitud, latitud]
+export const ISLAS = Object.freeze([
+  [-13.6, 29], [-14, 28.4], [-15.6, 28], [-16.6, 28.3], [-17.2, 28.1], [-17.8, 28.7], [-18, 27.75],   // Canarias
+  [-16.95, 32.75], [-16.35, 33.05],   // Madeira y Porto Santo
+  [-25.5, 37.8], [-27.2, 38.7], [-28.1, 38.5], [-28.7, 38.55], [-31.15, 39.45], [-25.1, 36.95],   // Azores
+  [-22.9, 16.1], [-23, 16.75], [-24.4, 16.6], [-25.1, 17], [-24.3, 15], [-23.6, 15.1], [-23.15, 15.2],   // Cabo Verde
+  [-29.35, 0.92], [-32.42, -3.86], [-14.37, -7.94], [-5.7, -15.95], [-12.3, -37.1], [-9.9, -40.3],
+  [-29.3, -20.5], [-64.75, 32.3], [-36.6, -54.3], [-26.4, -58.4], [-7.4, 4.3], [6.6, 0.25], [8.7, 3.6], [-80.8, -33.6]
+]);
+
 export const COSTAS = [
   // Sudamérica (desde el Darién, por el Caribe, Brasil, el Río de la Plata, la Patagonia y de vuelta por el Pacífico).
   [-77.4, 8.6, -75.6, 10.6, -72.6, 11.7, -71.3, 12.4, -71.6, 10.8, -70.2, 11.6, -68.2, 10.6, -66, 10.6, -63.8, 10.6, -61.9, 10.7,

@@ -52,7 +52,7 @@ export const MOMENTOS = {
   // primeras llamadas de la voz, los dos golpes de la letra a 10,9 y 15,7, el encuentro en el compás de 20,0, el salto en
   // el de 28,0 y la tarjeta en el de 30,0); con este fragmento coinciden y el clip va a 1:1. Sin archivo (o si no carga),
   // el clip va con su propio reloj de 32 s.
-  inicio: momento({ archivo: 'inicio.m4a', duracion: 32, marcas: { luzCarlos: 1.17, luzXiomara: 3.25, mapa: 5.11, ruta: 7.13, espera: 10.91, respuesta: 15.73, encuentro: 19.99, nombres: 22.01, cielo: 24.03, salto: 27.98, tarjeta: 30 } }),
+  inicio: momento({ archivo: 'inicio.m4a', duracion: 32, marcas: { luzCarlos: 1.17, luzXiomara: 3.25, mapa: 5.11, ruta: 7.13, juntos: 9.09, espera: 10.91, respuesta: 15.73, encuentro: 19.99, nombres: 22.01, cielo: 24.03, mundo: 26.01, salto: 27.98, tarjeta: 30 } }),
   // Instrumental de los viajes («Duvet», bôa): 15 s, lo que dura el viaje más largo, sin bucle. hastaLlegar: al despegar
   // empieza en el segundo 15 − duración del viaje, para que su final caiga justo en la llegada (allí se funde con la canción
   // del destino o con el ambiente).

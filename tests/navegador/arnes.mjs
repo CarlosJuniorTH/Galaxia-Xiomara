@@ -21,7 +21,11 @@ export const PERFILES = {
   pc: { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 },
   iphoneMax: { ...devices['iPhone 13'], viewport: { width: 430, height: 775 }, screen: { width: 430, height: 932 } },
   iphone: { ...devices['iPhone 13'], viewport: { width: 390, height: 844 }, screen: { width: 390, height: 844 } },   // 390×844, DPR 3
-  android: { ...devices['Pixel 7'] }
+  android: { ...devices['Pixel 7'] },
+  // Tamaños de móvil para la composición de la intro (vertical estrecho y apaisado).
+  movil390: { ...devices['iPhone 13'], viewport: { width: 390, height: 844 }, screen: { width: 390, height: 844 } },
+  movil360: { ...devices['Pixel 7'], viewport: { width: 360, height: 780 }, screen: { width: 360, height: 780 } },
+  movilApaisado: { ...devices['iPhone 13'], viewport: { width: 844, height: 390 }, screen: { width: 844, height: 390 } }
 };
 
 let servidor = null;

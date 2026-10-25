@@ -1,6 +1,7 @@
 // La intro de verdad (con «Maps», assets/musica/inicio.m4a): «Toca para empezar ♡», la carga y el videoclip de 32 s.
 // 1. Capturas del clip cada 2 s y en sus golpes, fijando el reloj del clip en cada instante (window.__intro.fijar), en el
-//    iPhone y en el PC: .pruebas/capturas/intro/<perfil>-<segundo>.png (para revisarlas a ojo).
+//    iPhone, en el PC y en los tamaños de móvil (390×844, 360×780 y apaisado): .pruebas/capturas/intro/<perfil>-<segundo>.png
+//    (para revisarlas a ojo).
 // 2. Fluidez en el iPhone con la CPU ×4: se espera a que la carga termine sin tocar, se limita la CPU y se toca; el clip
 //    entero (y la tarjeta) con p99 ≤ 25 ms (ver SUELTOS). El reloj del clip sigue al de la canción, la tarjeta
 //    sale en su marca y no hay forma de saltarlo. Guarda .pruebas/intro.json.
@@ -12,7 +13,7 @@ import { HITOS } from '../../js/ui/portada.js';
 // una recolección grande (el «reductor de memoria», ~25 ms reales en un móvil, ~100 ms con la CPU ×4) que puede caer en
 // cualquier momento del clip; el resto, ninguno. La tarjeta se prepara en el negro de antes de aparecer (29,55 s).
 const LIMITE = 34, P99 = 25, SUELTOS = 2, MAXIMO = 120;
-const INSTANTES = [...Array.from({ length: 17 }, (_, i) => i * 2), 1.4, 3.5, 5.6, 9.8, 11.1, 13.2, 15.9, 18.5, 20.3, 21, 22.8, 25, 27.7, 28.3, 28.9, 29.5, 30.4, 31.3]
+const INSTANTES = [...Array.from({ length: 17 }, (_, i) => i * 2), 1.4, 2.6, 3.5, 5.6, 7.6, 9.8, 11.1, 13.2, 15.9, 18.5, 20.3, 21, 22.8, 25, 25.8, 26.6, 27.4, 27.7, 28.3, 28.9, 29.5, 30.4, 31.3]
   .sort((a, b) => a - b);
 
 async function abrirIntro(perfil, base, { tocar = true, calma = false } = {}) {
@@ -27,7 +28,7 @@ async function abrirIntro(perfil, base, { tocar = true, calma = false } = {}) {
 export default async function ({ base, informe }) {
   mkdirSync('.pruebas/capturas/intro', { recursive: true });
   // 1. Capturas.
-  for (const perfil of process.env.INTRO_SIN_CAPTURAS ? [] : ['iphoneMax', 'pc']) {
+  for (const perfil of process.env.INTRO_SIN_CAPTURAS ? [] : (process.env.INTRO_PERFILES || 'iphoneMax,pc,movil390,movil360,movilApaisado').split(',')) {
     const { navegador, pagina, errores } = await abrirIntro(perfil, base);
     try {
       await pagina.waitForFunction(() => window.__intro?.empezado, null, { timeout: 150000, polling: 100 });

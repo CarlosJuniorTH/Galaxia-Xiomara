@@ -149,7 +149,6 @@
 .toque.fuera{opacity:0;pointer-events:none;}
 .toque-ceja{font:600 .62rem 'Quicksand',sans-serif;letter-spacing:5px;text-transform:uppercase;color:#f3c9dd;}
 .toque-texto{font-family:'Great Vibes',cursive;font-size:clamp(2.6rem,12vw,3.6rem);line-height:1.2;color:#ffd1e6;animation:cargaRespira 2.6s ease-in-out infinite;}
-.toque-nota{font:italic 1rem 'Cormorant Garamond',serif;color:rgba(255,210,230,.6);}
 .toque:focus-visible{outline:none;}
 .toque:focus-visible .toque-texto{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:8px;}
 #entrada.con-toque .carga{opacity:0;}
