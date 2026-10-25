@@ -77,7 +77,7 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
     if (!Contexto) return null;
     // «playback»: búfer de salida más grande (menos trabajo y menos cortes en el móvil); aquí nada necesita latencia baja.
     try { ctx = new Contexto({ latencyHint: 'playback' }); } catch { ctx = new Contexto(); }
-    maestro = ctx.createGain(); maestro.connect(ctx.destination);
+    maestro = ctx.createGain(); maestro.connect(ctx.destination); vigilarEstado();
     ambiente.ganancia = ctx.createGain(); ambiente.ganancia.gain.value = 0; ambiente.ganancia.connect(maestro);
     for (const p of pistas.values()) prepararElemento(p);
     return ctx;
@@ -183,13 +183,41 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
   }
 
   // Pausa al cambiar de aplicación o bloquear el teléfono; al volver, entra con un fundido.
+  // Al irse: el maestro baja en ~0,1 s y el contexto se suspende después (antes, la ganancia a 0 de golpe y la suspensión en
+  // el acto daban un chasquido feo). Al volver: iOS deja a menudo el contexto «interrumpido» y resume() fuera de un toque no
+  // hace nada, así que se reintenta y, si sigue parado, se reanuda en el siguiente toque de la pantalla (antes el sonido no
+  // volvía nunca, ni apagando y encendiendo la música).
+  let suspension = 0, pidiendoToque = false;
+  const reanudarConToque = () => {
+    if (pidiendoToque) return; pidiendoToque = true;
+    const alTocar = () => { if (!ctx || ctx.state === 'running') { quitar(); return; } ctx.resume().then(() => { if (ctx.state === 'running') { quitar(); aplicar(1.2); } }).catch(() => {}); };
+    const quitar = () => { pidiendoToque = false; for (const ev of ['pointerdown', 'touchend', 'keydown']) removeEventListener(ev, alTocar, true); };
+    for (const ev of ['pointerdown', 'touchend', 'keydown']) addEventListener(ev, alTocar, true);
+  };
+  const reanudar = () => {
+    if (!ctx || document.hidden) return;
+    clearTimeout(suspension);
+    maestro.gain.cancelScheduledValues(ctx.currentTime); maestro.gain.setValueAtTime(1, ctx.currentTime);
+    const despues = () => { if (ctx.state === 'running') aplicar(1.2); else reanudarConToque(); };
+    if (ctx.state === 'running') { aplicar(1.2); return; }
+    ctx.resume().then(despues, despues); setTimeout(despues, 600);
+  };
   document.addEventListener('visibilitychange', () => {
     if (!ctx) return;
     if (document.hidden) {
-      for (const canal of [ambiente, ...pistas.values()]) { if (!canal.ganancia) continue; canal.ganancia.gain.cancelScheduledValues(ctx.currentTime); canal.ganancia.gain.value = 0; canal.nivel = 0; clearTimeout(canal.parada); detener(canal); }
-      ctx.suspend().catch(() => {});
-    } else { ctx.resume().catch(() => {}); aplicar(1.2); }
+      const t = ctx.currentTime; maestro.gain.cancelScheduledValues(t); maestro.gain.setValueAtTime(maestro.gain.value, t); maestro.gain.linearRampToValueAtTime(0, t + 0.12);
+      clearTimeout(suspension);
+      suspension = setTimeout(() => {
+        if (!document.hidden) return;
+        for (const canal of [ambiente, ...pistas.values()]) { if (!canal.ganancia) continue; canal.ganancia.gain.cancelScheduledValues(ctx.currentTime); canal.ganancia.gain.value = 0; canal.nivel = 0; clearTimeout(canal.parada); detener(canal); }
+        ctx.suspend().catch(() => {});
+      }, 160);
+    } else reanudar();
   });
+  // iOS también interrumpe el contexto sin ocultar la página (una llamada, Siri, otra app que suena): al volver a estar
+  // libre, se reanuda igual.
+  addEventListener('pageshow', reanudar);
+  function vigilarEstado() { if (ctx && !ctx.__vigilado) { ctx.__vigilado = true; ctx.addEventListener('statechange', () => { if (ctx.state !== 'running' && !document.hidden && activa) setTimeout(reanudar, 300); }); } }
 
   return {
     get conInicio() { return pistas.has('inicio'); },
@@ -214,7 +242,7 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
       return true;
     },
     // El botón de música (y el toque de la portada): con ella apagada nada suena ni se descarga de más.
-    activar(valor) { activa = !!valor; if (activa && objetivo === null) objetivo = reposo(); aplicar(activa ? 0.8 : 0.3); },
+    activar(valor) { activa = !!valor; if (activa && objetivo === null) objetivo = reposo(); if (activa && ctx && ctx.state !== 'running') { ctx.resume().catch(() => {}); maestro.gain.setValueAtTime(1, ctx.currentTime); } aplicar(activa ? 0.8 : 0.3); },
     ir,
     // La ceremonia de un lugar (la supernova): su canción desde el principio, a la vez que la animación.
     ceremonia: nombre => ir(nombre, { desde: 0 }),
