@@ -145,6 +145,7 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
   let accionEnCurso = false;
   async function accionLugar(id) {
     if (accionEnCurso || escena.viajando) return;
+    if (escenasGigantes.enCurso === id) return;   // las escenas de llegada no se pueden saltar ni interrumpir con la acción del lugar
     accionEnCurso = true; document.body.classList.add('accionando');
     try {
       if (id === 'hogar') abrirPanel('lugares');
@@ -156,7 +157,7 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
       else if (id === 'calma') { modoCalma(true); escena.accion('calma'); }
       else if (id === 'cometa') sorpresa();
       else if (id === 'supernova') await verSupernova();
-      else if (id === 'cuasar') { $('lugar-faro').hidden = true; escenasGigantes.cancelar('cuasar'); await faro.iniciar(); if (actual === 'cuasar') situar('cuasar'); }   // el faro (con sus frases) sustituye a la escena de llegada
+      else if (id === 'cuasar') { $('lugar-faro').hidden = true; await faro.iniciar(); if (actual === 'cuasar') situar('cuasar'); }
       else if (LEJANOS.some(l => l.id === id)) await escena.accion(id);
       else if (id === 'cartas') { await abrirSobre(); abrirPanel('cartas'); }
       else if (id === 'azul') { await escena.accion('azul'); if (actual === 'azul') abrirPanel('horarios'); }

@@ -1289,6 +1289,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       return terminada;
     },
     cancelarEscenaGigante: id => cosmos.escenas.cancelar(id),
+    segundoEscena: id => cosmos.escenas.segundo(id),
     get escenaGiganteEnCurso() { return cosmos.escenas.enCurso; },
     posicionCometa: () => mundos.posicionCometa(),
     besar() { pulso = 1; planificador.pedirCuadro(); },

@@ -285,23 +285,26 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
     renderer.setRenderTarget(previo); renderer.autoClear = ac;
     malla.geometry.dispose(); m.dispose();
   }
+  // uLuzGas: luz del remolino (la galaxia anfitriona), algo tenue para que luzcan el disco y el chorro; en la escena del
+  // cuásar baja más (cosmos.js) y se ven sus motas. Solo el color: el polvo sigue tapando igual.
+  const uLuzGas = { value: 0.82 };
   for (let k = 0; k < 5; k++) {
     yield;
     const h = (k - 2) / 2, lam = new THREE.Mesh(new THREE.RingGeometry(R_IN, R_OUT, 256, 48), new THREE.ShaderMaterial({
-      uniforms: { uT: { value: 0 }, uIn: { value: R_IN }, uOut: { value: R_OUT }, uH: { value: h }, uTex: { value: texRemolino } },
+      uniforms: { uT: { value: 0 }, uIn: { value: R_IN }, uOut: { value: R_OUT }, uH: { value: h }, uTex: { value: texRemolino }, uLuzGas },
       vertexShader: 'varying vec2 vP; varying float vC; void main(){ vP = position.xy; vec4 mv = modelViewMatrix * vec4(position, 1.0); vC = abs(dot(normalize(mv.xyz), normalize(normalMatrix * vec3(0.0, 0.0, 1.0)))); gl_Position = projectionMatrix * mv; }',
-      fragmentShader: /* glsl */`uniform sampler2D uTex; uniform float uT, uIn, uOut, uH; varying vec2 vP; varying float vC;
+      fragmentShader: /* glsl */`uniform sampler2D uTex; uniform float uT, uIn, uOut, uH, uLuzGas; varying vec2 vP; varying float vC;
         void main(){
           // Gira entero (en el plano de la elipse) y cada capa exterior es la misma nube girada y algo mayor.
           float L = length(vP), k = mix(1.0, 1.55, smoothstep(uIn * 2.0, uIn * 6.0, L));
           vec2 e = vP * vec2(1.0, k); float a = uT * 0.03 + uH * 1.3, c = cos(a), s = sin(a);
           e = mat2(c, s, -s, c) * e * (1.0 + abs(uH) * 0.06);
           vec4 t = texture2D(uTex, (e / vec2(1.0, k)) / (2.0 * uOut) + 0.5);
-          if (uH == 0.0) { gl_FragColor = vec4(t.rgb, t.a) * mix(0.55, 1.0, smoothstep(0.08, 0.35, vC)); return; }
+          if (uH == 0.0) { gl_FragColor = vec4(t.rgb * uLuzGas, t.a) * mix(0.55, 1.0, smoothstep(0.08, 0.35, vC)); return; }
           // Capas de arriba y abajo: solo jirones donde el gas es denso, más fríos y translúcidos.
           float al = smoothstep(0.7, 0.98, t.a) * 0.22 * (1.0 - abs(uH) * 0.35) * mix(0.55, 1.0, smoothstep(0.08, 0.35, vC));
           vec3 col = t.rgb / max(t.a, 1e-3); col = mix(col, col * vec3(0.85, 0.9, 1.25), 0.4);
-          gl_FragColor = vec4(col * al, al); }`,
+          gl_FragColor = vec4(col * al * uLuzGas, al); }`,
       transparent: true, depthWrite: false, side: THREE.DoubleSide, premultipliedAlpha: true,
       blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor }));
     lam.rotation.x = -Math.PI / 2; lam.scale.y = -1; lam.position.y = h * 320; lam.renderOrder = 10 + (k === 2 ? 3 : k < 2 ? k : 6 - k); remolino.push(lam);
@@ -562,6 +565,7 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
     grupo, disco, toro, haz: hazMedida, hornearRemolino,
     // El faro: posición del acento de luz en los chorros (0–1) o apagado (negativo).
     acento(v) { uAc.value = v; },
+    luzGas(v) { uLuzGas.value = v; },
     medidas: { disco: discoOut, toro: toroR + toroTubo, chorro: LARGO, anfitriona: RG },
     actualizar(t, camera) {
       for (const m of animados) m.material.uniforms.uT.value = t;

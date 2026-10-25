@@ -229,7 +229,7 @@ export function crearEscenaDeneb({ uScale, uPR }) {
       vC = mix(vC, vec3(1.0, 0.82, 0.62), uCalido * 0.35 * (1.0 - planeta));
       float nace = smoothstep(aDato.x * 0.6, aDato.x * 0.6 + 0.4, uNace);
       float titila = 1.0 - uTitileo * 0.3 * (0.5 + 0.5 * sin(uT * (0.9 + aDato.w * 1.8) + aDato.x * 60.0));
-      vA = uLuz * nace * trazo * titila * (1.0 + 0.25 * uPum * (1.0 - planeta) + 1.8 * onda) * tamMota(planeta > 0.5 ? 1.3 + aDato.w * 0.8 : 1.7 + aDato.w * 1.6, mv, 2.8) * fueraSilueta(mv) * uExpo; }`));
+      vA = uLuz * nace * trazo * titila * (1.0 + 0.25 * uPum * (1.0 - planeta) + 1.8 * onda) * tamMota(planeta > 0.5 ? 1.3 + aDato.w * 0.8 : 1.9 + aDato.w * 1.7, mv, 2.8) * fueraSilueta(mv) * sqrt(uExpo); }`));   // el corazón se lee igual en el móvil (la exposición del móvil lo dejaba tenue)
   mundoMotas.frustumCulled = false;
   const mundo = new THREE.Group(); mundo.add(mundoMotas); mundo.visible = false;
 
@@ -276,7 +276,7 @@ export function crearEscenaCuasar({ uScale, uPR, largo = 7600 }) {
       float onda = pow(0.5 + 0.5 * sin(r * 0.011 - uFaseRisa), 10.0) * uRisa;
       vC = mix(mix(vec3(0.95, 0.93, 1.0), vec3(1.0, 0.86, 0.6), smoothstep(700.0, 1300.0, r)), mix(vec3(1.0, 0.62, 0.78), vec3(1.0, 0.8, 0.5), position.z), uCalido);
       float titila = 1.0 - uTitileo * 0.3 * (0.5 + 0.5 * sin(uT * (1.0 + position.z * 2.0) + position.y * 30.0));
-      vA = uLuz * titila * (0.55 + 0.45 * position.z) * (1.0 + 1.8 * onda) * (1.0 - smoothstep(1250.0, 1400.0, r)) * tamMota(30.0 + position.z * 22.0, mv, 3.2) * fueraSilueta(mv) * uExpo * 1.5; }`));
+      vA = uLuz * titila * (0.55 + 0.45 * position.z) * (1.0 + 1.8 * onda) * (1.0 - smoothstep(1250.0, 1400.0, r)) * tamMota(34.0 + position.z * 26.0, mv, 3.4) * fueraSilueta(mv) * uExpo * 2.2; }`));
   anillo.renderOrder = 16;
 
   // La luz que sube por los chorros: dentro de la vaina (radio 40 → 620), subiendo despacio; solo hasta donde ha

@@ -85,5 +85,5 @@ test('escalar una escena mueve sus marcas en proporción', () => {
   const e = escalarEscena(ESCENA_PULSAR, 56);
   const k = 56 / ESCENA_PULSAR.duracion;
   assert.equal(e.duracion, 56); assert.ok(cerca(e.marcas.estribillo, 15 * k)); assert.equal(ESCENA_PULSAR.marcas.estribillo, 15); assert.ok(cerca(e.pulso, ESCENA_PULSAR.pulso * k));
-  assert.ok(cerca(escalarEscena(ESCENA_DENEB, ESCENA_DENEB.duracion / 2).latido, ESCENA_DENEB.latido / 2));
+  assert.ok(cerca(escalarEscena(ESCENA_DENEB, ESCENA_DENEB.duracion / 2).pulso, ESCENA_DENEB.pulso / 2));
 });

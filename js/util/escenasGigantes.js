@@ -29,10 +29,13 @@ export const ESCENA_PULSAR = { id: 'pulsar', duracion: 33.6, pulso: 60 / 108, co
 //  ideal     «Es mi mujer ideal» (27,6–28,7): el clímax: la luz llega a la punta de los chorros, una onda de motas sale
 //            del disco y la luz del faro sube por ellos;
 //  fin       se serena y vuelve a su estado normal.
-export const ESCENA_CUASAR = { id: 'cuasar', duracion: 31, marcas: { inicio: 0, vi: 3.2, salir: 4.4, novios: 8, increible: 10.6, otras: 14.5, otrasFin: 20.2, reir: 21, risaFin: 25.5, disfrutar: 26, ideal: 27.6, cima: 28.7, fin: 31 } };
+// camara: el videoclip. En cada marca (más un desfase en segundos) la cámara hace un tramo del recorrido del faro
+// (index.js, faro: siempre por fuera, sin cruzar el disco ni los chorros): se acerca, un arco lento alrededor, a lo largo
+// de los chorros y el encuadre final, que queda quieto para «es mi mujer ideal». Con movimiento reducido no se mueve.
+export const ESCENA_CUASAR = { id: 'cuasar', duracion: 31, camara: [['inicio', 0, 'inicio'], ['salir', 0, 'arco'], ['otras', 0, 'chorros'], ['reir', 1.2, 'final']], marcas: { inicio: 0, vi: 3.2, salir: 4.4, novios: 8, increible: 10.6, otras: 14.5, otrasFin: 20.2, reir: 21, risaFin: 25.5, disfrutar: 26, ideal: 27.6, cima: 28.7, fin: 31 } };
 
-// Deneb → deneb.m4a (43,4 s): «Middle» (DJ Snake), a 103 BPM (un compás cada 2,33 s). La supergigante late suave
-// (`latido`: un latido cada dos pulsos) y, con la canción, nace a su alrededor un mundo nuevo con ella en el medio.
+// Deneb → deneb.m4a (43,4 s): «Middle» (DJ Snake), a 103 BPM (un compás cada 2,33 s). La supergigante late suave con
+// cada pulso de la canción (más en el primero de cada compás) y, con la canción, nace a su alrededor un mundo nuevo con ella en el medio.
 //  atras       «I hope that I can turn back the time» (3,1–5,2): el tiempo retrocede: el viento de motas vuelve a la estrella;
 //  bien        «to make it all alright… for us» (5,7–9,6): su luz crece;
 //  prometo     «I promise to build a new world for us two» (11–15,4): nace un disco de motas que se ordena en un corazón
@@ -41,7 +44,7 @@ export const ESCENA_CUASAR = { id: 'cuasar', duracion: 31, marcas: { inicio: 0, 
 //  estribillo  «…in the middle» (20,6): el gran momento: una onda de luz sale de Deneb, en el centro, y enciende el corazón;
 //  segunda     segunda vuelta del estribillo: otra onda, aún más cálida;
 //  fundido     fundido final (41–43,4): se serena; en `fin` queda en calma con el mundo nuevo orbitando, sin volver a empezar.
-export const ESCENA_DENEB = { id: 'deneb', duracion: 43.4, latido: 2 * 60 / 103, persiste: true, marcas: { inicio: 0, atras: 3.1, atrasFin: 5.2, bien: 5.7, prometo: 11, prometoFin: 15.4, contigo: 16, estribillo: 20.6, segunda: 32, fundido: 41, fin: 43.4 } };
+export const ESCENA_DENEB = { id: 'deneb', duracion: 43.4, pulso: 60 / 103, compas: 4, desfase: 0, persiste: true, marcas: { inicio: 0, atras: 3.1, atrasFin: 5.2, bien: 5.7, prometo: 11, prometoFin: 15.4, contigo: 16, estribillo: 20.6, segunda: 32, fundido: 41, fin: 43.4 } };
 
 export const ESCENAS_GIGANTES = { pulsar: ESCENA_PULSAR, cuasar: ESCENA_CUASAR, deneb: ESCENA_DENEB };
 
@@ -133,8 +136,7 @@ export function estadoDeneb(s, config, e = {}, reducido = false) {
   const m = config.marcas, fin = Math.min(s, m.fin);
   e.calma = suave(fin, m.fundido, m.fin);
   e.latido = suave(fin, m.inicio, m.inicio + 2) * (1 - 0.55 * e.calma);
-  const f = (Math.max(0, s - m.inicio) / config.latido) % 1;
-  e.pum = Math.exp(-((f / 0.07) ** 2)) + 0.6 * Math.exp(-(((f - 0.24) / 0.07) ** 2));
+  e.pum = latidoPulso(Math.max(0, s), config, e, reducido);   // al compás de la canción (pulsos de 0,58 s, compases de 2,33 s)
   e.viento = 1 - (reducido ? 1.3 : 2.6) * suave(fin, m.atras - 0.2, m.atras + 0.6) * (1 - suave(fin, m.atrasFin, m.bien));
   e.luz = suave(fin, m.bien - 0.3, m.prometo) * (1 - 0.45 * e.calma);
   const formacion = m.prometoFin - m.prometo;

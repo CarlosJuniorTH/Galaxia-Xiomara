@@ -241,7 +241,7 @@ export function* construirCosmos({ uScale, uPR }) {
       g.add(...extra); halos.push(...extra);
       rayos.material.opacity = 0.12; rayos.scale.setScalar(tam * 0.5);
       // Su escena (escenasGigantes.js): la corona de motas y el mundo nuevo, alrededor de la estrella.
-      yield; escenaDeneb = crearEscenaDeneb({ uScale, uPR }); g.add(escenaDeneb.nebulosa, escenaDeneb.corona, escenaDeneb.mundo); superficieDeneb = superficie; superficie.material.uniforms.uC.value = new THREE.Color('#b9cdff'); superficie.material.uniforms.uCel.value = 8; yield;   // blanco azulada, con sus células visibles
+      yield; escenaDeneb = crearEscenaDeneb({ uScale, uPR }); g.add(escenaDeneb.nebulosa, escenaDeneb.corona, escenaDeneb.mundo); superficieDeneb = superficie; superficie.material.uniforms.uC.value = new THREE.Color('#cddcff'); superficie.material.uniforms.uCel.value = 8; yield;   // blanco azulada, con sus células visibles
       // De cerca, una supergigante enorme (radio RADIO_DENEB) con su viento y su nebulosa de motas: su brillo difuso de lejos
       // (los destellos y halos) se apaga al acercarse (actualizar), y lo que se ve es la estrella.
     }
@@ -516,6 +516,7 @@ export function* construirCosmos({ uScale, uPR }) {
     },
     cancelar(id = null) { for (const k in directores) if (!id || k === id) directores[k].cancelar(); },
     // La escena que está en marcha (o null) y si algo de ellas se mueve (para dibujar a 60: planificador).
+    segundo: id => directores[id]?.segundo ?? 0,
     get enCurso() { for (const k in directores) if (directores[k].activa) return k; return null; },
     // Penumbra del resto del cielo mientras dura una escena (index.js la aplica a la telaraña).
     get foco() { return Math.max(estadoP.foco * directores.pulsar.peso, estadoC.foco * directores.cuasar.peso, estadoD.foco * directores.deneb.peso); },
@@ -666,6 +667,7 @@ export function* construirCosmos({ uScale, uPR }) {
       tCuasar += dt * (1 + (estadoC.tiempo - 1) * wC);
       piezasCuasar.actualizar(tCuasar, camera);
       escenaCuasar.actualizar(estadoC, wC, dt, t, reducido);
+      piezasCuasar.luzGas(0.82 - 0.4 * (estadoC.foco / 0.55) * wC);   // la galaxia se apaga un poco: la historia la cuentan el disco y los chorros
       // La luz del faro sube por los chorros en «es mi mujer ideal» (y se apaga después, sin tocar la del faro).
       if (dC.activa && (estadoC.acento >= 0 || acentoEscena)) { piezasCuasar.acento(estadoC.acento); acentoEscena = estadoC.acento >= 0; }
       else if (!dC.activa && acentoEscena) { piezasCuasar.acento(-1); acentoEscena = false; }
