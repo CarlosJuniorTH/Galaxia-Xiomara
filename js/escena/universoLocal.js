@@ -36,7 +36,7 @@ const CIELOS = {
   cuasar: [['corazon', 23, 140, 4.5], ['infinito', 24, 330, 4.5]],
   ton618: [['corazon', 24, 320, 4.5], ['infinito', 24, 140, 4.5]],
   pulsar: [['corazon', 23, 135, 4.5], ['infinito', 24, 315, 4.5]],
-  sagitario: [['corazon', 23, 45, 4.5], ['infinito', 24, 225, 4.5]],
+  sagitario: [['flecha', 23, 45, 4.5], ['estrella', 24, 225, 4.5]],   // la flecha del arquero (Sagitario); sin corazones ni infinitos
   deneb: []   // sin figuras de estrellas: su historia la cuenta la estrella que nace (deneb.js)
 };
 

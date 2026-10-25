@@ -24,6 +24,7 @@
 import { TIEMPOS_AMOR } from '../util/supernovaAmor.js';
 import { ESCENA_PULSAR, ESCENA_CUASAR, ESCENA_DENEB } from '../util/escenasGigantes.js';
 import { MARCAS_TON618 } from '../util/guionTon618.js';
+import { MARCAS_SAGITARIO } from '../util/guionSagitario.js';
 
 export const CARPETA = 'assets/musica/';
 export const FUNDIDO = 1.6;   // segundos del fundido entre dos momentos (1–2 s: ni corte ni espera)
@@ -71,9 +72,10 @@ export const MOMENTOS = {
   // js/escena/sagitario.js, js/util/guionAgujeros.js) empieza al llegar, con la canción, y cae en estas marcas.
   //   ton618     las de su videoclip (js/util/guionTon618.js, MARCAS_TON618): la estrella que cae, pasa rozando en el
   //              primer «yours» y enciende el disco en cada «yours» del estribillo; se ajustan allí
-  //   sagitario  estribillo (las órbitas dibujan corazones) · segundaFrase (dos estrellas orbitan juntas) · fundido
+  //   sagitario  primera 1.ª frase (cae el primer grumo) · tengo la certeza (S2 cae) · si1…si4 cada «sí» (el agujero traga
+  //              un grumo: llamarada y eco; en si1 S2 lo roza) · cielo / mi el final de cada frase · fundido (js/util/guionSagitario.js)
   ton618: momento({ archivo: 'ton618.m4a', marcas: { ...MARCAS_TON618 }, estancia: estancia('ton618-estancia.m4a') }),
-  sagitario: momento({ archivo: 'sagitario.m4a', marcas: { estribillo: 18.4, segundaFrase: 23.6, fundido: 35.6 }, estancia: estancia('sagitario-estancia.m4a') }),
+  sagitario: momento({ archivo: 'sagitario.m4a', marcas: { ...MARCAS_SAGITARIO }, estancia: estancia('sagitario-estancia.m4a') }),
   gigante: momento(),
   hogar: momento({ archivo: 'hogar.m4a', estancia: estancia('hogar-estancia.m4a') }),                    // «I Saw Your Face Today»
   // Una canción por mes (1 = enero … 12 = diciembre, en la hora de Argentina): suena en casa durante ese mes en lugar

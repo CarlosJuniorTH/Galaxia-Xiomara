@@ -1,29 +1,48 @@
 // Sagitario A*: el corazón de la Vía Láctea. Un agujero negro discreto (sombra, anillo de fotones y un flujo de gas caliente
-// que la lente curva en anillo, con su media luna brillante), las estrellas S que lo rodean en elipses rápidas (como S2,
-// que pasa junto a él cada 16 años) dejando trazas de motas, y el gas del centro galáctico: la minispiral de gas ionizado
-// y el anillo de polvo que la rodea. Todo con motas nítidas (sin halos ni degradados).
-// Su escena (js/util/guionAgujeros.js, guionSagitario), con «Say Yes to Heaven»: las órbitas, al principio en todas las
-// direcciones, se van ordenando en un mismo plano de cara; en el estribillo cada una se convierte en un corazón alrededor
-// del centro, y en la segunda frase las dos estrellas más brillantes orbitan juntas sobre el corazón mayor. Las órbitas
-// se calculan en la GPU (ecuación de Kepler); por cuadro solo cambian unos uniformes (14 estrellas).
+// que la lente curva en anillo, con su media luna brillante), las estrellas S en sus órbitas reales (elementos medidos por
+// el VLT y GRAVITY: js/util/guionSagitario.js) dejando trazas de motas, y el gas del centro galáctico: la minispiral de gas
+// ionizado y el anillo de polvo que la rodea. Todo con motas nítidas (sin halos ni degradados).
+// Su escena («Say Yes to Heaven», js/util/guionSagitario.js): las elipses se dibujan mientras ella dice que nada más
+// importa; S2 cae y roza el agujero en el primer «sí» (se sonroja y su órbita precesa: una roseta); cada «sí» es una
+// llamarada real (el anillo se enciende, una mancha caliente gira junto a la sombra) cuyo eco de luz sale y enciende el
+// gas. Mientras, el agujero, hambriento al principio, se traga cuatro grumos de gas que caen de la minispiral (uno por
+// cada «sí») y su flujo se va encendiendo hasta el diseño final. Las órbitas se calculan en la GPU (Kepler); por cuadro
+// solo cambian unos uniformes (15 estrellas).
 import * as THREE from 'three';
 import { GLSL_LENTE, GLSL_TAMANO, GLSL_OCULTA, geometriaMotas, materialMotas, crearAnilloFotones } from './curvaLuz.js';
 import { materialSombra } from './materiales.js';
-import { guionReposo } from '../util/guionAgujeros.js';
+import { ESTRELLAS_S, reposoSagitario, segundosPorAno, marcasSagitario } from '../util/guionSagitario.js';
 
-const N_ESTRELLAS = 14, N_TRAZA = 1000, N_FLUJO = 6000, N_ESPIRAL = 16000, N_POLVO = 8000;
+const N_FLUJO = 6000, N_ESPIRAL = 16000, N_POLVO = 8000, N_GRUMO = 700;
+// Motas de cada traza: S2 (la protagonista) más densa; el resto, en proporción a lo largo de su elipse.
+const N_S2 = 1800, N_OTRA = 820;
+// Compresión de las distancias (real en segundos de arco → radios de la sombra): R = K·r^0,4. S2 pasa a 1,75 radios de la
+// sombra (rozando el flujo) y su apocentro queda a 5,3; la más abierta (S1) llega a 9,2. Ninguna atraviesa la sombra.
+const K_COMP = 9.5, EXP_COMP = 0.4;
+const PRECESION = 18 * Math.PI / 180;   // giro de la órbita de S2 en cada pericentro (el real es 0,2°: exagerado para verse)
 function azar(semilla) { let s = semilla >>> 0; return () => { s = (s + 0x6d2b79f5) >>> 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t ^= t + Math.imul(t ^ (t >>> 7), 61 | t); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
-const n0 = 2 * Math.PI / 5 * Math.pow(3, 1.5);   // movimiento medio: una vuelta cada 5 s con semieje 3 (Kepler: n ∝ a^-1,5)
+const muySuave = (x, a, b) => { const k = Math.min(1, Math.max(0, (x - a) / (b - a))); return k * k * k * (k * (k * 6 - 15) + 10); };
+const DOS_PI = 2 * Math.PI, grad = Math.PI / 180;
 
 const cabecera = `attribute float aImagen, aTam; varying vec3 vC; varying float vA;
   uniform float uUnidad, uR;
   ${GLSL_LENTE}
   ${GLSL_TAMANO}`;
+// Eco de luz de cada «sí»: un frente nítido que sale del centro a 2,8 radios por segundo (la luz de la llamarada llegando
+// a cada mota) y se apaga en unos segundos.
+const GLSL_ECO = /* glsl */`
+  uniform vec4 uEcos, uEcosF;
+  float eco(float r){
+    float b = 0.0;
+    for (int i = 0; i < 4; i++) { float e = uEcos[i]; if (e >= 0.0) { float d = (r - 1.2 - e * 2.8) / 0.45; b += uEcosF[i] * exp(-d * d - e / 5.0); } }
+    return b;
+  }`;
 
 // grupo: el del agujero en el cosmos (su posición y su escala); aquí se le añaden las piezas.
 export function* construirSagitario({ uScale, uPR, RS, grupo }) {
   const al = azar(2026);
-  const comunes = { uScale, uPR, uMaximo: { value: 6 }, uSombra: { value: RS }, uR: { value: RS }, uUnidad: { value: RS }, uGiro: { value: 0 }, uLatido: { value: 0 } };
+  const comunes = { uScale, uPR, uMaximo: { value: 3 }, uSombra: { value: RS }, uR: { value: RS }, uUnidad: { value: RS }, uGiro: { value: 0 },
+    uEcos: { value: new THREE.Vector4(-1, -1, -1, -1) }, uEcosF: { value: new THREE.Vector4() } };
 
   const sombra = new THREE.Mesh(new THREE.SphereGeometry(RS, 128, 96), materialSombra({ depthTest: true, depthWrite: true }));
   const anillo = crearAnilloFotones(RS, ['#fff1dc', '#ff9a4a']);
@@ -31,14 +50,17 @@ export function* construirSagitario({ uScale, uPR, RS, grupo }) {
 
   yield;
   // ── Flujo de acreción: gas caliente y tenue, grueso, muy cerca de la sombra. Gira deprisa y el Doppler concentra su luz
-  // en una media luna; la lente dobla su parte de detrás en un anillo (como en la imagen del Telescopio del Horizonte). ──
+  // en una media luna; la lente dobla su parte de detrás en un anillo (como en la imagen del Telescopio del Horizonte).
+  // En cada «sí», la llamarada: todo el flujo se aviva y una mancha caliente gira con él pegada a la sombra. ──
   const planoFlujo = new THREE.Group(); planoFlujo.rotation.set(1.05, 0.4, 0.2); grupo.add(planoFlujo);
   let flujo;
   {
     const d = new Float32Array(N_FLUJO * 3), tam = new Float32Array(N_FLUJO);
     for (let i = 0; i < N_FLUJO; i++) { const r = 1.18 + Math.pow(al(), 1.4) * 1.7; d.set([r, al() * Math.PI * 2, (al() - 0.5) * 0.45], i * 3); tam[i] = 0.025 + al() * 0.025; }
-    flujo = new THREE.Points(geometriaMotas({ aFlujo: [d, 3], aTam: [tam, 1], position: [new Float32Array(N_FLUJO * 3), 3] }, RS * 3.5), materialMotas({ ...comunes, uCamLocal: { value: new THREE.Vector3(0, 0, 1e6) } }, /* glsl */`
-      attribute vec3 aFlujo; uniform float uGiro, uLatido; uniform vec3 uCamLocal;
+    flujo = new THREE.Points(geometriaMotas({ aFlujo: [d, 3], aTam: [tam, 1], position: [new Float32Array(N_FLUJO * 3), 3] }, RS * 3.5), materialMotas({
+      ...comunes, uCamLocal: { value: new THREE.Vector3(0, 0, 1e6) }, uDestello: { value: 0 }, uMancha: { value: 0 }, uManchaAng: { value: 0 }, uAlimento: { value: 1 }
+    }, /* glsl */`
+      attribute vec3 aFlujo; uniform float uGiro, uDestello, uMancha, uManchaAng, uAlimento; uniform vec3 uCamLocal;
       ${cabecera}
       void main(){
         float r = aFlujo.x, th = aFlujo.y + uGiro * 2.1 * pow(r / 1.18, -1.5);
@@ -47,7 +69,13 @@ export function* construirSagitario({ uScale, uPR, RS, grupo }) {
         float b = 0.55 * sqrt(1.18 / r), g = sqrt(1.0 - b * b) / (1.0 - b * dot(vel, haciaCam)), dop = g * g * g;
         vec3 c = mix(vec3(1.0, 0.86, 0.62), vec3(1.0, 0.45, 0.18), smoothstep(1.2, 2.8, r));
         c = mix(c, vec3(1.0, 0.95, 0.88), clamp(g - 1.0, 0.0, 1.0) * 0.5);
-        float brillo = clamp(dop, 0.2, 2.0) * pow(1.18 / r, 1.0) * (1.0 + uLatido * 0.8) * 0.9;
+        // La mancha caliente: un grumo del flujo a 1,35 radios que se enciende y gira con él.
+        float da = mod(th - uManchaAng + 3.14159265, 6.2831853) - 3.14159265, dr = (r - 1.35) / 0.2;
+        float mancha = uMancha * exp(-da * da / 0.09 - dr * dr);
+        c = mix(c, vec3(1.0, 0.97, 0.92), clamp(uDestello * 0.4 + mancha, 0.0, 1.0));
+        // Hambriento (uAlimento bajo) el flujo es casi oscuro y rojizo; con cada grumo tragado se aviva.
+        c = mix(vec3(0.85, 0.32, 0.2), c, uAlimento);
+        float brillo = clamp(dop, 0.2, 2.0) * (1.18 / r) * (uAlimento + uDestello * 2.2) * 0.9 + mancha * 3.2;
         vec4 im = imagenLente((modelViewMatrix * vec4(pl * uR, 1.0)).xyz, aImagen);
         if (im.w <= 0.001) { ${GLSL_OCULTA} }
         gl_Position = projectionMatrix * vec4(im.xyz, 1.0);
@@ -57,9 +85,50 @@ export function* construirSagitario({ uScale, uPR, RS, grupo }) {
     planoFlujo.add(flujo);
   }
 
+  // ── Los grumos que caen: cuatro nubecillas de gas que se sueltan de la minispiral y caen en espiral hasta el agujero,
+  // una por cada «sí». La marea las estira en un hilo al acercarse (como la nube G2) y se calientan (rosa → blanco); la
+  // cabeza del hilo entra en la sombra un poco antes del «sí» y la cola un poco después. Solo existen durante la escena. ──
+  let grumos;
+  {
+    const n = N_GRUMO * 4, g = new Float32Array(n * 4), tam = new Float32Array(n);
+    for (let j = 0; j < n; j++) {
+      const i = Math.floor(j / N_GRUMO), r = Math.sqrt(al()), a = al() * DOS_PI;
+      // a lo largo (−1 delante … 1 detrás; más motas detrás: la cola larga) y a lo ancho (disco de radio 1)
+      g.set([i, Math.pow(al(), 0.8) * 2 - 1, Math.cos(a) * r, Math.sin(a) * r], j * 4); tam[j] = 0.045 + al() * 0.03;
+    }
+    grumos = new THREE.Points(geometriaMotas({ aG: [g, 4], aTam: [tam, 1], position: [new Float32Array(n * 3), 3] }, RS * 9), materialMotas({
+      ...comunes, uTs: { value: 0 }, uGrumos: { value: 0 }, uIni: { value: new THREE.Vector4(-9, -9, -9, -9) }, uFin: { value: new THREE.Vector4(-8, -8, -8, -8) }
+    }, /* glsl */`
+      attribute vec4 aG; uniform float uTs, uGrumos; uniform vec4 uIni, uFin;
+      ${cabecera}
+      void main(){
+        int i = int(aG.x + 0.5); float ini = uIni[i], fin = uFin[i], T = max(fin - ini, 1.0);
+        float p = clamp((uTs - ini) / T, 0.0, 1.0);
+        // Segundos que le faltan a esta mota para entrar en la sombra (la marea separa cabeza y cola).
+        float tau = fin - uTs + aG.y * (0.15 + 1.7 * p * p);
+        if (uGrumos <= 0.001 || tau <= 0.0 || uTs < ini) { ${GLSL_OCULTA} }
+        float q = clamp(tau / T, 0.0, 1.2), R0 = 7.6 - float(i) * 0.5;
+        float r = 1.0 + (R0 - 1.0) * pow(q, 0.667);                       // caída libre: r ∝ τ^⅔
+        float th = float(i) * 1.9 + 0.8 + 2.6 * log(R0 / r);              // la espiral se cierra al bajar
+        float ancho = 0.32 * (1.0 - 0.8 * p) * (0.4 + 0.6 * (r - 1.0) / (R0 - 1.0));
+        vec3 pl = vec3(cos(th) * r, 0.9 * (r - 1.0) / (R0 - 1.0) * (i == 1 || i == 3 ? -1.0 : 1.0), sin(th) * r) + vec3(aG.z, aG.w * 0.5, aG.w) * ancho;
+        float calor = 1.0 - smoothstep(1.4, 4.5, r);
+        vec3 c = mix(i == 0 || i == 3 ? vec3(1.0, 0.5, 0.66) : vec3(1.0, 0.72, 0.5), vec3(1.0, 0.96, 0.9), calor);
+        // Aparece al soltarse, brilla más al calentarse y se apaga al cruzar el horizonte (corrimiento al rojo).
+        float brillo = smoothstep(0.0, 1.6, uTs - ini) * (1.4 + 2.4 * calor) * smoothstep(1.0, 1.3, r) * uGrumos;
+        vec4 im = imagenLente((modelViewMatrix * vec4(pl * uR, 1.0)).xyz, aImagen);
+        if (im.w <= 0.001) { ${GLSL_OCULTA} }
+        gl_Position = projectionMatrix * vec4(im.xyz, 1.0);
+        float luz; gl_PointSize = tamanoMota(aTam * uUnidad, -im.z, luz);
+        vC = c; vA = brillo * luz * im.w;
+      }`));
+    planoFlujo.add(grumos);
+  }
+
   yield;
   // ── Gas del centro galáctico: la minispiral (tres brazos de gas ionizado, rosa) y el anillo circumnuclear de polvo
-  // (grumos anaranjados, inclinado). Motas pequeñas y tenues: acompañan sin tapar al agujero. ──
+  // (grumos anaranjados, inclinado). Motas pequeñas y tenues: acompañan sin tapar al agujero. No gira (en la realidad
+  // tarda miles de años): solo se enciende cuando le llega el eco de una llamarada, y queda algo iluminado. ──
   let gas;
   {
     const n = N_ESPIRAL + N_POLVO, pos = new Float32Array(n * 3), col = new Float32Array(n * 3), tam = new Float32Array(n), fase = new Float32Array(n);
@@ -84,135 +153,142 @@ export function* construirSagitario({ uScale, uPR, RS, grupo }) {
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
     geo.setAttribute('aTam', new THREE.BufferAttribute(tam, 1)); geo.setAttribute('aFase', new THREE.BufferAttribute(fase, 1));
     geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), RS * 13);
-    gas = new THREE.Points(geo, materialMotas({ ...comunes, uT: { value: 0 } }, /* glsl */`
-      attribute vec3 aColor; attribute float aTam, aFase; uniform float uUnidad, uT, uR; varying vec3 vC; varying float vA;
+    gas = new THREE.Points(geo, materialMotas({ ...comunes, uT: { value: 0 }, uEncendido: { value: 0 } }, /* glsl */`
+      attribute vec3 aColor; attribute float aTam, aFase; uniform float uUnidad, uT, uR, uEncendido; varying vec3 vC; varying float vA;
       ${GLSL_TAMANO}
+      ${GLSL_ECO}
       void main(){
-        float a = uT * 0.012 * (1.0 + aFase * 0.3), ca = cos(a), sa = sin(a);   // gira muy despacio
-        vec3 p = vec3(position.x * ca - position.z * sa, position.y, position.x * sa + position.z * ca);
-        vec4 mv = modelViewMatrix * vec4(p, 1.0); gl_Position = projectionMatrix * mv;
+        vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv;
         float luz; gl_PointSize = tamanoMota(aTam * uUnidad, -mv.z, luz);
         // Cerca de la cámara (el anillo de polvo puede rodearla) se apaga: nada grande ni borroso delante.
         float cerca = smoothstep(1.5, 4.0, -mv.z / uUnidad);
-        vC = aColor; vA = luz * 0.3 * cerca * (0.75 + 0.25 * sin(uT * (0.6 + aFase) + aFase * 30.0));
+        float e = eco(length(position) / uR), luzEco = e * 5.0 + uEncendido * 1.5;
+        vC = mix(aColor, vec3(1.0, 0.86, 0.74), clamp(e * 0.6, 0.0, 0.7));
+        vA = luz * 0.3 * cerca * (0.8 + 0.2 * sin(uT * (0.5 + aFase * 0.5) + aFase * 30.0)) * (1.0 + luzEco);
       }`));
     grupo.add(gas);
   }
 
   yield;
-  // ── Estrellas S y sus trazas: cada estrella deja detrás una estela de motas por donde acaba de pasar. Elementos de cada
-  // órbita (semieje, excentricidad, orientación) con el pericentro siempre por fuera de la sombra. ──
-  const estrellas = [];
-  for (let i = 0; i < N_ESTRELLAS; i++) {
-    const a = 3 + al() * 4, e = Math.min(0.88, 0.35 + al() * 0.55, 1 - 1.7 / a);
-    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(al() * Math.PI * 2, al() * Math.PI * 2, al() * Math.PI * 2));
-    // En el estribillo cada una recorre un corazón (de 4 a 5,5 radios de sombra) girado un poco alrededor del eje vertical:
-    // juntos forman un solo corazón con volumen, una jaula de luz alrededor del centro.
-    estrellas.push({ a, e, q, fase: al() * Math.PI * 2, corazon: 4 + (i % 5) / 4 * 1.5, giro: i * 2.399963, vuelta: ((i * 0.618034) % 1 - 0.5) * 1.1 });
-  }
-  // Las dos primeras (las más brillantes: una rosada, como la protagonista, y otra blanca azulada) forman la pareja.
-  const colores = [[1.0, 0.78, 0.86], [0.8, 0.88, 1.0]];
-  // El resto, en tres tonos que se alternan por el corazón: rosa, oro y blanco azulado (las estrellas S son azules y
-  // calientes; sus estelas toman el color del amanecer).
-  for (let i = 2; i < N_ESTRELLAS; i++) colores.push([[1.0, 0.6, 0.76], [1.0, 0.82, 0.58], [0.8, 0.87, 1.0]][i % 3]);
+  // ── Estrellas S y sus trazas: cada estrella deja detrás su elipse de motas (la parte reciente más viva). Base de cada
+  // órbita en el cielo (Thiele–Innes): norte = +Y, este = −X, hacia la Tierra = +Z (desde +Z se ven como en las medidas). ──
+  const estrellas = ESTRELLAS_S.map(({ a, e, i, nodo, peri, anos }) => {
+    const O = nodo * grad, w = peri * grad, I = i * grad, base = (wa) => {
+      // Vector unitario en el plano de la órbita a un ángulo wa desde el nodo ascendente (norte, este, línea de visión).
+      const n = Math.cos(O) * Math.cos(wa) - Math.sin(O) * Math.sin(wa) * Math.cos(I), es = Math.sin(O) * Math.cos(wa) + Math.cos(O) * Math.sin(wa) * Math.cos(I), z = Math.sin(wa) * Math.sin(I);
+      return new THREE.Vector3(-es, n, z);
+    };
+    return { a, e, anos, P: base(w), Q: base(w + Math.PI / 2), M: al() * DOS_PI };
+  });
+  const N_EST = estrellas.length;
   let trazas;
   {
-    const n = N_ESTRELLAS * N_TRAZA, est = new Float32Array(n * 2), tam = new Float32Array(n), col = new Float32Array(n * 3);
-    for (let i = 0; i < N_ESTRELLAS; i++) for (let k = 0; k < N_TRAZA; k++) {
-      const j = i * N_TRAZA + k; est.set([i, k / N_TRAZA], j * 2); col.set(colores[i], j * 3);
-      tam[j] = k === 0 ? (i < 2 ? 0.12 : 0.085) : 0.04;
+    const cuantas = estrellas.map((_, i) => i === 0 ? N_S2 : N_OTRA), n = cuantas.reduce((a, b) => a + b, 0);
+    const est = new Float32Array(n * 2), tam = new Float32Array(n), col = new Float32Array(n * 3);
+    // S2 rosa (la protagonista); las demás, blancas azuladas (son estrellas jóvenes y calientes), alguna dorada.
+    const color = i => i === 0 ? [1.0, 0.7, 0.82] : i % 5 === 3 ? [1.0, 0.84, 0.62] : [0.78, 0.86, 1.0];
+    let j = 0;
+    for (let i = 0; i < N_EST; i++) for (let k = 0; k < cuantas[i]; k++, j++) {
+      est.set([i, k / cuantas[i]], j * 2); col.set(color(i), j * 3);
+      tam[j] = k === 0 ? (i === 0 ? 0.13 : 0.1) : 0.042;
     }
-    const v3 = () => Array.from({ length: N_ESTRELLAS }, () => new THREE.Vector3());
     trazas = new THREE.Points(geometriaMotas({ aEst: [est, 2], aTam: [tam, 1], aColor: [col, 3], position: [new Float32Array(n * 3), 3] }, RS * 13), materialMotas({
-      ...comunes, uP: { value: v3() }, uQ: { value: v3() }, uEl: { value: Array.from({ length: N_ESTRELLAS }, () => new THREE.Vector4()) }, uFase: { value: new Array(N_ESTRELLAS).fill(0) },
-      uXh: { value: new THREE.Vector3(1, 0, 0) }, uYh: { value: new THREE.Vector3(0, 1, 0) }, uZh: { value: new THREE.Vector3(0, 0, 1) },
-      uCorazon: { value: 0 }, uTraza: { value: 0.32 }, uPareja: { value: 0 }, uPsi: { value: 0 }, uChispa: { value: -99 }, uChispaF: { value: 0 }, uCalma: { value: 0 }
+      ...comunes,
+      uP: { value: estrellas.map(s => s.P.clone()) }, uQ: { value: estrellas.map(s => s.Q.clone()) },
+      uEl: { value: estrellas.map(s => new THREE.Vector3(s.a, s.e, 0)) },   // semieje (″), excentricidad, anomalía excéntrica ahora
+      uTraza: { value: 1 }, uFoco: { value: 0 }, uVueltasS2: { value: 0 }
     }, /* glsl */`
       attribute vec2 aEst; attribute vec3 aColor;
-      uniform vec3 uP[${N_ESTRELLAS}], uQ[${N_ESTRELLAS}], uXh, uYh, uZh; uniform vec4 uEl[${N_ESTRELLAS}]; uniform float uFase[${N_ESTRELLAS}];
-      uniform float uCorazon, uTraza, uPareja, uPsi, uChispa, uChispaF, uCalma, uLatido;
+      uniform vec3 uP[${N_EST}], uQ[${N_EST}], uEl[${N_EST}]; uniform float uTraza, uFoco, uVueltasS2;
       ${cabecera}
+      ${GLSL_ECO}
       void main(){
         int i = int(aEst.x + 0.5); float k = aEst.y;
-        vec4 el = uEl[i];                                   // semieje, excentricidad, tamaño del corazón, su giro
-        float M = uFase[i] - k * uTraza * 6.2831853;
-        // Kepler: anomalía media → excéntrica (Newton).
-        float E = M; for (int n = 0; n < 5; n++) E -= (E - el.y * sin(E) - M) / (1.0 - el.y * cos(E));
-        vec3 elipse = uP[i] * (el.x * (cos(E) - el.y)) + uQ[i] * (el.x * sqrt(1.0 - el.y * el.y) * sin(E));
-        // Corazón clásico (16 sen³ t, 13 cos t − 5 cos 2t − 2 cos 3t − cos 4t), con el agujero en su centro.
-        float s = sin(M);
-        vec2 h = vec2(16.0 * s * s * s, 13.0 * cos(M) - 5.0 * cos(2.0 * M) - 2.0 * cos(3.0 * M) - cos(4.0 * M) + 3.0) / 17.0;
-        vec3 corazon = ((uXh * cos(el.w) + uZh * sin(el.w)) * h.x + uYh * h.y) * el.z;   // w: giro alrededor del eje vertical
-        vec3 pl = mix(elipse, corazon, uCorazon);
-        // La pareja: las dos estrellas giran una alrededor de la otra mientras recorren juntas el corazón mayor.
-        if (i < 2) { float psi = uPsi - k * uTraza * 18.85, lado = i == 0 ? 1.0 : -1.0; pl += (uXh * cos(psi) + uYh * sin(psi) + uZh * 0.3 * sin(psi * 0.5)) * lado * 0.2 * uPareja; }
+        vec3 el = uEl[i];
+        // Cada mota de la traza, un punto de la elipse por detrás de la estrella (en anomalía excéntrica: reparto parejo).
+        float E = el.z - k * 6.2831853, ex = el.y;
+        vec3 P = uP[i], Q = uQ[i];
+        if (i == 0) {
+          // S2: su órbita gira ${PRECESION.toFixed(3)} rad en cada pericentro (la roseta): cada mota, con las vueltas que
+          // llevaba la estrella cuando pasó por ella.
+          float x = (E - ex * sin(E)) / 6.2831853, f = fract(x + 0.5);
+          float vueltas = mod(uVueltasS2 + floor(x + 0.5) + smoothstep(0.47, 0.53, f), 20.0), w = vueltas * ${PRECESION.toFixed(5)};
+          vec3 P2 = P * cos(w) + Q * sin(w); Q = Q * cos(w) - P * sin(w); P = P2;
+        }
+        float rReal = el.x * (1.0 - ex * cos(E));
+        vec3 dir = (P * (cos(E) - ex) + Q * (sqrt(1.0 - ex * ex) * sin(E))) * (el.x / rReal);
+        float R = ${K_COMP.toFixed(2)} * pow(rReal, ${EXP_COMP.toFixed(2)});
+        vec3 pl = dir * R;
         float cabeza = step(k, 0.0001);
-        float estela = pow(1.0 - k, mix(1.4, 0.3, uCorazon)) * mix(0.8, 1.6, uCorazon) * (1.0 - 0.2 * uCalma);
-        float chispa = uChispaF * 2.2 * exp(-pow((k - uChispa * 0.42) / 0.035, 2.0)) * step(uChispa * 0.42, 1.15);
-        float brillo = mix(estela * (1.0 + chispa + uLatido), (i < 2 ? 2.2 : 1.5) * (1.0 + uLatido * 0.5), cabeza);
+        // La traza: viva cerca de la estrella, tenue en el resto de la elipse; crece con la escena (uTraza).
+        float largo = max(uTraza, 0.05), estela = mix(0.16, 1.0, pow(1.0 - min(k / largo, 1.0), 1.3)) * (1.0 - smoothstep(largo - 0.06, largo, k));
+        float foco = i == 0 ? 1.0 + 0.5 * uFoco : 1.0 - 0.6 * uFoco;
+        float brillo = mix(estela * 0.75, i == 0 ? 2.4 : 1.6, cabeza) * foco * (1.0 + eco(R) * 1.6);
+        // S2 se sonroja al rozar el agujero (corrimiento al rojo gravitatorio).
+        float roce = i == 0 ? 1.0 - smoothstep(1.8, 3.2, R) : 0.0;
+        vec3 c = mix(mix(aColor, vec3(1.0), cabeza * 0.6), vec3(1.0, 0.5, 0.58), roce * cabeza);
         vec4 im = imagenLente((modelViewMatrix * vec4(pl * uR, 1.0)).xyz, aImagen);
         if (im.w <= 0.001) { ${GLSL_OCULTA} }
         gl_Position = projectionMatrix * vec4(im.xyz, 1.0);
         float luz; gl_PointSize = tamanoMota(aTam * uUnidad, -im.z, luz);
-        vC = mix(aColor, vec3(1.0), cabeza * 0.55); vA = brillo * luz * im.w * 0.75;
+        vC = c; vA = brillo * luz * im.w * (1.0 + roce * cabeza * 0.5);
       }`));
     grupo.add(trazas);
   }
 
-  for (const [o, orden] of [[gas, 0], [sombra, 1], [flujo, 2], [trazas, 3], [anillo, 4]]) o.renderOrder = orden;
+  for (const [o, orden] of [[gas, 0], [sombra, 1], [flujo, 2], [grumos, 2], [trazas, 3], [anillo, 4]]) o.renderOrder = orden;
 
   // ── Por cuadro (sin memoria nueva) ──
-  const g = guionReposo('sagitario'), u = trazas.material.uniforms, X = new THREE.Vector3(1, 0, 0), Y = new THREE.Vector3(0, 1, 0);
-  const qCorazon = new THREE.Quaternion(), qRot = new THREE.Quaternion(), qObj = new THREE.Quaternion(), qAhora = new THREE.Quaternion(), m4 = new THREE.Matrix4(), tmp = new THREE.Vector3(), centro = new THREE.Vector3(), qa = new THREE.Quaternion();
-  const fases = estrellas.map(s => s.fase), Z = new THREE.Vector3(0, 0, 1);
-  let giro = 0, psi = 0, corazonFijado = false;
+  const g = reposoSagitario(), u = trazas.material.uniforms, uf = flujo.material.uniforms;
+  const tmp = new THREE.Vector3(), centro = new THREE.Vector3(), qa = new THREE.Quaternion(), qb = new THREE.Quaternion();
+  // Anomalía media de cada estrella. S2 sin envolver (las vueltas cuentan para la roseta).
+  const marcas = marcasSagitario(), spa = segundosPorAno(marcas), ritmo = estrellas.map(s => DOS_PI / (s.anos * spa));
+  let giro = 0, escenaVista = null, baseS2 = 0;
+  const kepler = (M, e) => { let E = M; for (let n = 0; n < 6; n++) E -= (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E)); return E; };
   return {
-    sombra, anillo, flujo, gas, trazas, RS,
-    // Cuánto se atenúa la lente de pantalla (cosmos.lentes): con las órbitas ordenadas, los corazones no se deforman.
-    atenuacionLente: 1,
+    sombra, anillo, flujo, gas, trazas, grumos, RS,
+    atenuacionLente: 1,   // (cosmos.lentes: la lente de pantalla con toda su fuerza)
     actualizar(t, dt, camera, escena) {
-      const w = escena ? escena.presencia : 0, s = escena ? escena.guion : g;
+      const w = escena ? escena.presencia : 0, s = escena ? escena.guion : g, viva = !!escena?.viva;
       grupo.updateMatrixWorld();
       const unidad = RS * grupo.matrixWorld.getMaxScaleOnAxis(); comunes.uUnidad.value = unidad; comunes.uSombra.value = unidad;
       const d = camera.position.distanceTo(grupo.getWorldPosition(centro)), px = unidad / Math.max(1, d) * 900;
-      for (const m of [flujo, trazas]) m.geometry.instanceCount = px > 5 ? 3 : 1;
-      planoFlujo.updateMatrixWorld(); planoFlujo.worldToLocal(flujo.material.uniforms.uCamLocal.value.copy(camera.position));
+      for (const m of [flujo, trazas, grumos]) m.geometry.instanceCount = px > 5 ? 3 : 1;
+      planoFlujo.updateMatrixWorld(); planoFlujo.worldToLocal(uf.uCamLocal.value.copy(camera.position));
       giro += dt; comunes.uGiro.value = giro; gas.material.uniforms.uT.value = t;
-      // El plano de los corazones: de cara a la cámara al empezar la escena (se fija una vez por escena).
-      if (escena && !corazonFijado) {
-        corazonFijado = true;
-        camera.updateMatrixWorld(); m4.extractRotation(camera.matrixWorld);
-        qCorazon.setFromRotationMatrix(m4).premultiply(grupo.getWorldQuaternion(qa).invert());
-        u.uXh.value.set(1, 0, 0).applyQuaternion(qCorazon); u.uYh.value.set(0, 1, 0).applyQuaternion(qCorazon); u.uZh.value.set(0, 0, 1).applyQuaternion(qCorazon);
+      // Órbitas: todas a su ritmo real. S2, en la escena, sigue el reloj de la canción (pericentro en el primer «sí»); al
+      // empezar se pone al día por delante en los primeros 14 s (sin saltos ni marcha atrás).
+      for (let i = 1; i < N_EST; i++) estrellas[i].M += dt * ritmo[i];
+      const s2 = estrellas[0];
+      if (escena && viva) {
+        if (escenaVista !== escena) {
+          escenaVista = escena;
+          const adelanto = ((s2.M - s.s2) % DOS_PI + DOS_PI) % DOS_PI;   // [0, 2π): lo que la escena debe recuperar
+          baseS2 = s2.M - s.s2 - adelanto;
+        }
+        const objetivo = baseS2 + s.s2, desfase = ((objetivo - s2.M) % DOS_PI + DOS_PI) % DOS_PI;
+        // Recupera el desfase (siempre hacia delante) y, pasados 14 s, sigue exactamente el reloj.
+        const k = muySuave(s.t, 0, 14);
+        s2.M = k >= 1 ? objetivo : s2.M + Math.min(desfase, Math.max(dt * ritmo[0], desfase * Math.min(1, dt * (0.4 + 3 * k))));
+      } else { s2.M += dt * ritmo[0]; if (!escena) escenaVista = null; }
+      for (let i = 0; i < N_EST; i++) {
+        const e = estrellas[i], Mw = ((e.M % DOS_PI) + DOS_PI) % DOS_PI;
+        u.uEl.value[i].z = kepler(Mw, e.e);
       }
-      if (!escena) corazonFijado = false;
-      const orden = s.orden * w, cor = s.corazon * w, par = s.pareja * w, ritmo = 1 + (s.ritmo - 1) * w;
-      for (let i = 0; i < N_ESTRELLAS; i++) {
-        const e = estrellas[i];
-        // Ordenarse: la órbita gira (sin atajos raros: interpolación de cuaterniones) hasta el plano del corazón, cada una
-        // con su pericentro en otra dirección (una flor de elipses), y se va pareciendo al tamaño de su corazón.
-        qObj.copy(qCorazon).multiply(qRot.setFromAxisAngle(Z, e.giro));
-        qAhora.slerpQuaternions(e.q, qObj, orden);
-        u.uP.value[i].copy(X).applyQuaternion(qAhora); u.uQ.value[i].copy(Y).applyQuaternion(qAhora);
-        const a = e.a + (e.corazon * 0.95 - e.a) * orden, ex = e.e + (0.6 - e.e) * orden;
-        fases[i] += dt * n0 * Math.pow(a, -1.5) * ritmo;
-        u.uEl.value[i].set(a, ex, e.corazon, e.vuelta);
-      }
-      // La pareja: la segunda estrella alcanza a la primera (por el camino más corto) y comparten el corazón mayor.
-      let dif = (fases[0] - fases[1]) % (2 * Math.PI); if (dif > Math.PI) dif -= 2 * Math.PI; if (dif < -Math.PI) dif += 2 * Math.PI;
-      for (let i = 0; i < N_ESTRELLAS; i++) u.uFase.value[i] = fases[i];
-      u.uFase.value[1] = fases[1] + dif * par;
-      u.uEl.value[0].z = estrellas[0].corazon + (5.9 - estrellas[0].corazon) * par; u.uEl.value[1].z = estrellas[1].corazon + (5.9 - estrellas[1].corazon) * par;
-      u.uEl.value[0].w = estrellas[0].vuelta * (1 - par); u.uEl.value[1].w = estrellas[1].vuelta * (1 - par);   // la pareja, en el corazón de frente
-      psi += dt * 2.4; u.uPsi.value = psi; u.uPareja.value = par;
-      u.uCorazon.value = cor; u.uTraza.value = 0.32 + (s.traza - 0.32) * w; u.uCalma.value = s.calma * w;
-      u.uChispa.value = s.chispa; u.uChispaF.value = s.chispaFuerza * w; comunes.uLatido.value = s.latido * w;
-      // Anillo de fotones: su lado brillante es el de la media luna del flujo.
+      u.uVueltasS2.value = Math.floor(s2.M / DOS_PI) % 20;
+      // Lo que manda el guion (fundido con el reposo por la presencia de la escena).
+      u.uTraza.value = 1 + (s.revela - 1) * w; u.uFoco.value = s.foco * w;
+      uf.uDestello.value = s.destello * w; uf.uMancha.value = s.mancha * w; uf.uManchaAng.value = s.manchaAng;
+      for (let i = 0; i < 4; i++) { comunes.uEcos.value.setComponent(i, s.ecos[i]); comunes.uEcosF.value.setComponent(i, s.ecosF[i] * w); }
+      gas.material.uniforms.uEncendido.value = s.encendido * w;
+      const alimento = 1 + (s.alimento - 1) * w, ug = grumos.material.uniforms;
+      uf.uAlimento.value = alimento; ug.uTs.value = s.t; ug.uGrumos.value = w;
+      ug.uIni.value.fromArray(s.grumosIni); ug.uFin.value.fromArray(s.grumosFin);
+      // Anillo de fotones: su lado brillante es el de la media luna del flujo; se enciende en cada «sí».
       anillo.lookAt(camera.position);
-      const c = flujo.material.uniforms.uCamLocal.value; tmp.set(c.z, 0, -c.x).normalize().applyQuaternion(planoFlujo.getWorldQuaternion(qa)).applyQuaternion(anillo.getWorldQuaternion(qRot).invert());
+      const c = uf.uCamLocal.value; tmp.set(c.z, 0, -c.x).normalize().applyQuaternion(planoFlujo.getWorldQuaternion(qa)).applyQuaternion(anillo.getWorldQuaternion(qb).invert());
       anillo.material.uniforms.uLado.value.set(tmp.x, tmp.y).normalize();
-      anillo.material.uniforms.uLuz.value = 0.9 + comunes.uLatido.value;
-      this.atenuacionLente = 1 - Math.max(orden, cor);
+      anillo.material.uniforms.uLuz.value = 0.9 * (0.3 + 0.7 * alimento) + (s.inspira + s.destello * 1.3) * w;
     }
   };
 }
