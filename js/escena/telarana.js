@@ -207,6 +207,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   const colorPrevio = new THREE.Color();
   let escalaCapa = esMovil ? 0.8 : CAPA_PC, escalaMax = escalaCapa;   // en el móvil, la capa de galaxias al 80 % (al 60 % se veían pixeladas); si el teléfono se calienta, la calidad automática la baja
   function dibujarGalaxias(renderer, camera) {
+    if (!raiz.visible) return;   // oculta (p. ej. «Mirar hacia casa»): su capa no se ve, no se dibuja
     // Reservada al tamaño de su escala más alta; bajar la escala (calidad automática) solo cambia la zona (zona.js).
     const rw = Math.max(1, Math.round(vista.ancho * escalaMax)), rh = Math.max(1, Math.round(vista.alto * escalaMax));
     if (rtGalaxias.width < rw || rtGalaxias.height < rh || rtGalaxias.width * rtGalaxias.height > rw * rh * 2.2) rtGalaxias.setSize(rw, rh);

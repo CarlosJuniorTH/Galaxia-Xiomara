@@ -380,7 +380,7 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
   }
   function iniciarRuta(desde = 0) {
     if (celebrando) return;
-    if (panel.open) cerrarPanel(); tour = true; pausa = false; document.body.classList.add('en-ruta'); $('ruta').hidden = false; pasoRuta(Number.isInteger(desde) ? desde : 0);
+    if (panel.open) cerrarPanel(); tour = true; pausa = false; despertarTick(); document.body.classList.add('en-ruta'); $('ruta').hidden = false; pasoRuta(Number.isInteger(desde) ? desde : 0);
   }
   async function pasoRuta(i) {
     if (!tour) return;
@@ -534,8 +534,11 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
       if (permanencia >= 17) { if (indiceRuta === ruta.length - 1) terminarRuta(true); else pasoRuta(indiceRuta + 1); }
     }
     if (tour && !document.hidden) $('ruta-avance').firstElementChild.style.transform = `scaleX(${Math.min(1, permanencia / 17)})`;
-    requestAnimationFrame(tick);
+    // Solo trabaja durante el recorrido: fuera de él duerme (antes se despertaba en cada cuadro de la pantalla, 120 veces
+    // por segundo en un móvil de 120 Hz, sin nada que hacer).
+    if (tour) requestAnimationFrame(tick); else tickActivo = false;
   }
-  requestAnimationFrame(tick);
+  let tickActivo = false;
+  const despertarTick = () => { if (tickActivo) return; tickActivo = true; ultimo = performance.now(); requestAnimationFrame(tick); };
   return { get contemplando() { return contemplando || performance.now() - salidaContemplar < 700; }, contemplar, abrirCieloNoche: () => cieloNoche.abrir(), get celebrando() { return celebrando; }, actualizarAlbum() { if (panelActual === 'album') abrirPanel('album'); }, avisar, situar, visitar, alConstelar, tocarNodo, celebrar, abrirPanel, sorpresa, pausarRuta, iniciarRuta, get enRuta() { return tour; } };
 }
