@@ -25,7 +25,8 @@
   <link rel="stylesheet" href="css/ventanas.css">
   <link rel="stylesheet" href="css/universo.css">
 
-  <script async src="assets/vendor/es-module-shims.js"></script>
+  <!-- Solo en navegadores sin mapas de importación nativos (Safari anterior a iOS 16.4…): los demás no lo descargan. -->
+  <script>if (!(window.HTMLScriptElement && HTMLScriptElement.supports && HTMLScriptElement.supports('importmap'))) { const s = document.createElement('script'); s.async = true; s.src = 'assets/vendor/es-module-shims.js'; document.head.appendChild(s); }</script>
   <script type="importmap">
   {"imports":{"three":"./assets/vendor/three/three.module.js","three/addons/":"./assets/vendor/three/addons/"}}
   </script>
