@@ -6,6 +6,7 @@
 //  · Aquí, contigo: cortinas de aurora, luciérnagas y dos luces que orbitan juntas.
 //  · El cometa (cometa.js): núcleo, coma y dos colas que cruzan el cielo.
 import * as THREE from 'three';
+import { deUnTiron } from '../util/azarSemilla.js';
 import { DESTINOS, SUENOS, CONSTELACIONES, CAPSULAS } from '../data/universo.js';
 import { capsulaAbierta } from '../util/tiempo.js';
 import { texBrillo, texDestello, texTexto, texSobre, texFlor, texFlorRedonda, lienzoLuz, texNebulosa } from './texturas.js';
@@ -81,7 +82,9 @@ function dentro(x, y, poligono) {
   return si;
 }
 
-export function crearMundos({ scene, uScale, uPR }, { alConstelar = () => {}, consteladas = [] } = {}) {
+// De un tirón; la carga usa construirMundos, el mismo código como generador (yield entre pasos: ver porTramos).
+export const crearMundos = (...a) => deUnTiron(construirMundos(...a));
+export function* construirMundos({ scene, uScale, uPR }, { alConstelar = () => {}, consteladas = [] } = {}) {
   const raiz = new THREE.Group(); scene.add(raiz);
   const grupos = new Map(), animados = [], tocables = [], etiquetas = [];
   const brillo = texBrillo(), destello = texDestello();
@@ -106,6 +109,7 @@ export function crearMundos({ scene, uScale, uPR }, { alConstelar = () => {}, co
     animados.push({ objeto: baliza, tipo: 'baliza', base: 185 });
   }
 
+  yield;
   // ── El hilo invisible ──
   // La constelación se dibuja en el espacio, punto a punto; no es una superposición 2D.
   const constelacion = grupos.get('constelacion');
@@ -113,6 +117,7 @@ export function crearMundos({ scene, uScale, uPR }, { alConstelar = () => {}, co
   const completadas = new Set(consteladas);
   let constelacionId = 'hilo', nodos = [], puntosHilo = [], geo = null, hilo = null, hiloLuz = null, relleno = null, guia = null, nebulosa = null, decoracion = null, luces = [];
   let trazado = 0, unidos = 0, tejiendo = false, tejidoT = 0, completada = false, llenado = 0, posicionNodos = [];
+  yield;
   // Estrellas de campo: un cielo propio, tenue, alrededor de la figura.
   const campo = crearDestellos(Array.from({ length: 70 }, () => {
     const a = Math.random() * Math.PI * 2, r = 215 + Math.random() * 170;
@@ -228,11 +233,13 @@ export function crearMundos({ scene, uScale, uPR }, { alConstelar = () => {}, co
     if (etiqueta) { etiqueta.material.map.dispose(); etiqueta.material.map = texTexto(elegida.nombre, { fuente: "48px 'Cormorant Garamond', serif", color: '#ffd595' }); etiqueta.material.needsUpdate = true; }
   }
 
+  yield;
   // ── El correo de la luna ──
   const correo = grupos.get('cartas');
   const luna = new THREE.Mesh(new THREE.SphereGeometry(80, 128, 96), new THREE.MeshStandardMaterial({ map: texCrateres(['#3d3c42', '#a3a2a8', '#f0eff2'], 21, 80, 1, 1024), roughness: 0.97, emissive: '#2c2a33', emissiveIntensity: 0.28, transparent: true }));
   luna.userData.destino = 'cartas'; correo.add(luna); tocables.push(luna);
   const luzLuna = new THREE.PointLight('#fff2f6', 90000, 800, 2); luzLuna.position.set(170, 170, 240); correo.add(luzLuna);
+  yield;
   // Ruta postal: un anillo inclinado de polvo de luz; los sobres viajan SOBRE él.
   const ruta = new THREE.Group(); ruta.rotation.set(0.38, 0, 0.22); correo.add(ruta);
   const RADIO_RUTA = 142;
@@ -250,10 +257,12 @@ export function crearMundos({ scene, uScale, uPR }, { alConstelar = () => {}, co
     sp.scale.set(34, 34, 1); sp.userData = { destino: 'cartas', angulo: i / 5 * Math.PI * 2 };
     ruta.add(sp); tocables.push(sp); return sp;
   });
+  yield;
   // Estela de chispas detrás de cada sobre (12 por sobre, se recolocan cada cuadro).
   const POR_SOBRE = 12;
   const estelaSobres = crearDestellos(Array.from({ length: sobres.length * POR_SOBRE }, (_, k) => ({ pos: [0, 0, 0], color: k % 3 ? '#ffd6ea' : '#fff6e0', tam: 6 * (1 - (k % POR_SOBRE) / POR_SOBRE) + 1.5, opacidad: 0.9 * (1 - (k % POR_SOBRE) / POR_SOBRE), pulso: 0.3 })), { map: brillo, uScale, uPR });
   ruta.add(estelaSobres);
+  yield;
   // Segunda ruta, más pequeña e inclinada al revés: sus sobres circulan en sentido contrario.
   const ruta2 = new THREE.Group(); ruta2.rotation.set(-0.52, 0.6, -0.3); correo.add(ruta2);
   const RADIO_RUTA2 = 112;
@@ -271,11 +280,13 @@ export function crearMundos({ scene, uScale, uPR }, { alConstelar = () => {}, co
   });
   const estelaSobres2 = crearDestellos(Array.from({ length: 3 * POR_SOBRE }, (_, k) => ({ pos: [0, 0, 0], color: k % 3 ? '#ffe0ee' : '#fff6e0', tam: 5 * (1 - (k % POR_SOBRE) / POR_SOBRE) + 1.2, opacidad: 0.85 * (1 - (k % POR_SOBRE) / POR_SOBRE), pulso: 0.3 })), { map: brillo, uScale, uPR });
   ruta2.add(estelaSobres2);
+  yield;
   // Corazoncitos que se desprenden de los sobres y suben despacio.
   const corazonesCorreo = new THREE.Points(geometriaPuntos(40, (i, p) => { p.x = p.y = p.z = 0; const c = new THREE.Color(i % 2 ? '#ffb7d6' : '#ffe2ef'); p.r = c.r; p.g = c.g; p.b = c.b; p.s = 6; }), materialPuntos({ uScale, uPR, corazon: true, maximo: 10, titileo: 0.2 }));
   corazonesCorreo.frustumCulled = false; correo.add(corazonesCorreo);
   const puntoSobre = new THREE.Vector3();
 
+  yield;
   // ── El jardín de lo que viene ──
   const jardin = grupos.get('suenos');
   const jardinGiro = new THREE.Group(); jardin.add(jardinGiro);
@@ -301,9 +312,11 @@ export function crearMundos({ scene, uScale, uPR }, { alConstelar = () => {}, co
     centros.push({ pos: [x, h - 87, z], color: '#fff6dc', tam: 9, pulso: 0.2 });
   }
   const tallosPuntos = crearDestellos(tallos, { map: brillo, uScale, uPR, ondula: 1.2 }); jardinGiro.add(tallosPuntos);
+  yield;
   // Dos formas de flor alternadas (seis pétalos finos y cinco redondeados).
   const petalosPuntos = crearDestellos(cabezas.filter((_, i) => i % 2 === 0), { map: texFlor(), uScale, uPR, ondula: 2.4 }); jardinGiro.add(petalosPuntos);
   const petalosRedondos = crearDestellos(cabezas.filter((_, i) => i % 2 === 1), { map: texFlorRedonda(), uScale, uPR, ondula: 2.4 }); jardinGiro.add(petalosRedondos);
+  yield;
   // Savia de luz: pulsos que suben por cada tallo hasta la flor.
   const saviaPuntos = (() => {
     const n = savia.length, pos = new Float32Array(n * 3), t = new Float32Array(n), f = new Float32Array(n);
@@ -317,10 +330,12 @@ export function crearMundos({ scene, uScale, uPR }, { alConstelar = () => {}, co
     });
     const pt = new THREE.Points(g, m); pt.frustumCulled = false; jardinGiro.add(pt); return pt;
   })();
+  yield;
   // Rocío luminoso sobre la hierba: gotas que se encienden y apagan.
   const rocio = crearDestellos(Array.from({ length: 160 }, () => { const a = Math.random() * Math.PI * 2, r = 20 + Math.sqrt(Math.random()) * 190; return { pos: [Math.cos(a) * r, -84 + Math.random() * 10, Math.sin(a) * r], color: Math.random() < 0.5 ? '#e9fff8' : '#fff3d6', tam: 3 + Math.random() * 2, opacidad: 0.85, pulso: 0.9 }; }), { map: destello, uScale, uPR });
   jardin.add(rocio);
   const centrosPuntos = crearDestellos(centros, { map: destello, uScale, uPR, ondula: 2.4 }); jardinGiro.add(centrosPuntos);
+  yield;
   // Suelo de musgo luminoso y luciérnagas.
   const musgo = crearDestellos(Array.from({ length: 420 }, () => {
     const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * 205;
@@ -328,6 +343,7 @@ export function crearMundos({ scene, uScale, uPR }, { alConstelar = () => {}, co
   }), { map: brillo, uScale, uPR });
   jardin.add(musgo);
   const luciernagasJardin = crearLuciernagas({ uScale, uPR }, { cantidad: 60, radio: 190, alto: 210, base: -85 }); jardin.add(luciernagasJardin);
+  yield;
   // Hierba luminosa: briznas finas que se mecen con el viento.
   const hierba = crearDestellos(Array.from({ length: 900 }, (_, k) => {
     const brizna = Math.floor(k / 4), a = brizna * 2.39996 + 0.7, r = 15 + Math.sqrt((brizna % 225) / 225) * 195, h = (k % 4) * (5 + (brizna % 5) * 1.6);
@@ -335,8 +351,10 @@ export function crearMundos({ scene, uScale, uPR }, { alConstelar = () => {}, co
   }), { map: brillo, uScale, uPR, ondula: 1.6 });
   jardin.add(hierba);
 
+  yield;
   // ── La órbita del mañana ──
   const capsula = grupos.get('capsulas');
+  yield;
   // Cristal: solo el borde brilla (fresnel); el interior es transparente.
   const cristal = new THREE.Mesh(new THREE.SphereGeometry(62, 64, 48), new THREE.ShaderMaterial({
     uniforms: { uT: { value: 0 } },
@@ -354,6 +372,7 @@ export function crearMundos({ scene, uScale, uPR }, { alConstelar = () => {}, co
   capsula.add(cristal);
   const corazonCapsula = luz(capsula, [0, 0, 0], '#ffd9a6', 70, destello);
   const nucleoCapsula = luz(capsula, [0, 0, 0], '#ffb980', 120); nucleoCapsula.material.opacity = 0.35;
+  yield;
   // Astrolabio: tres aros finos con marcas, cada uno en su eje.
   const aros = [[100, '#ffd6a0', [0.65, 0, 0.2]], [124, '#e3b9ff', [-0.7, 0.4, 0]], [148, '#f7d8c0', [0.2, 0, -0.6]]].map(([r, color, rot]) => {
     const g = new THREE.Group(); g.rotation.set(...rot); capsula.add(g);
@@ -362,12 +381,14 @@ export function crearMundos({ scene, uScale, uPR }, { alConstelar = () => {}, co
     g.add(marcas);
     return g;
   });
+  yield;
   // Relicarios: una luz por cápsula del tiempo; las que ya pueden abrirse brillan doradas.
   const relicarios = CAPSULAS.map((c, i) => {
     const s = luz(aros[0], [0, 0, 0], '#ffe3b1', 22, destello); s.userData = { fecha: c.fecha, angulo: i / CAPSULAS.length * Math.PI * 2 };
     const halo = luz(s, [0, 0, 0], '#ffcf8f', 2.2); halo.material.opacity = 0.5; return s;
   });
   const polvoTiempo = crearLuciernagas({ uScale, uPR }, { cantidad: 90, radio: 170, alto: 260, base: -130, colores: ['#ffe2b8', '#f0d2ff'], tam: 2.4, giro: 1 }); capsula.add(polvoTiempo);
+  yield;
   // Reloj de arena de luz dentro del cristal: dos conos y arena dorada que cae.
   const reloj = new THREE.Group(); capsula.add(reloj);
   const perfilReloj = [];
@@ -377,6 +398,7 @@ export function crearMundos({ scene, uScale, uPR }, { alConstelar = () => {}, co
     fragmentShader: 'varying vec3 vN; varying vec3 vV; void main(){ float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 2.5); gl_FragColor = vec4(vec3(1.0, 0.85, 0.65) * f * 0.6, f); }',
     transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending
   })));
+  yield;
   // Marco del reloj de arena: dos bases y tres columnas de luz dorada.
   const oro = new THREE.MeshBasicMaterial({ color: '#ffcf8f', transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending, depthWrite: false });
   for (const y of [-44, 44]) reloj.add(new THREE.Mesh(new THREE.TorusGeometry(31, 1.2, 8, 64), oro).rotateX(Math.PI / 2).translateZ(-y));
@@ -404,6 +426,7 @@ export function crearMundos({ scene, uScale, uPR }, { alConstelar = () => {}, co
     });
     const p = new THREE.Points(g, m); p.frustumCulled = false; reloj.add(p); return p;
   })();
+  yield;
   // Esfera de reloj: números romanos de luz alrededor, en el plano del aro exterior.
   const numeros = new THREE.Mesh(new THREE.RingGeometry(158, 182, 192, 1), new THREE.ShaderMaterial({
     uniforms: { uTex: { value: texTextoAnillo('XII · I · II · III · IV · V · VI · VII · VIII · IX · X · XI · ', "500 64px 'Cormorant Garamond', serif", '#ffe6c4') }, uTic: { value: 0 } },
@@ -412,21 +435,25 @@ export function crearMundos({ scene, uScale, uPR }, { alConstelar = () => {}, co
     transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending
   }));
   numeros.rotation.x = Math.PI / 2; aros[2].add(numeros);
+  yield;
   // Ruedas de reloj detrás del cristal: dos círculos dentados que giran en sentidos opuestos.
   const ruedas = [[84, 48, '#ffd7a0'], [96, 60, '#e9c9ff']].map(([r, dientes, color]) => {
     const g = new THREE.Group(); capsula.add(g);
     g.add(crearDestellos(Array.from({ length: dientes * 3 }, (_, k) => { const a = k / (dientes * 3) * Math.PI * 2, diente = k % 3 === 0; return { pos: [Math.cos(a) * (r + (diente ? 4 : 0)), Math.sin(a) * (r + (diente ? 4 : 0)), 0], color, tam: diente ? 3.4 : 2, opacidad: diente ? 0.85 : 0.5 }; }), { map: brillo, uScale, uPR }));
     return g;
   });
+  yield;
   // La fecha de cada cápsula junto a su relicario.
   for (const s of relicarios) {
     const [a, m, d] = s.userData.fecha.split('-');
     const fecha = new THREE.Sprite(new THREE.SpriteMaterial({ map: texTexto(`${+d} · ${+m} · ${a}`, { fuente: "500 56px 'Cormorant Garamond', serif", color: '#ffe8c8', sombra: '#ffb070', ancho: 512, alto: 120 }), transparent: true, depthWrite: false, opacity: 0.85, blending: THREE.AdditiveBlending }));
     fecha.scale.set(4.6, 1.1, 1); fecha.position.set(0, 1.3, 0); s.add(fecha);
   }
+  yield;
   // Facetas del cristal: aristas de un icosaedro que brillan como una gema y giran despacio.
   const facetas = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.IcosahedronGeometry(63, 1)), new THREE.LineBasicMaterial({ color: '#ffe2bf', transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false }));
   capsula.add(facetas);
+  yield;
   // Rayos de luz hacia arriba desde las cápsulas que ya pueden abrirse.
   const rayosCapsula = relicarios.map(r => {
     const m = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 3.2, 120, 16, 1, true), new THREE.ShaderMaterial({
@@ -437,15 +464,19 @@ export function crearMundos({ scene, uScale, uPR }, { alConstelar = () => {}, co
     }));
     m.geometry.translate(0, 60, 0); m.scale.setScalar(1 / 22); r.add(m); return m;
   });
+  yield;
   // Anillo de estrellitas que da la vuelta dentro del cristal, como las horas que pasan.
   const horas = crearDestellos(Array.from({ length: 12 }, (_, i) => { const a = i / 12 * Math.PI * 2; return { pos: [Math.cos(a) * 50, 0, Math.sin(a) * 50], color: i % 3 ? '#ffe6c8' : '#ffffff', tam: i % 3 ? 4 : 7, opacidad: 0.9, pulso: 0.4 }; }), { map: destello, uScale, uPR });
   const anilloHoras = new THREE.Group(); anilloHoras.rotation.x = 0.35; anilloHoras.add(horas); capsula.add(anilloHoras);
+  yield;
   // Dos corrientes de luz que entran en espiral en el cristal.
   const espirales = [0, Math.PI].map(desfase => crearRecorridoLuz(Array.from({ length: 140 }, (_, k) => { const f = k / 139, a = desfase + f * Math.PI * 5, r = 230 - f * 168; return new THREE.Vector3(Math.cos(a) * r, (1 - f) * 90 * (desfase ? -1 : 1), Math.sin(a) * r); }), desfase ? '#e8c8ff' : '#ffd9a8'));
   for (const e of espirales) capsula.add(e);
 
+  yield;
   // ── Aquí, contigo ──
   const calma = grupos.get('calma');
+  yield;
   // Refugio cósmico: una estrella joven con su disco protoplanetario (polvo que gira con
   // huecos donde nacen planetas), nubes de nebulosa alrededor y dos luces que orbitan juntas.
   // Lado opuesto a la llegada de la cámara (desde el lado de la luz, girada como en index.js).
@@ -478,6 +509,7 @@ export function crearMundos({ scene, uScale, uPR }, { alConstelar = () => {}, co
     });
     const p = new THREE.Points(g, m); p.frustumCulled = false; p.rotation.set(0.32, 0, -0.18); calma.add(p); return p;
   })();
+  yield;
   // Estrellas fugaces que cruzan el refugio de vez en cuando.
   const fugaces = Array.from({ length: 3 }, (_, i) => {
     const desde = new THREE.Vector3(-260 + i * 90, 150 - i * 40, -60 + i * 50), hasta = desde.clone().add(new THREE.Vector3(300, -140, 80));
@@ -486,6 +518,7 @@ export function crearMundos({ scene, uScale, uPR }, { alConstelar = () => {}, co
     p.material.vertexShader = p.material.vertexShader.replace('vA = (0.12 + pow(p, 6.0))', 'vA = (pow(p, 2.0))');
     calma.add(p); return p;
   });
+  yield;
   // La binaria: Xio (rosa) y Cas (azul) orbitan juntas, con su estela, y entre ellas fluye
   // un puente de gas luminoso de una a otra (como en las estrellas binarias reales).
   const parCalma = crearDosEstrellas({ uScale, uPR }, { radio: 46, alto: 0, fondo: 46, velocidad: 0.2, colores: ['#ff9fcb', '#94baff'], tam: 2.2 });
@@ -497,6 +530,7 @@ export function crearMundos({ scene, uScale, uPR }, { alConstelar = () => {}, co
   const resplandorBinaria = luz(calma, [0, 0, 0], '#e6b8ff', 260); resplandorBinaria.material.opacity = 0.1;
   const luciernagasCalma = crearLuciernagas({ uScale, uPR }, { cantidad: 90, radio: 230, alto: 300, base: -150, colores: ['#ffffff', '#dfe8ff', '#ffe4f0'], tam: 2.2, parpadeo: 0.8 }); calma.add(luciernagasCalma);
   
+  yield;
   // ── El cometa ── (cometa.js)
   const cometa = crearCometa({ uScale, uPR }); raiz.add(cometa.grupo); tocables.push(cometa.cabeza);
   let foco = 'hogar', floracion = 0;

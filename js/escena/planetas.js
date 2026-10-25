@@ -4,6 +4,7 @@
 // La luz viene del centro de la galaxia. El halo y la atmósfera son discretos: la máxima
 // luminosidad se reserva para lo importante (la fecha, las ciudades, las estrellas).
 import * as THREE from 'three';
+import { deUnTiron } from '../util/azarSemilla.js';
 import { esMovil, texturasLigeras } from '../util/dispositivo.js';
 import { texTexto, texBrillo, texDestello } from './texturas.js';
 import { BARCELONA, BUENOS_AIRES } from './geografia.js';
@@ -415,17 +416,20 @@ function crearAsteroides(rIn, rOut, cantidad, { detalle = 1, tamMin = 0.8, tamMa
 // en lugar de la Gran Mancha Roja, una tormenta con forma de corazón. Lo rodea un cinturón
 // de asteroides y un anillo de polvo muy tenue.
 export const CENTRO_GIGANTE = new THREE.Vector3(3200, -520, -2650), RADIO_GIGANTE = 150;
-function crearGigante(scene, { uScale, uPR }) {
+function* crearGigante(scene, { uScale, uPR }) {
   const grupo = new THREE.Group(); grupo.position.copy(CENTRO_GIGANTE); scene.add(grupo);
   const textura = texturaPlaneta('gaseosa', { paleta: ['#d9c8ae', '#b8936a', '#8c5a38', '#6b4128', '#cdb596', '#7f5236', '#dcc29f'], semilla: 23, ancho: RES_CERCA, alto: RES_CERCA / 2 }, { relleno: [220, 190, 160], bloquea: false, liberable: true });
   const esfera = new THREE.Mesh(new THREE.SphereGeometry(RADIO_GIGANTE, 160, 112), materialPlaneta(textura, 0xffd9b0, { deriva: 0.004, atmosfera: 0.35, especular: 0.03, terminador: 0.55, corazon: [0.62, 0.38, 0.075] }));
   esfera.rotation.z = 0.05; esfera.scale.y = 0.94;   // achatado por su giro rápido
   grupo.add(esfera);
+  yield;
   const plano = new THREE.Group(); plano.rotation.set(0.32, 0, 0.18); grupo.add(plano);
   // Muchas rocas pequeñas sencillas y unas pocas grandes con más detalle.
   const asteroides = crearAsteroides(RADIO_GIGANTE * 1.9, RADIO_GIGANTE * 2.9, 650, { detalle: 1, tamMin: 0.7, tamMax: 3.5 });
+  yield;
   const grandes = crearAsteroides(RADIO_GIGANTE * 1.95, RADIO_GIGANTE * 2.85, 44, { detalle: 3, tamMin: 4, tamMax: 11, semilla: 8 });
   plano.add(asteroides, grandes);
+  yield;
   const polvo = crearCinturon(RADIO_GIGANTE * 1.7, RADIO_GIGANTE * 3.1, CENTRO_GIGANTE.clone(), RADIO_GIGANTE, { uScale, uPR });
   polvo.rotation.x = -Math.PI / 2; plano.add(polvo);
   const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: texBrillo(), color: 0xffd2a0, transparent: true, opacity: 0.08, blending: THREE.AdditiveBlending, depthWrite: false }));
@@ -450,9 +454,10 @@ export const OTROS_PLANETAS = [
   { nombre: 'Urano', centro: a(7200, 250, -150), radio: 52, tex: () => texGaseosa(['#c9f1f2', '#b5e6ea', '#d6f6f5', '#a9dde3'], 61), giro: 0.03, inclinacion: 1.7, borde: 0xb8f4ff },
   { nombre: 'Neptuno', centro: a(8400, 20, 100), radio: 50, tex: () => texGaseosa(['#3d63d6', '#2e4fb8', '#5a7fe8', '#3456c4', '#7b98f0'], 67), giro: 0.035, borde: 0x8fb0ff }
 ];
-function crearOtrosPlanetas(scene, radiosOrbita) {
+function* crearOtrosPlanetas(scene, radiosOrbita) {
   const planetas = [];
   for (const p of OTROS_PLANETAS) {
+    yield;
     const g = new THREE.Group(); g.position.copy(p.centro); g.rotation.z = p.inclinacion ?? 0.2; scene.add(g);
     const tex = p.tex(); tex.colorSpace = THREE.SRGBColorSpace;   // colores pensados como en una foto
     const esfera = new THREE.Mesh(new THREE.SphereGeometry(p.radio, 96, 64), materialPlaneta(tex, p.borde ?? 0xffffff, { atmosfera: p.atmosfera ?? 0.3, especular: 0.02, terminador: 0.4, deriva: 0.003 }));
@@ -487,10 +492,15 @@ function crearOtrosPlanetas(scene, radiosOrbita) {
   return { actualizar(t, dt) { for (const [e, giro] of planetas) { e.rotation.y += dt * giro; e.material.uniforms.uTime.value = t; } } };
 }
 
-export function crearPlanetas({ scene, uScale, uPR }, fechaTexto) {
-  const gigante = crearGigante(scene, { uScale, uPR });
+// De un tirón; la carga usa construirPlanetas, el mismo código como generador (yield entre pasos: ver porTramos).
+export const crearPlanetas = (...a) => deUnTiron(construirPlanetas(...a));
+export function* construirPlanetas({ scene, uScale, uPR }, fechaTexto) {
+  const gigante = yield* crearGigante(scene, { uScale, uPR });
+  yield;
   // Radios de las órbitas de los lugares (planeta rosa, Tierra, luna del correo, gigante) y del resto.
-  const otros = crearOtrosPlanetas(scene, [Math.hypot(1550, -400), Math.hypot(1650, 1600), Math.hypot(1250, 1550), Math.hypot(3200, 2650)]);
+  yield;
+  const otros = yield* crearOtrosPlanetas(scene, [Math.hypot(1550, -400), Math.hypot(1650, 1600), Math.hypot(1250, 1550), Math.hypot(3200, 2650)]);
+  yield;
   // ── Planeta rosa ──
   const orbitaRosa = new THREE.Group(); scene.add(orbitaRosa);
   const planeta = new THREE.Group();
@@ -510,6 +520,7 @@ export function crearPlanetas({ scene, uScale, uPR }, fechaTexto) {
   anillo.rotation.x = Math.PI / 2 - 0.42; anillo.rotation.y = 0.25;
   planeta.add(anillo);
   sombraAnillo.normal.set(0, 0, 1).applyEuler(anillo.rotation);
+  yield;
   // Nubes altas rosadas que corren más rápido que las bandas.
   const nubesRosa = new THREE.Mesh(new THREE.SphereGeometry(R * 1.012, 96, 64), materialNubes(texNubes(17), { color: '#ffe8f3', velocidad: 0.008, opacidad: 0.4 }));
   nubesRosa.renderOrder = 1; esfera.add(nubesRosa);
@@ -521,11 +532,13 @@ export function crearPlanetas({ scene, uScale, uPR }, fechaTexto) {
   cinturon.rotation.copy(anillo.rotation);
   planeta.add(cinturon);
 
+  yield;
   // Halo discreto (antes 0,35 a 5 radios: un degradado rosa que lo envolvía todo).
   const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: texBrillo(), color: 0xff7fb8, transparent: true, opacity: 0.11, blending: THREE.AdditiveBlending, depthWrite: false }));
   halo.scale.set(R * 3.6, R * 3.6, 1);
   planeta.add(halo);
 
+  yield;
   // Auroras en los polos: cortinas de luz que ondulan (la vida del planeta).
   const auroras = [1, -1].map(polo => {
     const m = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.5, R * 0.36, R * 0.32, 96, 1, true), new THREE.ShaderMaterial({
@@ -544,11 +557,13 @@ export function crearPlanetas({ scene, uScale, uPR }, fechaTexto) {
     }));
     m.position.y = polo * R * 0.9; if (polo < 0) m.rotation.x = Math.PI; m.renderOrder = 2; esfera.add(m); return m;
   });
+  yield;
   // Lunita con cráteres
   const orbitaLuna = new THREE.Group(); planeta.add(orbitaLuna);
   const luna = new THREE.Mesh(new THREE.SphereGeometry(14, 128, 96), materialPlaneta(texLuna(['#4c4650', '#a49aa6', '#efe7ee'], 3, 170, 1, texturasLigeras ? 768 : 1024), 0xffd8ea, { atmosfera: 0.04, especular: 0.0, terminador: 0.3, relieve: RELIEVE, altura: true, lunar: true, reflejo: 0x3a1c2c }));
   luna.position.set(R * 3.1, 18, 0);
   orbitaLuna.add(luna); orbitaLuna.rotation.x = 0.3;
+  yield;
   // Segunda luna, pequeña y más rápida, en otra órbita.
   const orbitaLuna2 = new THREE.Group(); orbitaLuna2.rotation.set(-0.5, 0, 0.35); planeta.add(orbitaLuna2);
   const luna2 = new THREE.Mesh(new THREE.SphereGeometry(7, 96, 64), materialPlaneta(texLuna(['#5a4a4e', '#b8a0a8', '#f4e2e8'], 13, 110, 0.6, 512, 1), 0xffd0e0, { atmosfera: 0.03, especular: 0, terminador: 0.3, relieve: RELIEVE, altura: true, lunar: true, reflejo: 0x2a1420 }));
@@ -561,18 +576,22 @@ export function crearPlanetas({ scene, uScale, uPR }, fechaTexto) {
   etiqueta.scale.set(260, 40, 1); etiqueta.position.set(0, R * 2.1, 0);
   planeta.add(etiqueta);
 
+  yield;
   // ── Dos orillas, un cielo: planeta océano ──
   const RA = 30, centroAzul = new THREE.Vector3(1650, -100, 1600);
   const orbitaAzul = new THREE.Group(); orbitaAzul.position.copy(centroAzul); scene.add(orbitaAzul);
   const ciudades = [lugar(...BARCELONA, RA), lugar(...BUENOS_AIRES, RA)];
   const { superficie, mascara } = texTierra(11);
+  yield;
   // Colores pensados en sRGB (como una foto): sin esto el océano se veía lavado, celeste.
   superficie.colorSpace = THREE.SRGBColorSpace;
+  yield;
   // El Sol de la Tierra está donde está de verdad ahora mismo (día y noche reales).
   const solTierra = new THREE.Vector3(1, 0, 0), solLocal = new THREE.Vector3(1, 0, 0), giroTierra = new THREE.Quaternion();
   let ultimoSol = -Infinity;
   const giroAzul = new THREE.Group(); giroAzul.rotation.z = 0.32; orbitaAzul.add(giroAzul);
   const azul = new THREE.Mesh(new THREE.SphereGeometry(RA, 128, 96), materialPlaneta(superficie, 0x7fb0ff, { atmosfera: 0.9, mascara, terminador: 0.35, sol: solTierra, relieve: 7, altura: true }));
+  yield;
   // Atmósfera: una capa exterior que dispersa la luz azul en el borde iluminado (como vista desde el espacio).
   const atmosferaTierra = new THREE.Mesh(new THREE.SphereGeometry(RA * 1.045, 96, 64), new THREE.ShaderMaterial({
     uniforms: { uSol: { value: solTierra } },
@@ -593,9 +612,11 @@ export function crearPlanetas({ scene, uScale, uPR }, fechaTexto) {
   giroAzul.add(azul, atmosferaTierra);
   const nubes = new THREE.Mesh(new THREE.SphereGeometry(RA * 1.012, 96, 64), materialNubes(texNubes(5), { sol: solTierra }));
   nubes.renderOrder = 1; giroAzul.add(nubes);
+  yield;
   // Atmósfera fina (borde) en lugar de un gran halo.
   const haloAzul = new THREE.Sprite(new THREE.SpriteMaterial({ map: texBrillo(), color: 0x7fa6ff, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false }));
   haloAzul.scale.set(RA * 3.4, RA * 3.4, 1); orbitaAzul.add(haloAzul);
+  yield;
   // Las dos ciudades encendidas y el arco de luz que las une, girando con el planeta.
   const destello = texDestello();
   for (const [i, c] of ciudades.entries()) {
@@ -608,14 +629,17 @@ export function crearPlanetas({ scene, uScale, uPR }, fechaTexto) {
     return p.multiplyScalar(RA * (1.02 + Math.sin(t * Math.PI) * 0.32));
   });
   const puente = crearRecorrido(arco, '#ffe0ef', { uScale, uPR, tam: 2.3, velocidad: 0.12, base: 0.55 }); puente.renderOrder = 2; azul.add(puente);
+  yield;
   // Luna con cráteres en órbita inclinada.
   const orbitaLunaAzul = new THREE.Group(); orbitaLunaAzul.rotation.set(0.5, 0, 0.25); orbitaAzul.add(orbitaLunaAzul);
   const lunaAzul = new THREE.Mesh(new THREE.SphereGeometry(6.5, 128, 96), materialPlaneta(texLuna(['#3a3a3e', '#9a9aa0', '#f0f0f2'], 9, 220, 1, texturasLigeras ? 768 : 1024, 4), 0xffffff, { atmosfera: 0.02, especular: 0.0, terminador: 0.3, sol: solTierra, relieve: RELIEVE, altura: true, lunar: true, reflejo: 0x101c2e }));
   lunaAzul.position.set(58, 0, 0); orbitaLunaAzul.add(lunaAzul);
+  yield;
   // Las dos estrellas de las orillas, encima del planeta.
   const dosEstrellas = crearDosEstrellas({ uScale, uPR });
   dosEstrellas.grupo.position.y = 64; orbitaAzul.add(dosEstrellas.grupo);
 
+  yield;
   // Mitad del océano entre las dos ciudades (lo que se muestra al visitar) y vector auxiliar.
   const atlantico = lugar(-32, -6, 1), haciaCamara = new THREE.Vector3();
   esfera.userData.destino = 'rosa'; azul.userData.destino = 'azul';

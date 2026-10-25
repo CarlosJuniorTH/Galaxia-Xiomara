@@ -3,15 +3,16 @@
 // agujero negro ultramasivo (como TON 618), cada uno con posición y tamaño fijos. Se atenúa bajo
 // el velo al visitar un lugar (index.js). Las galaxias lejanas evitan estas zonas (ZONAS_OCUPADAS).
 import * as THREE from 'three';
+import { deUnTiron } from '../util/azarSemilla.js';
 const ejeCometa = new THREE.Vector3(), frenteCometa = new THREE.Vector3(), auxCometa = new THREE.Vector3();   // reutilizados por los cometas en cada cuadro
 import { texturasLigeras } from '../util/dispositivo.js';
-import { texBrillo, texDestello, texEstrellaGigante, texNebulosa } from './texturas.js';
+import { texBrillo, texDestello, texEstrellaGigante, prepararTexNebulosa } from './texturas.js';
 import { texturaPlaneta } from './fabricaTexturas.js';
 import { crearVelo } from './cometa.js';
-import { crearSupernova } from './supernova.js';
+import { construirSupernova } from './supernova.js';
 import { crearNube } from './nube.js';
 import { crearAcrecion } from './acrecion.js';
-import { crearCuasar } from './cuasar.js';
+import { construirCuasar } from './cuasar.js';
 import { ESCALA_SUPERNOVA, PROGENITORA_RELATIVA, ESCALA_CUASAR, ESCALA_TON, ESCALA_PULSAR, ESCALA_DENEB, ESCALA_SGR } from '../data/escalaCosmica.js';
 import { SITIOS_DESTINO } from '../data/sitios.js';
 import { materialSombra } from './materiales.js';
@@ -136,21 +137,26 @@ function crearLente(R, color) {
         gl_FragColor = vec4(c, max(anillo, lente)); }`));
 }
 
-export function crearCosmos({ uScale, uPR }) {
+// De un tirón; la carga usa construirCosmos, el mismo código como generador (yield entre pasos: ver porTramos).
+export const crearCosmos = (...a) => deUnTiron(construirCosmos(...a));
+export function* construirCosmos({ uScale, uPR }) {
   // decor: soles, enanas rojas y cometas de decoración. Van con el fondo (acompañan a la
   // cámara, infinitamente lejos): desde el cuásar o el púlsar no aparecen «al lado».
   const raiz = new THREE.Group(), decor = new THREE.Group(), animar = [];
   const brillo = texBrillo(), destello = texDestello(), gigante = texEstrellaGigante();
 
+  yield;
   // Las nebulosas viven en la capa más lejana, en 3D (galaxiasLejanas.js).
   const L = texturasLigeras ? 320 : 400;
 
+  yield;
   // ── Estrellas reales: soles colosales muy lejos. Pequeños en el cielo, pero se nota que son
   // enormes: disco resuelto (no un punto) con pocas células de convección gigantes, centro
   // deslumbrante, brillo ceñido, destellos de difracción como en un telescopio, estrellas más
   // cercanas que pasan por delante y, las hipergigantes, la nebulosa que expulsan ──
   const estrellas = [], superficies = [], envolturas = [], cercanas = [], gruposEstrella = {};
   for (const [nombre, color, tam, acimut, elevacion] of ESTRELLAS_REALES) {
+    yield;
     const g = new THREE.Group(); g.position.copy(direccionCielo(acimut, elevacion, DIST_ESTRELLAS)); g.lookAt(0, 0, 0); (nombre === 'Deneb' ? raiz : decor).add(g); gruposEstrella[nombre] = g;
     // Deneb se ve como lo que es desde aquí: un punto deslumbrante (su disco no se resuelve);
     // con un disco grande parecía una luna desde los otros lugares.
@@ -239,12 +245,14 @@ export function crearCosmos({ uScale, uPR }) {
     'uniform float uT, uPR; varying float vA; void main(){ float f = fract(sin(dot(position.xy, vec2(12.9898, 78.233))) * 43758.5); vA = 0.7 + 0.3 * sin(uT * (1.0 + f * 2.0) + f * 6.28); gl_PointSize = (1.6 + f * 1.8) * uPR; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
     'varying float vA; void main(){ float d = length(gl_PointCoord - 0.5); float a = pow(max(0.0, 1.0 - d * 2.0), 2.0) * vA; gl_FragColor = vec4(vec3(1.0, 0.97, 0.95) * a, a); }'));
   delante.renderOrder = 5; decor.add(delante);
+  yield;
   // Enanas rojas: diminutas pero intensas, repartidas por todo el cielo.
   for (let i = 0; i < 34; i++) {
     const s = sprite(brillo, '#ff7a60', 45 + (i % 4) * 9, 0.7); s.position.copy(direccionCielo((i * 137.5) % 360 - 180, -18 + (i * 23) % 36, 6500 + (i * 613) % 1500));
     decor.add(s); estrellas.push({ nucleo: s, base: s.scale.x, fase: i * 1.7 });
   }
 
+  yield;
   // ── Cometas lejanos de otros colores ──
   const cometas = [
     { coma: '#8ff2d4', cola: '#c9fff0', fin: '#6fd8ff', recorrido: [direccionCielo(-70, 20, 9000), direccionCielo(-5, 28, 9500), direccionCielo(60, 18, 9000)], periodo: 120, fase: 0.2 },
@@ -258,22 +266,28 @@ export function crearCosmos({ uScale, uPR }) {
     return { g, curva, velo, ...c };
   });
 
+  yield;
   // ── Púlsar: estrella de neutrones con dos haces enormes que barren el cielo como un faro ──
   const pulsar = new THREE.Group(); pulsar.position.copy(direccionCielo(SITIO.pulsar[0], SITIO.pulsar[1], SITIO.pulsar[2])); pulsar.scale.setScalar(ESCALA_PULSAR); raiz.add(pulsar);
+  yield;
   // Nebulosa del Cangrejo: interior azul de sincrotrón y red de filamentos rojo-anaranjados.
   const tCangrejo = texturaPlaneta('nebulosaFondo', { semilla: 44, tono: 3, ancho: L, alto: L }, { relleno: [0, 0, 0], bloquea: false }); tCangrejo.wrapS = THREE.ClampToEdgeWrapping;
+  yield;
   // En 3D: nueve capas de gas y filamentos a distintas profundidades alrededor del púlsar.
   const cangrejo = crearNube(tCangrejo, new THREE.Vector3(), 4000, 44, ESCALA_CIELO * ESCALA_PULSAR, 9, { variante: 'cavidad' }); pulsar.add(cangrejo); cangrejo.userData.brilloPropio = true;   // anima su brillo con el haz; variante con grosor: volumen desde cualquier lado
+  yield;
   // Como las demás nebulosas, de frente hacia casa (de donde se llega): visto de canto, su lámina
   // de gas se ve estirada en vetas.
   cangrejo.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), pulsar.position.clone().negate().normalize()); cangrejo.rotateZ(0.5);
   pulsar.add(sprite(brillo, '#9cc4ff', 1500, 0.3), sprite(brillo, '#7f9cff', 5200, 0.12));   // halo azul de sincrotrón alrededor
+  yield;
   // Eje de giro perpendicular a la línea de visión desde el centro: los haces se ven barrer de lado.
   const vistaPulsar = pulsar.position.clone().normalize().negate();
   const ejeGiro = new THREE.Vector3(0, 1, 0).addScaledVector(vistaPulsar, -vistaPulsar.y).normalize().applyAxisAngle(vistaPulsar, 0.45);
   const giroPulsar = new THREE.Group(); giroPulsar.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), ejeGiro); pulsar.add(giroPulsar);
   const giroInterno = new THREE.Group(); giroPulsar.add(giroInterno);
   const magnetico = new THREE.Group(); magnetico.rotation.z = 0.75; giroInterno.add(magnetico);
+  yield;
   // Toro ecuatorial (anillos de viento con grumos, como en las imágenes de rayos X del Cangrejo)
   // y chorros por los polos del eje de giro.
   const toro = new THREE.Mesh(new THREE.RingGeometry(180, 720, 160, 6), aditivo({ uT: { value: 0 } },
@@ -289,6 +303,7 @@ export function crearCosmos({ uScale, uPR }) {
   let chorroPulsar = null, hazPulsar = null;
   for (const s of [1, -1]) { const ch = crearHaz({ radio: 60, largo: 900, colorA: '#e8f0ff', colorB: '#9cb8ff', intensidad: 0.9, nudos: 2 }); if (s < 0) ch.rotation.x = Math.PI; giroPulsar.add(ch); animar.push(ch); chorroPulsar = ch; }
   for (const s of [1, -1]) { const h = crearHaz({ radio: 130, largo: 2200, colorA: '#f4f8ff', colorB: '#6f9bff', intensidad: 1.5 }); if (s < 0) h.rotation.x = Math.PI; magnetico.add(h); animar.push(h); hazPulsar = h; }
+  yield;
   // Líneas de campo magnético (dipolo): r = L · sen²θ, en varios planos alrededor del eje.
   for (let k = 0; k < 10; k++) for (const Lc of [260, 460]) {
     const pts = Array.from({ length: 64 }, (_, i) => { const th = 0.15 + i / 63 * (Math.PI - 0.3), r = Lc * Math.sin(th) ** 2; return new THREE.Vector3(Math.sin(th) * r, Math.cos(th) * r, 0); });
@@ -308,6 +323,7 @@ export function crearCosmos({ uScale, uPR }) {
       'varying float vA; void main(){ float d = length(gl_PointCoord - 0.5); float k = pow(max(1.0 - d * 2.0, 0.0), 2.0) * vA; gl_FragColor = vec4(vec3(0.8, 0.9, 1.0) * k, k); }'));
     flujo.frustumCulled = false; magnetico.add(flujo); animar.push(flujo);
   }
+  yield;
   // La estrella de neutrones: una esfera diminuta y ardiente con dos puntos calientes en los
   // polos magnéticos (de ahí salen los haces), girando con ellos.
   const estrellaNeutrones = new THREE.Mesh(new THREE.SphereGeometry(260, 128, 96),   // grande: tan inmensa como los agujeros negros
@@ -324,14 +340,17 @@ export function crearCosmos({ uScale, uPR }) {
   const halo = sprite(brillo, '#a9c8ff', 800, 0.5); pulsar.add(halo);
   const ejeHaz = new THREE.Vector3(), haciaCam = new THREE.Vector3();
 
+  yield;
   // ── Cuásar: galaxia anfitriona, anillo de fuego, disco de acreción, sombra y chorros (js/escena/cuasar.js) ──
   const cuasar = new THREE.Group(); cuasar.position.copy(direccionCielo(SITIO.cuasar[0], SITIO.cuasar[1], SITIO.cuasar[2])); cuasar.rotation.set(0.5, 0.3, 0.9); cuasar.scale.setScalar(ESCALA_CUASAR); raiz.add(cuasar);
-  const piezasCuasar = crearCuasar({ uScale, uPR, texGigante: gigante, texBrillo: brillo, texNebulosa: texNebulosa(23) });
+  const piezasCuasar = yield* construirCuasar({ uScale, uPR, texGigante: gigante, texBrillo: brillo, texNebulosa: yield* prepararTexNebulosa(23) });
   cuasar.add(piezasCuasar.grupo);
   const rotacionCuasar = cuasar.quaternion.clone();
 
+  yield;
   // ── Agujero negro ultramasivo (como TON 618): lejos, pero enorme ──
   const gigantesco = new THREE.Group(); gigantesco.position.copy(direccionCielo(SITIO.agujero[0], SITIO.agujero[1], SITIO.agujero[2])); raiz.add(gigantesco);
+  yield;
   // A 7 500 unidades y proporcionalmente menor: se ve igual de grande y lejano, pero queda
   // delante de las estrellas del fondo (9 000–60 000), así su sombra las tapa de verdad.
   // Lejos y a un tamaño prudente; su enormidad se nota en lo que deforma: la lente gravitacional
@@ -345,6 +364,7 @@ export function crearCosmos({ uScale, uPR }) {
   const lente = crearLente(R, '#ffcf8f'); gigantesco.add(lente);
   const resplandor = sprite(brillo, '#ffb36b', R * 9, 0.12); gigantesco.add(resplandor);
 
+  yield;
   // Composición INTERNA por orden fijo: resplandor, mitad lejana del disco, sombra negra, lente
   // y mitad cercana del disco. Relación con el RESTO del universo por profundidad: todas sus
   // partes hacen la prueba de profundidad (un cuerpo opaco delante las tapa) y solo la sombra la
@@ -356,6 +376,7 @@ export function crearCosmos({ uScale, uPR }) {
   for (const [o, orden] of [[resplandor, -1], [discoAtras, 0], [sombra, 1], [lente, 2], [discoDelante, 3]]) { o.material.depthTest = true; o.material.depthWrite = o === sombra; o.renderOrder = orden; }
   gigantesco.add(sombra);
   let discoTON = null, hazTON = null;   // (para medidas())
+  yield;
   // Su sistema: un disco enorme de estrellas que giran a su alrededor (como una galaxia entera
   // alrededor del agujero) y dos chorros relativistas que salen de los polos.
   {
@@ -375,11 +396,13 @@ export function crearCosmos({ uScale, uPR }) {
     for (const lado of [1, -1]) { const h = crearHaz({ radio: R * 1.2, largo: R * 60, colorA: '#f4f2ff', colorB: '#8aa6ff', intensidad: 0.9, nudos: 1.2 }); if (lado < 0) h.rotation.x = Math.PI; planoDisco.add(h); animar.push(h); hazTON = h; }
   }
 
+  yield;
   // ── Sagitario A*: abajo, en el centro de la Vía Láctea. Anillo anaranjado con una media luna
   // brillante (como la imagen del Telescopio del Horizonte de Sucesos); la luz de lo que hay
   // detrás la curva la lente gravitacional de pantalla (lente.js) ──
   const sagitario = new THREE.Group(); sagitario.position.copy(direccionCielo(...SITIO.sagitario)); sagitario.scale.setScalar(0.7 * ESCALA_SGR); raiz.add(sagitario);
   const RS = 170;
+  yield;
   // Anillo como en la imagen del Event Horizon Telescope: un anillo fino de fotones pegado a la
   // sombra, la emisión ancha con su media luna brillante (el lado que viene hacia nosotros),
   // filamentos de gas que se arremolinan y un resplandor tenue hacia fuera. Mira siempre a la
@@ -399,12 +422,14 @@ export function crearCosmos({ uScale, uPR }) {
         vec3 c = mix(vec3(0.95, 0.32, 0.07), vec3(1.0, 0.86, 0.58), clamp(media * 0.7 + fotones, 0.0, 1.0));
         gl_FragColor = vec4(c * a * 1.4, a); }`));
   const sombraSgr = new THREE.Mesh(new THREE.SphereGeometry(RS, 128, 96), materialSombra());
+  yield;
   // Igual que TON 618: orden interno fijo y prueba de profundidad frente al resto (el anillo mira a
   // la cámara, es un fenómeno aparente, pero un cuerpo opaco delante lo tapa).
   for (const [o, orden] of [[sombraSgr, 1], [anilloEHT, 2]]) { o.material.depthTest = true; o.material.depthWrite = o === sombraSgr; o.renderOrder = orden; sagitario.add(o); }
   const materiaSgr = crearAcrecion({ radio: RS, escala: ESCALA_CIELO * 0.7 * ESCALA_SGR, uScale, uPR, cantidad: 900 }); sagitario.add(materiaSgr); animar.push(materiaSgr);
   const materiaTON = crearAcrecion({ radio: R, escala: ESCALA_CIELO * 0.55 * ESCALA_TON, uScale, uPR, cantidad: 1100 }); planoDisco.add(materiaTON); animar.push(materiaTON);
   const haloSgr = sprite(brillo, '#ff9a4a', RS * 7, 0.08); sagitario.add(haloSgr);
+  yield;
   // Las estrellas S: giran alrededor del agujero en elipses muy alargadas (como S2, observada
   // durante décadas), aceleran al pasar cerca de él; sus órbitas se ven muy tenues.
   const orbitasS = [[2.6, 0.88, 0.4, 0.2, 1.2], [3.2, 0.7, 1.4, -0.6, 0.9], [4, 0.8, -0.9, 1.0, 0.7], [4.8, 0.55, 2.2, 0.3, 0.55], [5.6, 0.75, -1.8, -1.2, 0.45], [3.6, 0.93, 0.9, 1.6, 0.8], [6.4, 0.6, 2.8, -0.2, 0.35]].map(([a, e, inc, giro, vel]) => {
@@ -417,12 +442,14 @@ export function crearCosmos({ uScale, uPR }) {
     return { a, e, vel, estrella, plano, guia, fase: Math.random() * 6 };
   });
 
+  yield;
   // ── La estrella que va a estallar (supernova.js), en una zona libre del cielo ──
-  const sn = crearSupernova({ uScale, uPR, escala: ESCALA_CIELO * ESCALA_SUPERNOVA });
+  const sn = yield* construirSupernova({ uScale, uPR, escala: ESCALA_CIELO * ESCALA_SUPERNOVA });
   sn.radioFinal *= ESCALA_SUPERNOVA; sn.grupo.scale.setScalar(ESCALA_SUPERNOVA);
   sn.grupo.position.copy(direccionCielo(...SITIO.supernova)); raiz.add(sn.grupo);
   sn.orientarHacia(sn.grupo.position.clone().negate().normalize());   // el corazón mira a casa, siempre
 
+  yield;
   // Todo el cielo profundo se dibuja antes que las galaxias lejanas y la galaxia central: la
   // sombra tapa su propio disco y lo que hay detrás, pero no lo que queda delante.
   raiz.traverse(o => { o.renderOrder -= 20; }); decor.traverse(o => { o.renderOrder -= 20; });

@@ -15,6 +15,7 @@
 // cuando la galaxia ocupa poco, cada uno lleva la parte de luz que le toca por área (sin suelo); por
 // debajo de unos píxeles queda una luz no resuelta con el mismo presupuesto.
 import * as THREE from 'three';
+import { deUnTiron } from '../util/azarSemilla.js';
 import { gauss, azar } from '../util/dibujo.js';
 import { sitioDestino } from './cosmos.js';
 import { vista } from '../util/vista.js';
@@ -28,10 +29,13 @@ const COLOR = {
   gigante: new THREE.Color('#ff8a5c'), halo: new THREE.Color('#c9a27a')
 };
 
-export function crearViaLactea({ scene, uPR }) {
+// De un tirón; la carga usa construirViaLactea, el mismo código como generador (yield entre pasos: ver porTramos).
+export const crearViaLactea = (...a) => deUnTiron(construirViaLactea(...a));
+export function* construirViaLactea({ scene, uPR }) {
   const centro = sitioDestino('sagitario'), R = RADIO_VIA_LACTEA;
   const grupo = new THREE.Group(); grupo.position.copy(centro); grupo.name = 'Vía Láctea (centro en Sagitario A*)';
   grupo.userData.profundo = true;   // posición fija en el universo: no acompaña a la cámara como el fondo óptico
+  yield;
   // Orientación fija: el disco inclinado ~55° respecto a la línea de visión desde Xiomara.
   const haciaCasa = centro.clone().negate().normalize(), lado = new THREE.Vector3().crossVectors(haciaCasa, new THREE.Vector3(0, 1, 0)).normalize();
   const normal = haciaCasa.clone().applyAxisAngle(lado, 55 * Math.PI / 180);
@@ -39,6 +43,7 @@ export function crearViaLactea({ scene, uPR }) {
   scene.add(grupo);
   const BRAZOS = 4, ENROLLADO = 4.6;
   const enBrazo = (k, r, ruido) => { const t = (2 * Math.PI * k + Math.log(Math.max(r, 0.05)) * ENROLLADO) / BRAZOS + ruido; return [Math.cos(t) * r, Math.sin(t) * r]; };
+  yield;
   // Carril de polvo de cada brazo: en su borde interior (como en las espirales reales).
   const anguloBrazo = (k, r) => (2 * Math.PI * k + Math.log(Math.max(r, 0.05)) * ENROLLADO) / BRAZOS;
   const enPolvo = (x, z) => {
@@ -49,16 +54,19 @@ export function crearViaLactea({ scene, uPR }) {
     const grieta = Math.exp(-Math.pow((r - 0.34) / 0.04, 2)) * (0.5 + 0.5 * Math.sin(a * 3 + 1.2));
     return Math.min(1, m * (0.7 + 0.3 * Math.sin(a * 7 + r * 23)) + grieta * 0.6);
   };
+  yield;
   // Nubes estelares (grumos brillantes) y regiones H II: centros sobre los brazos.
   const nubes = Array.from({ length: 80 }, () => { const r = azar(0.22, 0.92); return [...enBrazo(Math.floor(Math.random() * BRAZOS), r, gauss() * 0.06), azar(0.02, 0.05)]; });
   const regionesHII = Array.from({ length: 52 }, () => { const r = azar(0.25, 0.9); return [...enBrazo(Math.floor(Math.random() * BRAZOS), r, gauss() * 0.03 + 0.02), azar(0.016, 0.034), Math.random() < 0.16]; });
   const cumulos = Array.from({ length: 34 }, () => { const r = azar(0.18, 0.9); return [...enBrazo(Math.floor(Math.random() * BRAZOS), r, gauss() * 0.05), azar(0.004, 0.01)]; });
 
+  yield;
   // ── Estrellas resueltas ──
   const N = 30000;
   const pos = new Float32Array(N * 3), col = new Float32Array(N * 3), tam = new Float32Array(N), c = new THREE.Color();
   let luzTotal = 0;
   for (let i = 0; i < N; i++) {
+    if (i % 2000 === 1999) yield;
     const u = Math.random(); let x, y, z, k = 1;
     if (u < 0.15) {   // bulbo triaxial con barra: población vieja dorada, alguna gigante roja
       const barra = Math.random() < 0.45; const a = barra ? gauss() * 0.2 : gauss() * 0.1;
@@ -91,6 +99,7 @@ export function crearViaLactea({ scene, uPR }) {
     transparent: true, premultipliedAlpha: true, depthWrite: false, blending: THREE.AdditiveBlending }));
   estrellas.frustumCulled = false; estrellas.renderOrder = 2; grupo.add(estrellas);
 
+  yield;
   // ── Luz difusa (estrellas no resueltas y gas): nubes de luz con tamaño en el MUNDO y brillo
   // superficial constante. De lejos se funden en un disco continuo con sus brazos, su bulbo, sus
   // regiones rosadas y sus grietas; desde dentro de su disco forman la banda. ──
@@ -99,6 +108,7 @@ export function crearViaLactea({ scene, uPR }) {
   const K_DIFUSA = 0.016; let flujoDifusa = 0;
   const NL = 5200, pl = new Float32Array(NL * 3), cl = new Float32Array(NL * 3), rl = new Float32Array(NL);
   for (let i = 0; i < NL; i++) {
+    if (i % 1000 === 999) yield;
     const u = Math.random(); let x, y, z, r, k = 1;
     if (u < 0.07) {   // bulbo compacto (sin quemar el centro); hueco alrededor de Sagitario A*: su sombra se ve
       x = gauss() * 0.1; z = gauss() * 0.05; y = gauss() * 0.04; r = azar(0.03, 0.06); c.copy(COLOR.bulbo).lerp(COLOR.bulboClaro, Math.random() * 0.4); k = 0.55;
@@ -130,11 +140,13 @@ export function crearViaLactea({ scene, uPR }) {
     transparent: true, premultipliedAlpha: true, depthWrite: false, blending: THREE.AdditiveBlending }));
   difusa.frustumCulled = false; difusa.renderOrder = 0; grupo.add(difusa);
 
+  yield;
   // ── Polvo de canto: nubes oscuras GRANDES y suaves en el plano medio, a lo largo de los carriles y
   // de la grieta interior (se dibujan entre la luz difusa y las estrellas). Se apagan cuando ocuparían
   // menos de unos píxeles: nunca son motas. De cara apenas se notan (las grietas ya son ausencia de luz). ──
   const ND = 1100, pd = new Float32Array(ND * 3), rd = new Float32Array(ND);
   for (let i = 0, n = 0; n < ND && i < ND * 30; i++) {
+    if (i % 2000 === 1999) yield;
     const r = 0.14 + Math.pow(Math.random(), 0.8) * 0.8, a = Math.random() * 6.283, x = Math.cos(a) * r, z = Math.sin(a) * r;
     if (Math.random() > enPolvo(x, z)) continue;
     pd.set([x * R, gauss() * 0.004 * R, z * R], n * 3); rd[n] = azar(0.018, 0.04) * R; n++;
@@ -150,6 +162,7 @@ export function crearViaLactea({ scene, uPR }) {
     transparent: true, depthWrite: false }));
   polvo.frustumCulled = false; polvo.renderOrder = 1; grupo.add(polvo);
 
+  yield;
   // Luz no resuelta (cuando ocupa unos pocos píxeles): un punto con el mismo presupuesto de luz.
   const gl = new THREE.BufferGeometry(); gl.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3), 3));
   const uPunto = { value: 0 }, uTamPunto = { value: 3 };

@@ -10,6 +10,7 @@
 //  · rayos rojizos que brotan del núcleo (radiación).
 // Unidades locales del grupo (el grupo se escala desde cosmos.js).
 import * as THREE from 'three';
+import { deUnTiron } from '../util/azarSemilla.js';
 import { nivelSeguro } from '../util/dispositivo.js';
 import { EXPOSICION } from './exposicion.js';
 import { RUIDO_TABLA, texturaRuido } from './nube.js';
@@ -64,10 +65,13 @@ function crearNubePolar({ datos, uScale, uPR, vel, suave = 0, tamMax = 48, cerca
 }
 
 const esMovilCuasar = /Android|iPhone|iPad|Mobi/i.test(navigator.userAgent);
-export function crearCuasar({ uScale, uPR, texGigante, texBrillo, texNebulosa }) {
+// De un tirón; la carga usa construirCuasar, el mismo código como generador (yield entre pasos: ver porTramos).
+export const crearCuasar = (...a) => deUnTiron(construirCuasar(...a));
+export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulosa }) {
   const grupo = new THREE.Group(), animados = [], a = azar(4101), K = 1;   // el mismo contenido en móvil y en PC
   const { sombra: RS, discoIn, discoOut, toroR, toroTubo, anfitriona: RG, chorro: LARGO } = CUASAR;
 
+  yield;
   // ── Galaxia anfitriona: UNA sola descripción de sus dos brazos, compartida por estrellas y gas ──
   // Espiral logarítmica: ángulo del brazo k a radio r = ln(r / RA) / paso + DESFASE[k]. El segundo brazo va algo
   // desfasado (no es un reflejo exacto). Ancho que crece hacia fuera; plumas finas junto al brazo (no otras espirales).
@@ -75,6 +79,7 @@ export function crearCuasar({ uScale, uPR, texGigante, texBrillo, texNebulosa })
   const anchoBrazo = x => 0.34 + 0.3 * x;   // radianes de semiancho a la altura relativa x (0 dentro, 1 fuera)
   const estrellas = [], rosa = C('#ff9cc0'), lila = C('#c9a6ff'), azul = C('#86b4ff'), hielo = C('#d6e6ff'), nudo = C('#ff5d9e');
   for (let i = 0, n = Math.round(30000 * K); i < n; i++) {
+    if (i % 2000 === 1999) yield;
     const r = R0 * 0.9 + (RG - R0 * 0.9) * Math.pow(a(), 1.25), brazo = Math.floor(a() * brazos), x = Math.max(0, (r - R0) / (RG - R0));
     const enBrazo = a() < 0.8, pluma = enBrazo && x > 0.25 && a() < 0.22 ? (a() < 0.5 ? 1 : -1) * (0.42 + a() * 0.12) : 0;
     const disp = enBrazo ? gauss(a) * anchoBrazo(x) * (pluma ? 0.35 : 0.6) : (a() - 0.5) * Math.PI * 2;
@@ -88,11 +93,13 @@ export function crearCuasar({ uScale, uPR, texGigante, texBrillo, texNebulosa })
     estrellas.push({ ang: th, r, h: gauss(a) * (30 + x * 90), c: c.multiplyScalar(brillo), tam: esNudo ? 70 + a() * 60 : enBrazo ? 24 + a() * 22 : 12 + a() * 8, fase: a() });
   }
   const galaxia = crearNubePolar({ datos: estrellas, uScale, uPR, vel: 0.02, tamMax: 3.5, cerca: 1 });   // estrellas finas (sin bolitas de color)
+  yield;
   // Gas de los brazos (sin partículas): capas a distintas alturas con LA MISMA espiral que las estrellas; cada brazo,
   // un perfil gaussiano alrededor de su línea, con anchura y densidad que varían (zonas densas y huecos), plumas
   // tenues y más espesor donde el brazo es denso. Quieto: la forma no cambia con el tiempo.
   const capasBrazo = [];
   for (let k = 0; k < 7; k++) {
+    yield;
     const h = (k - 3) / 3, capa = new THREE.Mesh(new THREE.RingGeometry(R0 * 0.5, RG, 192, 24), aditivo({ uT: { value: 0 }, uR: { value: RG }, uPaso: { value: paso }, uH: { value: h }, uR0: { value: R0 }, uRA: { value: RA }, uD1: { value: DESFASE[1] } },
       'varying vec2 vP; varying float vD, vC; void main(){ vP = position.xy; vec4 mv = modelViewMatrix * vec4(position, 1.0); vD = length(mv.xyz) / length(modelMatrix[0].xyz); vC = abs(dot(normalize(mv.xyz), normalize(normalMatrix * vec3(0.0, 0.0, 1.0)))); gl_Position = projectionMatrix * mv; }',
       /* glsl */`uniform float uT, uR, uPaso, uH, uR0, uRA, uD1; varying vec2 vP; varying float vD, vC; ${RUIDO}
@@ -149,6 +156,7 @@ export function crearCuasar({ uScale, uPR, texGigante, texBrillo, texNebulosa })
   grupo.add(...capasBrazo, galaxia); animados.push(...capasBrazo, galaxia);
   capasBrazo.forEach(c => c.visible = false);   // sustituidas por el remolino
 
+  yield;
   // ── Remolino (como en la imagen de referencia): un único gas pintado con color y polvo OPACOS (no solo luz que se
   // suma): vetas finas doradas y blancas que giran junto al agujero, naranja y rojo, rosa luminoso con bordes
   // blancos, zarcillos de polvo negro muy condensado dentro del rojo y el rosa, muchas espirales seguidas que por fuera pasan a
@@ -156,6 +164,7 @@ export function crearCuasar({ uScale, uPR, texGigante, texBrillo, texNebulosa })
   // fija: gira entera, muy despacio, sin enroscarse. ──
   const R_IN = discoIn * 1.02, R_OUT = RG * 1.3;
   const remolino = [];
+  yield;
   // El remolino es muy rico (muchas capas de ruido por píxel): se HORNEA una vez durante la carga en una imagen
   // (hornearRemolino, desde index.js) y en cada cuadro solo se muestrea, girando entero. Misma calidad, mucho menos
   // trabajo para la GPU (antes costaba ≈ 25 ms por cuadro en PC).
@@ -277,6 +286,7 @@ export function crearCuasar({ uScale, uPR, texGigante, texBrillo, texNebulosa })
     malla.geometry.dispose(); m.dispose();
   }
   for (let k = 0; k < 5; k++) {
+    yield;
     const h = (k - 2) / 2, lam = new THREE.Mesh(new THREE.RingGeometry(R_IN, R_OUT, 256, 48), new THREE.ShaderMaterial({
       uniforms: { uT: { value: 0 }, uIn: { value: R_IN }, uOut: { value: R_OUT }, uH: { value: h }, uTex: { value: texRemolino } },
       vertexShader: 'varying vec2 vP; varying float vC; void main(){ vP = position.xy; vec4 mv = modelViewMatrix * vec4(position, 1.0); vC = abs(dot(normalize(mv.xyz), normalize(normalMatrix * vec3(0.0, 0.0, 1.0)))); gl_Position = projectionMatrix * mv; }',
@@ -297,6 +307,7 @@ export function crearCuasar({ uScale, uPR, texGigante, texBrillo, texNebulosa })
     lam.rotation.x = -Math.PI / 2; lam.scale.y = -1; lam.position.y = h * 320; lam.renderOrder = 10 + (k === 2 ? 3 : k < 2 ? k : 6 - k); remolino.push(lam);
   }
   grupo.add(...remolino); animados.push(...remolino);
+  yield;
   // Polvo estelar de colores en 3D dentro del remolino: miles de motas finas que siguen las espirales y giran con él
   // (dan volumen: al mover la cámara se ve que el gas tiene espesor).
   {
@@ -304,6 +315,7 @@ export function crearCuasar({ uScale, uPR, texGigante, texBrillo, texNebulosa })
     const rampaJS = u => { const P = [[0, [1, 0.95, 0.8]], [0.04, [1, 0.68, 0.22]], [0.2, [1, 0.42, 0.1]], [0.34, [0.88, 0.13, 0.17]], [0.48, [1, 0.45, 0.68]], [0.6, [1, 0.72, 0.9]], [0.78, [0.55, 0.5, 1]], [1, [0.3, 0.55, 1]]];
       for (let i = 1; i < P.length; i++) if (u <= P[i][0]) { const t = (u - P[i - 1][0]) / (P[i][0] - P[i - 1][0]); return P[i - 1][1].map((v, j) => v + (P[i][1][j] - v) * t); } return P[P.length - 1][1]; };
     for (let i = 0, j = 0; j < n && i < n * 20; i++) {
+      if (i % 3000 === 2999) yield;
       const x = Math.pow(a(), 0.8), r = R_IN + (R_OUT * 0.9 - R_IN) * x, th = a() * Math.PI * 2, lr = Math.log(r / R_IN);
       const bandas = 0.5 + 0.5 * Math.cos(7 * (th - lr * 2.6));
       if (a() > 0.25 + 0.75 * bandas) continue;
@@ -324,16 +336,19 @@ export function crearCuasar({ uScale, uPR, texGigante, texBrillo, texNebulosa })
     grupo.add(polvoEst); animados.push(polvoEst);
   }
   galaxia.renderOrder = 15;   // el polvo estelar brilla por encima del remolino
+  yield;
   // Polvo estelar: puntitos finos y brillantes (no una bruma rosa que tape el polvo negro).
   { const c = galaxia.geometry.attributes.aCol, t = galaxia.geometry.attributes.aTam;
-    for (let i = 0; i < t.count; i++) { t.setX(i, t.getX(i) * 0.35); const k = 0.55; c.setXYZ(i, Math.min(1, c.getX(i) * k + 0.35), Math.min(1, c.getY(i) * k + 0.3), Math.min(1, c.getZ(i) * k + 0.3)); }
+    for (let i = 0; i < t.count; i++) { if (i % 5000 === 4999) yield; t.setX(i, t.getX(i) * 0.35); const k = 0.55; c.setXYZ(i, Math.min(1, c.getX(i) * k + 0.35), Math.min(1, c.getY(i) * k + 0.3), Math.min(1, c.getZ(i) * k + 0.3)); }
     t.needsUpdate = c.needsUpdate = true; galaxia.material.uniforms.uMax.value = 1.8; }
   const resplandor = new THREE.Sprite(new THREE.SpriteMaterial({ map: texBrillo, color: '#ffb7a6', transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending }));
   resplandor.scale.setScalar(3600);   // sin resplandor difuso (degradado): no se añade
 
+  yield;
   // ── Anillo de gas ardiente alrededor del disco: continuo (capas con ruido), sin puntos ──
   const capasFuego = [];
   for (let k = 0; k < 5; k++) {
+    yield;
     const h = (k - 2) / 2, capa = new THREE.Mesh(new THREE.RingGeometry(discoOut * 0.98, discoOut + 1100, 200, 8), aditivo({ uT: { value: 0 }, uIn: { value: discoOut }, uH: { value: h } },
       'varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
       /* glsl */`uniform float uT, uIn, uH; varying vec2 vP; ${RUIDO}
@@ -347,6 +362,7 @@ export function crearCuasar({ uScale, uPR, texGigante, texBrillo, texNebulosa })
   }
   grupo.add(...capasFuego); animados.push(...capasFuego);
   capasFuego.forEach(c => c.visible = false);   // el remolino ya pinta el anillo de fuego
+  yield;
   // Toro de polvo: casi invisible de frente; de canto tapa un poco el disco y su borde se templa.
   const toro = new THREE.Mesh(new THREE.TorusGeometry(toroR, toroTubo, 32, 128), new THREE.ShaderMaterial({
     uniforms: { uT: { value: 0 } },
@@ -359,6 +375,7 @@ export function crearCuasar({ uScale, uPR, texGigante, texBrillo, texNebulosa })
   }));
   toro.rotation.x = Math.PI / 2; grupo.add(toro); animados.push(toro); toro.visible = false;
 
+  yield;
   // ── Disco de acreción ──
   const disco = new THREE.Mesh(new THREE.RingGeometry(discoIn, discoOut, 320, 12), aditivo(
     { uT: { value: 0 }, uIn: { value: discoIn }, uOut: { value: discoOut } },
@@ -384,9 +401,11 @@ export function crearCuasar({ uScale, uPR, texGigante, texBrillo, texNebulosa })
         gl_FragColor = vec4(c * b * 1.35, min(1.0, b)); }`));
   disco.rotation.x = Math.PI / 2; grupo.add(disco); animados.push(disco);
 
+  yield;
   // ── Horizonte: la sombra y su anillo de fotones (mira siempre a la cámara) ──
   const sombraMalla = new THREE.Mesh(new THREE.SphereGeometry(RS, 128, 96), new THREE.MeshBasicMaterial({ color: 0x000000 }));
   grupo.add(sombraMalla);
+  yield;
   // La sombra se ve siempre limpia (como en las imágenes de agujeros negros: la luz se curva a su alrededor): un
   // disco negro que mira a la cámara, dibujado encima del gas; el anillo de fotones y el destello, encima de ella.
   const sombraDisco = new THREE.Mesh(new THREE.CircleGeometry(RS * 1.02, 96), new THREE.ShaderMaterial({
@@ -405,8 +424,10 @@ export function crearCuasar({ uScale, uPR, texGigante, texBrillo, texNebulosa })
   fotones.material.depthTest = false; fotones.renderOrder = 51;
   grupo.add(fotones); animados.push(fotones);
 
+  yield;
   // ── Chorros relativistas ──
   const chorros = new THREE.Group(); grupo.add(chorros);
+  yield;
   // Acento de luz (el faro): un brillo rosado y dorado que sube por cada chorro. uAc: su posición a lo largo
   // del chorro (0 base, 1 punta; negativo: apagado). Compartido por todas las capas.
   const uAc = { value: -1 };
@@ -480,6 +501,7 @@ export function crearCuasar({ uScale, uPR, texGigante, texBrillo, texNebulosa })
           gl_FragColor = vec4(mix(vec3(0.55, 0.7, 1.0), vec3(1.0), 0.4) * f, f); }`));
     helices.renderOrder = 21; lado.add(helices); animados.push(helices);
   }
+  yield;
   // Partículas que suben en hélice por los chorros.
   const nCh = Math.round(1600 * K), pCh = new Float32Array(nCh * 3);
   for (let i = 0; i < nCh; i++) pCh.set([a() * Math.PI * 2, a(), a()], i * 3);
@@ -496,6 +518,7 @@ export function crearCuasar({ uScale, uPR, texGigante, texBrillo, texNebulosa })
     'varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; if (d > 1.0) discard; float k = exp(-d * d * 4.0) * vA; gl_FragColor = vec4(vC * k, k); }'));
   particulasChorro.frustumCulled = false; chorros.add(particulasChorro); animados.push(particulasChorro);
 
+  yield;
   // ── Materia que cae en espiral al disco: se calienta de rojo a blanco azulado ──
   const nCa = Math.round(2200 * K), pCa = new Float32Array(nCa * 3);
   for (let i = 0; i < nCa; i++) pCa.set([a() * Math.PI * 2, a(), a()], i * 3);
@@ -512,6 +535,7 @@ export function crearCuasar({ uScale, uPR, texGigante, texBrillo, texNebulosa })
     'varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; if (d > 1.0) discard; float k = exp(-d * d * 4.0) * vA; gl_FragColor = vec4(vC * k, k); }'));
   caida.frustumCulled = false; grupo.add(caida); animados.push(caida);
 
+  yield;
   // ── Rayos rojizos que brotan del núcleo, por encima y por debajo del disco ──
   const nR = Math.round(420 * K), pR = new Float32Array(nR * 6), fR = new Float32Array(nR * 2), faseR = new Float32Array(nR * 2);
   for (let i = 0; i < nR; i++) {
@@ -526,6 +550,7 @@ export function crearCuasar({ uScale, uPR, texGigante, texBrillo, texNebulosa })
     'varying float vA; varying float vF; void main(){ float k = pow(1.0 - vF, 1.6) * vA * 0.9; gl_FragColor = vec4(mix(vec3(1.0, 0.85, 0.8), vec3(1.0, 0.22, 0.35), smoothstep(0.0, 0.5, vF)) * k, k); }'));
   rayos.frustumCulled = false; grupo.add(rayos); animados.push(rayos);
 
+  yield;
   // ── Núcleo: deslumbrante de lejos; de cerca se aparta y deja ver la sombra ──
   const destello = new THREE.Sprite(new THREE.SpriteMaterial({ map: texGigante, color: '#ffffff', transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending }));
   const aura = new THREE.Sprite(new THREE.SpriteMaterial({ map: texBrillo, color: '#dbe8ff', transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending }));

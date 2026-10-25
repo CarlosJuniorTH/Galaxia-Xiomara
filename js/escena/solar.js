@@ -4,6 +4,7 @@
 // dorado hacia el centro galáctico, nubes de estrellas, polvo oscuro y nudos rosados.
 // El universo lejano (cielo, galaxias, cosmos) sigue detrás, a su distancia.
 import * as THREE from 'three';
+import { deUnTiron } from '../util/azarSemilla.js';
 import { texBrillo, texDestello, texEstrellaGigante } from './texturas.js';
 import { Q } from '../util/dispositivo.js';
 
@@ -15,9 +16,12 @@ const RUIDO = /* glsl */`
 
 export const RADIO_SOL = 150;
 
-export function crearSolar({ haciaCentroGalactico, renderer, uPR = { value: 1 } }) {
+// De un tirón; la carga usa construirSolar, el mismo código como generador (yield entre pasos: ver porTramos).
+export const crearSolar = (...a) => deUnTiron(construirSolar(...a));
+export function* construirSolar({ haciaCentroGalactico, renderer, uPR = { value: 1 } }) {
   const escena = new THREE.Scene();
 
+  yield;
   // ── La galaxia de Xiomara vista desde dentro: se «hornea» una sola vez en un cubemap que es
   // el fondo de esta escena (sin coste por cuadro, como el cielo principal) ──
   const centro = haciaCentroGalactico.clone().setY(0).normalize();
@@ -51,6 +55,7 @@ export function crearSolar({ haciaCentroGalactico, renderer, uPR = { value: 1 } 
     side: THREE.BackSide, depthWrite: false
   }));
   const horno = new THREE.Scene(); horno.add(banda);
+  yield;
   // En sRGB (como una foto): con 8 bits lineales los tonos oscuros de la banda tenían escalones gruesos que, ampliados,
   // se veían como rectángulos de bordes rectos en el cielo de Rosa, Azul y las cartas. Misma memoria, ~3 veces más niveles en lo oscuro.
   const cubo = new THREE.WebGLCubeRenderTarget(Q.cielo, { generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, colorSpace: THREE.SRGBColorSpace });
@@ -58,6 +63,7 @@ export function crearSolar({ haciaCentroGalactico, renderer, uPR = { value: 1 } 
   banda.geometry.dispose(); banda.material.dispose();
   escena.background = cubo.texture;
 
+  yield;
   // Estrellas de la galaxia de Xiomara, mucho más densas en la banda: antes iban horneadas en el cielo (1024 por cara) y
   // al ampliarse en un móvil se veían como manchitas borrosas. Ahora son puntos nítidos a cualquier resolución, con la
   // misma densidad (≈0,35 % de los píxeles del cielo horneado, hasta 4,4 veces más en la banda), colores y brillos que las horneadas.
@@ -68,6 +74,7 @@ export function crearSolar({ haciaCentroGalactico, renderer, uPR = { value: 1 } 
     const CELDAS = 6 * 1024 * 1024;   // el cielo horneado decidía una estrella por cada píxel de sus 6 caras de 1024
     let intentos = Math.round(CELDAS * 0.0155);
     while (intentos-- > 0) {
+      if (intentos % 4000 === 0) yield;
       const z = azar() * 2 - 1, a = azar() * Math.PI * 2, r = Math.sqrt(1 - z * z); v.set(r * Math.cos(a), z, r * Math.sin(a));
       const lat = v.y, lon = Math.acos(Math.min(1, Math.max(-1, (v.x * base.x + v.z * base.z) / Math.max(1e-6, Math.hypot(v.x, v.z)))));
       const bulbo = Math.exp(-lon * lon * 1.3), ancho = 0.075 + 0.11 * bulbo, l2 = lat / ancho, bandaV = Math.exp(-l2 * l2);
@@ -88,6 +95,7 @@ export function crearSolar({ haciaCentroGalactico, renderer, uPR = { value: 1 } 
     estrellasBanda.frustumCulled = false; estrellasBanda.renderOrder = -900; estrellasBanda.name = 'Estrellas de la banda'; escena.add(estrellasBanda);
   }
 
+  yield;
   // ── El Sol: superficie hirviendo, corona y destellos; ilumina a los planetas ──
   const sol = new THREE.Group(); escena.add(sol);
   const superficie = new THREE.Mesh(new THREE.SphereGeometry(RADIO_SOL, 96, 64), new THREE.ShaderMaterial({
@@ -108,6 +116,7 @@ export function crearSolar({ haciaCentroGalactico, renderer, uPR = { value: 1 } 
   const capa = (mapa, color, tam, op) => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: mapa, color, transparent: true, opacity: op, depthWrite: false, blending: THREE.AdditiveBlending })); s.scale.setScalar(tam); sol.add(s); return s; };
   const halos = [[capa(brillo, '#ffd9a0', RADIO_SOL * 3.2, 0.32), 3.2], [capa(brillo, '#ffb070', RADIO_SOL * 9, 0.24), 9], [capa(brillo, '#ff9a5a', RADIO_SOL * 24, 0.07), 24]];
   const rayos = capa(texEstrellaGigante(), '#fff1d8', RADIO_SOL * 12, 0.35), destello = capa(texDestello(), '#ffffff', RADIO_SOL * 7, 0.5);
+  yield;
   // Corona: filamentos que salen del borde y ondulan.
   const corona = new THREE.Mesh(new THREE.RingGeometry(RADIO_SOL * 0.98, RADIO_SOL * 2.6, 180, 4), new THREE.ShaderMaterial({
     uniforms: { uT: { value: 0 } },
@@ -120,6 +129,7 @@ export function crearSolar({ haciaCentroGalactico, renderer, uPR = { value: 1 } 
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide
   }));
   sol.add(corona);
+  yield;
   // Protuberancias: arcos de plasma que salen de la superficie siguiendo el campo magnético.
   const materialArco = new THREE.ShaderMaterial({
     uniforms: { uT: { value: 0 } },

@@ -2,6 +2,7 @@
 // nebulosa de corazón persistente. Los puntos se transforman en la GPU y las
 // texturas aditivas tienen fondo negro opaco para evitar artefactos en Safari.
 import * as THREE from 'three';
+import { deUnTiron } from '../util/azarSemilla.js';
 import { EXPOSICION } from './exposicion.js';
 import { crearNube } from './nube.js';
 import { RADIO_REMANENTE_SUPERNOVA, PROGENITORA_RELATIVA as P } from '../data/escalaCosmica.js';
@@ -26,11 +27,14 @@ export const radioOnda = e => 60 + 1900 * (1 - Math.exp(-e / 2.4));
 export const ECO = Object.freeze({ plano: 6000, inicio: 120, velocidad: 900 });
 export const radioEco = e => ECO.inicio + ECO.velocidad * e;
 
-export function crearSupernova({ uScale, uPR, escala }) {
+// De un tirón; la carga usa construirSupernova, el mismo código como generador (yield entre pasos: ver porTramos).
+export const crearSupernova = (...a) => deUnTiron(construirSupernova(...a));
+export function* construirSupernova({ uScale, uPR, escala }) {
   const grupo = new THREE.Group();
   const brillo = texBrillo(), destello = texDestello(), rayosTex = texEstrellaGigante();
   const R = 110;   // radio de la estrella (espacio de diseño)
 
+  yield;
   // ── La estrella: superficie azul blanca hirviendo, con oscurecimiento al borde ──
   const progenitora = new THREE.Group(); grupo.add(progenitora);
   const superficie = new THREE.Mesh(new THREE.SphereGeometry(R, 64, 48), new THREE.ShaderMaterial({
@@ -57,6 +61,7 @@ export function crearSupernova({ uScale, uPR, escala }) {
   progenitora.add(superficie);
   const corona = sprite(brillo, '#ffad62', R * 4, 0.3), halo = sprite(brillo, '#d95f3b', R * 9, 0.08), rayos = sprite(rayosTex, '#ffd8aa', R * 12, 0.16);
   progenitora.add(halo, corona, rayos);
+  yield;
   // Prominencias irregulares ancladas a la superficie, no dos globos huecos.
   const plasma = new THREE.Group(); progenitora.add(plasma);
   const materialPlasma=aditivo({uT:{value:0},uLuz:{value:1}},
@@ -78,6 +83,7 @@ export function crearSupernova({ uScale, uPR, escala }) {
     plasma.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(puntos),48,2.5+i%3,5,false),materialPlasma));
   }
 
+  yield;
   // ── De tanta luz, nacimos nosotros ──
   // La misma materia primero se expande y después encuentra su lugar en un corazón.
   // Dos lotes de puntos y seis cintas, sin añadir objetos por cada partícula.
@@ -87,9 +93,10 @@ export function crearSupernova({ uScale, uPR, escala }) {
   const n = 7600;
   let semilla = 180125;
   const azar = () => { semilla = (Math.imul(1664525, semilla) + 1013904223) >>> 0; return semilla / 4294967296; };
-  function polvo(cantidad, exterior) {
+  function* polvo(cantidad, exterior) {
     const posiciones = new Float32Array(cantidad * 3), salidas = new Float32Array(cantidad * 3), datos = new Float32Array(cantidad * 3);
     for (let i = 0; i < cantidad; i++) {
+      if (i % 1000 === 999) yield;
       const a = azar() * Math.PI * 2, r = exterior ? 0.92 + azar() * 0.14 : Math.cbrt(azar()) * 0.94;
       const z = azar()*2-1;
       const p = puntoCorazonVolumen(a,z,r,0);
@@ -137,13 +144,16 @@ export function crearSupernova({ uScale, uPR, escala }) {
         gl_FragColor = vec4(vColor * a * ${exterior ? '1.6' : '0.8'}, a); }`);
     const puntos = new THREE.Points(geo, mat); puntos.frustumCulled = false; corazon.add(puntos);
   }
-  polvo(n, true); polvo(Math.round(n * 0.6), false);
+  yield* polvo(n, true); yield* polvo(Math.round(n * 0.6), false);
+  yield;
   // Caja de la figura final (espacio del corazón): la cámara la encuadra entera.
   const cajaCorazon = new THREE.Box3();
   for (const o of corazon.children) { o.geometry.computeBoundingBox(); cajaCorazon.union(o.geometry.boundingBox); }
 
+  yield;
   // Filamentos con espesor real: el corazón conserva volumen al rodearlo.
   for (let i = 0; i < 10; i++) {
+    yield;
     const radio = 0.9 + (i%3) * 0.055;
     const curva = new THREE.CatmullRomCurve3(Array.from({ length: 129 }, (_, j) => {
       const a = j / 128 * Math.PI * 2, p = puntoCorazonVolumen(a, (i/9-0.5)*1.55 + Math.sin(a*2+i)*0.08, radio, i*0.7);
@@ -172,11 +182,13 @@ export function crearSupernova({ uScale, uPR, escala }) {
     corazon.add(cinta);
   }
 
+  yield;
   // Gas continuo tenue dentro de la figura: fondo opaco en la textura aditiva,
   // sin los alfas diminutos que causaban puntos de color en Safari.
   const ladoGas = 256, datosGas = new Uint8Array(ladoGas * ladoGas * 4);
   const { fbm } = crearRuido(1801);
   for(let y=0;y<ladoGas;y++)for(let x=0;x<ladoGas;x++){
+    if (x === 0 && (y & 15) === 15) yield;
     const u=x/ladoGas*2-1,v=y/ladoGas*2-1;
     const giro=fbm(u*2+7,v*2,1,3),desvio=fbm(u*2,v*2+9,2,3);
     const qx=u+(giro-0.5)*0.65,qy=v+(desvio-0.5)*0.65;
@@ -192,6 +204,7 @@ export function crearSupernova({ uScale, uPR, escala }) {
   const gasTex = new THREE.DataTexture(datosGas,ladoGas,ladoGas,THREE.RGBAFormat);
   gasTex.flipY=true;gasTex.minFilter=THREE.LinearMipmapLinearFilter;gasTex.magFilter=THREE.LinearFilter;gasTex.generateMipmaps=true;gasTex.needsUpdate=true;
   const gas = crearNube(gasTex, new THREE.Vector3(0, 0, -40), 1800, 1801, escala, 7, { corazon: true }); gas.rotation.set(0, 0, 0); corazon.add(gas); gas.userData.brilloPropio = true;
+  yield;
   // Dos estrellas que siguen juntas en el corazón: una gigante azul (más masiva, más grande y
   // brillante) y una enana roja pequeña. Giran alrededor de su centro de masas en el plano del
   // corazón (la azul describe una órbita menor), sin acercarse ni alejarse de quien mira.
@@ -199,6 +212,7 @@ export function crearSupernova({ uScale, uPR, escala }) {
   const parejas = [['#9fc4ff', 300, 110, 0.95, 70], ['#ff8fc8', 300, 110, 0.95, 175]].map(([color, halo, nucleo, op, orbita]) => {
     const p = new THREE.Group(); p.add(sprite(brillo, color, halo, 0.36), sprite(destello, color, nucleo, op)); p.userData.orbita = orbita; corazon.add(p); return p;
   });
+  yield;
   // Antes de estallar, la estrella late y cada latido lanza una onda de gas que se aleja de su
   // superficie (pulsaciones cada vez más rápidas e intensas).
   // Pérdida de masa en las pulsaciones previas: no son cáscaras lisas sino eyecta de plasma
@@ -219,6 +233,7 @@ export function crearSupernova({ uScale, uPR, escala }) {
     m.visible = false; m.userData.f = 1; progenitora.add(m); return m;
   });
   let fasePulso = 0, faseLatido = 0, faseGiro = 0;
+  yield;
   // Las dos estrellitas (azul y rosa) que nacen del colapso: giran en órbita, se acercan en espiral y,
   // al juntarse, estalla todo. Cada una con su estela.
   const NE = 48, dos = [['#8fbaff', '#d8e8ff'], ['#ff7fbf', '#ffd2ea']].map(([c, c2]) => {
@@ -239,6 +254,7 @@ export function crearSupernova({ uScale, uPR, escala }) {
     `varying vec3 vN,vV; uniform float uE, uVer; void main(){float borde=pow(clamp(1.0-abs(dot(normalize(vN),normalize(vV))),0.0,1.0),7.0);float a=borde*smoothstep(0.0,0.25,uE)*exp(-uE/3.2)*0.15*uVer;if(a<0.003)discard;gl_FragColor=vec4(vec3(0.6,0.78,1.0)*a,a);}`,
     { side: THREE.DoubleSide })); explosion.add(onda);
 
+  yield;
   // Bola de fuego: la eyecta incandescente se expande y se enfría (azul blanca → amarilla →
   // naranja → roja); al volverse transparente se rompe en grumos y dedos (Rayleigh-Taylor) que
   // dejan ver el remanente que nace dentro.
@@ -273,6 +289,7 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
       float a=luz*grumos*cuerpo*hervor*0.6*(1.0+0.9*cresta*smoothstep(1.0,4.0,uE)); if(a<0.002)discard;
       gl_FragColor=vec4(c*a*1.9,a); }`, { side: THREE.FrontSide }));
   bola.visible = false; explosion.add(bola);
+  yield;
   // Fragmentos: miles de grumos de materia incandescente que salen disparados (unos más rápidos que
   // otros, en chorros), dejando una estela; se frenan y se enfrían: blanco azulado → amarillo →
   // naranja → rojo, y se apagan mientras nace el corazón.
@@ -298,8 +315,10 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
     }`, /* glsl */`varying vec3 vC; varying float vA;
     void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; if (d > 1.0) discard; float a = (exp(-d * d * 4.0) + exp(-d * 10.0) * 0.4) * vA; gl_FragColor = vec4(vC * a * 1.5, a); }`));
   fragmentos.frustumCulled = false; fragmentos.visible = false; explosion.add(fragmentos);
+  yield;
   // Destello del choque: núcleo blanco azulado cegador y una raya horizontal (como en las fotos).
   const raya = sprite(destello, '#cfe0ff', 1, 0); raya.material.rotation = 0; explosion.add(raya);
+  yield;
   // Ecos de luz: el destello ilumina capas de polvo cada vez más lejanas y se ven anillos tenues
   // que se agrandan alrededor (como los de V838 Monocerotis).
   const eco = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), aditivo({ uE },
@@ -311,6 +330,7 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
         a+=exp(-pow((r-ri)/(0.003+t*0.0008),2.0))*smoothstep(0.0,0.6,t)*exp(-t/5.0)*(1.0-fi*0.25); }
       a*=smoothstep(0.4,0.75,polvo)*(1.0-smoothstep(0.7,0.95,r))*0.16*(1.0-smoothstep(9.0,15.0,uE)); if(a<0.002)discard;
       gl_FragColor=vec4(mix(vec3(0.7,0.8,1.0),vec3(1.0,0.85,0.75),polvo)*a,a); }`, { side: THREE.DoubleSide }));
+  yield;
   // Eco de luz: el destello iluminando polvo que ya estaba ahí. Viaja a velocidad constante
   // (la luz, ~900 u/s en esta escala) y siempre por delante de la onda de material, que nace a
   // ~790 u/s y se frena. Se dibuja en el plano del cielo: un eco es un fenómeno aparente.

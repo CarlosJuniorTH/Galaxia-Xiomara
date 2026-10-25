@@ -3,7 +3,8 @@ import * as THREE from 'three';
 import { radioPxDisco } from '../data/escalaCosmica.js';
 import { Q } from '../util/dispositivo.js';
 import { gauss, azar } from '../util/dibujo.js';
-import { materialPuntos, geometriaPuntos } from './materiales.js';
+import { materialPuntos, puntosPorPasos } from './materiales.js';
+import { deUnTiron } from '../util/azarSemilla.js';
 import { texBrillo } from './texturas.js';
 import { texturaPlaneta } from './fabricaTexturas.js';
 import { vista } from '../util/vista.js';
@@ -18,7 +19,9 @@ export function enBrazo(brazo, t, dispersion) {
   return { x: Math.cos(ang) * rad, z: Math.sin(ang) * rad, rad };
 }
 
-export function crearGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia }) {
+// Se construye por tramos (construirGalaxia es un generador: index.js lo recorre cediendo entre tramos).
+export const crearGalaxia = o => deUnTiron(construirGalaxia(o));
+export function* construirGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia }) {
   const grupo = new THREE.Group();
   scene.add(grupo);
   const col = new THREE.Color();
@@ -124,7 +127,7 @@ export function crearGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia }) {
   // ── Estrellas del disco ──
   const matEstrellas = materialPuntos({ uScale, uPR, tam: uTamGalaxia, titileo: 0.12, silueta: true });
   mats.push(matEstrellas);
-  const estrellas = geometriaPuntos(n(72000), (i, p) => {
+  const estrellas = yield* puntosPorPasos(n(72000), (i, p) => {
     const enDisco = Math.random() < 0.12;    // pocas estrellas entre brazos, para que se noten los espacios oscuros
     const t = Math.pow(Math.random(), 0.55);
     let x, z, rad;
@@ -152,7 +155,7 @@ export function crearGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia }) {
   // ── Bulbo central dorado-rosado ──
   const matBulbo = materialPuntos({ uScale, uPR, tam: uTamGalaxia, titileo: 0.1, opacidad: 0.9, silueta: true });
   mats.push(matBulbo);
-  grupo.add(new THREE.Points(geometriaPuntos(n(14000), (i, p) => {
+  grupo.add(new THREE.Points(yield* puntosPorPasos(n(14000), (i, p) => {
     const r = 75 + Math.pow(Math.random(), 1.5) * 230;
     const th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1);
     p.x = r * Math.sin(ph) * Math.cos(th);
@@ -167,7 +170,7 @@ export function crearGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia }) {
   const matRieles = materialPuntos({ uScale, uPR, tam: uTamGalaxia, titileo: 0.25, opacidad: 0.85, silueta: true });
   mats.push(matRieles);
   const nR = n(11000);
-  grupo.add(new THREE.Points(geometriaPuntos(nR, (i, p) => {
+  grupo.add(new THREE.Points(yield* puntosPorPasos(nR, (i, p) => {
     // Columna brillante de cada brazo: sigue exactamente la misma espiral que las estrellas
     const t = 0.04 + (i / nR) * 0.96, c = enBrazo(i % BRAZOS, t, gauss() * 0.018);
     p.x = c.x; p.y = gauss() * 2.5; p.z = c.z;
@@ -176,6 +179,7 @@ export function crearGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia }) {
     p.s = azar(2.6, 4.2);
   }), matRieles));
 
+  yield;
   // Ruido a lo largo del brazo: crea filamentos y grumos naturales en vez de una franja uniforme
   const ruido = (t, b, d) =>
     0.5 + 0.25 * Math.sin(t * 37 + b * 2.1 + d * 9) + 0.25 * Math.sin(t * 91 + b * 5.3 - d * 13);
@@ -192,7 +196,7 @@ export function crearGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia }) {
   // Juntas forman la luz suave y continua de una galaxia real (sin manchas ni burbujas)
   const matResplandor = materialPuntos({ uScale, uPR, tam: uTamGalaxia, maximo: 5, titileo: 0, opacidad: 1, silueta: true });
   mats.push(matResplandor);
-  grupo.add(new THREE.Points(geometriaPuntos(n(28000), (i, p) => {
+  grupo.add(new THREE.Points(yield* puntosPorPasos(n(28000), (i, p) => {
     const b = i % BRAZOS, c = puntoFilamento(b, 0.11);
     p.x = c.x; p.z = c.z;
     p.y = gauss() * 9 * Math.exp(-c.rad / 500);
@@ -215,7 +219,7 @@ export function crearGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia }) {
     cumulos.push({ ...centro, azul: Math.random() < 0.3 });
   }
   const porCumulo = Math.max(8, Math.round(14 * Q.k));
-  grupo.add(new THREE.Points(geometriaPuntos(cumulos.length * porCumulo, (i, p) => {
+  grupo.add(new THREE.Points(yield* puntosPorPasos(cumulos.length * porCumulo, (i, p) => {
     const c = cumulos[Math.floor(i / porCumulo)];
     p.x = c.x + gauss() * 5; p.y = gauss() * 2.5; p.z = c.z + gauss() * 5;
     if (c.azul) col.setHSL(0.6, 0.7, azar(0.78, 0.92));
@@ -224,6 +228,7 @@ export function crearGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia }) {
     p.s = azar(1.8, 3.2);
   }), matCumulos));
 
+  yield;
   // Resplandor suave del centro (degradado limpio, sin forma de nube)
   const brilloCentro = new THREE.Sprite(new THREE.SpriteMaterial({
     map: texBrillo(), color: 0xffa0c8, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.2
@@ -234,7 +239,7 @@ export function crearGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia }) {
   // ── Polvo oscuro: filamentos finos en el borde interior de cada brazo ──
   const matPolvo = materialPuntos({ uScale, uPR, tam: uTamGalaxia, maximo: 9, aditivo: false, opacidad: 0.55, titileo: 0 });
   mats.push(matPolvo);
-  const polvo = new THREE.Points(geometriaPuntos(n(16000), (i, p) => {
+  const polvo = new THREE.Points(yield* puntosPorPasos(n(16000), (i, p) => {
     const b = i % BRAZOS, t = azar(0.18, 0.95), d = -0.13 + gauss() * 0.03;
     const r = ruido(t, b, d * 3);
     const c = enBrazo(b, t, d);
@@ -257,6 +262,7 @@ export function crearGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia }) {
     const N = N_LEJOS, pos = new Float32Array(N * 3), colr = new Float32Array(N * 3), tam = new Float32Array(N);
     const rosa = new THREE.Color('#ff7fb8'), lila = new THREE.Color('#b78cff'), azul = new THREE.Color('#9fc4ff'), oro = new THREE.Color('#ffd9a0'), c = new THREE.Color();
     for (let i = 0; i < N; i++) {
+      if (i % 1000 === 999) yield;
       // Bulbo esferoidal (no aplanado), halo tenue y disco con espesor: de canto sigue siendo una
       // galaxia (línea brillante del disco con su bulbo y su halo), no un trazo que desaparece.
       // Bulbo con menos puntos y más ancho: antes concentraba el 18 % en un núcleo diminuto (pico de luz 3×).
@@ -282,6 +288,7 @@ export function crearGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia }) {
   const bulboLejos = new THREE.Sprite(new THREE.SpriteMaterial({ map: texBrillo(), color: '#ffe2b8', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
   bulboLejos.scale.setScalar(RADIO * 0.7); lejos.add(bulboLejos);
   const opBase = [];
+  yield;
   // Luz no resuelta de Xiomara: cuando ocupa unos pocos píxeles es un punto con el MISMO flujo que su
   // versión lejana (disco + bulbo + puntos, calculado con sus texturas reales) y se funde con ella.
   const gPunto = new THREE.BufferGeometry(); gPunto.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3), 3));
@@ -291,6 +298,7 @@ export function crearGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia }) {
     fragmentShader: 'uniform float uI; void main(){ float d = length(gl_PointCoord - 0.5); float a = pow(max(1.0 - d * 2.0, 0.0), 1.6) * uI; gl_FragColor = vec4(vec3(1.0, 0.78, 0.92) * a, a); }',
     transparent: true, premultipliedAlpha: true, depthWrite: false, blending: THREE.AdditiveBlending }));
   puntoLuz.frustumCulled = false; puntoLuz.visible = false; grupo.add(puntoLuz);
+  yield;
   // Su halo rosado de lejos (licencia, para reconocerla entre las demás): un brillo suave y estable de
   // tamaño fijo en pantalla alrededor de su luz no resuelta; desde cualquier gigante se la encuentra.
   const uHalo = { uI: { value: 0 }, uPR };

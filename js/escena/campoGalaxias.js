@@ -11,7 +11,7 @@
 // GPU recibe posiciones relativas a la cámara: precisión de sobra a millones de unidades), y se
 // liberan al alejarse. Siempre son las mismas estrellas: misma semilla, misma forma.
 import * as THREE from 'three';
-import { generador, semillaDe } from '../util/azarSemilla.js';
+import { generador, semillaDe, deUnTiron } from '../util/azarSemilla.js';
 import { PALETAS_GALAXIA } from './texturasPlaneta.js';
 import { componentesGalaxia, componentesAndromeda, componentesColision, paso } from './formasGalaxia.js';
 import { crearRuido } from '../util/ruido.js';
@@ -31,13 +31,16 @@ export const GAMMA_LUZ = 0.5;
 // Componente de cada estrella: 0 población vieja (bulbo, disco, núcleos), 1 joven (brazos, anillo,
 // cúmulos, colas), 2 regiones HII.
 const N_REJILLA = 72, mapas = new Map();
-export function mapaGalaxia(d) {
+export function mapaGalaxia(d) { return deUnTiron(prepararMapaGalaxia(d)); }
+// El mismo mapa por tramos (un generador, con yield cada 6 filas de la rejilla): la carga los prepara todos cediendo.
+export function* prepararMapaGalaxia(d) {
   const clave = `${d.tipo}/${d.especial || ''}/${d.semilla}/${d.brazos}/${d.enrollado}`;
   if (mapas.has(clave)) return mapas.get(clave);
   const luz = (PALETAS_GALAXIA[d.paleta] || PALETAS_GALAXIA.clasica).map(c => (c[0] + c[1] + c[2]) / 3);
   const R = crearRuido(d.semilla), n = N_REJILLA, peso = new Float32Array(n * n * 3), acumulado = new Float64Array(n * n);
   let total = 0;
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    if (x === 0 && y % 6 === 5) yield;
     const u = (x + 0.5) / n * 2 - 1, v = (y + 0.5) / n * 2 - 1, j = y * n + x;
     if (Math.hypot(u, v) < 0.98) {
       let c0, c1, c2, polvo;

@@ -6,13 +6,13 @@ import { crearIndiceEsferas } from '../util/indiceEsferas.js';
 import * as THREE from 'three';
 import { esMovil, texturasLigeras } from '../util/dispositivo.js';
 import { azar } from '../util/dibujo.js';
-import { ceder } from '../util/azarSemilla.js';
+import { ceder, porTramos, cederSiToca } from '../util/azarSemilla.js';
 import { texturaPlaneta } from './fabricaTexturas.js';
 import { crearNube } from './nube.js';
-import { crearCampoGalaxias } from './campoGalaxias.js';
+import { crearCampoGalaxias, prepararMapaGalaxia } from './campoGalaxias.js';
 import { crearInteriorNebulosa } from './interiorNebulosa.js';
 import { DESCRIPTORES } from './formasGalaxia.js';
-import { universoCatalogo, ENCUENTROS } from '../data/catalogo.js';
+import { construirCatalogo, ENCUENTROS } from '../data/catalogo.js';
 import { vista } from '../util/vista.js';
 
 // Texturas como en las fotografías (bulbo, brazos azulados, regiones HII rosadas, polvo),
@@ -40,9 +40,10 @@ const texNebulosa = (semilla, tono, forma = 'emision', bloquea = false) => {
   return cacheNebulosa.get(clave);
 };
 
-// Se construye por pasos (cede el control al navegador entre nebulosas): la portada no se congela.
+// Se construye por pasos (cede el control al navegador entre nebulosas, entre tramos del catálogo…): la portada no se congela.
 export async function crearGalaxiasLejanas({ scene, uPR, uScale }) {
-  const tipos = DESCRIPTORES.map(d => d.especial ? texEspecial(d.especial, d.semilla, texturasLigeras ? d.lado[0] : d.lado[1]) : texGalaxia(d.tipo, d.semilla, { brazos: d.brazos, enrollado: d.enrollado, paleta: d.paleta }));
+  const tipos = [];
+  for (const d of DESCRIPTORES) { tipos.push(d.especial ? texEspecial(d.especial, d.semilla, texturasLigeras ? d.lado[0] : d.lado[1]) : texGalaxia(d.tipo, d.semilla, { brazos: d.brazos, enrollado: d.enrollado, paleta: d.paleta })); await cederSiToca(); }
   const grupo = new THREE.Group(); grupo.name = 'Fondo óptico (acompaña a la cámara)';
   const nubes = new THREE.Group(); nubes.name = 'Nebulosas (coordenadas fijas)'; nubes.userData.profundo = true;
   const universo = new THREE.Group(); universo.name = 'Galaxias del catálogo (coordenadas fijas)'; universo.userData.profundo = true;
@@ -50,12 +51,15 @@ export async function crearGalaxiasLejanas({ scene, uPR, uScale }) {
 
   // ── Catálogo persistente: el mismo mapa en cada carga y en cualquier dispositivo ──
   await ceder();
-  const u = universoCatalogo(THREE);
+  const u = await porTramos(construirCatalogo(THREE));
   const nombres = new Map(ENCUENTROS.flatMap(e => (e.galaxias || []).map(g => [g.id, e.nombre])));
   // op: brillo superficial de las imágenes, igualado al de Xiomara a igual tamaño e inclinación (antes
   // 0,9: un 60 % más luz por área que nuestra galaxia; ver .pruebas/pw/comparar.mjs y la documentación).
   const listaGalaxias = u.galaxias.map(g => ({ id: g.id, pos: g.pos, radio: g.r, quaternion: g.quaternion, tipo: g.tipo, op: 0.62, region: g.region, encuentro: g.encuentro, nombre: nombres.get(g.id),
     puntos: 1950 }));   // el mismo número en todas: la transición imagen → estrellas está calibrada con él (y se crean solo al acercarse)
+  await ceder();
+  // El mapa de estrellas de cada tipo de galaxia, por tramos (crearCampoGalaxias los encuentra ya hechos).
+  for (const d of Object.values(DESCRIPTORES)) if (d) await porTramos(prepararMapaGalaxia(d));
   await ceder();
   const campo = crearCampoGalaxias({ lista: listaGalaxias, texturas: tipos, descriptores: DESCRIPTORES, uPR }); universo.add(campo.grupo);
 
@@ -64,10 +68,11 @@ export async function crearGalaxiasLejanas({ scene, uPR, uScale }) {
   // Las que se ven desde casa (cerca de Xiomara) hacen esperar a la carga: al empezar ya tienen su imagen y no
   // «aparecen» de golpe cuando llega. Se piden primero; las demás, lejanas, se generan después en segundo plano.
   const cercaDeCasa = n => n.pos.length() < 450000;
-  for (const n of u.nebulosas) if (cercaDeCasa(n)) texNebulosa(n.semilla, n.tono, n.forma, true);
+  for (const n of u.nebulosas) if (cercaDeCasa(n)) { texNebulosa(n.semilla, n.tono, n.forma, true); await cederSiToca(); }
   let indice = null;
   const indiceCercania = () => (indice ??= crearIndiceEsferas([...listaGalaxias.map(g => ({ x: g.pos.x, y: g.pos.y, z: g.pos.z, r: g.radio * 1.1 })), ...listaNubes.map(n => ({ x: n.pos.x, y: n.pos.y, z: n.pos.z, r: n.r * 1.3 }))]));
-  const listaNubes = u.nebulosas.map(n => ({ ...n, malla: null, tex: texNebulosa(n.semilla, n.tono, n.forma) }));
+  const listaNubes = [];
+  for (const n of u.nebulosas) { listaNubes.push({ ...n, malla: null, tex: texNebulosa(n.semilla, n.tono, n.forma) }); await cederSiToca(); }
   const v = new THREE.Vector3();
   function prepararNube(n) {
     n.malla = crearNube(n.tex, n.pos, n.r / 0.45, n.semilla, 1, 7, { variante: n.forma, orientacion: n.orientacion });
@@ -107,7 +112,9 @@ export async function crearGalaxiasLejanas({ scene, uPR, uScale }) {
     // Carga completa (como un videojuego): todas las nebulosas creadas antes de entrar, ocultas; así ninguna se
     // construye durante un viaje.
     async prepararTodas(alAvance = () => {}) {
-      for (let i = 0; i < listaNubes.length; i++) { const n = listaNubes[i]; if (!n.malla) { prepararNube(n); n.malla.visible = false; if (n.interior) n.interior.visible = false; } if (i % 12 === 11) { alAvance(i + 1, listaNubes.length); await ceder(); } }
+      // Cede cuando lleva un tramo trabajando (antes, cada 12 nebulosas: con la CPU lenta eran medio segundo sin pintar).
+      for (let i = 0; i < listaNubes.length; i++) { const n = listaNubes[i]; if (!n.malla) { prepararNube(n); n.malla.visible = false; if (n.interior) n.interior.visible = false; } alAvance(i + 1, listaNubes.length); await cederSiToca(); }
+      await ceder();
       indiceCercania();   // el índice de cercanía también se prepara en la carga
       alAvance(listaNubes.length, listaNubes.length);
     },

@@ -1,33 +1,33 @@
 import { avanceLogaritmico, duracionViaje } from '../util/aproximacion.js';
-import { sembrarAzar, semillaDe, SEMILLA_UNIVERSO, ceder } from '../util/azarSemilla.js';
+import { sembrarAzar, semillaDe, SEMILLA_UNIVERSO, ceder, porTramos } from '../util/azarSemilla.js';
 import { conFocoSupernova } from './focoSupernova.js';
 import * as THREE from 'three';
 import { crearNucleo, BRILLO_BASE } from './nucleo.js';
 import { crearCielo } from './cielo.js';
 import { crearEstrellas } from './estrellas.js';
 import { crearGalaxiasLejanas } from './galaxiasLejanas.js';
-import { crearViaLactea } from './viaLactea.js';
-import { crearGalaxia, enBrazo } from './galaxia.js';
-import { crearSolar } from './solar.js';
+import { construirViaLactea } from './viaLactea.js';
+import { construirGalaxia, enBrazo } from './galaxia.js';
+import { construirSolar } from './solar.js';
 import { texBrillo, texDestello, texTexto, texEstrellaGigante } from './texturas.js';
 import { crearAgujeroNegro } from './agujeroNegro.js';
 import { crearCorazon } from './corazon.js';
 import { crearNombre } from './nombre.js';
 import { crearFrases } from './frases.js';
-import { crearPlanetas, CENTRO_GIGANTE, RADIO_GIGANTE, OTROS_PLANETAS } from './planetas.js';
+import { construirPlanetas, CENTRO_GIGANTE, RADIO_GIGANTE, OTROS_PLANETAS } from './planetas.js';
 import { crearEstrellasSecretas } from './estrellasSecretas.js';
 import { crearAmor } from './amor.js';
-import { crearMundos } from './mundos.js';
-import { crearCosmos, ESCALA_CIELO, ESCALA_FONDO } from './cosmos.js';
+import { construirMundos } from './mundos.js';
+import { construirCosmos, ESCALA_CIELO, ESCALA_FONDO } from './cosmos.js';
 import { crearVelocidad } from './velocidad.js';
-import { crearUniversoLocal } from './universoLocal.js';
+import { construirUniversoLocal } from './universoLocal.js';
 import { EXPOSICION } from './exposicion.js';
 import { crearTelaranaCosmica, pedirDatosTelarana } from './telarana.js';
 import { crearCieloProfundo } from './cieloProfundo.js';
 import { crearPreparacion } from './carga/preparacion.js';
 import { crearGestorCalidad } from './calidad/gestor.js';
 import { crearRutas } from './camara/rutas.js';
-import { crearMaravillas } from './maravillas.js';
+import { construirMaravillas } from './maravillas.js';
 import { crearPolvo } from './polvo.js';
 import { texturasListas, texturasTodas } from './fabricaTexturas.js';
 import { hornoListo, soltarHorno } from '../util/horno.js';
@@ -90,7 +90,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // La construcción se reparte en pasos: entre capa y capa se cede el control al navegador para que la portada siga
   // animándose (sin congelarse). Durante la pausa Math.random vuelve a ser el libre y después se retoma el generador
   // del universo exactamente donde estaba: el mapa sigue siendo el mismo en cada carga.
-  // Capas que se construyen en varios pasos (ceden el control por dentro).
+  // Capas que se construyen en varios pasos (ceden el control por dentro). Las grandes son generadores (construirX)
+  // que porTramos recorre cediendo cada ~30 ms: con la CPU de un móvil modesto ningún paso congela la portada.
   const capaPorPasos = async (nombre, crear) => {
     empiezaCapa(nombre);
     const restaurar = sembrarAzar(semillaDe(nombre)), antes = new Set(scene.children), t0 = performance.now();
@@ -122,19 +123,20 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // lanzándose a la velocidad de la luz hacia ese punto del brazo (entrarOSalir).
   const SOLARES = new Set(['rosa', 'azul', 'cartas', 'gigante']);
   const brazoInicial = enBrazo(1, 0.62, 0);
-  const solar = crearSolar({ haciaCentroGalactico: new THREE.Vector3(-brazoInicial.x, 0, -brazoInicial.z), renderer, uPR: nucleo.uPR });
-  const planetas = crearPlanetas({ ...nucleo, scene: solar.escena }, fechaTexto);
   await ceder();
-  const mundos = capa('mundos', () => crearMundos(nucleo, { consteladas, alConstelar }));
+  const solar = await porTramos(construirSolar({ haciaCentroGalactico: new THREE.Vector3(-brazoInicial.x, 0, -brazoInicial.z), renderer, uPR: nucleo.uPR }));
+  const planetas = await porTramos(construirPlanetas({ ...nucleo, scene: solar.escena }, fechaTexto));
+  await ceder();
+  const mundos = await capaPorPasos('mundos', () => porTramos(construirMundos(nucleo, { consteladas, alConstelar })));
   for (const id of SOLARES) if (mundos.grupos.get(id)) solar.escena.add(mundos.grupos.get(id));
   await ceder();
   // Escala de los puntos de la galaxia de casa: la de siempre, salvo con el teleobjetivo de «Mirar hacia casa», que la
   // amplía como al resto de la imagen (si no, sus estrellas, calculadas para la vista normal, eran miles de veces pequeñas).
   const uScaleCasa = { value: nucleo.uScale.value };
   const nucleoCasa = { scene: nucleo.scene, renderer: nucleo.renderer, camera: nucleo.camera, uScale: uScaleCasa, uPR: nucleo.uPR, uTamGalaxia: nucleo.uTamGalaxia };   // para todo lo de casa
-  const galaxia = capa('galaxia', () => crearGalaxia(nucleoCasa));
+  const galaxia = await capaPorPasos('galaxia', () => porTramos(construirGalaxia(nucleoCasa)));
   await ceder();
-  const cosmos = capa('cosmos', () => { const c = crearCosmos(nucleo); nucleo.scene.add(c.raiz, c.decor); return c; });
+  const cosmos = await capaPorPasos('cosmos', async () => { const c = await porTramos(construirCosmos(nucleo)); nucleo.scene.add(c.raiz, c.decor); return c; });
   await ceder();
   const lejanas = await capaPorPasos('galaxiasLejanas', () => crearGalaxiasLejanas(nucleo));
   // El cielo del «más allá»: otro universo lleno de vida detrás de todo, lejos de casa.
@@ -146,26 +148,26 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   telarana.fijarGigantes(cosmos.cuerpos().filter(c => c.id !== 'xiomara').map(c => ({ centro: c.centro, radio: c.visible })));
   // Maravillas: rincones impresionantes (el Ojo, la enana de las burbujas, la espiral de hebras, la nube de fuego).
   await ceder();
-  const maravillas = capa('maravillas', () => crearMaravillas({ ...nucleo, texBrillo: texBrillo(), centros: Object.fromEntries(['supernova', 'cuasar', 'ton618'].map(id => [id, cosmos.cuerpos().find(c => c.id === id).centro])) }));
+  const maravillas = await capaPorPasos('maravillas', () => porTramos(construirMaravillas({ ...nucleo, texBrillo: texBrillo(), centros: Object.fromEntries(['supernova', 'cuasar', 'ton618'].map(id => [id, cosmos.cuerpos().find(c => c.id === id).centro])) })));
   // El cielo propio de cada gigante (estrellas, velo de color y constelaciones): se enciende al llegar.
   await ceder();
-  const universoLocal = capa('universoLocal', () => crearUniversoLocal({ ...nucleo, centros: Object.fromEntries(['supernova', 'cuasar', 'ton618', 'pulsar', 'sagitario', 'deneb'].map(id => [id, (cosmos.cuerpos().find(c => c.id === id)?.centro) ?? cosmos.objetivo(id).centro])) }));
+  const universoLocal = await capaPorPasos('universoLocal', () => porTramos(construirUniversoLocal({ ...nucleo, centros: Object.fromEntries(['supernova', 'cuasar', 'ton618', 'pulsar', 'sagitario', 'deneb'].map(id => [id, (cosmos.cuerpos().find(c => c.id === id)?.centro) ?? cosmos.objetivo(id).centro])) })));
   await ceder();
-  const partes = [
-    crearCielo(nucleo),
-    lejanas,
-    universoLocal,
-    telarana,
-    maravillas,
-    capa('viaLactea', () => { const v = crearViaLactea(nucleo); return { ...v, actualizar: (t, dt, ctx) => v.actualizar(ctx.camera) }; }),
-    cosmos,
-    galaxia,
-    capa('amor', () => crearAmor(nucleoCasa)),
-    capa('agujeroNegro', () => crearAgujeroNegro(nucleo)),
-    capa('corazon', () => crearCorazon(nucleoCasa)),
-    capa('nombre', () => crearNombre(nucleoCasa, config.nombre)),
-    capa('frases', () => crearFrases(nucleo, config.frases))
-  ];
+  // (En el mismo orden de siempre: cielo, Vía Láctea, amor, agujero negro, corazón, nombre y frases, cediendo entre ellas.)
+  const cielo = crearCielo(nucleo);
+  await ceder();
+  const viaLactea = await capaPorPasos('viaLactea', async () => { const v = await porTramos(construirViaLactea(nucleo)); return { ...v, actualizar: (t, dt, ctx) => v.actualizar(ctx.camera) }; });
+  await ceder();
+  const amor = capa('amor', () => crearAmor(nucleoCasa));
+  await ceder();
+  const agujeroNegro = capa('agujeroNegro', () => crearAgujeroNegro(nucleo));
+  await ceder();
+  const corazon = capa('corazon', () => crearCorazon(nucleoCasa));
+  await ceder();
+  const nombre = capa('nombre', () => crearNombre(nucleoCasa, config.nombre));
+  await ceder();
+  const frases = capa('frases', () => crearFrases(nucleo, config.frases));
+  const partes = [cielo, lejanas, universoLocal, telarana, maravillas, viaLactea, cosmos, galaxia, amor, agujeroNegro, corazon, nombre, frases];
   await ceder();
   const estrellas = capa('estrellas', () => crearEstrellas(nucleo));
   let secretas = capa('secretas', () => crearEstrellasSecretas(nucleoCasa, cantidadSecretas, encontradas));

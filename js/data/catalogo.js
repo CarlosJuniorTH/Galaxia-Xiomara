@@ -27,7 +27,7 @@
 // forma de nebulosa (nube.js): emision, cavidad, pilares, filamentos, reflexion, oscura.
 import { posicionDestino, direccion } from './sitios.js';
 import { UNIDAD_ANOS_LUZ, desdeMal, aMal, RADIO_GIGANTE, LLEGADA_GIGANTE, SILUETA_GIGANTE, LEJANIA } from './escalaCosmica.js';
-import { generador, semillaDe } from '../util/azarSemilla.js';
+import { generador, semillaDe, deUnTiron } from '../util/azarSemilla.js';
 import { crearTelarana, puntoFilamento } from './telarana.js';
 
 export { UNIDAD_ANOS_LUZ };
@@ -126,8 +126,10 @@ export function destinosYCorredores(V) {
   return { D, corredores };
 }
 
-// Universo completo, determinista (T: espacio de nombres de three; semilla fija por parte).
-export function universoCatalogo(T) {
+// Universo completo, determinista (T: espacio de nombres de three; semilla fija por parte). construirCatalogo es la
+// misma construcción por tramos (un generador: la carga lo recorre cediendo entre tramos; ver porTramos).
+export const universoCatalogo = T => deUnTiron(construirCatalogo(T));
+export function* construirCatalogo(T) {
   const V = T.Vector3, { D, corredores } = destinosYCorredores(V), galaxias = [], nebulosas = [], porId = new Map();
   const anadir = g => { if (porId.has(g.id)) throw Error(`galaxia repetida: ${g.id}`); galaxias.push(g); porId.set(g.id, g); return g; };
   const azarLocal = generador(semillaDe('catalogo-local'));
@@ -137,10 +139,10 @@ export function universoCatalogo(T) {
     anadir({ id: g.id, tipo: g.tipo, r: g.r, pos, quaternion: orientacionLocal(pos, g.rot, azarLocal, T), region: 'salida', grupo: 'grupo-local', satelite: g.satelite, nota: g.nota });   // el grupo local: Andrómeda, el Triángulo y los satélites
   }
   // Paisaje de los viajes y universo de llegada de cada gigante
-  paisajeViajes(T, D, galaxias, nebulosas, anadir);
-  universosLlegada(T, D, galaxias, anadir);
+  yield* paisajeViajes(T, D, galaxias, nebulosas, anadir);
+  yield* universosLlegada(T, D, galaxias, anadir);
   // Población: grupos y filamentos alrededor de «semillas» de superestructura, con vacíos.
-  poblar(T, D, corredores, galaxias, nebulosas, anadir);
+  yield* poblar(T, D, corredores, galaxias, nebulosas, anadir);
   return { galaxias, nebulosas, destinos: D, corredores };
 }
 
@@ -179,7 +181,7 @@ function nebulosaEn(h, n, B, T, region, encuentro, objetivo) {
 // ── Paisaje de los viajes: a lo largo de cada camino largo desde Xiomara, galaxias a los lados (a
 // distancia: se ven crecer y pasar por los bordes, sin rozar la cámara), pequeños grupos más lejos,
 // nebulosas cerca del camino y nebulosas enormes que el camino atraviesa. Todo con posición fija. ──
-function paisajeViajes(T, D, galaxias, nebulosas, anadir) {
+function* paisajeViajes(T, D, galaxias, nebulosas, anadir) {
   const V = T.Vector3, tipos = [0, 1, 2, 3, 7, 8, 1, 3, 0, 4, 6, 9, 10, 5, 7, 2];
   const separada = (p, r) => galaxias.every(o => o.pos.distanceTo(p) >= Math.max(SEPARACION_MINIMA, (o.r + r) * 3));
   for (const ruta of RUTAS) {
@@ -192,6 +194,7 @@ function paisajeViajes(T, D, galaxias, nebulosas, anadir) {
     const angulo = () => { let a; do a = azar() * 360; while (a > 235 && a < 305); return a; };
     let k = 0;
     for (let i = 0; i < ruta.galaxias; i++) {
+      yield;
       for (let intento = 0; intento < 30; intento++) {
         const s = s0 + (i + 0.15 + azar() * 0.7) / ruta.galaxias * tramo, r = Math.round(450 + Math.pow(azar(), 1.4) * 430);
         const l = r * 2.4 + 3000 + Math.pow(azar(), 2) * 15000 * Math.sqrt(LEJANIA), pos = punto(s, l, angulo());
@@ -224,7 +227,7 @@ function paisajeViajes(T, D, galaxias, nebulosas, anadir) {
 // ── Universo de llegada: galaxias detrás y alrededor de cada gigante, lejos de él (de 1,6 a 5 veces su
 // radio más la distancia de llegada) y grandes, para que al llegar se vea un cosmos nuevo con
 // profundidad. Las del cono se ven en el encuadre de llegada, junto al gigante y por detrás. ──
-function universosLlegada(T, D, galaxias, anadir) {
+function* universosLlegada(T, D, galaxias, anadir) {
   const V = T.Vector3, tipos = [0, 1, 3, 7, 8, 2, 4, 9, 10, 6, 1, 0];
   for (const [destino, { n, cono }] of Object.entries(UNIVERSO_LLEGADA)) {
     const C = D[destino], eje = C.clone().normalize(), Bs = base(new V(), C, V), azar = generador(semillaDe(`llegada-${destino}`));
@@ -233,6 +236,7 @@ function universosLlegada(T, D, galaxias, anadir) {
     const angMin = Math.atan(SILUETA_GIGANTE[destino] / A) * 180 / Math.PI * 1.12 + 4, angMax = Math.max(cono, angMin + 20);
     let k = 0;
     for (let i = 0, intentos = 0; k < n && intentos < 600; intentos++) {
+      if (intentos % 20 === 19) yield;
       const enCono = k < n * 0.65, ang = enCono ? angMin + azar() * (angMax - angMin) : 70 + azar() * 100, giro = azar() * 360;
       const dir = eje.clone().applyAxisAngle(Bs.u1, ang * Math.PI / 180).applyAxisAngle(eje, giro * Math.PI / 180).normalize();
       // Desde la cámara de llegada: las del cono, más allá del gigante (detrás de él, lejos).
@@ -248,7 +252,7 @@ function universosLlegada(T, D, galaxias, anadir) {
   }
 }
 
-function poblar(T, D, corredores, galaxias, nebulosas, anadir) {
+function* poblar(T, D, corredores, galaxias, nebulosas, anadir) {
   const V = T.Vector3, P = POBLACION, azar = generador(semillaDe('poblacion'));
   const distCorredor = p => Math.min(...corredores.map(([a, b]) => distanciaSegmento(p, D[a], D[b])));
   const distDestino = p => Math.min(...['xiomara', 'ton618', 'cuasar', 'supernova'].map(id => p.distanceTo(D[id]) - RESERVA[id]));
@@ -274,8 +278,9 @@ function poblar(T, D, corredores, galaxias, nebulosas, anadir) {
   // La población vive sobre la telaraña cósmica (js/data/telarana.js): un cúmulo en cada nudo y
   // galaxias a lo largo de los filamentos. Entre ellos, los grandes vacíos.
   const web = crearTelarana(V);
-  web.nudos.forEach((nudo, gi) => {
-    const c = nudo.pos; if (distCorredor(c) < P.margenCorredor || distDestino(c) < P.margenDestino * 0.3) return;
+  for (let gi = 0; gi < web.nudos.length; gi++) {
+    yield;
+    const nudo = web.nudos[gi], c = nudo.pos; if (distCorredor(c) < P.margenCorredor || distDestino(c) < P.margenDestino * 0.3) continue;
     const grupo = `cumulo-${gi + 1}`, n = 5 + Math.floor(nudo.peso * 8), radioGrupo = nudo.r * 0.7;
     for (let k = 0, intentos = 0; k < n && intentos < 400; intentos++) {
       const d = new V(azar() * 2 - 1, azar() * 2 - 1, azar() * 2 - 1); if (d.length() > 1) continue;
@@ -283,15 +288,16 @@ function poblar(T, D, corredores, galaxias, nebulosas, anadir) {
       if (!libre(p, r, grupo)) { if (k === 0) break; continue; }
       anadir({ id: `${grupo}-${++k}`, tipo: k === 1 ? 4 : tipoAzar(), r, pos: p, quaternion: orientacionAzar(azar, T), region: regionPoblacion(p, D), grupo, poblacion: true, nudo: gi });
     }
-  });
+  }
   let f = 0;
-  web.filamentos.forEach(fil => {
+  for (const fil of web.filamentos) {
+    yield;
     const largo = web.nudos[fil.a].pos.distanceTo(web.nudos[fil.b].pos), n = Math.floor(largo / (260000 * LEJANIA / 3));
     for (let m = 1; m <= n; m++) {
       const t = (m + (azar() - 0.5) * 0.6) / (n + 1), p = puntoFilamento(t, web.nudos, fil, V).add(new V(azar() - 0.5, azar() - 0.5, azar() - 0.5).multiplyScalar(fil.grosor)), r = radioAzar(300, 850);
       if (libre(p, r, null)) anadir({ id: `hebra-${++f}`, tipo: tipoAzar(), r, pos: p, quaternion: orientacionAzar(azar, T), region: regionPoblacion(p, D), grupo: `hebra-${f}`, poblacion: true });
     }
-  });
+  }
   // Regiones H II en algunas galaxias grandes de la población (dentro de su disco).
   const formas = ['emision', 'cavidad', 'pilares', 'reflexion', 'emision', 'oscura'];
   let nn = 0;

@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { lienzo, trazarCorazon } from '../util/dibujo.js';
 import { crearRuido } from '../util/ruido.js';
+import { deUnTiron } from '../util/azarSemilla.js';
 
 // Sin conversión de color: la cadena de post-procesado muestra los valores tal cual,
 // así los colores del canvas se ven exactamente como se dibujaron.
@@ -160,11 +161,14 @@ export function texAnillo() {
 
 // Nube de nebulosa: ruido fbm en un lienzo opaco (se tiñe y se suma con mezcla aditiva).
 const nebulosas = new Map();
-export function texNebulosa(semilla = 0) {
+export function texNebulosa(semilla = 0) { return deUnTiron(prepararTexNebulosa(semilla)); }
+// La misma por tramos (un generador, con yield cada 16 filas).
+export function* prepararTexNebulosa(semilla = 0) {
   if (nebulosas.has(semilla)) return nebulosas.get(semilla);
   const S = 192, [c, x] = lienzoLuz(S), img = x.getImageData(0, 0, S, S), d = img.data;
   const { fbm } = crearRuido(semilla + 3);
   for (let py = 0; py < S; py++) for (let px = 0; px < S; px++) {
+    if (px === 0 && py % 16 === 15) yield;
     const u = px / S - 0.5, v = py / S - 0.5, r = Math.hypot(u, v) * 2;
     // Borde deshilachado (el ruido decide dónde acaba la nube) y filamentos finos: nada de bolas.
     const n = fbm(u * 3 + semilla, v * 3, 0.5, 5), filamento = fbm(u * 10, v * 10 + semilla, 2.1, 4);

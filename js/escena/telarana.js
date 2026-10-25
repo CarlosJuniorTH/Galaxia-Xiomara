@@ -45,22 +45,36 @@ function texturaBrazos() {
   return brazosTex;
 }
 
-// Pide los datos (posiciones, colores, brillos ya troceados en bloques) al obrero, que los calcula en otro núcleo
-// mientras se prepara el resto del universo; si el navegador no puede, se calculan aquí cediendo el control a menudo.
+// Pide los datos (posiciones, colores, brillos ya troceados en bloques) a tres obreros, que los calculan en otros núcleos
+// mientras se prepara el resto del universo: dos se reparten los filamentos principales (y uno trocea el polvo) y el
+// tercero hace los filamentos menores, los cúmulos, las galaxias y las nubes; se pasan lo que necesitan por canales
+// propios (telaranaDatos.js). El resultado es idéntico al de un solo hilo. Si el navegador no puede, se calcula todo
+// aquí cediendo el control a menudo.
+const PARTES = ['filamentos', 'segunda', 'menores'];
 export function pedirDatosTelarana() {
   const aqui = () => generarDatosTelarana(THREE, ceder);
   try {
-    const obrero = new Worker(new URL('./telaranaObrero.js', import.meta.url), { type: 'module' });
+    const obreros = PARTES.map(() => new Worker(new URL('./telaranaObrero.js', import.meta.url), { type: 'module' }));
+    // Un canal por pareja de obreros: puertos[parte][otra] es el extremo de «parte» hacia «otra».
+    const puertos = Object.fromEntries(PARTES.map(p => [p, {}]));
+    PARTES.forEach((a, i) => PARTES.slice(i + 1).forEach(b => { const { port1, port2 } = new MessageChannel(); puertos[a][b] = port1; puertos[b][a] = port2; }));
     return new Promise(resolver => {
-      let hecho = false;
-      const fin = d => { if (hecho) return; hecho = true; clearTimeout(vigia); obrero.terminate(); resolver(d); };
-      const respaldo = () => { window.__respaldoTelarana = true; if (hecho) return; hecho = true; clearTimeout(vigia); obrero.terminate(); aqui().then(resolver); };
-      // Si el sistema cierra el obrero sin avisar (iOS lo hace cuando falta memoria), no se espera para siempre: el obrero
-      // da un latido en cada pausa; si pasan 10 s sin ninguno (o 25 s sin el primero, mientras carga), se calcula aquí.
+      let hecho = false; const partes = [];
+      const cerrar = () => { hecho = true; clearTimeout(vigia); for (const o of obreros) o.terminate(); };
+      const respaldo = () => { window.__respaldoTelarana = true; if (hecho) return; cerrar(); aqui().then(resolver); };
+      // Si el sistema cierra un obrero sin avisar (iOS lo hace cuando falta memoria), no se espera para siempre: los obreros
+      // dan un latido en cada pausa (el que espera al otro no late); si pasan 10 s sin ninguno (o 25 s sin el primero,
+      // mientras cargan), se calcula aquí.
       let vigia = setTimeout(respaldo, 25000);
-      obrero.onmessage = ({ data }) => { if (data.latido) { window.__latidosTelarana = (window.__latidosTelarana || 0) + 1; clearTimeout(vigia); vigia = setTimeout(respaldo, 10000); return; } data.datos ? fin(data.datos) : respaldo(); };
-      obrero.onerror = e => { e.preventDefault?.(); respaldo(); };
-      obrero.postMessage(null);
+      for (const obrero of obreros) {
+        obrero.onmessage = ({ data }) => {
+          if (data.latido) { window.__latidosTelarana = (window.__latidosTelarana || 0) + 1; clearTimeout(vigia); vigia = setTimeout(respaldo, 10000); return; }
+          if (!data.datos) return respaldo();
+          partes.push(data.datos); if (partes.length === PARTES.length && !hecho) { cerrar(); resolver(Object.assign({}, ...partes)); }
+        };
+        obrero.onerror = e => { e.preventDefault?.(); respaldo(); };
+      }
+      PARTES.forEach((parte, i) => obreros[i].postMessage({ parte, puertos: puertos[parte] }, Object.values(puertos[parte])));
     });
   } catch { return aqui(); }
 }

@@ -1,5 +1,6 @@
 // Material de partículas compartido: puntos redondos, tamaño por estrella y titileo
 import * as THREE from 'three';
+import { deUnTiron } from '../util/azarSemilla.js';
 
 // Forma de corazón dibujada en el shader (cada estrella es un corazoncito)
 const FORMA_CORAZON = /* glsl */`
@@ -82,11 +83,14 @@ export function materialPuntos({ uScale, uPR, maximo = 6, aditivo = true, opacid
 
 // Crea una geometría de puntos a partir de una función generadora
 // gen(i, p) debe rellenar p.x p.y p.z p.r p.g p.b p.s
-export function geometriaPuntos(n, gen) {
+export function geometriaPuntos(n, gen) { return deUnTiron(puntosPorPasos(n, gen)); }
+// La misma, por tramos (yield cada 2048 puntos: decenas de miles de puntos de una vez congelaban la portada en el móvil).
+export function* puntosPorPasos(n, gen) {
   const pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
   const tam = new Float32Array(n), fase = new Float32Array(n);
   const p = { x: 0, y: 0, z: 0, r: 1, g: 1, b: 1, s: 1 };
   for (let i = 0; i < n; i++) {
+    if ((i & 2047) === 2047) yield;
     gen(i, p);
     pos[i * 3] = p.x; pos[i * 3 + 1] = p.y; pos[i * 3 + 2] = p.z;
     col[i * 3] = p.r; col[i * 3 + 1] = p.g; col[i * 3 + 2] = p.b;

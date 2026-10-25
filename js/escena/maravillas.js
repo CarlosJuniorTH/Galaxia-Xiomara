@@ -12,6 +12,7 @@
 // Las galaxias son MENORES que Xiomara (ella es la mayor del universo); las nebulosas, de tamaño
 // moderado. Licencias artísticas declaradas.
 import * as THREE from 'three';
+import { deUnTiron } from '../util/azarSemilla.js';
 import { texturasLigeras } from '../util/dispositivo.js';
 import { LLEGADA_GIGANTE, LEJANIA } from '../data/escalaCosmica.js';
 import { crearNube } from './nube.js';
@@ -168,10 +169,11 @@ function crearEnana(R, o) {
 const smoothsiempre = t => { const x = Math.min(1, Math.max(0, (t - 0.35) / 0.35)); return x * x * (3 - 2 * x); };
 
 // ── La espiral de hebras (radio R < Xiomara) ──
-function crearEspiralHebras(R, o) {
+function* crearEspiralHebras(R, o) {
   const a = azarSemilla(1213), hebras = [], estrellas = [];
   // Hebras: muchas cadenas finas a lo largo de los brazos, cada una una curva propia (no una nube).
   for (let k = 0, nh = Math.round(900 * K); k < nh; k++) {
+    if (k % 60 === 59) yield;
     const brazo = Math.floor(a() * 3), r0 = R * (0.08 + a() * 0.85), largo = R * (0.08 + a() * 0.2), giro = gauss(a) * 0.25, tono = a();
     for (let i = 0; i < 40; i++) {
       const r = r0 + largo * i / 40, th = Math.log(r / (R * 0.05)) / 0.3 + brazo * Math.PI * 2 / 3 + giro + Math.sin(i * 0.3 + k) * 0.03;
@@ -179,10 +181,10 @@ function crearEspiralHebras(R, o) {
     }
   }
   // Estrellas azules y nudos rosas a lo largo de los brazos; núcleo azul brillante.
-  for (let i = 0, n = Math.round(9000 * K); i < n; i++) { const r = R * (0.06 + Math.pow(a(), 0.8) * 0.9), brazo = Math.floor(a() * 3), th = Math.log(r / (R * 0.05)) / 0.3 + brazo * Math.PI * 2 / 3 + gauss(a) * 0.22;
+  for (let i = 0, n = Math.round(9000 * K); i < n; i++) { if (i % 2000 === 1999) yield; const r = R * (0.06 + Math.pow(a(), 0.8) * 0.9), brazo = Math.floor(a() * 3), th = Math.log(r / (R * 0.05)) / 0.3 + brazo * Math.PI * 2 / 3 + gauss(a) * 0.22;
     estrellas.push([Math.cos(th) * r, Math.sin(th) * r, gauss(a) * R * 0.015, (a() < 0.88 ? C('#a8d4ff') : C('#ff7aa0')).multiplyScalar(1 + a()), R * (0.03 + a() * 0.03)]); }
   for (let i = 0; i < 2500 * K; i++) { const r = Math.abs(gauss(a)) * R * 0.07, th = a() * Math.PI * 2; estrellas.push([Math.cos(th) * r, Math.sin(th) * r, gauss(a) * R * 0.02, C('#5ab8ff').multiplyScalar(1.6), R * 0.04]); }
-  const g = new THREE.Group(); g.add(particulas(hebras, { ...o, limite: 8 }), particulas(estrellas, { ...o, limite: 6 }));
+  const g = new THREE.Group(); yield; const ph = particulas(hebras, { ...o, limite: 8 }); yield; g.add(ph, particulas(estrellas, { ...o, limite: 6 }));
   return { grupo: g };
 }
 
@@ -196,15 +198,18 @@ export const MARAVILLAS = Object.freeze([
   { id: 'hebras', destino: 'ton618', ang: 24, giro: 90, distancia: 22000 * LEJANIA, radio: 900 }
 ]);
 
-export function crearMaravillas({ scene, uScale, uPR, centros }) {
+// De un tirón; la carga usa construirMaravillas, el mismo código como generador (yield entre pasos: ver porTramos).
+export const crearMaravillas = (...a) => deUnTiron(construirMaravillas(...a));
+export function* construirMaravillas({ scene, uScale, uPR, centros }) {
   const raiz = new THREE.Group(); raiz.name = 'Maravillas'; raiz.userData.profundo = true; scene.add(raiz);
   const o = { uScale, uPR }, creadas = [];
   for (const m of MARAVILLAS) {
+    yield;
     const C0 = centros[m.destino], eje = C0.clone().normalize(), camara = C0.clone().addScaledVector(eje, -LLEGADA_GIGANTE[m.destino]);
     const u1 = new THREE.Vector3().crossVectors(eje, new THREE.Vector3(0, 1, 0)).normalize();
     const dir = eje.clone().applyAxisAngle(u1, THREE.MathUtils.degToRad(m.ang)).applyAxisAngle(eje, THREE.MathUtils.degToRad(m.giro)).normalize();
     const pos = camara.clone().addScaledVector(dir, m.distancia);
-    const hecho = m.id === 'ojo' ? crearOjo(m.radio, o) : m.id === 'fuego' ? crearFuego(m.radio, o) : m.id === 'enana' ? crearEnana(m.radio, o) : crearEspiralHebras(m.radio, o);
+    const hecho = m.id === 'ojo' ? crearOjo(m.radio, o) : m.id === 'fuego' ? crearFuego(m.radio, o) : m.id === 'enana' ? crearEnana(m.radio, o) : yield* crearEspiralHebras(m.radio, o);
     const g = hecho.grupo; g.position.copy(pos);
     // De cara a la llegada; las galaxias algo inclinadas (con volumen), las nebulosas de frente.
     g.lookAt(camara);
