@@ -447,8 +447,10 @@ export function* construirCosmos({ uScale, uPR }) {
       const ton = { distancia: d(gigantesco), cuerpo: r(esfera(piezasTon.sombra)), disco: r(anillo(piezasTon.base)), lente: r(anillo(piezasTon.anillo)), materia: r(R * piezasTon.rFuera * e(piezasTon.planoDisco)),
         estrellas: r(maxAtributo(piezasTon.discoEstrellas, 1) * e(piezasTon.discoEstrellas)), chorro: 0, halo: 0 };
       ton.navegacion = Math.max(ton.disco, ton.lente);
-      // materia: lo luminoso denso de Sagitario A* (el flujo y las órbitas de las estrellas S, hasta ≈ 7,3 RS en su apocentro).
-      const sgr = { distancia: d(sagitario), cuerpo: r(esfera(piezasSgr.sombra)), anillo: r(anillo(piezasSgr.anillo)), materia: r(RS * 7.3 * e(sagitario)), halo: 0 };
+      // materia: la zona luminosa de Sagitario A* (flujo, minispiral y el corazón de las órbitas de las estrellas S), 6,3 RS
+      // como antes del rediseño: es su radio de navegación y su extensión visible (las elipses que se alejan más son trazas
+      // finas que se pueden atravesar, no algo denso).
+      const sgr = { distancia: d(sagitario), cuerpo: r(esfera(piezasSgr.sombra)), anillo: r(anillo(piezasSgr.anillo)), materia: r(RS * 6.3 * e(sagitario)), halo: 0 };
       sgr.navegacion = Math.max(sgr.anillo, sgr.materia);
       const cua = { distancia: d(cuasar), disco: r(anillo(piezasCuasar.disco)), toro: r(toroExt(piezasCuasar.toro)), chorro: r(cono(piezasCuasar.haz)), anfitriona: r(piezasCuasar.medidas.anfitriona * e(cuasar)) };
       cua.navegacion = Math.max(cua.disco, cua.toro);
