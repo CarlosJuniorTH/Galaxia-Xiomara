@@ -225,6 +225,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // tamaño en el cielo, nunca recortado ni delante de lo que se visita.
   let escalaFondo = 1;
   const acompanar = () => { for (const o of cieloLejano) if (o !== cosmos.raiz && !o.userData.fijo) { o.position.copy(camera.position); o.scale.setScalar(o.userData.escalaBase * escalaFondo); o.updateMatrixWorld(); } };
+  // Esas raíces ya se actualizan aquí (con todo lo que llevan dentro) en cada cuadro: three.js no las recorre otra vez al
+  // dibujar (antes se calculaban dos veces por cuadro, tres en algunos; las galaxias lejanas son casi 300 objetos).
+  for (const o of cieloLejano) if (o !== cosmos.raiz && !o.userData.fijo) o.matrixWorldAutoUpdate = false;
   // Para visitar algo del cielo profundo (púlsar, cuásar, TON 618, Sagitario A*, Deneb, la
   // supernova) el cielo deja de acompañar a la cámara ('fijo') y la cámara viaja hasta donde
   // está de verdad. Al volver, el cielo se recoge poco a poco en el tramo final ('regreso').
