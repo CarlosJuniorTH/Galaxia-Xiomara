@@ -22,7 +22,7 @@ export function crearCieloProfundo({ renderer, scene }) {
   const lado = sufijo === 'alta' ? 2048 : 1024, pxPorGrado = innerHeight * Math.min(devicePixelRatio, 2) / 60;
   if (pxPorGrado >= lado / 90 * 0.88) { textura.generateMipmaps = false; textura.minFilter = THREE.LinearFilter; }
   let listo = 0;
-  const cargado = Promise.all(CARAS.map(c => fetch(`assets/cielo/${c}-${sufijo}.webp`).then(r => { if (!r.ok) throw Error(r.status); const n = Number(r.headers.get('content-length')) || 0; descargas.previsto(n); return r.blob().then(b => { descargas.hecho(n); return b; }); })
+  const cargado = Promise.all(CARAS.map(c => fetch(`assets/cielo/${c}-${sufijo}.webp`).then(r => { if (!r.ok) throw Error(r.status); const n = Number(r.headers.get('content-length')) || 0; return r.blob().then(b => { descargas.hecho(n); return b; }); })
     .then(b => createImageBitmap(b, { imageOrientation: 'none', premultiplyAlpha: 'none', colorSpaceConversion: 'none' }))))
     .then(caras => { textura.images = caras; textura.needsUpdate = true; renderer.initTexture?.(textura); listo = performance.now(); })
     .catch(e => console.warn('No se pudo cargar el cielo profundo', e));

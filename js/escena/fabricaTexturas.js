@@ -5,12 +5,22 @@ import * as THREE from 'three';
 import { GENERADORES } from './texturasPlaneta.js';
 import { huellaTextura } from './huellaTextura.js';
 import { descargas } from '../util/descargas.js';
+import { esMovil, texturasLigeras, Q } from '../util/dispositivo.js';
 
 // Texturas HORNEADAS (scripts/hornear-texturas.mjs): las mismas, ya calculadas, en imágenes WebP sin pérdidas. Se descargan
 // y el navegador las decodifica (nativo y rápido en cualquier aparato); calcularlas aquí queda solo de respaldo. En un
 // iPhone, calcular las 105 texturas en JavaScript tardaba minutos (la carga se quedaba en el 85 %).
 const enNavegador = typeof window !== 'undefined' && typeof fetch === 'function' && typeof createImageBitmap === 'function';
-const indiceHorneadas = enNavegador ? fetch('assets/texturas/indice.json').then(r => (r.ok ? r.json() : {})).catch(() => ({})) : Promise.resolve({});
+// El índice dice qué imágenes descarga este tipo de aparato (y cuánto pesa el cielo): el total de la descarga se conoce y se
+// muestra desde el principio («0 de 11,9 MB»), no sumando por partes.
+const grupoAparato = `${esMovil ? 'movil' : 'pc'}-${texturasLigeras ? 1 : 0}`, sufijoCielo = texturasLigeras || Q.cielo < 1024 ? 'media' : 'alta';
+const contadas = new Set();
+const indiceHorneadas = !enNavegador ? Promise.resolve({}) : fetch('assets/texturas/indice.json').then(r => (r.ok ? r.json() : {})).catch(() => ({})).then(j => {
+  const archivos = j.archivos || {}, propias = j.grupos?.[grupoAparato] || [];
+  for (const n of propias) contadas.add(n);
+  descargas.previsto(propias.reduce((a, n) => a + (archivos[n] || 0), 0) + (j.cielo?.[sufijoCielo] || 0));
+  return archivos;
+});
 let bajando = 0; const esperando = [];
 const turnoDescarga = () => (bajando < 6 ? (bajando++, Promise.resolve()) : new Promise(r => esperando.push(r)));
 const finDescarga = () => { const s = esperando.shift(); if (s) s(); else bajando--; };
@@ -128,7 +138,7 @@ export function texturaPlaneta(tipo, opciones, { claves = ['pixeles'], relleno =
       const nombres = claves.map(c => `${h}-${c}.webp`);
       if (!nombres.every(n => indice[n] != null)) { enviar(); return; }
       const bytes = c => indice[`${h}-${c}.webp`] + (indice[`${h}-${c}-a.webp`] || 0);
-      descargas.previsto(claves.reduce((a, c) => a + bytes(c), 0));
+      const nuevas = claves.filter(c => !contadas.has(`${h}-${c}.webp`)); if (nuevas.length) descargas.previsto(nuevas.reduce((a, c) => a + bytes(c), 0));   // (solo si no estaban ya en el total)
       Promise.all(claves.map(async c => {
         const rgba = await bajarImagen(`${h}-${c}.webp`, ancho, alto, indice[`${h}-${c}.webp`]);
         if (indice[`${h}-${c}-a.webp`]) { const a = await bajarImagen(`${h}-${c}-a.webp`, ancho, alto, indice[`${h}-${c}-a.webp`]); for (let i = 3; i < rgba.length; i += 4) rgba[i] = a[i - 3]; }

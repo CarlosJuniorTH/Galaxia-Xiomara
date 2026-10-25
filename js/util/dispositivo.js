@@ -24,7 +24,9 @@ export const Q = modoCompatible ? { pr: 1, k: 0.42, cielo: 512, galaxiasLejanas:
 // Protección contra cierres: si una carga no llegó a terminar (iOS cierra la página cuando le falta memoria), la siguiente
 // arranca en un modo más ligero en memoria (nivelSeguro 1: sin HDR y con menos puntos; 2: además menos resolución y
 // texturas). Tras varias cargas buenas seguidas se vuelve a probar el nivel anterior. Así nunca se queda en un cierre.
-const CLAVE_CARGA = 'xiomara:carga';
+// (v2: se reinicia el contador. Las cargas atascadas por un fallo ya corregido se contaron como cierres y dejaron algunos
+// aparatos en modo seguro, sin resplandor y con texturas reducidas.)
+const CLAVE_CARGA = 'xiomara:carga-v2';
 let estadoCarga = { enCurso: false, nivel: 0, buenas: 0 };
 try { estadoCarga = { ...estadoCarga, ...JSON.parse(localStorage.getItem(CLAVE_CARGA) || '{}') }; } catch {}
 const forzado = new URLSearchParams(location.search).get('seguro');
