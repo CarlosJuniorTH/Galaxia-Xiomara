@@ -111,12 +111,13 @@ const fuente = (tam, familia) => { const k = familia + tam; let v = cacheFuente.
 const COL = [rgba(VIOLETA, 1), rgba(ROSA, 1), rgba(BLANCO, 1)];
 
 // reloj(): t del clip en segundos, o null mientras no ha empezado (no se dibuja nada).
-// alFrase(texto): cambia el texto de la historia. alFinal(): llega «tarjeta» (aparece el cielo y la tarjeta).
-export function crearPortada(lienzo, { reloj = () => null, calma = false, alFrase = () => {}, alFinal = () => {} } = {}) {
+// alFrase(texto): cambia el texto de la historia. alPrevio(): 0,45 s antes de «tarjeta». alFinal(): llega «tarjeta»
+// (aparece el cielo y la tarjeta).
+export function crearPortada(lienzo, { reloj = () => null, calma = false, alFrase = () => {}, alPrevio = () => {}, alFinal = () => {} } = {}) {
   const x = lienzo.getContext('2d');
   const movil = matchMedia('(pointer:coarse)').matches;
   const dpr = Math.min(devicePixelRatio || 1, 2);
-  let ancho = 0, alto = 0, m = 0, vertical = true, k = 1, ox = 0, oy = 0, activo = true, id = 0, frase = -1, finalDado = false, saltoCuadro = false;
+  let ancho = 0, alto = 0, m = 0, vertical = true, k = 1, ox = 0, oy = 0, activo = true, id = 0, frase = -1, finalDado = false, previoDado = false, saltoCuadro = false;
   let Hx = 0, Hy = 0, Fx = 0, Fy = 0, S = 1, Sf = 1, nx = 0, ny = 0, cx = 0, cy = 0, xx = 0, xy = 0;
   const mapa = document.createElement('canvas'), xm = mapa.getContext('2d');
   // Ruta: la curva de España a Argentina, muestreada por distancia (RUTA_N tramos iguales).
@@ -213,7 +214,7 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     const gr = (px, py, a) => { if (px < 0 || px > ancho || py < 0 || py > alto) return; const b = borde(px, py) * a; if (b <= 0.01) return; xm.globalAlpha = b; xm.beginPath(); xm.arc(px, py, 0.7, 0, TAU); xm.fill(); };
     for (let lon = -180; lon <= 180; lon += 15) { const px = ox + lon * k; if (px < 0 || px > ancho) continue; for (let py = 3; py < alto; py += 7) if (!esTierra(lon, desmerc((oy - py) / k))) gr(px, py, 0.2); }
     for (let lat = -75; lat <= 75; lat += 15) { const py = oy - merc(lat) * k; if (py < 0 || py > alto) continue; for (let px = 3; px < ancho; px += 7) if (!esTierra((px - ox) / k, lat)) gr(px, py, lat === 0 ? 0.36 : 0.2); }
-    const rMota = Math.max(1.1, paso * 0.19);
+    const rMota = Math.max(1.1, paso * 0.165);
     const tonos = ['rgb(242,184,222)', 'rgb(214,186,255)', 'rgb(255,220,238)'];
     for (let i = 0; i < n; i++) { xm.globalAlpha = tierra.a[i]; xm.fillStyle = tonos[tierra.c[i]]; xm.beginPath(); xm.arc(tierra.x[i], tierra.y[i], rMota, 0, TAU); xm.fill(); }
     xm.globalAlpha = 1;
@@ -259,14 +260,15 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
   // Rótulo de una orilla: el nombre (Great Vibes) y el país (Quicksand espaciada), arriba o abajo de su luz.
   function rotulo(px, py, nombre, pais, arriba, alfa) {
     if (alfa <= 0.01) return;
-    const tn = Math.round(Math.max(24, m * 0.072)), mitad = Math.max(54, tn * 1.9);
+    const tn = Math.round(Math.max(26, Math.min(48, m * 0.068))), tp = Math.round(Math.max(9, Math.min(12, m * 0.022))), mitad = Math.max(54, tn * 1.9);
     const qx = Math.max(16 + mitad, Math.min(ancho - 16 - mitad, px));
     x.globalAlpha = alfa; x.textAlign = 'center';
     x.fillStyle = 'rgb(255,214,236)'; x.font = fuente(tn, 'v'); x.textBaseline = 'alphabetic';
-    x.fillText(nombre, qx, arriba ? py - 30 : py + 22 + tn * 0.8);
-    x.fillStyle = 'rgb(232,200,224)'; x.font = fuente(Math.round(Math.max(9, m * 0.022)), 'q');
+    // Arriba: el país justo encima de la luz y el nombre encima de él; abajo, al revés.
+    x.fillText(nombre, qx, arriba ? py - 16 - tp - 8 : py + 14 + tn * 0.75);
+    x.fillStyle = 'rgb(232,200,224)'; x.font = fuente(tp, 'q');
     if ('letterSpacing' in x) x.letterSpacing = '4px';
-    x.fillText(pais, qx + 2, arriba ? py - 16 : py + 30 + tn * 1.15);
+    x.fillText(pais, qx + 2, arriba ? py - 16 : py + 14 + tn * 0.75 + tp + 10);
     if ('letterSpacing' in x) x.letterSpacing = '0px';
     x.globalAlpha = 1;
   }
@@ -319,20 +321,29 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     const R0 = m * 0.17, Rtodo = Math.hypot(ancho, alto) * 1.02;
     const despliega = calma ? tramo(t, H.mapa, 8.01) : aPulsos(t, H.mapa, 8.01);
     const rC = R0 * salida(tramo(t, 1.97, 3.3)) + (Rtodo - R0) * despliega, rX = R0 * salida(tramo(t, 3.99, 5.3)) + (Rtodo - R0) * despliega;
-    const mapaAlfa = 1 - suave(tramo(t, H.encuentro + 0.4, 23.6));
+    // (en el encuentro baja a la mitad de golpe, para que el corazón se lea; luego se apaga del todo)
+    const mapaAlfa = (1 - 0.5 * salida(tramo(t, H.encuentro, H.encuentro + 0.35))) * (1 - suave(tramo(t, H.encuentro + 0.6, 23.4)));
     if (mapaAlfa > 0 && (rC > 0 || rX > 0) && t < H.salto + 0.3) {
       x.globalAlpha = mapaAlfa;
       if (rC < Rtodo || rX < Rtodo) {
-        x.save(); x.beginPath(); if (rC > 0) circulo(cx, cy, rC); if (rX > 0) circulo(xx, xy, rX); x.clip();
-        x.drawImage(mapa, 0, 0, ancho, alto); x.restore();
+        // Un recorte circular por orilla (no uno con los dos círculos: un recorte de una sola figura redonda lo hace la
+        // GPU al vuelo; el de la unión de dos se rasterizaba como máscara en cada cuadro, 30–50 ms con la CPU ×4).
+        // Donde se solapan se pinta dos veces, encima y sin sumar: idéntico.
+        x.globalCompositeOperation = 'source-over';
+        for (let o = 0; o < 2; o++) {
+          const r = o ? rX : rC; if (r <= 0) continue;
+          x.save(); x.beginPath(); x.arc(o ? xx : cx, o ? xy : cy, r, 0, TAU); x.clip(); x.drawImage(mapa, 0, 0, ancho, alto); x.restore();
+        }
+        x.globalCompositeOperation = 'lighter';
         // Frente: las motas que el borde está cruzando, más claras y algo más grandes (tapan las que el recorte corta).
         x.fillStyle = 'rgb(255,232,246)'; x.globalAlpha = 0.95; x.beginPath();
-        for (const [orden, r, ox2, oy2, otro, ro] of [[porC, rC, cx, cy, porX, rX], [porX, rX, xx, xy, porC, rC]]) {
+        for (let o = 0; o < 2; o++) {   // (bucles por índice: en cada cuadro no se crea ninguna lista)
+          const orden = o ? porX : porC, r = o ? rX : rC, ro = o ? rC : rX, qx = o ? cx : xx, qy = o ? cy : xy;
           if (r <= 0 || r >= Rtodo) continue;
           let a = 0, b = orden.d.length; while (a < b) { const h = (a + b) >> 1; if (orden.d[h] < r - 3.5) a = h + 1; else b = h; }
           for (let j = a; j < orden.d.length && orden.d[j] <= r + 1.5; j++) {
             const i = orden.idx[j], px = tierra.x[i], py = tierra.y[i];
-            if (ro > 0 && Math.hypot(px - (otro === porC ? cx : xx), py - (otro === porC ? cy : xy)) < ro - 3.5) continue;
+            if (ro > 0 && Math.hypot(px - qx, py - qy) < ro - 3.5) continue;
             circulo(px, py, Math.max(1.35, m / 78 * 0.24));
           }
         }
@@ -366,8 +377,9 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
       rotulo(xx, xy, 'Xiomara', 'ARGENTINA', false, tramo(t, H.luzXiomara + 0.2, H.luzXiomara + 1) * (t > H.respuesta ? 0.7 : 1) * rot * nombresFuera);
       // Lo que queda en casa cuando cada uno se va: una estrella fija con su anillo de motas.
       x.globalCompositeOperation = 'lighter';
-      for (const [px, py, col, se] of [[cx, cy, VIOLETA, t > H.espera], [xx, xy, ROSA, t > H.respuesta]]) {
-        if (!se) continue;
+      for (let o = 0; o < 2; o++) {
+        const px = o ? xx : cx, py = o ? xy : cy, col = o ? ROSA : VIOLETA;
+        if (t <= (o ? H.respuesta : H.espera)) continue;
         x.globalAlpha = rot; x.fillStyle = rgba(col, 1); x.beginPath(); circulo(px, py, 2); x.fill();
         x.strokeStyle = rgba(col, 0.8); x.lineWidth = 1.2; x.setLineDash([0, 3.6]); x.lineCap = 'round'; x.beginPath(); x.arc(px, py, 6.5, 0, TAU); x.stroke(); x.setLineDash([]); x.lineCap = 'butt';
       }
@@ -396,7 +408,8 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
         x.stroke();
       }
       // Estrellas del camino.
-      for (const [col, lado] of [[VIOLETA, 0], [ROSA, 1]]) {
+      for (let lado = 0; lado < 2; lado++) {
+        const col = lado ? ROSA : VIOLETA;
         x.fillStyle = rgba(col, 1); x.globalAlpha = vivo; x.beginPath();
         for (let i = 0; i < CAMINO; i++) {
           const s = cs[i], d = lado ? s - tX : tC - s;
@@ -413,7 +426,8 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     // 5. Las dos luces: en casa hasta su golpe, luego viajan por el camino con una estela de motas; los golpes las
     // hacen estallar en chispas; al encontrarse se funden en el corazón.
     if (t < H.encuentro + 0.05) {
-      for (const [col, enc, sale, f] of [[VIOLETA, H.luzCarlos, H.espera, viajeCarlos], [ROSA, H.luzXiomara, H.respuesta, viajeXiomara]]) {
+      for (let o = 0; o < 2; o++) {
+        const col = o ? ROSA : VIOLETA, enc = o ? H.luzXiomara : H.luzCarlos, sale = o ? H.respuesta : H.espera, f = o ? viajeXiomara : viajeCarlos;
         if (t < enc) continue;
         situar(f(t, calma)); const px = PX, py = PY;
         if (t > sale) {   // estela: dónde estaba hace unos instantes (sin memoria: se recalcula con el reloj)
@@ -490,6 +504,9 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     // El texto de la historia y el final (tarjeta y cielo).
     let indice = -1; for (let i = 0; i < FRASES.length; i++) if (t >= FRASES[i].desde) indice = i;
     if (indice !== frase) { frase = indice; alFrase(FRASES[indice]?.texto ?? ''); }
+    // Medio segundo antes, con la pantalla en negro tras el salto, se prepara la tarjeta (su primer pintado y su desenfoque
+    // cuestan un cuadro largo: así cae donde no se ve nada moverse).
+    if (!previoDado && t >= H.tarjeta - 0.45) { previoDado = true; alPrevio(); }
     if (!finalDado && t >= H.tarjeta) { finalDado = true; alFinal(); }
   }
 

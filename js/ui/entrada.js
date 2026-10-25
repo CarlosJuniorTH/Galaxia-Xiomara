@@ -59,10 +59,11 @@ export function crearEntrada(config, { viaje, banda } = {}) {
     entrada.classList.add('formado', 'cielo'); frase.classList.remove('visible');
     viaje?.marcarPortada();
     // Lo que espera al final del clip (descargas en segundo plano), cuando la tarjeta ya ha terminado de entrar.
-    setTimeout(() => { introAcabada = true; for (const fn of trasIntro.splice(0)) fn(); }, 2500);
+    // (sin clip, ?sinIntro de las pruebas, en el acto: como antes de la intro)
+    setTimeout(() => { introAcabada = true; for (const fn of trasIntro.splice(0)) fn(); }, sinIntro ? 0 : 2500);
   }
   const portada = crearPortada($('#portada-lienzo'), {
-    calma: reducido, reloj: relojClip, alFinal: mostrarTarjeta,
+    calma: reducido, reloj: relojClip, alFinal: mostrarTarjeta, alPrevio: () => entrada.classList.add('previa'),
     alFrase: texto => {
       frase.classList.remove('visible');
       clearTimeout(alFraseEspera);

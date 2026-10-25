@@ -34,6 +34,9 @@
   transition:opacity 1.3s ease,transform 1.3s cubic-bezier(.2,.8,.2,1);
 }
 #entrada.formado .tarjeta{opacity:1;transform:none;pointer-events:auto;}
+/* Medio segundo antes de aparecer (pantalla en negro tras el salto del clip): casi invisible, para que su primer pintado
+   y su desenfoque no caigan en el cuadro en que entra. */
+#entrada.previa:not(.formado) .tarjeta{opacity:.002;transition:none;}
 /* En vertical la tarjeta deja ver el universo recién nacido en la parte de arriba. */
 @media (orientation:portrait){
   #entrada{align-items:flex-end;}
