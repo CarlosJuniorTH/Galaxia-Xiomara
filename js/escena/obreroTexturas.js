@@ -1,6 +1,9 @@
 // Web Worker: calcula las texturas de los planetas fuera del hilo principal.
 import { GENERADORES } from './texturasPlaneta.js';
 
+// Aviso de arranque: si el hilo principal no lo recibe en unos segundos, da este obrero por muerto y calcula él.
+self.postMessage({ listo: true });
+
 self.onmessage = ({ data: { id, tipo, opciones } }) => {
   try {
     const r = GENERADORES[tipo](opciones);

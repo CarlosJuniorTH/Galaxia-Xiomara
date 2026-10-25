@@ -35,8 +35,9 @@ function obtenerObrero() {
     try {
       for (let i = 0; i < NUM_OBREROS; i++) {
         const w = new Worker(new URL('./obreroTexturas.js', import.meta.url), { type: 'module' });
-        w.onmessage = ({ data: { id, datos, error } }) => {
+        w.onmessage = ({ data: { id, datos, error, listo } }) => {
           ultimaRespuesta = w.ultima = performance.now();
+          if (listo) { w.vivo = true; return; }
           const pedido = pendientes.get(id); if (!pedido) return;
           pendientes.delete(id);
           if (error) aqui(pedido); else pedido.resolver(datos);
@@ -44,6 +45,13 @@ function obtenerObrero() {
         w.onerror = e => { e.preventDefault?.(); rescatar(); };
         obreros.push(w);
       }
+      // Obreros que no avisan de que han arrancado en 5 s (en un iPhone no llegaban a funcionar, sin dar error): se
+      // descartan y lo suyo se calcula aquí. Antes se esperaba a la red de seguridad: ~1,5 min con la barra en el 85 %.
+      setTimeout(() => {
+        const muertos = obreros.filter(w => !w.vivo); if (!muertos.length) return;
+        obreros = obreros.filter(w => w.vivo); muertos.forEach(w => w.terminate?.());
+        for (const [id, pedido] of pendientes) if (muertos.includes(pedido.obrero)) { pendientes.delete(id); aqui(pedido); }
+      }, 5000);
     } catch { obreros = []; }
   }
   return obreros.length ? obreros[turno++ % obreros.length] : false;
@@ -85,7 +93,7 @@ export function texturaPlaneta(tipo, opciones, { claves = ['pixeles'], relleno =
     const enviar = () => {
       const w = obtenerObrero();
       if (!w) { aqui(pedido); return; }
-      const id = ++siguiente; pendientes.set(id, pedido); w.ultima ??= performance.now();
+      const id = ++siguiente; pendientes.set(id, pedido); pedido.obrero = w; w.ultima ??= performance.now();
       w.postMessage({ id, tipo, opciones });
       // Red de seguridad: si SU obrero deja de contestar (muerto, no lento), se calcula aquí. Antes contaba la respuesta de
       // cualquier obrero y esperaba solo 15 s: en un iPhone una textura grande tarda más, se repetía el cálculo en el hilo
