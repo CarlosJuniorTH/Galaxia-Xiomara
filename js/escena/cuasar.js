@@ -328,12 +328,12 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
       col.set([c[0] * b, c[1] * b, c[2] * b], j * 3); tam[j] = a() < 0.03 ? 2.6 : 1.0 + a() * 0.9; j++;
     }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aCol', new THREE.BufferAttribute(col, 3)); g.setAttribute('aTam', new THREE.BufferAttribute(tam, 1));
-    const polvoEst = new THREE.Points(g, aditivo({ uT: { value: 0 }, uPR, uExpo: EXPOSICION },
-      /* glsl */`uniform float uT, uPR, uExpo; attribute vec3 aCol; attribute float aTam; varying vec3 vC; varying float vA;
+    const polvoEst = new THREE.Points(g, aditivo({ uT: { value: 0 }, uPR, uExpo: EXPOSICION, uLuzGas },
+      /* glsl */`uniform float uT, uPR, uExpo, uLuzGas; attribute vec3 aCol; attribute float aTam; varying vec3 vC; varying float vA;
         void main(){ float ga = uT * 0.03, c = cos(ga), s = sin(ga);
           float k = position.y / max(1.0, length(position.xy)); vec2 p = position.xy; p.y *= 1.55; p = mat2(c, s, -s, c) * p; p.y /= 1.55;   // gira con el remolino
           vec4 mv = modelViewMatrix * vec4(p, position.z, 1.0); gl_Position = projectionMatrix * mv;
-          gl_PointSize = aTam * uPR; vA = 0.9 * uExpo * step(0.0, -mv.z); vC = aCol; }`,   // exposición automática: de lejos no se amontona en una mancha
+          gl_PointSize = aTam * uPR; vA = 0.9 * uExpo * step(0.0, -mv.z) * min(1.0, uLuzGas / 0.82); vC = aCol; }`,   // (uLuzGas: en la escena, el cuásar dormido)   // exposición automática: de lejos no se amontona en una mancha
       /* glsl */`varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; if (d > 1.0) discard; float a = (1.0 - smoothstep(0.4, 1.0, d)) * vA; gl_FragColor = vec4(vC * a, a); }`));
     polvoEst.rotation.x = -Math.PI / 2; polvoEst.scale.y = -1; polvoEst.frustumCulled = false; polvoEst.renderOrder = 16;
     grupo.add(polvoEst); animados.push(polvoEst);
@@ -381,9 +381,9 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
   yield;
   // ── Disco de acreción ──
   const disco = new THREE.Mesh(new THREE.RingGeometry(discoIn, discoOut, 320, 12), aditivo(
-    { uT: { value: 0 }, uIn: { value: discoIn }, uOut: { value: discoOut } },
+    { uT: { value: 0 }, uIn: { value: discoIn }, uOut: { value: discoOut }, uLuzD: { value: 1 }, uOndaK: { value: 0 }, uOndaF: { value: 0 }, uCalido: { value: 0 } },
     'varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    /* glsl */`uniform float uT, uIn, uOut; varying vec2 vP; ${RUIDO}
+    /* glsl */`uniform float uT, uIn, uOut, uLuzD, uOndaK, uOndaF, uCalido; varying vec2 vP; ${RUIDO}
       void main(){
         float r = length(vP), t = clamp((r - uIn) / (uOut - uIn), 0.0, 1.0), ang = atan(vP.y, vP.x);
         float giro = ang - 90.0 * pow(uIn / r, 1.5) - uT * 0.35 - log(r / uIn) * 2.6;   // espirales finas con su enroscado fijo (el de la primera imagen); gira entera sin enroscarse más   // Kepler: dentro gira más rápido
@@ -401,6 +401,11 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
         float perfil = smoothstep(0.0, 0.02, t) * pow(1.0 - t, 1.1) * mix(1.5, 0.85, smoothstep(0.0, 0.35, t));
         float isco = exp(-pow((t - 0.012) / 0.01, 2.0)) * 1.6;
         float b = (perfil * (0.25 + 1.2 * fil * fil + 0.3 * fino) + isco) * (0.5 + 0.6 * dop);
+        // Escena (js/util/escenasGigantes.js): ondas de luz nítidas que salen del centro (la chispa, la risa), rosa y oro, y
+        // la luz del disco que se enciende con la historia. En reposo (0, 0, 1) no cambia nada.
+        if (uOndaK > 0.0) b *= 1.0 + 1.8 * uOndaK * pow(0.5 + 0.5 * cos(6.2832 * (t * 2.5 - uOndaF)), 16.0) * (1.0 - 0.6 * t);
+        c = mix(c, vec3(1.0, 0.62, 0.74) * (0.4 + 0.6 * max(c.r, max(c.g, c.b))), uCalido * 0.35);
+        b *= uLuzD;
         gl_FragColor = vec4(c * b * 1.7, min(1.0, b)); }`));   // más brillante: el disco es lo que más luce del cuásar
   disco.rotation.x = Math.PI / 2; grupo.add(disco); animados.push(disco);
 
@@ -416,11 +421,11 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
     fragmentShader: 'uniform float uR; varying vec2 vP; void main(){ float r = length(vP) / uR; gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0 - smoothstep(0.92, 1.0, r)); }',
     uniforms: { uR: { value: RS * 1.02 } }, transparent: true, depthTest: false, depthWrite: false }));
   sombraDisco.renderOrder = 50; grupo.add(sombraDisco);
-  const fotones = new THREE.Mesh(new THREE.RingGeometry(RS * 0.95, RS * 2.6, 160, 4), aditivo({ uT: { value: 0 }, uR: { value: RS } },
+  const fotones = new THREE.Mesh(new THREE.RingGeometry(RS * 0.95, RS * 2.6, 160, 4), aditivo({ uT: { value: 0 }, uR: { value: RS }, uFot: { value: 1 } },
     'varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    /* glsl */`uniform float uT, uR; varying vec2 vP;
+    /* glsl */`uniform float uT, uR, uFot; varying vec2 vP;
       void main(){ float r = length(vP) / uR, ang = atan(vP.y, vP.x);
-        float anillo = exp(-pow((r - 1.08) * 16.0, 2.0)) * (1.6 + 0.4 * sin(ang * 2.0 + uT));
+        float anillo = exp(-pow((r - 1.08) * 16.0, 2.0)) * (1.6 + 0.4 * sin(ang * 2.0 + uT)) * uFot;
         float halo = exp(-pow((r - 1.25) * 3.0, 2.0)) * 0.35;
         vec3 c = vec3(0.85, 0.93, 1.0) * anillo + vec3(1.0, 0.75, 0.6) * halo;
         gl_FragColor = vec4(c, min(1.0, anillo + halo)); }`));
@@ -433,19 +438,23 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
   yield;
   // Acento de luz (el faro): un brillo rosado y dorado que sube por cada chorro. uAc: su posición a lo largo
   // del chorro (0 base, 1 punta; negativo: apagado). Compartido por todas las capas.
-  const uAc = { value: -1 };
+  const uAc = { value: -1 }, uAcK = { value: 1 };
+  // Largo de los chorros (fracción de LARGO) en la escena del cuásar: nacen y crecen con la historia. En reposo 1,05:
+  // enteros (los cortes de abajo no quitan nada). uLob: luz de la nube de las puntas (0 sin chorros enteros, 1 normal).
+  const uAlc = { value: 1.05 }, uLob = { value: 1 };
   // (En los sombreadores de los chorros, vCara y l se acotan antes de pow: en un píxel que el triángulo solo roza, la GPU
   // puede extrapolar las variables un poco fuera de su rango —con MSAA, siempre— y pow de un negativo da NaN: un punto negro.)
   const capaChorro = ({ rBase, rPunta, colorA, colorB, intensidad, helice }) => {
     const geo = new THREE.CylinderGeometry(rPunta, rBase, LARGO, 48, 24, true); geo.translate(0, LARGO / 2, 0);
-    return new THREE.Mesh(geo, aditivo({ uT: { value: 0 }, uA: { value: C(colorA) }, uB: { value: C(colorB) }, uI: { value: intensidad }, uH: { value: helice }, uAc },
+    return new THREE.Mesh(geo, aditivo({ uT: { value: 0 }, uA: { value: C(colorA) }, uB: { value: C(colorB) }, uI: { value: intensidad }, uH: { value: helice }, uAc, uAcK, uAlc },
       'varying vec2 vU; varying float vCara; void main(){ vU = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vCara = abs(dot(normalize(normalMatrix * normal), normalize(-mv.xyz))); gl_Position = projectionMatrix * mv; }',
-      /* glsl */`uniform float uT, uI, uH, uAc; uniform vec3 uA, uB; varying vec2 vU; varying float vCara;
-        void main(){ float l = vU.y;
+      /* glsl */`uniform float uT, uI, uH, uAc, uAcK, uAlc; uniform vec3 uA, uB; varying vec2 vU; varying float vCara;
+        void main(){ float l = vU.y; if (l > uAlc) discard;
           float hel = mix(1.0, 0.55 + 0.45 * pow(0.5 + 0.5 * sin(vU.x * 6.2832 * 3.0 + l * 38.0 - uT * 5.0), 3.0), uH);
           float nudos = 1.0 + 1.4 * pow(0.5 + 0.5 * sin(l * 26.0 - uT * 3.2), 10.0) + 3.0 * exp(-pow((l - fract(uT * 0.12)) / 0.025, 2.0));   // el latido del faro: un pulso de luz sube cada ≈ 8 s
           float f = pow(max(vCara, 0.0), 1.6) * pow(max(1.0 - l, 0.0), 1.3) * smoothstep(0.0, 0.015, l) * hel * nudos;
-          float ac = uAc < 0.0 ? 0.0 : exp(-pow((l - uAc) / 0.035, 2.0)) * pow(max(vCara, 0.0), 1.2) * smoothstep(0.0, 0.03, l) * (1.0 - smoothstep(0.85, 1.0, uAc));
+          f *= 1.0 - smoothstep(uAlc - 0.03, uAlc, l);   // la punta de un chorro que aún crece
+          float ac = uAc < 0.0 ? 0.0 : exp(-pow((l - uAc) / 0.035, 2.0)) * pow(max(vCara, 0.0), 1.2) * smoothstep(0.0, 0.03, l) * (1.0 - smoothstep(0.85, 1.0, uAc)) * uAcK;
           gl_FragColor = vec4(mix(uA, uB, pow(max(l, 0.0), 0.6)) * f * uI + vec3(1.0, 0.72, 0.82) * ac * uI * mix(0.12, 1.1, step(uH, 0.5)), min(1.0, f * uI + ac * uI * mix(0.12, 1.0, step(uH, 0.5)))); }`));   // sobre todo en la columna fina: un hilo de luz, no una mancha
   };
   chorros.renderOrder = 20;
@@ -457,13 +466,14 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
     // Nubes de plasma alrededor del chorro (como en la imagen: hebras azules y blancas retorcidas, con toques naranjas
     // donde el chorro atraviesa el gas): ruido con estructura (no un resplandor liso), más ancho hacia la punta.
     const geoN = new THREE.CylinderGeometry(820, 120, LARGO * 0.95, 96, 48, true); geoN.translate(0, LARGO * 0.475, 0);
-    const nubeChorro = new THREE.Mesh(geoN, aditivo({ uT: { value: 0 }, uS: { value: s > 0 ? 1.7 : 5.3 }, uRuido: { value: texturaRuido() } },
+    const nubeChorro = new THREE.Mesh(geoN, aditivo({ uT: { value: 0 }, uS: { value: s > 0 ? 1.7 : 5.3 }, uRuido: { value: texturaRuido() }, uAlc },
       'varying vec2 vU; varying float vCara; void main(){ vU = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vCara = abs(dot(normalize(normalMatrix * normal), normalize(-mv.xyz))); gl_Position = projectionMatrix * mv; }',
-      /* glsl */`uniform float uT, uS; varying vec2 vU; varying float vCara; ${RUIDO_RAPIDO}
+      /* glsl */`uniform float uT, uS, uAlc; varying vec2 vU; varying float vCara; ${RUIDO_RAPIDO}
         void main(){ float l = vU.y, a = vU.x * 6.2831853;
+          if (l * 0.95 > uAlc) discard;
           // Lo que no puede verse se descarta antes de calcular el ruido (mismo resultado, menos trabajo: la máscara de
           // borde y de largo, y luego la de huecos; con f < 0,01 la luz que aportaría es < 0,0002, invisible).
-          float m = pow(max(vCara, 0.0), 2.0) * smoothstep(0.02, 0.12, l) * (1.0 - smoothstep(0.6, 1.0, l));
+          float m = pow(max(vCara, 0.0), 2.0) * smoothstep(0.02, 0.12, l) * (1.0 - smoothstep(0.6, 1.0, l)) * (1.0 - smoothstep(uAlc - 0.08, uAlc, l * 0.95));
           if (m * 1.7 < 0.01) discard;
           vec3 q = vec3(cos(a) * 1.2, sin(a) * 1.2, l * 9.0 - uT * 0.08) + uS;
           vec3 w = q + (vec3(fbm3(q * 1.3), fbm3(q * 1.3 + 4.0), fbm3(q * 1.3 + 8.0)) - 0.5) * 1.6;
@@ -482,24 +492,24 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
     const lobulo = new THREE.Sprite(new THREE.SpriteMaterial({ map: texBrillo, color: '#8d8cff', transparent: true, opacity: 0.16, depthWrite: false, blending: THREE.AdditiveBlending }));
     lobulo.position.y = LARGO * 0.97; lobulo.scale.setScalar(2200); lobulo.visible = false;   // sin resplandor difuso: se sustituye por la nube de abajo
     // Nube de plasma al final del chorro (donde se frena y se abre): hebras azules y violetas con estructura.
-    const nubeFin = new THREE.Mesh(new THREE.SphereGeometry(1700, 48, 32), aditivo({ uT: { value: 0 }, uS: { value: s > 0 ? 2.3 : 7.1 }, uRuido: { value: texturaRuido() } },
+    const nubeFin = new THREE.Mesh(new THREE.SphereGeometry(1700, 48, 32), aditivo({ uT: { value: 0 }, uS: { value: s > 0 ? 2.3 : 7.1 }, uRuido: { value: texturaRuido() }, uLob },
       'varying vec3 vP; varying float vCara; void main(){ vP = position / 1700.0; vec4 mv = modelViewMatrix * vec4(position, 1.0); vCara = abs(dot(normalize(normalMatrix * normal), normalize(-mv.xyz))); gl_Position = projectionMatrix * mv; }',
-      /* glsl */`uniform float uT, uS; varying vec3 vP; varying float vCara; ${RUIDO_RAPIDO}
-        void main(){ if (pow(max(vCara, 0.0), 1.5) * 0.45 * 1.35 < 0.01) discard;
+      /* glsl */`uniform float uT, uS, uLob; varying vec3 vP; varying float vCara; ${RUIDO_RAPIDO}
+        void main(){ if (pow(max(vCara, 0.0), 1.5) * 0.45 * 1.35 * uLob < 0.01) discard;
           vec3 q = vP * 1.6 + uS + vec3(0.0, uT * 0.02, 0.0);
           vec3 w = q + (vec3(fbm3(q * 1.2), fbm3(q * 1.2 + 4.0), fbm3(q * 1.2 + 8.0)) - 0.5) * 1.4;
           float hebra = pow(1.0 - abs(fbm3(w * 2.4) * 2.0 - 1.0), 7.0), nube = smoothstep(0.5, 0.8, fbm3(w * 1.5 + 9.0));
-          float f = (hebra + nube * 0.35) * pow(max(vCara, 0.0), 1.5) * 0.45;
+          float f = (hebra + nube * 0.35) * pow(max(vCara, 0.0), 1.5) * 0.45 * uLob;
           if (f < 0.01) discard;   // invisible (aportaría < 0,0001): se ahorra el ruido del color
           vec3 c = mix(vec3(0.45, 0.5, 1.0), vec3(0.85, 0.9, 1.0), hebra); c = mix(c, vec3(0.75, 0.45, 1.0), smoothstep(0.5, 0.8, fbm3(w + 3.0)) * 0.5);
           gl_FragColor = vec4(c * f, f); }`));
     nubeFin.position.y = LARGO * 0.97; nubeFin.scale.set(1.0, 1.3, 1.0); nubeFin.renderOrder = 20; lado.add(nubeFin); animados.push(nubeFin);
     // Hebras de plasma en espiral alrededor del haz (tres, enroscadas), con pulsos que suben.
     const geoH = new THREE.CylinderGeometry(270, 60, LARGO * 0.9, 64, 64, true); geoH.translate(0, LARGO * 0.45, 0);
-    const helices = new THREE.Mesh(geoH, aditivo({ uT: { value: 0 } },
+    const helices = new THREE.Mesh(geoH, aditivo({ uT: { value: 0 }, uAlc },
       'varying vec2 vU; varying float vCara; void main(){ vU = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vCara = abs(dot(normalize(normalMatrix * normal), normalize(-mv.xyz))); gl_Position = projectionMatrix * mv; }',
-      /* glsl */`uniform float uT; varying vec2 vU; varying float vCara; ${RUIDO}
-        void main(){ float l = vU.y, a = vU.x;
+      /* glsl */`uniform float uT, uAlc; varying vec2 vU; varying float vCara; ${RUIDO}
+        void main(){ float l = vU.y, a = vU.x; if (l * 0.9 > uAlc) discard;
           float h = fract(a * 3.0 + l * 7.0 - uT * 0.25), linea = exp(-pow((h - 0.5) / 0.035, 2.0));
           float rota = smoothstep(0.3, 0.6, fbm3(vec3(a * 6.0, l * 30.0 - uT * 0.5, 1.0)));   // la hebra se rompe a trozos
           float pulso = 0.6 + 1.6 * exp(-pow((l - fract(uT * 0.12)) / 0.03, 2.0));
@@ -512,15 +522,15 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
   const nCh = Math.round(1600 * K), pCh = new Float32Array(nCh * 3);
   for (let i = 0; i < nCh; i++) pCh.set([a() * Math.PI * 2, a(), a()], i * 3);
   const gCh = new THREE.BufferGeometry(); gCh.setAttribute('position', new THREE.BufferAttribute(pCh, 3));
-  const particulasChorro = new THREE.Points(gCh, aditivo({ uT: { value: 0 }, uScale, uPR, uL: { value: LARGO } },
-    /* glsl */`uniform float uT, uScale, uPR, uL; varying vec3 vC; varying float vA;
+  const particulasChorro = new THREE.Points(gCh, aditivo({ uT: { value: 0 }, uScale, uPR, uL: { value: LARGO }, uAlc },
+    /* glsl */`uniform float uT, uScale, uPR, uL, uAlc; varying vec3 vC; varying float vA;
       void main(){ float f = fract(position.y + uT * 0.09), lado = position.z < 0.5 ? 1.0 : -1.0;
         float r = 16.0 + f * 330.0 * pow(fract(position.x * 7.3), 2.0), giro = position.x + f * 22.0 + uT * 1.4;
         vec4 mv = modelViewMatrix * vec4(cos(giro) * r, lado * f * uL, sin(giro) * r, 1.0); gl_Position = projectionMatrix * mv;
         vC = mix(vec3(1.0), vec3(0.45, 0.55, 1.0), f);
         float s = (34.0 - f * 18.0) * length(modelViewMatrix[0].xyz) * uScale / max(1e-3, -mv.z);
         gl_PointSize = clamp(s, 1.0, 10.0 * uPR);
-        vA = min(1.0, s) * (1.0 - f) * smoothstep(0.0, 0.03, f) * (0.6 + 0.4 * sin(f * 70.0 - uT * 6.0)); }`,
+        vA = min(1.0, s) * (1.0 - f) * smoothstep(0.0, 0.03, f) * (0.6 + 0.4 * sin(f * 70.0 - uT * 6.0)) * step(f, uAlc); }`,
     'varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; if (d > 1.0) discard; float k = exp(-d * d * 4.0) * vA; gl_FragColor = vec4(vC * k, k); }'));
   particulasChorro.frustumCulled = false; chorros.add(particulasChorro); animados.push(particulasChorro);
 
@@ -529,15 +539,15 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
   const nCa = Math.round(2200 * K), pCa = new Float32Array(nCa * 3);
   for (let i = 0; i < nCa; i++) pCa.set([a() * Math.PI * 2, a(), a()], i * 3);
   const gCa = new THREE.BufferGeometry(); gCa.setAttribute('position', new THREE.BufferAttribute(pCa, 3));
-  const caida = new THREE.Points(gCa, aditivo({ uT: { value: 0 }, uScale, uPR, uIn: { value: discoIn }, uOut: { value: discoOut * 1.5 } },
-    /* glsl */`uniform float uT, uScale, uPR, uIn, uOut; varying vec3 vC; varying float vA;
+  const caida = new THREE.Points(gCa, aditivo({ uT: { value: 0 }, uScale, uPR, uIn: { value: discoIn }, uOut: { value: discoOut * 1.5 }, uLuzC: { value: 1 } },
+    /* glsl */`uniform float uT, uScale, uPR, uIn, uOut, uLuzC; varying vec3 vC; varying float vA;
       void main(){ float f = fract(position.y + uT * (0.04 + position.z * 0.035));
         float r = mix(uOut, uIn * 1.2, pow(f, 0.75)), ang = position.x + f * f * 12.0 + uT * 0.3;
         vec4 mv = modelViewMatrix * vec4(cos(ang) * r, (position.z - 0.5) * 50.0 * (1.0 - f), sin(ang) * r, 1.0); gl_Position = projectionMatrix * mv;
         vC = f < 0.6 ? mix(vec3(1.0, 0.3, 0.2), vec3(1.0, 0.75, 0.35), f / 0.6) : mix(vec3(1.0, 0.75, 0.35), vec3(0.75, 0.9, 1.0), (f - 0.6) / 0.4);
         float s = (14.0 + f * 10.0) * length(modelViewMatrix[0].xyz) * uScale / max(1e-3, -mv.z);
         gl_PointSize = clamp(s, 1.0, 6.0 * uPR);
-        vA = min(1.0, s) * smoothstep(0.0, 0.1, f) * (1.0 - smoothstep(0.9, 1.0, f)); }`,
+        vA = min(1.0, s) * smoothstep(0.0, 0.1, f) * (1.0 - smoothstep(0.9, 1.0, f)) * uLuzC; }`,
     'varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; if (d > 1.0) discard; float k = exp(-d * d * 4.0) * vA; gl_FragColor = vec4(vC * k, k); }'));
   caida.frustumCulled = false; grupo.add(caida); animados.push(caida);
 
@@ -563,19 +573,41 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
   destello.scale.setScalar(1050); aura.scale.setScalar(700); destello.renderOrder = 52; grupo.add(destello);   // sin aura difusa: se ve la sombra negra
 
   const centro = new THREE.Vector3(), escala = new THREE.Vector3();
+  // Escena del cuásar (cosmos.js, con el estado de js/util/escenasGigantes.js): el disco y lo que cae llevan su propio
+  // reloj (se aceleran con la emoción); los chorros, su largo y su intensidad. Todo en uniformes, sin memoria nueva.
+  const capasChorro = [], nubesFin = [];
+  chorros.traverse(o => { const u = o.material?.uniforms; if (u?.uI) capasChorro.push([u, u.uI.value, u.uA.value.clone(), u.uB.value.clone()]); });
+  const calidoA = C('#ffc2d8'), calidoB = C('#ff8ab4');
+  let tDisco = 0, tCaida = 0, tPrevio = null, luzNucleo = 1;
+  const animadosLibres = animados.filter(m => m !== disco && m !== caida);
   return {
     grupo, disco, toro, haz: hazMedida, hornearRemolino,
     // El faro: posición del acento de luz en los chorros (0–1) o apagado (negativo).
     acento(v) { uAc.value = v; },
     luzGas(v) { uLuzGas.value = v; },
     medidas: { disco: discoOut, toro: toroR + toroTubo, chorro: LARGO, anfitriona: RG },
+    // e: estado del cuásar (REPOSO_CUASAR fuera de la escena); peso: 1 en escena, → 0 al cancelarla.
+    escena(e, peso) {
+      const w = peso > 0.0005 ? peso : 0, por = (v, r = 1) => r + (v - r) * w;
+      uAlc.value = por(e.alcance, 1.05); uLob.value = por(e.lobulo);
+      disco.material.uniforms.uLuzD.value = por(e.disco); disco.material.uniforms.uOndaK.value = e.ondaK * w; disco.material.uniforms.uOndaF.value = e.ondaFase;
+      disco.material.uniforms.uCalido.value = e.calido * w;
+      fotones.material.uniforms.uFot.value = por(e.fotones); caida.material.uniforms.uLuzC.value = por(Math.min(e.caida, 1.5));
+      for (const [u, i, a, b] of capasChorro) { u.uI.value = i * por(e.chorro); u.uA.value.copy(a).lerp(calidoA, e.calido * w * 0.45); u.uB.value.copy(b).lerp(calidoB, e.calido * w * 0.45); }
+      luzNucleo = por(e.destello); this.giro = por(e.giro); this.prisa = por(e.caida);
+      uAcK.value = e.acento >= 0 ? 0.5 + 1.1 * e.frente : 1;
+    },
+    giro: 1, prisa: 1,
     actualizar(t, camera) {
-      for (const m of animados) m.material.uniforms.uT.value = t;
+      const dt = tPrevio === null ? 0 : Math.min(0.1, Math.max(0, t - tPrevio)); tPrevio = t;
+      tDisco += dt * this.giro; tCaida += dt * this.prisa;
+      for (const m of animadosLibres) m.material.uniforms.uT.value = t;
+      disco.material.uniforms.uT.value = tDisco; caida.material.uniforms.uT.value = tCaida;
       fotones.lookAt(camera.position); sombraDisco.lookAt(camera.position);
       grupo.getWorldPosition(centro); grupo.getWorldScale(escala);
       // A qué distancia está la cámara, en radios del disco: el destello cede al acercarse.
       const d = camera.position.distanceTo(centro) / (discoOut * escala.x), lejos = THREE.MathUtils.smoothstep(d, 1.2, 6);
-      destello.material.opacity = 0.35 + 0.45 * lejos;
+      destello.material.opacity = (0.35 + 0.45 * lejos) * luzNucleo;
       destello.scale.setScalar(620 * (0.45 + 0.55 * lejos) * (1 + Math.sin(t * 0.7) * 0.06 + Math.sin(t * 3.1) * 0.03));
     }
   };

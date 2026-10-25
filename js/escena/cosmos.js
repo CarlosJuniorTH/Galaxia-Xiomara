@@ -571,13 +571,15 @@ export function* construirCosmos({ uScale, uPR }) {
       cercaDeneb = 1 - THREE.MathUtils.smoothstep(lejosLlegada, 3, 6);
       denebCerca.marco.scale.setScalar(Math.max(wD > 0 ? 1 : 0, 0.3 + 0.7 * (1 - THREE.MathUtils.smoothstep(lejosLlegada, 2.5, 6))));
       denebCerca.actualizar(estadoD, normalD, wD, dt, t, reducido, camera.position);
-      // Cuásar: en su escena su gas se calma (tiempo propio, acumulado) y se va encendiendo con la historia.
+      // Cuásar: en su escena se enciende con la historia: empieza dormido (chorros recogidos, disco y galaxia apagados) y
+      // los chorros nacen y crecen con las frases hasta su diseño de siempre (js/util/escenasGigantes.js, estadoCuasar).
       const dC = directores.cuasar, sC = dC.avanzar(t, dt), wC = dC.peso; estadoCuasar(sC, dC.config, estadoC, reducido);
       tCuasar += dt * (1 + (estadoC.tiempo - 1) * wC);
+      piezasCuasar.escena(estadoC, wC);
       piezasCuasar.actualizar(tCuasar, camera);
       escenaCuasar.actualizar(estadoC, wC, dt, t, reducido);
-      piezasCuasar.luzGas(0.82 - 0.4 * (estadoC.foco / 0.55) * wC);   // la galaxia se apaga un poco: la historia la cuentan el disco y los chorros
-      // La luz del faro sube por los chorros en «es mi mujer ideal» (y se apaga después, sin tocar la del faro).
+      piezasCuasar.luzGas(0.82 * (1 + (estadoC.gas - 1) * wC));
+      // El frente de los chorros que crecen (la luz del faro, que sube por ellos); se apaga después, sin tocar la del faro.
       if (dC.activa && (estadoC.acento >= 0 || acentoEscena)) { piezasCuasar.acento(estadoC.acento); acentoEscena = estadoC.acento >= 0; }
       else if (!dC.activa && acentoEscena) { piezasCuasar.acento(-1); acentoEscena = false; }
       // El cuásar no cambia de orientación (antes precesaba y al volver se veía distinto).
