@@ -17,7 +17,9 @@ export const BRILLO_BASE = 0.45;
 export function crearNucleo(canvas) {
   // En móvil el lienzo trabaja a resolución nativa y solo recibe la pasada final, así que
   // el multimuestreo del lienzo no aporta nada y costaría memoria a 3 Mpx.
-  const seleccion = crearContextoWebGL(canvas, { antialias: !modoCompatible && !esMovil });
+  // Sin profundidad en el lienzo cuando habrá postprocesado (siempre fuera del modo compatible: si no hay HDR se compone
+  // igual sobre un búfer de 8 bits con su profundidad); solo el dibujo directo, el último recurso, la necesita.
+  const seleccion = crearContextoWebGL(canvas, { antialias: !modoCompatible && !esMovil, depth: modoCompatible });
   const renderer = new THREE.WebGLRenderer({ canvas, context: seleccion.contexto, alpha: false });
   canvas.dataset.webgl = seleccion.api;
   canvas.dataset.perfil3d = modoCompatible ? 'compatible' : calidadFija ? 'alta' : 'normal'; canvas.dataset.seguro = String(nivelSeguro);
@@ -110,6 +112,7 @@ export function crearNucleo(canvas) {
     } catch (error) {
       post?.dispose(); post = null; lente = null; salto = null;
       console.warn('Se dibuja directamente, sin pasada de salida:', error);
+      if (!modoCompatible) console.warn('El lienzo se creó sin profundidad: para dibujar directo con ocultación correcta, abre con ?calidad=compatible');
     }
   }
   canvas.dataset.brillo3d ||= post ? 'hdr' : 'directo';

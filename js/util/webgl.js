@@ -1,5 +1,7 @@
 // No cambia ajustes ni protecciones del navegador: pide contextos admitidos por él.
-export function crearContextoWebGL(canvas, { antialias = true } = {}) {
+// depth: el búfer de profundidad del propio lienzo. Con postprocesado no se usa (la escena se dibuja en búferes propios
+// con su profundidad y el lienzo solo recibe la pasada final): sin él, ~10 MB menos en un iPhone.
+export function crearContextoWebGL(canvas, { antialias = true, depth = true } = {}) {
   const motivos = [];
   const registrar = e => { if (e.statusMessage) motivos.push(String(e.statusMessage).slice(0, 1000)); };
   canvas.addEventListener('webglcontextcreationerror', registrar);
@@ -13,7 +15,7 @@ export function crearContextoWebGL(canvas, { antialias = true } = {}) {
     for (const api of ['webgl2', 'webgl']) {
       for (const opcion of opciones) {
         try {
-          const contexto = canvas.getContext(api, { alpha: false, depth: true, stencil: false, preserveDrawingBuffer: false, failIfMajorPerformanceCaveat: false, ...opcion });
+          const contexto = canvas.getContext(api, { alpha: false, depth, stencil: false, preserveDrawingBuffer: false, failIfMajorPerformanceCaveat: false, ...opcion });
           intentos.push({ api, ...opcion, disponible: !!contexto });
           if (contexto) return { contexto, api, intentos };
         } catch (e) { motivos.push(String(e.message || e).slice(0, 1000)); intentos.push({ api, ...opcion, disponible: false }); }
