@@ -1,12 +1,10 @@
 // Nuestro sistema solar, dentro de un brazo de la galaxia de Xiomara: una escena aparte con el
-// Sol en el centro (los planetas conservan sus coordenadas y reciben su luz de él). Desde aquí
-// la galaxia se ve por dentro: una gran banda rosa que rodea todo el cielo, con su núcleo
-// dorado hacia el centro galáctico, nubes de estrellas, polvo oscuro y nudos rosados.
-// El universo lejano (cielo, galaxias, cosmos) sigue detrás, a su distancia.
+// Sol en el centro (los planetas conservan sus coordenadas y reciben su luz de él). Desde aquí,
+// muy lejos y en su dirección real, solo se ve el centro de la galaxia: su núcleo dorado hecho de
+// motas nítidas y un leve rastro del disco. El resto del universo no se ve desde aquí.
 import * as THREE from 'three';
 import { deUnTiron } from '../util/azarSemilla.js';
 import { texBrillo, texDestello, texEstrellaGigante } from './texturas.js';
-import { Q } from '../util/dispositivo.js';
 
 const RUIDO = /* glsl */`
   float h3(vec3 p){ p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }   // sin senos: con fract(sin(x)·43758) cada GPU redondea distinto el mismo punto de la rejilla y el ruido salía a bloques de bordes rectos
@@ -18,81 +16,67 @@ export const RADIO_SOL = 150;
 
 // De un tirón; la carga usa construirSolar, el mismo código como generador (yield entre pasos: ver porTramos).
 export const crearSolar = (...a) => deUnTiron(construirSolar(...a));
-export function* construirSolar({ haciaCentroGalactico, renderer, uPR = { value: 1 } }) {
+export function* construirSolar({ haciaCentroGalactico, uPR = { value: 1 } }) {
   const escena = new THREE.Scene();
 
   yield;
-  // ── La galaxia de Xiomara vista desde dentro: se «hornea» una sola vez en un cubemap que es
-  // el fondo de esta escena (sin coste por cuadro, como el cielo principal) ──
+  // ── El centro de la galaxia de Xiomara, muy lejos ──
+  // Desde el brazo solo se ve su núcleo, en la dirección real del centro galáctico (haciaCentroGalactico, la opuesta al
+  // punto del brazo donde está el sistema solar: galaxia.puntoBrazo) y en el plano de la galaxia (el de las órbitas), con
+  // un leve rastro del disco a los lados. Nada más: ni la banda difusa que rodeaba el cielo (era un degradado horneado en un
+  // cubemap) ni sus estrellas una a una, ni el resto del universo (index.js ya no lo trae a esta escena).
+  // Todo son motas nítidas de 1–2 px sumadas, sin halo: el núcleo brilla por acumulación de motas, y ninguna suma llega al
+  // umbral del resplandor (0,78), así no se difumina en mancha. Unos 16 500 puntos en una sola llamada: nada en el móvil.
   const centro = haciaCentroGalactico.clone().setY(0).normalize();
-  const banda = new THREE.Mesh(new THREE.SphereGeometry(100, 64, 32), new THREE.ShaderMaterial({
-    uniforms: { uCentro: { value: centro } },
-    vertexShader: 'varying vec3 vDir; void main(){ vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    fragmentShader: RUIDO + /* glsl */`
-      uniform vec3 uCentro; varying vec3 vDir;
-      void main(){
-        vec3 d = normalize(vDir);
-        float lat = d.y, lon = acos(clamp(dot(normalize(vec3(d.x, 0.0, d.z)), uCentro), -1.0, 1.0));
-        float bulbo = exp(-lon * lon * 1.3);
-        vec3 gal = vec3(d.x * 3.0, lat * 14.0, d.z * 3.0);
-        float ancho = 0.075 + 0.11 * bulbo + (fbm3(d * 3.0) - 0.5) * 0.03;
-        float l2 = (lat + (fbm3(d * 2.5 + 9.0) - 0.5) * 0.04) / ancho;
-        float bandaV = exp(-l2 * l2);
-        float nubes = pow(smoothstep(0.3, 0.85, fbm3(gal * 1.4) * 0.6 + fbm3(d * 10.0) * 0.4), 1.3) * 0.85 + smoothstep(0.5, 0.9, fbm3(d * 26.0)) * 0.4;
-        float polvo = smoothstep(0.42, 0.66, fbm3(gal * 1.8 + 3.0) * 0.6 + fbm3(d * 9.0) * 0.4) * exp(-pow((lat + 0.01) / (ancho * 0.32), 2.0));
-        polvo = clamp(polvo * (0.55 + 0.4 * bulbo), 0.0, 0.8);
-        // Colores de la galaxia de Xiomara: núcleo dorado, brazos rosa intenso, bordes violeta.
-        vec3 col = mix(mix(vec3(0.75, 0.45, 1.0), vec3(1.0, 0.45, 0.75), smoothstep(0.0, 0.6, bulbo + nubes * 0.3)), vec3(1.0, 0.82, 0.6), bulbo * 0.8);
-        float luz = bandaV * (0.25 + 0.75 * nubes) * (0.4 + 0.55 * bulbo) + exp(-lon * lon * 10.0 - lat * lat * 160.0) * 0.5 + exp(-pow(lat / (ancho * 2.8), 2.0)) * 0.05;
-        vec3 c = col * luz * (1.0 - polvo);
-        c += vec3(1.0, 0.4, 0.62) * pow(smoothstep(0.72, 0.92, fbm3(d * 24.0 + 5.0)), 2.0) * bandaV * (1.0 - polvo) * 0.6;
-        // (Las estrellas de la galaxia ya no se hornean aquí: son puntos nítidos, ver estrellasBanda.)
-        float a = max(max(c.r, c.g), c.b);
-        // Sin pasar del umbral del brillo: una zona grande y brillante haría bloques al difuminarse.
-        c = min(c * 0.7, vec3(0.55)) + vec3(0.006, 0.002, 0.012);
-        c += (h3(d * 4000.0) - 0.5) / 255.0;   // tramado contra bandas de color
-        gl_FragColor = vec4(c, 1.0); }`,
-    side: THREE.BackSide, depthWrite: false
-  }));
-  const horno = new THREE.Scene(); horno.add(banda);
-  yield;
-  // En sRGB (como una foto): con 8 bits lineales los tonos oscuros de la banda tenían escalones gruesos que, ampliados,
-  // se veían como rectángulos de bordes rectos en el cielo de Rosa, Azul y las cartas. Misma memoria, ~3 veces más niveles en lo oscuro.
-  const cubo = new THREE.WebGLCubeRenderTarget(Q.cielo, { generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, colorSpace: THREE.SRGBColorSpace });
-  new THREE.CubeCamera(1, 1000, cubo).update(renderer, horno);
-  banda.geometry.dispose(); banda.material.dispose();
-  escena.background = cubo.texture;
-
-  yield;
-  // Estrellas de la galaxia de Xiomara, mucho más densas en la banda: antes iban horneadas en el cielo (1024 por cara) y
-  // al ampliarse en un móvil se veían como manchitas borrosas. Ahora son puntos nítidos a cualquier resolución, con la
-  // misma densidad (≈0,35 % de los píxeles del cielo horneado, hasta 4,4 veces más en la banda), colores y brillos que las horneadas.
   {
     const azar = (() => { let s = 20251215; return () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; })();   // mulberry32
-    const pos = [], col = [], v = new THREE.Vector3(), base = centro, lado = new THREE.Vector3(-base.z, 0, base.x);
-    const c1 = new THREE.Color(0.75, 0.45, 1.0), c2 = new THREE.Color(1.0, 0.45, 0.75), c3 = new THREE.Color(1.0, 0.82, 0.6), c = new THREE.Color();
-    const CELDAS = 6 * 1024 * 1024;   // el cielo horneado decidía una estrella por cada píxel de sus 6 caras de 1024
-    let intentos = Math.round(CELDAS * 0.0155);
-    while (intentos-- > 0) {
-      if (intentos % 4000 === 0) yield;
-      const z = azar() * 2 - 1, a = azar() * Math.PI * 2, r = Math.sqrt(1 - z * z); v.set(r * Math.cos(a), z, r * Math.sin(a));
-      const lat = v.y, lon = Math.acos(Math.min(1, Math.max(-1, (v.x * base.x + v.z * base.z) / Math.max(1e-6, Math.hypot(v.x, v.z)))));
-      const bulbo = Math.exp(-lon * lon * 1.3), ancho = 0.075 + 0.11 * bulbo, l2 = lat / ancho, bandaV = Math.exp(-l2 * l2);
-      if (azar() * 0.0155 > 0.0035 + 0.012 * bandaV) continue;
-      c.copy(c1).lerp(c2, THREE.MathUtils.smoothstep(bulbo + 0.15, 0, 0.6)).lerp(c3, bulbo * 0.8);
-      const k = 0.4 + 0.8 * azar(), luz = (x) => Math.min(0.55, x * 0.7 * k);   // el mismo brillo que las horneadas
-      const r0 = 1 + (c.r - 1) * 0.4, g0 = 1 + (c.g - 1) * 0.4, b0 = 1 + (c.b - 1) * 0.4;
-      pos.push(v.x, v.y, v.z); col.push(luz(r0), luz(g0), luz(b0));
+    const gauss = () => Math.sqrt(-2 * Math.log(1 - azar())) * Math.cos(azar() * Math.PI * 2);
+    const lado = new THREE.Vector3(-centro.z, 0, centro.x), arriba = new THREE.Vector3(0, 1, 0), GRADO = Math.PI / 180;
+    const pos = [], col = [], tam = [], lb = [], v = new THREE.Vector3(), c = new THREE.Color();
+    const oro = new THREE.Color(1.0, 0.82, 0.6), crema = new THREE.Color(1.0, 0.95, 0.86), rosa = new THREE.Color(1.0, 0.45, 0.75), violeta = new THREE.Color(0.75, 0.45, 1.0);
+    // Dirección a (l, b) grados del centro galáctico (longitud en el plano, latitud hacia arriba).
+    const mota = (l, b, color, luz, t) => {
+      v.copy(centro).multiplyScalar(Math.cos(b * GRADO) * Math.cos(l * GRADO)).addScaledVector(lado, Math.cos(b * GRADO) * Math.sin(l * GRADO)).addScaledVector(arriba, Math.sin(b * GRADO));
+      pos.push(v.x, v.y, v.z); col.push(color.r * luz, color.g * luz, color.b * luz); tam.push(t); lb.push(l, b);
+    };
+    // Bulbo: achatado (×0,55 en latitud), dorado y más blanco hacia dentro, rosado en su borde; ~1,6° de radio característico
+    // (se ve lejos: unos 25 px en el PC). Sin tope duro de radio: los que pasarían de 9° se vuelven a sortear (con un tope se
+    // amontonaban en el borde y dibujaban una elipse).
+    for (let i = 0; i < 9000; i++) {
+      if (i % 4000 === 0) yield;
+      let r; do r = 1.6 * Math.pow(-Math.log(1 - azar() * 0.9999), 1.2); while (r > 9);
+      const a = azar() * Math.PI * 2;
+      c.copy(crema).lerp(oro, Math.min(1, r / 1.5)).lerp(rosa, THREE.MathUtils.smoothstep(r, 2.5, 8) * 0.7);
+      mota(r * Math.cos(a), r * Math.sin(a) * 0.55, c, (0.06 + 0.12 * Math.exp(-r / 1.2)) * (0.6 + 0.4 * azar()), 1 + azar());
     }
-    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-    const estrellasBanda = new THREE.Points(geo, new THREE.ShaderMaterial({ uniforms: { uPR },
-      // A distancia infinita (solo la rotación de la cámara). Se dibujan las primeras, justo después del cielo y sin
-      // profundidad: todo lo demás se pinta encima. Un poco por delante del plano lejano: justo en él, el recorte de la GPU
-      // descartaba por redondeo la mayoría de los puntos.
-      vertexShader: 'uniform float uPR; attribute vec3 color; varying vec3 vC; void main(){ vC = color; vec4 p = projectionMatrix * vec4(mat3(modelViewMatrix) * position, 1.0); gl_Position = vec4(p.xy, p.w * 0.9999, p.w); gl_PointSize = 2.0 * uPR; }',
-      fragmentShader: 'varying vec3 vC; void main(){ vec2 q = gl_PointCoord - 0.5; if (dot(q, q) > 0.25) discard; gl_FragColor = vec4(vC, 1.0); }',
+    // Núcleo: el corazón brillante, apretado en ~0,3°.
+    for (let i = 0; i < 1500; i++) { const r = Math.abs(gauss()) * 0.3, a = azar() * Math.PI * 2; mota(r * Math.cos(a), r * Math.sin(a) * 0.6, crema, 0.1 + 0.06 * azar(), 1.3 + azar() * 0.9); }
+    yield;
+    // Rastro del disco: una línea fina y tenue a ambos lados, cada vez más débil (hasta ±70°).
+    for (let i = 0; i < 6000; i++) {
+      const l = (azar() < 0.5 ? -1 : 1) * 70 * Math.pow(azar(), 1.6), f = Math.abs(l) / 70;
+      c.copy(rosa).lerp(violeta, f).lerp(oro, (1 - f) * (1 - f) * 0.5);
+      mota(l, gauss() * (0.25 + 0.8 * f), c, (0.03 + 0.045 * (1 - f) * (1 - f)) * (0.5 + 0.5 * azar()), 1 + azar() * 0.6);
+    }
+    // Tope de luz: donde las motas se apilan (el núcleo), cada celda de 1/15° (~1 px CSS) suma como mucho TOPE (luz × área de
+    // cada mota en px). Así el núcleo es brillante pero ningún píxel pasa del umbral del resplandor (0,78) y no se difumina en
+    // una mancha. Medido en el búfer de la escena (tests/navegador/solar.mjs): pico ≈ 0,55 en el PC y ≈ 0,65 en el perfil del
+    // iPhone (allí, con 1/15° ≈ 0,86 px CSS, las motas se apilan algo más por píxel).
+    {
+      const TOPE = 0.3, celdas = new Map(), clave = k => Math.round(lb[k * 2] * 15) * 4096 + Math.round(lb[k * 2 + 1] * 15), luz = k => (col[k * 3] + col[k * 3 + 1] + col[k * 3 + 2]) / 3 * tam[k] * tam[k];
+      for (let k = 0; k < tam.length; k++) celdas.set(clave(k), (celdas.get(clave(k)) ?? 0) + luz(k));
+      for (let k = 0; k < tam.length; k++) { const suma = celdas.get(clave(k)); if (suma > TOPE) for (let j = 0; j < 3; j++) col[k * 3 + j] *= TOPE / suma; }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); geo.setAttribute('aTam', new THREE.Float32BufferAttribute(tam, 1));
+    const nucleoGalactico = new THREE.Points(geo, new THREE.ShaderMaterial({ uniforms: { uPR },
+      // A distancia infinita (solo la rotación de la cámara). Se dibujan los primeros, sin profundidad: todo lo demás se pinta
+      // encima. Un poco por delante del plano lejano: justo en él, el recorte de la GPU descartaba por redondeo muchos puntos.
+      // Las de 2,5 px o más se redondean (discard, sin degradado); las menores son un píxel o dos, nítidos.
+      vertexShader: 'uniform float uPR; attribute vec3 color; attribute float aTam; varying vec3 vC; varying float vT; void main(){ vC = color; vec4 p = projectionMatrix * vec4(mat3(modelViewMatrix) * position, 1.0); gl_Position = vec4(p.xy, p.w * 0.9999, p.w); vT = aTam * uPR; gl_PointSize = vT; }',
+      fragmentShader: 'varying vec3 vC; varying float vT; void main(){ vec2 q = gl_PointCoord - 0.5; if (vT >= 2.5 && dot(q, q) > 0.25) discard; gl_FragColor = vec4(vC, 1.0); }',
       transparent: false, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending }));
-    estrellasBanda.frustumCulled = false; estrellasBanda.renderOrder = -900; estrellasBanda.name = 'Estrellas de la banda'; escena.add(estrellasBanda);
+    nucleoGalactico.frustumCulled = false; nucleoGalactico.renderOrder = -900; nucleoGalactico.name = 'Centro galáctico'; escena.add(nucleoGalactico);
   }
 
   yield;

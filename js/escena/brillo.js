@@ -2,7 +2,7 @@ import { ShaderMaterial, Vector2, Vector4 } from 'three';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { nucleoGaussiano } from '../util/gaussiano.js';
 import { fijarZona, zonaProporcional, zonaDe, GLSL_ZONA } from './zona.js';
-import { LIMITE_HDR } from './salida.js';
+import { LIMITE_HDR, GLSL_VALIDO } from './salida.js';
 
 export class BrilloEficiente extends UnrealBloomPass {
   constructor(...args) {
@@ -17,11 +17,12 @@ export class BrilloEficiente extends UnrealBloomPass {
       mat.depthTest = false;
       mat.depthWrite = false;
     }
-    // Filtro de brillo: lee la escena dentro de su zona (zona.js), sin valores no válidos y con el tope del HDR.
+    // Filtro de brillo: lee la escena dentro de su zona (zona.js), sin valores no válidos (NaN, infinitos, negativos) y con el tope del HDR.
     this.highPassUniforms.uZona = { value: new Vector4(1, 1, 1, 1) };
     this.materialHighPassFilter.fragmentShader = this.materialHighPassFilter.fragmentShader
-      .replace('varying vec2 vUv;', `varying vec2 vUv; uniform vec4 uZona; ${GLSL_ZONA}`)
-      .replace('vec4 texel = texture2D( tDiffuse, vUv );', `vec4 texel = min( max( texture2D( tDiffuse, enZona( vUv, uZona ) ), vec4( 0.0 ) ), vec4( ${LIMITE_HDR.toFixed(1)} ) );`);
+      .replace('varying vec2 vUv;', `varying vec2 vUv; uniform vec4 uZona; ${GLSL_ZONA} ${GLSL_VALIDO}`)
+      // Un píxel no válido no entra en el resplandor (si no, su NaN se extendía al difuminar: una mancha negra).
+      .replace('vec4 texel = texture2D( tDiffuse, vUv );', `vec4 texel = texture2D( tDiffuse, enZona( vUv, uZona ) ); texel = noValido( texel.rgb ) ? vec4( 0.0 ) : min( max( texel, vec4( 0.0 ) ), vec4( ${LIMITE_HDR.toFixed(1)} ) );`);
   }
 
   // escala: fracción del búfer de la escena a la que se calcula el primer nivel (UnrealBloomPass usa ½). Con ¼ cuesta

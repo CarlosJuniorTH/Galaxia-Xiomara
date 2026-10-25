@@ -63,7 +63,7 @@ export function crearVelocidad(camera, { reducido = false } = {}) {
       }`,
     fragmentShader: /* glsl */`
       varying float vA, vLado, vLargo; varying vec3 vC;
-      void main(){ float a = vA * pow(max(0.0, 1.0 - vLado * vLado), 1.5) * pow(1.0 - vLargo, 1.3);
+      void main(){ float a = vA * pow(max(0.0, 1.0 - vLado * vLado), 1.5) * pow(max(0.0, 1.0 - vLargo), 1.3);   // acotado: extrapolado en el borde (MSAA) daba pow(negativo) = NaN, un punto negro
         vec3 c = mix(vec3(1.0), vC, smoothstep(0.0, 0.35, vLargo));                      // cabeza blanca, cola de color
         gl_FragColor = vec4(c * a, a); }`,
     transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide

@@ -43,5 +43,20 @@ export function crearRutas({ camera, mundos }) {
     }
     return { paso: llegadaEnOrbita(camera.position, hasta, objetivo), mirarAntes: 1.7, corriente: 1 };
   }
-  return { llegadaEnOrbita, recta, pasoHacia };
+  // Entrada al sistema solar: tras el cambio de escena la cámara mira al Sol (sol) desde donde venía. Primero sigue hacia él,
+  // en recta y sin dejar de mirarlo, hasta entrar entre las órbitas (a algo más de la distancia del destino al Sol); allí gira
+  // suave hacia el destino y llega a él con su arco de siempre (llegadaEnOrbita). giroMirada: en qué tramo del recorrido
+  // (fracción de 0 a 1) pasa la mirada del Sol al destino.
+  function entradaPorElSol(desde, sol, hasta, objetivo) {
+    const r0 = desde.distanceTo(sol), dentro = Math.min(r0 * 0.7, Math.max(1800, objetivo.distanceTo(sol) * 1.35));
+    const haciaFuera = desde.clone().sub(sol).normalize(), giro = sol.clone().addScaledVector(haciaFuera, dentro);
+    const recto = [0.35, 0.7].map(f => desde.clone().lerp(giro, f));
+    const llegada = llegadaEnOrbita(giro, hasta, objetivo);
+    // Longitud aproximada de cada tramo (la curva pasa por estos puntos) para situar el giro de la mirada.
+    let total = 0, hastaGiro = 0, previo = desde;
+    for (const p of [...recto, giro, ...llegada, hasta]) { total += previo.distanceTo(p); if (p === giro) hastaGiro = total; previo = p; }
+    const f = hastaGiro / Math.max(1, total);
+    return { paso: [...recto, giro, ...llegada], giroMirada: [f * 0.7, Math.min(0.97, f + (1 - f) * 0.7)], centroDesde: sol.clone(), corriente: 1 };
+  }
+  return { llegadaEnOrbita, recta, pasoHacia, entradaPorElSol };
 }

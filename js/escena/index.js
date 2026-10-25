@@ -202,7 +202,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   let escenaActiva = 'principal', solarPreparado = false;
   function cambiarEscena(cual) {
     const destino = cual === 'solar' ? solar.escena : scene;
-    for (const o of cieloLejano) destino.add(o);
+    // El cielo lejano (estrellas, galaxias, Vía Láctea, cosmos con sus gigantes) ya no viaja al sistema solar: desde allí solo
+    // se ve el centro de nuestra galaxia (solar.js). Antes se traía entero y sus gigantes (cuásar, púlsar), diminutos y con el
+    // suavizado MSAA de esta escena, se llenaban de puntos y líneas negras; la lente de TON 618 también deformaba la vista.
     destino.add(camera);   // las estelas de la luz viajan con la cámara
     nucleo.fijarEscena(destino); escenaActiva = cual;
   }
@@ -408,12 +410,13 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   let trasFundido = false, tramoRestante = null, compuesto = null;
   // viaje: es un viaje entre lugares (dura lo que dice duracionViaje según la distancia); si no, un movimiento de cámara
   // con su duración propia (acercarse a la supernova, la vuelta alrededor de un lugar, el paseo contemplativo…).
-  function desplazar(hasta, objetivo, duracion = 4.8, alLlegar, { paso = [], mirarAntes = 1, corriente = 0.45, fija = false, avance = null, viaje = false } = {}) {
+  // giroMirada [a, b]: la mirada pasa de centroDesde (por defecto, lo que se miraba) al destino entre esas fracciones del recorrido.
+  function desplazar(hasta, objetivo, duracion = 4.8, alLlegar, { paso = [], mirarAntes = 1, corriente = 0.45, fija = false, avance = null, viaje = false, giroMirada = null, centroDesde: mirarDesde = null } = {}) {
     if (trasFundido) avance ??= 'posarse';
     vuelo?.resolver(false); if (vuelo?.plan) limpiarVuelo();
     let resolver;
     const promesa = new Promise(r => (resolver = r));
-    const desde = camera.position.clone(), centroDesde = controls.target.clone();
+    const desde = camera.position.clone(), centroDesde = (mirarDesde ?? controls.target).clone();
     let puntos = sinRepetidos([desde, ...paso, hasta.clone()]);
     if (puntos.length < 2) puntos = [desde, hasta.clone().add(new THREE.Vector3(0, 0.5, 0))];
     if (!paso.length) { const intermedio = desde.clone().lerp(hasta, 0.5); intermedio.y += Math.min(450, desde.distanceTo(hasta) * 0.17); puntos = [desde, intermedio, hasta.clone()]; }
@@ -421,7 +424,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // Los viajes largos no atraviesan cuerpos: la galaxia y los objetos del cosmos (TON 618,
     // Sagitario A*, el cuásar, el púlsar, la supernova) son obstáculos con su radio real.
     const curva = esquivar(base, desde, hasta, [...OBSTACULOS, ...(desde.distanceTo(hasta) > 20000 ? [GALAXIA_OBSTACULO, ...cosmos.cuerpos().slice(1).map(c => ({ c: c.centro, r: c.radio }))] : [])], { porDistancia: true });
-    vuelo = { curva, centroDesde, objetivo: objetivo.clone(), transcurrido: 0, duracion: viaje ? tramoRestante ?? duracionViaje(desde.distanceTo(hasta)) * (viajeBreve ? 0.7 : 1) : duracion, fija, distanciaTotal: curva.getLength(), llegada: hasta.distanceTo(objetivo), salida: Math.max(400, desde.distanceTo(centroDesde)), resolver, alLlegar, mirarAntes, corriente,
+    vuelo = { curva, centroDesde, objetivo: objetivo.clone(), transcurrido: 0, duracion: viaje ? tramoRestante ?? duracionViaje(desde.distanceTo(hasta)) * (viajeBreve ? 0.7 : 1) : duracion, fija, distanciaTotal: curva.getLength(), llegada: hasta.distanceTo(objetivo), salida: Math.max(400, desde.distanceTo(centroDesde)), resolver, alLlegar, mirarAntes, corriente, giroMirada,
       // Al cometa se llega persiguiéndolo: el vuelo se desplaza con él mientras avanza.
       cometaInicio: destinoActual === 'cometa' ? mundos.posicionCometa() : null, continuacion: trasFundido, perfil: paso.length > 0 || corriente >= 1, avance: avance && AVANCE[avance],
       // Con qué pantalla y qué encuadre ideal se trazó esta curva: si gira o cambia la interfaz
@@ -634,7 +637,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     marca.style.transform = `translate(${Math.round(marcaEstado.x * dpr) / dpr}px, ${Math.round(marcaEstado.y * dpr) / dpr}px)`;
   }
   // Rutas de los viajes cortos (camara/rutas.js).
-  const { recta, pasoHacia } = crearRutas({ camera, mundos });
+  const { recta, pasoHacia, entradaPorElSol } = crearRutas({ camera, mundos });
   // Encuadre del corazón de la supernova: mide su tamaño real y la franja de pantalla que dejan
   // libre la cabecera y el texto, y coloca el centro del corazón en el centro de esa franja,
   // entero y con margen, en vertical y en horizontal.
@@ -692,6 +695,11 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // hacia fuera), un fundido suave a oscuro mientras la cámara aún avanza, el cambio de escena tapado, y al otro lado el
   // viaje sigue ya en marcha mientras la imagen vuelve. El viaje entero dura lo que dice la regla (10–15 s): el primer
   // tramo ~40 % (desde un gigante lejano, el vuelo por fases hasta casa y ~4 s para el sistema solar) y el segundo, lo que queda.
+  // Ruta y mirada: se llega al punto del brazo en recta y mirándolo (allí está el Sol); al otro lado del fundido la cámara sigue
+  // en la misma dirección, mirando al Sol, entra hacia él y ya dentro gira hacia el destino (entradaPorElSol, camara/rutas.js).
+  // Al salir, se aparece en el brazo mirando hacia donde se iba. Antes se aparecía siempre en el mismo punto fijo
+  // (ENTRADA_SOLAR) mirando al Sol desde un lado cualquiera, y el viaje torcía la mirada hacia el destino desde el
+  // principio: la cámara «enfocaba a un costado».
   const ENTRADA_SOLAR = new THREE.Vector3(1900, 1500, 7800), ORIGEN = new THREE.Vector3();
   const fundido = document.createElement('div'); fundido.id = 'fundido-escena'; fundido.setAttribute('aria-hidden', 'true'); document.body.append(fundido);
   let esperaFundido = 0;
@@ -703,13 +711,25 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     if (id === 'cometa') return mundos.posicionCometa();
     const d = DESTINOS.find(x => x.id === id); return d ? v3(d.posicion) : new THREE.Vector3();
   }
+  // El sistema solar vive en el marco propio de la galaxia (sin su giro lento): entre las dos escenas, las direcciones se giran
+  // alrededor de Y lo que ha girado el punto del brazo desde el inicio (brazoInicial, con el que solar.js orienta el centro galáctico).
+  const giroBrazo = () => { const p = galaxia.puntoBrazo(); return Math.atan2(p.x, p.z) - Math.atan2(brazoInicial.x, brazoInicial.z); };
+  let entradaSolar = false;   // el próximo viaje sale del fundido al sistema solar: pasa primero hacia el Sol (viajar)
+  function colocarEntradaSolar(dirPrincipal) {
+    const dir = dirPrincipal.clone().applyAxisAngle(EJE_Y, -giroBrazo());
+    // Algo por encima (o por debajo) del plano de las órbitas, entre ~9° y ~40°: se ven las órbitas, ni de canto ni desde el polo.
+    const h = Math.hypot(dir.x, dir.z), elev = Math.atan2(-dir.y, h), e = Math.sign(elev || 1) * THREE.MathUtils.clamp(Math.abs(elev), 0.15, 0.7);
+    const horiz = h > 1e-4 ? new THREE.Vector3(dir.x / h, 0, dir.z / h) : ENTRADA_SOLAR.clone().setY(0).normalize().negate();
+    camera.position.copy(horiz).multiplyScalar(-Math.cos(e)).setY(Math.sin(e)).multiplyScalar(ENTRADA_SOLAR.length());
+    controls.target.copy(ORIGEN); camera.lookAt(ORIGEN);
+  }
   async function entrarOSalir(id, opciones) {
     const haciaSolar = SOLARES.has(id);
     destinoActual = id; mundos.enfocar(id); alViajar(id); soltarCielo();
     const desdeUniverso = escenaActiva === 'solar' ? galaxia.puntoBrazo() : camera.position.clone();
     const total = duracionViaje(desdeUniverso.distanceTo(posicionUniverso(id))) * (viajeBreve ? 0.7 : 1);
     const mio = compuesto = { fin: performance.now() + total * 1000 };
-    let primero;
+    let primero, fuera = null;
     if (haciaSolar) {
       const p = galaxia.puntoBrazo();
       if (camera.position.distanceTo(p) > 20000) {
@@ -717,9 +737,13 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
         tramoRestante = Math.max(6, total - 4);
         primero = volarCinematico(p.clone().addScaledVector(camera.position.clone().sub(p).normalize(), 500), p, { centro: p, rAprox: 9000 });
         tramoRestante = null;
-      } else primero = desplazar(p.clone().add(new THREE.Vector3(0, 3, 0)), p, total * 0.42, undefined, { corriente: 1, mirarAntes: 1.5, avance: 'acercarse' });
+      } else {
+        // En recta hacia el punto del brazo, mirándolo: el Sol queda en el centro de la pantalla todo el tramo.
+        const haciaSol = p.clone().sub(camera.position).normalize();
+        primero = desplazar(p.clone().addScaledVector(haciaSol, -3), p, total * 0.42, undefined, { paso: recta(camera.position, p), corriente: 1, mirarAntes: 1.5, avance: 'acercarse' });
+      }
     } else {
-      const fuera = camera.position.clone().setY(0).normalize().multiplyScalar(9500).add(new THREE.Vector3(0, 1800, 0));
+      fuera = camera.position.clone().setY(0).normalize().multiplyScalar(9500).add(new THREE.Vector3(0, 1800, 0));
       primero = desplazar(fuera, fuera.clone().multiplyScalar(2), THREE.MathUtils.clamp(total * 0.3, 3, 4.5), undefined, { corriente: 1, avance: 'acercarse' });
     }
     // El fundido a oscuro empieza medio segundo antes del final del primer tramo (la cámara sigue avanzando debajo).
@@ -728,18 +752,21 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     if (!ok || destinoActual !== id || compuesto !== mio) { if (compuesto === mio) { compuesto = null; quitarFundido(); } return false; }
     clearTimeout(esperaFundido); fundido.classList.add('activo');
     if (haciaSolar) {
+      // Al otro lado, en la dirección en que se llegaba al punto del brazo (la cámara mira al Sol).
+      const dir = galaxia.puntoBrazo().sub(camera.position).normalize();
       cambiarEscena('solar');
-      camera.position.copy(ENTRADA_SOLAR); controls.target.copy(ORIGEN); camera.lookAt(ORIGEN);
+      colocarEntradaSolar(dir); entradaSolar = true;
     } else {
       cambiarEscena('principal');
-      const p = galaxia.puntoBrazo(), sale = p.clone().setY(0).normalize();
+      // Se sale en la dirección en que se iba (pasada al marco de la escena principal).
+      const p = galaxia.puntoBrazo(), sale = fuera.clone().normalize().applyAxisAngle(EJE_Y, giroBrazo());
       camera.position.copy(p).addScaledVector(sale, 30).add(new THREE.Vector3(0, 14, 0)); controls.target.copy(p).addScaledVector(sale, 600); camera.lookAt(controls.target);
     }
     camaraAntes.copy(camera.position);
     // (Los dos los usa el desplazamiento o el vuelo que viajar crea en el acto.)
     trasFundido = true; tramoRestante = Math.max(3, (mio.fin - performance.now()) / 1000);
     const viaje = viajar(id, { ...opciones, continuacion: true });
-    trasFundido = false; tramoRestante = null;
+    trasFundido = false; tramoRestante = null; entradaSolar = false;
     // La imagen vuelve en el cuadro siguiente (ya con la escena nueva dibujada).
     requestAnimationFrame(() => requestAnimationFrame(() => { if (compuesto === mio) fundido.classList.remove('activo'); }));
     viaje.then(() => { if (compuesto === mio) compuesto = null; });
@@ -805,6 +832,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // a 12 000 de ella (fuera de su disco); el arco final, amplio, llega de frente al encuadre de casa.
     if (id === 'hogar' && recorrido > 20000 && escenaActiva === 'principal') return volarCinematico(hasta, objetivo, { centro: new THREE.Vector3(), rAprox: 12000 });
     if (recorrido > 60000) opciones.corriente = 1;
+    // Recién entrados en el sistema solar: primero hacia el Sol, mirándolo, y luego el giro hacia el destino.
+    if (entradaSolar) Object.assign(opciones, entradaPorElSol(camera.position, ORIGEN, hasta, objetivo));
     return desplazar(hasta, objetivo, duracion, undefined, { ...opciones, viaje: esViaje });
   }
   // Reencuadre al cambiar la ventana (girar el móvil, redimensionar, mostrar u ocultar la
@@ -950,6 +979,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
         // el resto del viaje (sin giros dramáticos ni mirar al vacío).
         controls.target.lerpVectors(vuelo.centroDesde, destinoMirada, giro ? THREE.MathUtils.smootherstep(k, 0, giro * 0.95) : THREE.MathUtils.smoothstep(k, 0, 0.22));
       }
+      // Giro de la mirada en un tramo del recorrido (entrada al sistema solar: mira al Sol y luego al destino).
+      if (vuelo.giroMirada) controls.target.lerpVectors(vuelo.centroDesde, destinoMirada, THREE.MathUtils.smootherstep(e, vuelo.giroMirada[0], vuelo.giroMirada[1]));
       camera.lookAt(controls.target);
       }
       if (k >= 1) {
@@ -1190,7 +1221,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
         if (visible) { u.uL.value[i].set((proyectado.x + 1) / 2, (proyectado.y + 1) / 2, rDentro, peso * l.fuerza / (2 * dist * tanMedio)); u.uF.value[i].set(alcance, alcance * 0.55); alguna = true; }
         else u.uL.value[i].set(0, 0, 0, 0);
       });
-      u.uAspecto.value = camera.aspect; nucleo.lente.enabled = alguna;
+      // (En el sistema solar no hay agujeros a la vista: sin lente, que además intercambiaba los búferes y el suavizado MSAA,
+      // que fijarEscena pone solo en el de la escena, se quedaba en cuadros alternos.)
+      u.uAspecto.value = camera.aspect; nucleo.lente.enabled = alguna && escenaActiva !== 'solar';
     }
     // Respiración y temblor del estallido: desplazamientos temporales solo para este cuadro.
     respira = 0;   // sin respiración: la cámara quieta no se acerca, aleja ni balancea (el cielo no se mueve al mirar)

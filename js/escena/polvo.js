@@ -61,7 +61,7 @@ export function crearPolvo({ scene, uPR }) {
         vA = visible(p) * smoothstep(220.0, 900.0, uRapidez) * (0.16 + aSemilla.w * 0.18);
         vLado = aEsquina.y; vLargo = aEsquina.x;
       }`,
-    fragmentShader: 'varying float vA, vLado, vLargo; void main(){ float a = vA * (1.0 - vLado * vLado) * pow(1.0 - vLargo, 1.4); gl_FragColor = vec4(vec3(1.0, 0.94, 0.97) * a, a); }',
+    fragmentShader: 'varying float vA, vLado, vLargo; void main(){ float a = vA * max(0.0, 1.0 - vLado * vLado) * pow(max(0.0, 1.0 - vLargo), 1.4); gl_FragColor = vec4(vec3(1.0, 0.94, 0.97) * a, a); }',
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide
   }));
   for (const o of [puntos, lineas]) { o.frustumCulled = false; o.renderOrder = 3; scene.add(o); }

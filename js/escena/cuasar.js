@@ -434,6 +434,8 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
   // Acento de luz (el faro): un brillo rosado y dorado que sube por cada chorro. uAc: su posición a lo largo
   // del chorro (0 base, 1 punta; negativo: apagado). Compartido por todas las capas.
   const uAc = { value: -1 };
+  // (En los sombreadores de los chorros, vCara y l se acotan antes de pow: en un píxel que el triángulo solo roza, la GPU
+  // puede extrapolar las variables un poco fuera de su rango —con MSAA, siempre— y pow de un negativo da NaN: un punto negro.)
   const capaChorro = ({ rBase, rPunta, colorA, colorB, intensidad, helice }) => {
     const geo = new THREE.CylinderGeometry(rPunta, rBase, LARGO, 48, 24, true); geo.translate(0, LARGO / 2, 0);
     return new THREE.Mesh(geo, aditivo({ uT: { value: 0 }, uA: { value: C(colorA) }, uB: { value: C(colorB) }, uI: { value: intensidad }, uH: { value: helice }, uAc },
@@ -442,9 +444,9 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
         void main(){ float l = vU.y;
           float hel = mix(1.0, 0.55 + 0.45 * pow(0.5 + 0.5 * sin(vU.x * 6.2832 * 3.0 + l * 38.0 - uT * 5.0), 3.0), uH);
           float nudos = 1.0 + 1.4 * pow(0.5 + 0.5 * sin(l * 26.0 - uT * 3.2), 10.0) + 3.0 * exp(-pow((l - fract(uT * 0.12)) / 0.025, 2.0));   // el latido del faro: un pulso de luz sube cada ≈ 8 s
-          float f = pow(vCara, 1.6) * pow(1.0 - l, 1.3) * smoothstep(0.0, 0.015, l) * hel * nudos;
-          float ac = uAc < 0.0 ? 0.0 : exp(-pow((l - uAc) / 0.035, 2.0)) * pow(vCara, 1.2) * smoothstep(0.0, 0.03, l) * (1.0 - smoothstep(0.85, 1.0, uAc));
-          gl_FragColor = vec4(mix(uA, uB, pow(l, 0.6)) * f * uI + vec3(1.0, 0.72, 0.82) * ac * uI * mix(0.12, 1.1, step(uH, 0.5)), min(1.0, f * uI + ac * uI * mix(0.12, 1.0, step(uH, 0.5)))); }`));   // sobre todo en la columna fina: un hilo de luz, no una mancha
+          float f = pow(max(vCara, 0.0), 1.6) * pow(max(1.0 - l, 0.0), 1.3) * smoothstep(0.0, 0.015, l) * hel * nudos;
+          float ac = uAc < 0.0 ? 0.0 : exp(-pow((l - uAc) / 0.035, 2.0)) * pow(max(vCara, 0.0), 1.2) * smoothstep(0.0, 0.03, l) * (1.0 - smoothstep(0.85, 1.0, uAc));
+          gl_FragColor = vec4(mix(uA, uB, pow(max(l, 0.0), 0.6)) * f * uI + vec3(1.0, 0.72, 0.82) * ac * uI * mix(0.12, 1.1, step(uH, 0.5)), min(1.0, f * uI + ac * uI * mix(0.12, 1.0, step(uH, 0.5)))); }`));   // sobre todo en la columna fina: un hilo de luz, no una mancha
   };
   chorros.renderOrder = 20;
   let hazMedida = null;
@@ -461,7 +463,7 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
         void main(){ float l = vU.y, a = vU.x * 6.2831853;
           // Lo que no puede verse se descarta antes de calcular el ruido (mismo resultado, menos trabajo: la máscara de
           // borde y de largo, y luego la de huecos; con f < 0,01 la luz que aportaría es < 0,0002, invisible).
-          float m = pow(vCara, 2.0) * smoothstep(0.02, 0.12, l) * (1.0 - smoothstep(0.6, 1.0, l));
+          float m = pow(max(vCara, 0.0), 2.0) * smoothstep(0.02, 0.12, l) * (1.0 - smoothstep(0.6, 1.0, l));
           if (m * 1.7 < 0.01) discard;
           vec3 q = vec3(cos(a) * 1.2, sin(a) * 1.2, l * 9.0 - uT * 0.08) + uS;
           vec3 w = q + (vec3(fbm3(q * 1.3), fbm3(q * 1.3 + 4.0), fbm3(q * 1.3 + 8.0)) - 0.5) * 1.6;
@@ -483,11 +485,11 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
     const nubeFin = new THREE.Mesh(new THREE.SphereGeometry(1700, 48, 32), aditivo({ uT: { value: 0 }, uS: { value: s > 0 ? 2.3 : 7.1 }, uRuido: { value: texturaRuido() } },
       'varying vec3 vP; varying float vCara; void main(){ vP = position / 1700.0; vec4 mv = modelViewMatrix * vec4(position, 1.0); vCara = abs(dot(normalize(normalMatrix * normal), normalize(-mv.xyz))); gl_Position = projectionMatrix * mv; }',
       /* glsl */`uniform float uT, uS; varying vec3 vP; varying float vCara; ${RUIDO_RAPIDO}
-        void main(){ if (pow(vCara, 1.5) * 0.45 * 1.35 < 0.01) discard;
+        void main(){ if (pow(max(vCara, 0.0), 1.5) * 0.45 * 1.35 < 0.01) discard;
           vec3 q = vP * 1.6 + uS + vec3(0.0, uT * 0.02, 0.0);
           vec3 w = q + (vec3(fbm3(q * 1.2), fbm3(q * 1.2 + 4.0), fbm3(q * 1.2 + 8.0)) - 0.5) * 1.4;
           float hebra = pow(1.0 - abs(fbm3(w * 2.4) * 2.0 - 1.0), 7.0), nube = smoothstep(0.5, 0.8, fbm3(w * 1.5 + 9.0));
-          float f = (hebra + nube * 0.35) * pow(vCara, 1.5) * 0.45;
+          float f = (hebra + nube * 0.35) * pow(max(vCara, 0.0), 1.5) * 0.45;
           if (f < 0.01) discard;   // invisible (aportaría < 0,0001): se ahorra el ruido del color
           vec3 c = mix(vec3(0.45, 0.5, 1.0), vec3(0.85, 0.9, 1.0), hebra); c = mix(c, vec3(0.75, 0.45, 1.0), smoothstep(0.5, 0.8, fbm3(w + 3.0)) * 0.5);
           gl_FragColor = vec4(c * f, f); }`));

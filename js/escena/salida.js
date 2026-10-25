@@ -39,6 +39,16 @@ export function enfocar(centro, vecinos, k) {
   return Math.min(mx, Math.max(mn, v));
 }
 
+// Píxel no válido (NaN o infinito). isnan/isinf existen desde GLSL ES 3.00; en WebGL 1, la comparación consigo mismo y el
+// tope (un infinito en media precisión pasa de 65 504). Se comprueba de forma explícita: max(NaN, 0) da 0 en unas GPU y NaN
+// en otras, así que «limpiar» por sí solo dejaba el píxel NEGRO (o lo propagaba por el resplandor).
+export const GLSL_VALIDO = /* glsl */`
+  #if __VERSION__ >= 300
+  bool noValido(vec3 c) { return any(isnan(c)) || any(isinf(c)); }
+  #else
+  bool noValido(vec3 c) { return any(notEqual(c, c)) || any(greaterThan(abs(c), vec3(1e30))); }
+  #endif`;
+
 const fragmentShader = /* glsl */`
   uniform sampler2D tDiffuse;
   uniform sampler2D tBrillo;
@@ -52,7 +62,25 @@ const fragmentShader = /* glsl */`
   // max/min devuelven el operando válido ante un NaN en las GPU habituales (Metal, NVIDIA, Mali).
   vec3 limpiar(vec3 c) { return min(max(c, vec3(0.0)), vec3(${LIMITE_HDR.toFixed(1)})); }
   vec3 aSrgb(vec3 c) { return mix(1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, c * 12.92, vec3(lessThanEqual(c, vec3(0.0031308)))); }
-  vec3 muestra(vec2 uv) { return aSrgb(limpiar(texture2D(tDiffuse, min(uv, uZona.zw)).rgb)); }
+  ${GLSL_VALIDO}
+  vec3 cruda(vec2 uv) { return texture2D(tDiffuse, min(uv, uZona.zw)).rgb; }
+  // Un NaN o un infinito suelto en la escena (p. ej. un pow de un negativo en el borde de un triángulo con MSAA) no se pinta
+  // negro: se rellena con la media de sus vecinos válidos. Con el reescalado del móvil (bicúbica + enfoque, 9 lecturas) un solo
+  // píxel así ennegrecía un bloque de 4×4 en la pantalla. La rama solo se toma en esos píxeles: no cuesta nada.
+  vec3 muestra(vec2 uv) {
+    vec3 c = cruda(uv);
+    if (noValido(c)) {
+      vec3 suma = vec3(0.0); float n = 0.0;
+      // A 1 y 2 píxeles en cruz: cubre también las rayitas de 3 píxeles que dejaban las estelas.
+      for (int i = 0; i < 8; i++) {
+        float r = i < 4 ? 1.0 : 2.0; int j = i - (i / 4) * 4;
+        vec2 d = (j == 0 ? vec2(1.0, 0.0) : j == 1 ? vec2(-1.0, 0.0) : j == 2 ? vec2(0.0, 1.0) : vec2(0.0, -1.0)) * uTexel * r;
+        vec3 v = cruda(uv + d); if (!noValido(v)) { suma += v; n += 1.0; }
+      }
+      c = n > 0.0 ? suma / n : vec3(0.0);
+    }
+    return aSrgb(limpiar(c));
+  }
   // Ampliación bicúbica Catmull-Rom con 5 lecturas filtradas (la bilineal emborronaba bordes y estrellas al ampliar):
   // conserva la nitidez de lo que se dibujó a menos resolución que la pantalla.
   vec3 bicubica(vec2 uv) {
@@ -72,7 +100,8 @@ const fragmentShader = /* glsl */`
       vec3 mn = min(c, min(min(n, s), min(e, o))), mx = max(c, max(max(n, s), max(e, o)));
       c = clamp(c + (4.0 * c - (n + s + e + o)) * uNitidez, mn, mx);
     }
-    c += limpiar(texture2D(tBrillo, enZona(vUv, uZonaBrillo)).rgb) * uBrillo;
+    vec3 brillo = texture2D(tBrillo, enZona(vUv, uZonaBrillo)).rgb;
+    c += (noValido(brillo) ? vec3(0.0) : limpiar(brillo)) * uBrillo;
     float m = max(max(c.r, c.g), c.b);
     if (m > ${CODO.toFixed(3)}) {
       float s = ${CODO.toFixed(3)} + ${(1 - CODO).toFixed(3)} * (1.0 - exp(-(m - ${CODO.toFixed(3)}) / ${(1 - CODO).toFixed(3)}));
