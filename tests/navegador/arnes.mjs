@@ -27,27 +27,34 @@ let servidor = null;
 export async function arrancarServidor(puerto = Number(process.env.PUERTO_PRUEBAS || 8091)) {
   if (process.env.BASE) return process.env.BASE;
   servidor = spawn('python3', [path.join(RAIZ, 'scripts/servir.py'), '--port', String(puerto)], { cwd: RAIZ, stdio: ['ignore', 'pipe', 'pipe'] });
+  // El registro de peticiones sale por stderr: si nadie lo lee, al llenarse la tubería (~64 KB) el servidor se bloquea y
+  // las páginas siguientes no cargan (pasaba tras varias visitas seguidas en la misma ejecución).
+  servidor.stderr.resume();
   await new Promise((ok, mal) => { const t = setTimeout(() => mal(new Error('el servidor de pruebas no arrancó')), 10000); servidor.stdout.on('data', d => { if (String(d).includes('Universo listo')) { clearTimeout(t); ok(); } }); servidor.on('exit', c => mal(new Error('servidor terminado: ' + c))); });
   return `http://127.0.0.1:${puerto}`;
 }
 export function pararServidor() { servidor?.kill(); servidor = null; }
 
 // Chromium con una página en blanco (sin abrir aún el universo).
-export async function lanzar(perfil = 'pc') {
+// musica: false (por defecto) hace que las canciones (assets/musica/*.m4a, que no están en el repositorio) respondan 404,
+// como en GitHub Pages: la web va como siempre, sin pantalla de toque, y las comprobaciones no dependen de esos archivos.
+// (Los audios de prueba de assets/musica/prueba/, con ?pruebaAudio, no se bloquean.)
+export async function lanzar(perfil = 'pc', { musica = false } = {}) {
   if (!existsSync(CHROME)) { console.error('No encuentro Chromium en ' + CHROME + ' (variable CHROME).'); process.exit(2); }
   const navegador = await chromium.launch({ executablePath: CHROME, headless: true, args: process.env.GL === 'sw' ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : ['--enable-gpu', '--ignore-gpu-blocklist', '--use-angle=vulkan', '--enable-features=Vulkan'] });
   const contexto = await navegador.newContext(PERFILES[perfil]);
+  if (!musica) await contexto.route('**/assets/musica/*.m4a', r => r.fulfill({ status: 404, body: '' }));
   const pagina = await contexto.newPage();
   const errores = [];
-  pagina.on('console', m => { if (m.type() === 'error') errores.push(m.text()); });
+  pagina.on('console', m => { if (m.type() === 'error' && !/status of 404/.test(m.text())) errores.push(m.text()); });
   pagina.on('pageerror', e => errores.push('pageerror: ' + e.message));
   return { navegador, pagina, errores };
 }
 
 // toque: con canción de portada (?pruebaAudio) hay que pulsar «Toca para empezar ♡» antes; la tarjeta para entrar sale en
 // la marca «tarjeta» de la canción (no basta con que el botón esté preparado: hasta entonces la tarjeta no se ve).
-export async function abrir(base, perfil = 'pc', { espera = 2500, calidad = 'alta', consulta = '', toque = false } = {}) {
-  const { navegador, pagina, errores } = await lanzar(perfil);
+export async function abrir(base, perfil = 'pc', { espera = 2500, calidad = 'alta', consulta = '', toque = false, musica = false } = {}) {
+  const { navegador, pagina, errores } = await lanzar(perfil, { musica });
   await pagina.goto(`${base}/?calidad=${calidad}${consulta}#debug`);
   if (toque) { await pagina.waitForSelector('#toque:not([hidden])', { timeout: 30000 }); await pagina.click('#toque'); await pagina.waitForFunction(() => document.getElementById('entrada').classList.contains('formado'), null, { timeout: 120000 }); await pagina.waitForTimeout(1400); }
   await pagina.waitForFunction(() => document.getElementById('btn-entrar')?.classList.contains('preparado'), null, { timeout: 90000 });

@@ -42,9 +42,10 @@ export function crearSupernovaAmor({ escena, progreso, musica, alDescubrir = () 
     raiz.hidden = false; document.body.classList.add('supernova-en-escena'); escena.detenerGiro(true);
     vigilancia = setInterval(() => { if (escena.destino !== 'supernova') cerrar(); }, 250);
     mostrarFase('encuentro');
-    sonido = musica.supernova?.();
     try {
-      const terminado = await escena.verEstallido({ repetir, alFase: fase => { if (activa && mia === revision) mostrarFase(fase); } });
+      // El sonido (la canción de la supernova, o los tonos sintéticos sin ella) empieza con la cuenta atrás de la escena:
+      // espera = lo que le falta para estallar (si ya había empezado, la canción entra por ese mismo segundo).
+      const terminado = await escena.verEstallido({ repetir, alEmpezar: espera => { if (activa && mia === revision) sonido = musica.supernova?.(espera); }, alFase: fase => { if (activa && mia === revision) mostrarFase(fase); } });
       if (activa && mia === revision && terminado) { mostrarFase('recuerdo'); await new Promise(r => setTimeout(r, 4500)); }
     } catch (error) { console.warn('La supernova conserva su recuerdo:', error); }
     if (mia === revision) cerrar();

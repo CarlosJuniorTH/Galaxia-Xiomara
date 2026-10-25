@@ -1,4 +1,5 @@
 import { crearSonidoSupernova } from './sonidoSupernova.js';
+import { TIEMPOS_AMOR } from '../util/supernovaAmor.js';
 // Canción opcional + una pequeña composición ambiental original, generada en el dispositivo.
 // No necesita descargar audio de terceros. El sonido comienza siempre con un gesto.
 // El ambiente es un canal más del mezclador de la banda sonora (js/ui/bandaSonora.js): la banda decide cuándo se oye
@@ -62,11 +63,12 @@ export function crearMusica(config, banda) {
   boton.addEventListener('click', () => quiere ? pausar() : reproducir());
   // (Al cambiar de aplicación, la banda apaga el ambiente y pausa el contexto; al volver, lo enciende con un fundido.)
   return { reproducir, pausar,
-    supernova() {
+    // espera: segundos que le faltan a la estrella para estallar (la ceremonia empieza ahora).
+    supernova(espera = TIEMPOS_AMOR.espera) {
       if (!quiere) return null;
-      // Con canción propia, la ceremonia la empieza desde el principio (sus fases son marcas de la canción) y no se
-      // superponen los tonos sintéticos.
-      if (banda.tiene('supernova')) { banda.ceremonia('supernova'); return null; }
+      // Con canción propia, la ceremonia la lleva desde su principio (o desde el segundo en que va la cuenta atrás): sus
+      // fases son marcas de la canción y no se superponen los tonos sintéticos.
+      if (banda.tiene('supernova')) { banda.ceremonia('supernova', Math.max(0, TIEMPOS_AMOR.espera - espera)); return null; }
       try { preparar(); } catch { return null; }
       return crearSonidoSupernova({ contexto, salida, permitido: () => quiere,
         atenuar: factor => {

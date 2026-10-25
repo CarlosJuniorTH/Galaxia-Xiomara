@@ -18,7 +18,7 @@ test('la escena pasa por encuentro, silencio, expansión, formación y recuerdo 
   assert.equal(faseSupernova('inestable', 0, 0.4), 'silencio');
   assert.equal(faseSupernova('estallido', 0.5), 'expansion');
   assert.equal(faseSupernova('estallido', 9), 'formacion');
-  assert.equal(faseSupernova('estallido', 17), 'revelacion');
+  assert.equal(faseSupernova('estallido', 13), 'revelacion');
   assert.equal(faseSupernova('estallido', TIEMPOS_AMOR.revelar), 'recuerdo');
   assert.equal(faseSupernova('remanente', 100000), 'recuerdo');
 });
@@ -56,17 +56,31 @@ test('la supernova se puede repetir, conservar y cancelar antes del estallido si
     const sn = crearSupernova({ uScale: { value: 400 }, uPR: { value: 2 }, escala: 40 });
     const vista = new Vector3(0, 0, 4000);
     sn.actualizar(0, vista, vista); assert.equal(sn.estado, 'estable');
-    assert.equal(sn.preparar(), 14); assert.equal(sn.preparar(), 14);
-    sn.actualizar(13.5, vista, vista); assert.equal(sn.fase, 'silencio');
-    sn.actualizar(14, vista, vista); assert.equal(sn.fase, 'expansion');
+    const E = TIEMPOS_AMOR.espera;
+    assert.equal(sn.preparar(), E); assert.equal(sn.preparar(), E);
+    sn.actualizar(E - 0.5, vista, vista); assert.equal(sn.fase, 'silencio');
+    sn.actualizar(E, vista, vista); assert.equal(sn.fase, 'expansion');
     // Sin aros fijos de choque: no quedan anillos quietos tras la explosión.
     const ondas=[];sn.grupo.traverse(o=>{if(o.geometry?.type==='TorusGeometry')ondas.push(o);});
-    sn.actualizar(17,vista,vista); assert.ok(ondas.every(o=>!o.visible),'sin anillos fijos');
-    sn.actualizar(34, vista, vista); assert.equal(sn.fase, 'recuerdo');
+    sn.actualizar(E + 3,vista,vista); assert.ok(ondas.every(o=>!o.visible),'sin anillos fijos');
+    sn.actualizar(E + TIEMPOS_AMOR.revelar + 0.1, vista, vista); assert.equal(sn.fase, 'recuerdo');
     sn.actualizar(10000, vista, vista); assert.equal(sn.estado, 'remanente');
     assert.equal(sn.preparar(), -1, 'el recuerdo no se destruye al visitarlo');
-    sn.reiniciar(); assert.equal(sn.preparar({ repetir: true }), 14);
+    sn.reiniciar(); assert.equal(sn.preparar({ repetir: true }), E);
     sn.recordar(); assert.equal(sn.estado, 'remanente');
     sn.grupo.traverse(o => { const pos = o.geometry?.getAttribute('position'); if(pos) assert.ok(pos.array.every(Number.isFinite)); o.geometry?.dispose(); o.material?.dispose(); });
   } finally { globalThis.document = guardarDocumento; globalThis.matchMedia = guardarMedia; globalThis.location = guardarLocation; }
+});
+
+test('la ceremonia dura lo que «Sparks»: estalla en el pico (41,7 s), se revela con «I said ooh» y la animación solo se estira', async () => {
+  const { faltaAnimacion, faltaReal, desdeAnimacion } = await import('../js/util/supernovaAmor.js');
+  const T = TIEMPOS_AMOR;
+  assert.ok(Math.abs(T.espera - 41.7) < 1e-9 && T.espera + T.formado > 52 && T.espera + T.formado < 58 && T.espera + T.reposo <= 62.4);
+  // Los tramos empiezan y terminan donde la animación de siempre (14 s de espera; 4/16/19/25 tras el estallido), sin saltos.
+  assert.equal(faltaAnimacion(T.espera), 14); assert.equal(faltaAnimacion(0), 0);
+  assert.equal(desdeAnimacion(T.formar), 4); assert.equal(desdeAnimacion(T.formado), 16); assert.equal(desdeAnimacion(T.revelar), 19); assert.equal(desdeAnimacion(T.reposo), 25);
+  let a = -1, b = -1; for (let x = 0; x <= 70; x += 0.01) { const fa = faltaAnimacion(Math.min(x, T.espera)), da = desdeAnimacion(x); assert.ok(fa >= a - 1e-9 && da > b); a = fa; b = da; }
+  for (const f of [0.5, 3.8, 7, 9.5, 13]) assert.ok(Math.abs(faltaAnimacion(faltaReal(f)) - f) < 1e-9);
+  // La formación ocurre a la vez que en la animación original, en su reloj: la revelación es el corazón ya formado.
+  assert.equal(faseSupernova('estallido', T.formado - 0.01), 'formacion'); assert.equal(faseSupernova('estallido', T.formado + 0.01), 'revelacion');
 });

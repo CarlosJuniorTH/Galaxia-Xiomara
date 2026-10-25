@@ -50,7 +50,7 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     avisar('Un paseo sin prisa por nuestro universo. Toca la pantalla cuando quieras volver.');
     setTimeout(() => { if (contemplando && mia === revisionContemplar) for (const evento of ['pointerdown', 'keydown']) document.addEventListener(evento, terminarContemplar, { once: true, capture: true }); }, 900);
     for (let i = 0; contemplando && mia === revisionContemplar; i = (i + 1) % ORDEN_CONTEMPLAR.length) {
-      const llegado = await escena.viajar(ORDEN_CONTEMPLAR[i], { duracion: 8.5 });
+      const llegado = await escena.viajar(ORDEN_CONTEMPLAR[i], { duracion: 8.5, ritmoPropio: true });   // un paseo, no un viaje: su ritmo
       if (!contemplando || mia !== revisionContemplar) break;
       await esperarContemplando(llegado ? (ORDEN_CONTEMPLAR[i] === 'hogar' ? 20000 : 15000) : 1000, mia);
     }
@@ -153,7 +153,8 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     if (lejano && escena.destino === id && !escena.viajando) { avisar(`Ya estás aquí: ${lejano.nombre}.`); return; }
     const llegado = await escena.viajar(id);
     // Si la estrella aún no ha estallado, al llegar empieza su cuenta atrás; el corazón ya nacido no.
-    if (llegado && id === 'supernova' && actual === 'supernova' && !corazonNacido()) setTimeout(() => { if (actual === 'supernova' && !escena.viajando) accionLugar('supernova'); }, 2500);
+    // En cuanto se llega (sin espera: la ceremonia y su canción empiezan con la llegada).
+    if (llegado && id === 'supernova' && actual === 'supernova' && !corazonNacido() && !escena.viajando) accionLugar('supernova');
     if (llegado && escenasGigantes.tiene(id) && actual === id) escenasGigantes.abrir(id);
     if (llegado) { progreso.anotar('visitas', id); if (id === 'constelacion') avisar('La luz blanca te muestra por dónde empezar. Puedes tocar las luces o unirlas con el botón.'); }
   }

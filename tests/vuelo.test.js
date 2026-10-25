@@ -1,11 +1,12 @@
-// Vuelo por fases (A selección, B maniobra, C alineación, D ruptura, E crucero, F aproximación,
-// G llegada) por el universo real del catálogo: maniobra segura, alineación antes del salto, crucero
+// Vuelo por fases (A selección, B maniobra, C alineación, E crucero, F aproximación, G llegada; sin la ruptura del
+// antiguo salto) por el universo real del catálogo: maniobra segura, alineación antes de arrancar, crucero
 // recto, mirando siempre al destino, más rápido que la luz, con el paisaje del camino pasando por
 // los bordes; velocidad continua, saltar, modalidad breve y movimiento reducido.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { planificarVuelo, distanciaAlCorredor, FASES } from '../js/util/vuelo.js';
+import { duracionViaje } from '../js/util/aproximacion.js';
 import { holgura } from '../js/util/ruta.js';
 import { universoCatalogo, distanciaSegmento } from '../js/data/catalogo.js';
 import { aMal, LLEGADA_GIGANTE, SEMIEJES_CORAZON } from '../js/data/escalaCosmica.js';
@@ -39,12 +40,17 @@ for (const [nombre, e] of Object.entries(ESCENARIOS)) {
     for (let i = 0; i <= N; i++) muestras.push({ t: i * dt, ...plan.evaluar(i * dt) });
     // Orden de fases (A → G) y fases del viaje presentes.
     let ultima = 0; for (const m of muestras) { const k = FASES.indexOf(m.fase); assert.ok(k >= ultima, `${nombre}: fase ${m.fase} después de ${FASES[ultima]}`); ultima = k; }
-    for (const f of ['ruptura', 'crucero', 'aproximacion', 'llegada']) assert.ok(muestras.some(m => m.fase === f), `${nombre}: tiene ${f}`);
-    // Sin estelas hasta el salto.
+    for (const f of ['crucero', 'aproximacion', 'llegada']) assert.ok(muestras.some(m => m.fase === f), `${nombre}: tiene ${f}`);
+    // Sin salto: ni fase de ruptura ni su destello.
+    assert.ok(muestras.every(m => m.fase !== 'ruptura' && m.ruptura === 0), `${nombre}: sin ruptura`);
+    // Sin estelas hasta arrancar, y entran poco a poco (sin golpe).
     for (const m of muestras) if (['seleccion', 'maniobra', 'alineacion'].includes(m.fase)) assert.equal(m.corriente, 0, `${nombre}: estelas durante ${m.fase}`);
-    // Alineada antes del salto: al empezar la ruptura, la mirada apunta por el corredor.
-    const r0 = muestras.find(m => m.fase === 'ruptura'), dirCorr = plan.recta.v2.clone().sub(plan.recta.v1).normalize();
-    assert.ok(r0.mira.clone().sub(r0.pos).normalize().angleTo(dirCorr) < 0.02, `${nombre}: alineación al saltar`);
+    for (let i = 1; i < muestras.length; i++) assert.ok(Math.abs(muestras[i].corriente - muestras[i - 1].corriente) < 0.05, `${nombre}: las estelas entran de golpe`);
+    // Alineada antes de arrancar: al empezar el crucero, la mirada apunta por el corredor.
+    const r0 = muestras.find(m => m.fase === 'crucero'), dirCorr = plan.recta.v2.clone().sub(plan.recta.v1).normalize();
+    assert.ok(r0.mira.clone().sub(r0.pos).normalize().angleTo(dirCorr) < 0.02, `${nombre}: alineación al arrancar`);
+    // Dura lo que dice la regla (10–15 s según la distancia), con las fases previas incluidas.
+    assert.ok(Math.abs(plan.duracion - duracionViaje(e.desde.distanceTo(e.hasta))) < 0.05 && plan.duracion >= 10 && plan.duracion <= 15, `${nombre}: ${plan.duracion.toFixed(2)} s`);
     // Crucero rectilíneo; el avance (punto de fuga de las estelas) es la recta y la mirada apunta
     // siempre al destino (sin giros de cámara: lo bonito pasa por los bordes).
     const crucero = muestras.filter(m => m.fase === 'crucero');
@@ -65,9 +71,9 @@ for (const [nombre, e] of Object.entries(ESCENARIOS)) {
   });
 }
 
-test('el viaje a la supernova es rapidísimo (9–19 s) y el paisaje pasa por los bordes: galaxias que crecen y quedan atrás', () => {
+test('el viaje a la supernova dura 10–15 s y el paisaje pasa por los bordes: galaxias que crecen y quedan atrás', () => {
   const plan = planes['casa → supernova (100 Mal)'] ?? planear('casa → supernova (100 Mal)');
-  assert.ok(plan.duracion >= 9 && plan.duracion <= 19, `${plan.duracion.toFixed(1)} s`);
+  assert.ok(plan.duracion >= 10 && plan.duracion <= 15, `${plan.duracion.toFixed(1)} s`);
   // Recorrido real: 100 Mal menos el encuadre de llegada (el gigante es enorme: se le ve entero desde lejos).
   assert.ok(aMal(plan.camino.getLength()) > 75, `${aMal(plan.camino.getLength()).toFixed(1)} Mal`);
   // Galaxias del paisaje que, delante (≤ 50° de la mirada), superan 25 px de radio y después quedan atrás.
@@ -101,10 +107,9 @@ test('saltar el viaje: el resto del crucero en unos segundos, con velocidad suav
   assert.equal(plan.saltar(plan.tiempos.aproximacion[0]), null, 'en la aproximación ya no se salta');
 });
 
-test('modalidad breve: el mismo recorrido en ~60 % del tiempo', () => {
+test('modalidad breve: el mismo recorrido en ~70 % del tiempo', () => {
   const normal = planes['casa → supernova (100 Mal)'] ?? planear('casa → supernova (100 Mal)'), breve = planear('casa → supernova (100 Mal)', { breve: true });
-  const tv = p => p.tiempos.viaje[1] - p.tiempos.viaje[0];
-  assert.ok(tv(breve) < tv(normal) * 0.75 && tv(breve) > 4, `${tv(breve).toFixed(1)} s frente a ${tv(normal).toFixed(1)} s`);
+  assert.ok(Math.abs(breve.duracion - normal.duracion * 0.7) < 0.05, `${breve.duracion.toFixed(1)} s frente a ${normal.duracion.toFixed(1)} s`);
   assert.ok(breve.evaluar(breve.duracion).pos.distanceTo(ESCENARIOS['casa → supernova (100 Mal)'].hasta) < 1);
 });
 
@@ -115,9 +120,9 @@ test('si el corredor ya está libre, no hay rodeo; si no, la maniobra es corta y
   assert.ok(bloq.salida.distanceTo(e.desde) > 0 && bloq.salida.distanceTo(e.desde) < 15000, `maniobra de ${bloq.salida.distanceTo(e.desde).toFixed(0)}`);
 });
 
-test('movimiento reducido: sin estelas ni ruptura y más corto', () => {
+test('movimiento reducido: sin estelas ni ruptura y con la misma duración', () => {
   const normal = planear('casa → supernova (100 Mal)'), red = planear('casa → supernova (100 Mal)', { reducido: true });
-  assert.ok(red.duracion < normal.duracion);
+  assert.ok(Math.abs(red.duracion - normal.duracion) < 0.05);
   for (let t = 0; t <= red.duracion; t += red.duracion / 200) { const m = red.evaluar(t); assert.equal(m.corriente, 0); assert.equal(m.ruptura, 0); }
 });
 

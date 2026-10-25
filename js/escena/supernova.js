@@ -7,7 +7,7 @@ import { EXPOSICION } from './exposicion.js';
 import { crearNube } from './nube.js';
 import { RADIO_REMANENTE_SUPERNOVA, PROGENITORA_RELATIVA as P } from '../data/escalaCosmica.js';
 import { crearRuido } from '../util/ruido.js';
-import { puntoCorazon, puntoCorazonVolumen, faseSupernova, TIEMPOS_AMOR } from '../util/supernovaAmor.js';
+import { puntoCorazon, puntoCorazonVolumen, faseSupernova, TIEMPOS_AMOR, faltaAnimacion, desdeAnimacion } from '../util/supernovaAmor.js';
 import { texBrillo, texDestello, texEstrellaGigante } from './texturas.js';
 
 const RUIDO = /* glsl */`
@@ -384,15 +384,16 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
       tActual = t; uT.value = t;
       if (estado === 'inestable' && t >= inicio) { estado = 'estallido'; inicio = t; }
       if (estado === 'estallido' && t - inicio >= TIEMPOS_AMOR.reposo) estado = 'remanente';
-      // Secuencia antes del estallido (falta: segundos que faltan):
+      // Secuencia antes del estallido (falta: segundos que faltan, en el reloj de la animación; la ceremonia real es más
+      // larga, como su canción, y faltaAnimacion la reparte: js/util/supernovaAmor.js):
       //  14 → 9,5 late «pum-pum» (despacio y luego deprisa), creciendo con cada latido; sus ondas respiran
       //           (se expanden y se contraen) y sus llamas se mueven;
       // 9,5 → 7,5 se aplasta por arriba y por abajo, en el medio, hasta formar un infinito (se apagan sus llamas);
       // 7,5 → 4,8 el infinito gira sobre sí mismo en muchas direcciones, rojo, y se contrae hasta desaparecer;
       // 4,8 → 3,8 oscuridad: un instante sin nada;
       // 3,8 → 0   dos estrellitas, azul y rosa, giran en órbita y se acercan en espiral; al juntarse, ¡pum!
-      const activa = estado === 'inestable', falta = inicio - t;
-      const agita = activa ? THREE.MathUtils.clamp((TIEMPOS_AMOR.espera - falta) / (TIEMPOS_AMOR.espera - 9.5), 0, 1) : 0;
+      const activa = estado === 'inestable', falta = faltaAnimacion(inicio - t);
+      const agita = activa ? THREE.MathUtils.clamp((14 - falta) / (14 - 9.5), 0, 1) : 0;
       const pellizco = activa ? 1 - THREE.MathUtils.smoothstep(falta, 7.5, 9.5) : 0;
       const giroInf = activa ? 1 - THREE.MathUtils.smoothstep(falta, 4.8, 7.5) : 0;
       const colapso = activa ? 1 - THREE.MathUtils.smoothstep(falta, 4.8, 6.6) : 0;
@@ -454,7 +455,7 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
       });
 
       if (!explosion.visible) return;
-      const e = Math.max(0, t - inicio); uE.value = e;
+      const e = desdeAnimacion(Math.max(0, t - inicio)); uE.value = e;   // (en el reloj de la animación)
       const flash = Math.exp(-e / 0.6) * THREE.MathUtils.smoothstep(e, 0, 0.08);   // ruptura del choque: breve
       destelloGrande.scale.setScalar(60 * (10 + 60 * flash)); destelloGrande.material.opacity = Math.min(1, flash * 0.9);
       raya.scale.set(60 * 140 * flash + 1, 60 * 6 * flash + 1, 1); raya.material.opacity = flash * 0.7;

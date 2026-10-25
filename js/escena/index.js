@@ -41,7 +41,8 @@ import { crearZoom } from '../util/zoom.js';
 import { crearCapaVolumen } from './capaVolumen.js';
 import { nivelSeguro } from '../util/dispositivo.js';
 import { esquivar, sinRepetidos } from '../util/ruta.js';
-import { planificarVuelo, DURACION } from '../util/vuelo.js';
+import { planificarVuelo } from '../util/vuelo.js';
+import { TIEMPOS_AMOR, faltaReal, desdeAnimacion } from '../util/supernovaAmor.js';
 import { aMal, SEMIEJES_CORAZON, ESCALA_SUPERNOVA, PROGENITORA_RELATIVA, LLEGADA_GIGANTE } from '../data/escalaCosmica.js';
 const RADIO_ESTRELLA = 110 * ESCALA_SUPERNOVA * PROGENITORA_RELATIVA;
 import { resolucionPostal, crearCapturador } from '../util/captura.js';
@@ -65,13 +66,13 @@ const tablaAvance = v => {
 const ss = THREE.MathUtils.smootherstep;
 // Desde parado (antes arrancaba de golpe al 4 %) y sin cambios bruscos de aceleración.
 const PERFIL = tablaAvance(k => (0.04 * ss(k, 0, 0.06) + 0.96 * ss(k, 0.1, 0.3)) * (1 - ss(k, 0.55, 1)));
-// Paso al sistema solar (o fuera de él), como un salto a la velocidad de la luz: hasta el corte la cámara se LANZA
-// acelerando (llega al corte a toda velocidad, sin frenar) y al otro lado aparece aún lanzada y frena hasta el lugar.
-// Antes se paraba en el brazo de la galaxia y arrancaba de nuevo tras el corte.
-const AVANCE = { lanzarse: tablaAvance(k => ss(k, 0, 0.8)), aterrizar: tablaAvance(k => 1 - ss(k, 0.12, 1)) };
+// Paso al sistema solar (o fuera de él), sin salto: la cámara vuela hacia su punto del brazo de la galaxia acelerando y,
+// al acercarse, afloja (llega al fundido aún en marcha, a algo menos de la mitad de su velocidad: ni se para ni se lanza);
+// al otro lado del fundido sale ya en marcha a esa misma fracción y frena con calma hasta el lugar.
+const AVANCE = { acercarse: tablaAvance(k => ss(k, 0, 0.4) * (1 - 0.6 * ss(k, 0.5, 1))), posarse: tablaAvance(k => (0.4 + 0.6 * ss(k, 0, 0.18)) * (1 - ss(k, 0.3, 1) * 0.999)) };
 const v3 = a => new THREE.Vector3(...a);
 const EJE_Y = new THREE.Vector3(0, 1, 0);
-export async function crearEscena(canvas, { config, cantidadSecretas, encontradas, fechaTexto, consteladas, alConstelar, alViajar = () => {}, alProblema = () => {}, alProgreso = () => {} }) {
+export async function crearEscena(canvas, { config, cantidadSecretas, encontradas, fechaTexto, consteladas, alConstelar, alViajar = () => {}, alLlegar = () => {}, alProblema = () => {}, alProgreso = () => {} }) {
   // Progreso de la carga (0–1) con el nombre de la etapa: la portada lo muestra como una barra.
   // Progreso de la carga: cada paso informa de dónde está (f) y hasta dónde llegará al terminar (techo); la barra
   // avanza despacio hacia el techo mientras el paso trabaja. Cada capa pesa lo que tarda de verdad (ms medidos en
@@ -205,7 +206,6 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     destino.add(camera);   // las estelas de la luz viajan con la cámara
     nucleo.fijarEscena(destino); escenaActiva = cual;
   }
-  const destellar = () => campoVelocidad.impulsar();
   camera.position.set(-2600, 3700, 4900); controls.target.copy(OBJETIVO); camera.lookAt(OBJETIVO);
 
   // Jerarquía visual: al visitar un lugar, el fondo (cielo, galaxias, la galaxia central y
@@ -403,9 +403,13 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // Viajes con intención: la cámara recorre una curva por puntos de paso propios de cada
   // destino (rozar un anillo, pasar tras una luna, seguir la ruta postal…). Sin puntos de
   // paso, un arco con altura evita atravesar el núcleo.
-  let trasSalto = false;   // el próximo viaje sale del corte al sistema solar: empieza lanzado
-  function desplazar(hasta, objetivo, duracion = 4.8, alLlegar, { paso = [], mirarAntes = 1, corriente = 0.45, fija = false, avance = null } = {}) {
-    if (trasSalto) avance ??= 'aterrizar';
+  // Viajes compuestos (entrar o salir del sistema solar): el tramo que sigue al fundido empieza en marcha (posarse) y
+  // dura lo que le queda al viaje entero (tramoRestante), para que el total siga la regla de 10–15 s.
+  let trasFundido = false, tramoRestante = null, compuesto = null;
+  // viaje: es un viaje entre lugares (dura lo que dice duracionViaje según la distancia); si no, un movimiento de cámara
+  // con su duración propia (acercarse a la supernova, la vuelta alrededor de un lugar, el paseo contemplativo…).
+  function desplazar(hasta, objetivo, duracion = 4.8, alLlegar, { paso = [], mirarAntes = 1, corriente = 0.45, fija = false, avance = null, viaje = false } = {}) {
+    if (trasFundido) avance ??= 'posarse';
     vuelo?.resolver(false); if (vuelo?.plan) limpiarVuelo();
     let resolver;
     const promesa = new Promise(r => (resolver = r));
@@ -417,9 +421,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // Los viajes largos no atraviesan cuerpos: la galaxia y los objetos del cosmos (TON 618,
     // Sagitario A*, el cuásar, el púlsar, la supernova) son obstáculos con su radio real.
     const curva = esquivar(base, desde, hasta, [...OBSTACULOS, ...(desde.distanceTo(hasta) > 20000 ? [GALAXIA_OBSTACULO, ...cosmos.cuerpos().slice(1).map(c => ({ c: c.centro, r: c.radio }))] : [])], { porDistancia: true });
-    vuelo = { curva, centroDesde, objetivo: objetivo.clone(), transcurrido: 0, duracion: fija ? duracion : duracionViaje(curva.getLength(), duracion), fija, distanciaTotal: curva.getLength(), llegada: hasta.distanceTo(objetivo), salida: Math.max(400, desde.distanceTo(centroDesde)), resolver, alLlegar, mirarAntes, corriente,
+    vuelo = { curva, centroDesde, objetivo: objetivo.clone(), transcurrido: 0, duracion: viaje ? tramoRestante ?? duracionViaje(desde.distanceTo(hasta)) * (viajeBreve ? 0.7 : 1) : duracion, fija, distanciaTotal: curva.getLength(), llegada: hasta.distanceTo(objetivo), salida: Math.max(400, desde.distanceTo(centroDesde)), resolver, alLlegar, mirarAntes, corriente,
       // Al cometa se llega persiguiéndolo: el vuelo se desplaza con él mientras avanza.
-      cometaInicio: destinoActual === 'cometa' ? mundos.posicionCometa() : null, perfil: paso.length > 0 || corriente >= 1, avance: avance && AVANCE[avance],
+      cometaInicio: destinoActual === 'cometa' ? mundos.posicionCometa() : null, continuacion: trasFundido, perfil: paso.length > 0 || corriente >= 1, avance: avance && AVANCE[avance],
       // Con qué pantalla y qué encuadre ideal se trazó esta curva: si gira o cambia la interfaz
       // durante el vuelo, la llegada se corrige al aterrizar (correccionAlLlegar).
       vw: vista.ancho, vh: vista.alto, idealSalida: idealDelVuelo(hasta.distanceTo(objetivo)) };
@@ -448,8 +452,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // destino, salir a un punto despejado, alinearse, romper, cruzar en línea recta y frenar. ──
   const marca = document.createElement('div'); marca.id = 'marca-destino'; marca.innerHTML = '<i></i>'; marca.setAttribute('aria-hidden', 'true'); document.body.append(marca);
   const obstaculosVuelo = () => [...OBSTACULOS, GALAXIA_OBSTACULO, ...cosmos.cuerpos().slice(1).map(c => ({ c: c.centro, r: c.radio }))];
-  // Al cancelar o cambiar de viaje no puede quedar nada de la fase anterior (campo de visión, señal, ruptura).
-  function limpiarVuelo() { marca.classList.remove('activa'); campoVelocidad?.ruptura(0, 0); campoVelocidad?.direccion(null); delete canvas.dataset.fase; delete canvas.dataset.region; delete canvas.dataset.encuentro; delete canvas.dataset.distanciaMal; if (camera.fov !== 60) { camera.fov = 60; camera.updateProjectionMatrix(); } }
+  // Al cancelar o cambiar de viaje no puede quedar nada de la fase anterior (campo de visión, señal).
+  function limpiarVuelo() { marca.classList.remove('activa'); campoVelocidad?.direccion(null); delete canvas.dataset.fase; delete canvas.dataset.region; delete canvas.dataset.encuentro; delete canvas.dataset.distanciaMal; if (camera.fov !== 60) { camera.fov = 60; camera.updateProjectionMatrix(); } }
   // Lo más cercano en el universo (catálogo y cuerpos del cosmos): velocidad del crucero y plano cercano.
   const cuerposCercania = () => cosmos.cuerpos().map(c => ({ c: c.centro, r: c.radio }));
   let cuerposCache = null;
@@ -557,9 +561,6 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     if (mirada.saliendo && mirada.t >= 1) { cieloProfundo.ampliar(1); for (const o of raicesLejanas) o.visible = true; mirada = null; estrellasLocales = -1; controls.enabled = true; delete canvas.dataset.mirandoCasa; marcaCasa.classList.remove('activa'); camera.fov = FOV_BASE; camera.updateProjectionMatrix(); camera.lookAt(controls.target); }
     else planificador.pedirCuadro();
   }
-  // Duración de referencia de los viajes largos (~55 s a la supernova), ajustable tras verla con
-  // ?duracionViaje=0.8 (entre 0,3 y 2) sin tocar el código.
-  { const e = Number(new URLSearchParams(location.search).get('duracionViaje')); if (e > 0) DURACION.escala = THREE.MathUtils.clamp(e, 0.3, 2); }
   // Modalidad breve del viaje (preferencia guardada) y salto del crucero.
   let viajeBreve = false; try { viajeBreve = localStorage.getItem('xiomara:viaje-breve') === '1'; } catch {}
   function volarCinematico(hasta, mira, { centro = mira, rAprox } = {}) {
@@ -588,10 +589,10 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       if (mejor) { const c = mejor.c; salidaFrente = { centro: c.centro.clone(), minimo: c.radio * 1.3, radio: Math.max(cosmos.objetivo(c.id)?.distancia ?? 0, LLEGADA_GIGANTE[c.id] ?? 0, lejano && lejano.id === c.id ? lejano.dist : 0, centroDesde.distanceTo(c.centro) < c.radio ? encuadre?.d || 0 : 0) }; }
     }
     partida = null;
-    const plan = planificarVuelo({ desde, miraDesde: centroDesde, hasta, mira, centro, obstaculos: obstaculosVuelo(), reducido: movimientoReducido, rAprox, cercania: cercaniaUniverso, breve: viajeBreve, salidaFrente });
+    const plan = planificarVuelo({ desde, miraDesde: centroDesde, hasta, mira, centro, obstaculos: obstaculosVuelo(), reducido: movimientoReducido, rAprox, cercania: cercaniaUniverso, breve: viajeBreve, salidaFrente, duracionTotal: tramoRestante ?? undefined });
     canvas.dataset.planMs = (performance.now() - t0Plan).toFixed(0);   // coste de planificar (diagnóstico)
     vuelo = { plan, curva: plan.trayectoria(), centroDesde, objetivo: mira.clone(), transcurrido: 0, get duracion() { return plan.duracion; }, distanciaTotal: plan.camino.getLength(), llegada: hasta.distanceTo(mira),
-      salida: Math.max(400, desde.distanceTo(centroDesde)), resolver, corriente: 0, perfil: false, centroDestino: centro.clone(), rupturaHecha: false,
+      salida: Math.max(400, desde.distanceTo(centroDesde)), resolver, corriente: 0, perfil: false, centroDestino: centro.clone(), continuacion: trasFundido,
       vw: vista.ancho, vh: vista.alto, idealSalida: idealDelVuelo(hasta.distanceTo(mira)) };
     canvas.dataset.viaje = destinoActual; canvas.dataset.avance = '0'; canvas.dataset.fase = 'seleccion';
     controls.enabled = false; controls.autoRotate = false;
@@ -667,7 +668,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   }
   // Viaje a un objeto lejano sin acercarlo: se llega por el lado desde el que se viene, un poco
   // por encima, a la distancia a la que se ve entero; la duración crece con el trayecto.
-  function viajarLejos(id, { duracion } = {}) {
+  function viajarLejos(id, { duracion, esViaje = false } = {}) {
     const profundo = id !== 'gigante';
     const o = profundo ? cosmos.objetivo(id) : { centro: CENTRO_GIGANTE.clone(), distancia: 680, alto: 0.22 };
     if (!o) return Promise.resolve(false);
@@ -685,42 +686,77 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     if (id === 'supernova' && cosmos.supernova.estado === 'remanente') { const e = encuadreCorazon('lugar'); mira = e.objetivo; lejano.dist = dist = e.distancia; hasta = mira.clone().add(desde.clone().sub(mira).normalize().multiplyScalar(e.posicion.distanceTo(mira))); }
     // Viajes largos: vuelo por fases con corredor recto. Cortos (el agujero de casa): curva suave.
     if (desde.distanceTo(hasta) > 12000) return volarCinematico(hasta, mira, { centro: o.centro });
-    return desplazar(hasta, mira, duracion ?? Math.min(22, 6 + desde.distanceTo(hasta) / 120000), undefined, { paso: recta(desde, hasta), mirarAntes: 1, corriente: 1 });
+    return desplazar(hasta, mira, duracion ?? 6, undefined, { paso: recta(desde, hasta), mirarAntes: 1, corriente: 1, viaje: duracion === undefined && esViaje });
   }
-  // Entrar en el sistema solar (o salir de él): lanzarse a la velocidad de la luz hacia su punto
-  // del brazo de la galaxia, un destello, y aparecer al otro lado; luego el viaje sigue normal.
+  // Entrar en el sistema solar (o salir de él), sin salto: un vuelo continuo hacia su punto del brazo de la galaxia (o
+  // hacia fuera), un fundido suave a oscuro mientras la cámara aún avanza, el cambio de escena tapado, y al otro lado el
+  // viaje sigue ya en marcha mientras la imagen vuelve. El viaje entero dura lo que dice la regla (10–15 s): el primer
+  // tramo ~40 % (desde un gigante lejano, el vuelo por fases hasta casa y ~4 s para el sistema solar) y el segundo, lo que queda.
   const ENTRADA_SOLAR = new THREE.Vector3(1900, 1500, 7800), ORIGEN = new THREE.Vector3();
+  const fundido = document.createElement('div'); fundido.id = 'fundido-escena'; fundido.setAttribute('aria-hidden', 'true'); document.body.append(fundido);
+  let esperaFundido = 0;
+  const quitarFundido = () => { clearTimeout(esperaFundido); fundido.classList.remove('activo'); };
+  // Dónde está cada lugar en el universo principal (para medir la distancia de un viaje que cruza escenas).
+  function posicionUniverso(id) {
+    if (SOLARES.has(id)) return galaxia.puntoBrazo();
+    if (ID_LEJANOS.has(id)) return cosmos.objetivo(id)?.centro.multiplyScalar(ESCALA_CIELO) ?? new THREE.Vector3();
+    if (id === 'cometa') return mundos.posicionCometa();
+    const d = DESTINOS.find(x => x.id === id); return d ? v3(d.posicion) : new THREE.Vector3();
+  }
   async function entrarOSalir(id, opciones) {
     const haciaSolar = SOLARES.has(id);
     destinoActual = id; mundos.enfocar(id); alViajar(id); soltarCielo();
+    const desdeUniverso = escenaActiva === 'solar' ? galaxia.puntoBrazo() : camera.position.clone();
+    const total = duracionViaje(desdeUniverso.distanceTo(posicionUniverso(id))) * (viajeBreve ? 0.7 : 1);
+    const mio = compuesto = { fin: performance.now() + total * 1000 };
+    let primero;
     if (haciaSolar) {
-      const p = galaxia.puntoBrazo(), aviso = setTimeout(destellar, 3200);
-      const ok = await desplazar(p.clone().add(new THREE.Vector3(0, 3, 0)), p, 3.8, undefined, { corriente: 1, mirarAntes: 1.5, avance: 'lanzarse' });
-      clearTimeout(aviso);
-      if (!ok || destinoActual !== id) return false;
+      const p = galaxia.puntoBrazo();
+      if (camera.position.distanceTo(p) > 20000) {
+        // Desde un gigante lejano: vuelo por fases hasta el brazo de la galaxia (llega frenando, ya tras el fundido).
+        tramoRestante = Math.max(6, total - 4);
+        primero = volarCinematico(p.clone().addScaledVector(camera.position.clone().sub(p).normalize(), 500), p, { centro: p, rAprox: 9000 });
+        tramoRestante = null;
+      } else primero = desplazar(p.clone().add(new THREE.Vector3(0, 3, 0)), p, total * 0.42, undefined, { corriente: 1, mirarAntes: 1.5, avance: 'acercarse' });
+    } else {
+      const fuera = camera.position.clone().setY(0).normalize().multiplyScalar(9500).add(new THREE.Vector3(0, 1800, 0));
+      primero = desplazar(fuera, fuera.clone().multiplyScalar(2), THREE.MathUtils.clamp(total * 0.3, 3, 4.5), undefined, { corriente: 1, avance: 'acercarse' });
+    }
+    // El fundido a oscuro empieza medio segundo antes del final del primer tramo (la cámara sigue avanzando debajo).
+    clearTimeout(esperaFundido); esperaFundido = setTimeout(() => fundido.classList.add('activo'), Math.max(0, (vuelo.duracion - 0.5) * 1000));
+    const ok = await primero;
+    if (!ok || destinoActual !== id || compuesto !== mio) { if (compuesto === mio) { compuesto = null; quitarFundido(); } return false; }
+    clearTimeout(esperaFundido); fundido.classList.add('activo');
+    if (haciaSolar) {
       cambiarEscena('solar');
       camera.position.copy(ENTRADA_SOLAR); controls.target.copy(ORIGEN); camera.lookAt(ORIGEN);
     } else {
-      const fuera = camera.position.clone().setY(0).normalize().multiplyScalar(9500).add(new THREE.Vector3(0, 1800, 0));
-      const aviso = setTimeout(destellar, 2700);
-      const ok = await desplazar(fuera, fuera.clone().multiplyScalar(2), 3.2, undefined, { corriente: 1, avance: 'lanzarse' });
-      clearTimeout(aviso);
-      if (!ok || destinoActual !== id) return false;
       cambiarEscena('principal');
       const p = galaxia.puntoBrazo(), sale = p.clone().setY(0).normalize();
       camera.position.copy(p).addScaledVector(sale, 30).add(new THREE.Vector3(0, 14, 0)); controls.target.copy(p).addScaledVector(sale, 600); camera.lookAt(controls.target);
     }
     camaraAntes.copy(camera.position);
-    trasSalto = true; const viaje = viajar(id, opciones); trasSalto = false;   // (lo usa el desplazamiento que viajar crea en el acto)
+    // (Los dos los usa el desplazamiento o el vuelo que viajar crea en el acto.)
+    trasFundido = true; tramoRestante = Math.max(3, (mio.fin - performance.now()) / 1000);
+    const viaje = viajar(id, { ...opciones, continuacion: true });
+    trasFundido = false; tramoRestante = null;
+    // La imagen vuelve en el cuadro siguiente (ya con la escena nueva dibujada).
+    requestAnimationFrame(() => requestAnimationFrame(() => { if (compuesto === mio) fundido.classList.remove('activo'); }));
+    viaje.then(() => { if (compuesto === mio) compuesto = null; });
     return viaje;
   }
-  function viajar(id, { duracion = 4.8 } = {}) {
+  // ritmoPropio: un movimiento con su duración (el paseo contemplativo), no un viaje con la regla de 10–15 s.
+  // continuacion: el segundo tramo de un viaje que cruza al sistema solar (no reinicia el viaje compuesto).
+  function viajar(id, { duracion = 4.8, ritmoPropio = false, continuacion = false } = {}) {
+    if (!continuacion) { compuesto = null; quitarFundido(); }
+    // Es un viaje (dura lo que su distancia) todo lo que no es el vuelo de entrada ni un paseo con su propio ritmo.
+    const esViaje = !ritmoPropio && tEntrada !== null && tiempo - tEntrada > 1;
     // De dónde se sale: el objeto lejano que se visitaba y su distancia de llegada (se recuerda antes de
     // que el nuevo destino lo sustituya; la salida vuelve primero a esa distancia, también con el zoom al máximo).
     partida = lejano ? { id: lejano.id, centro: lejano.centro.clone(), radio: encuadre?.d || lejano.dist, alcance: Math.max(controls.maxDistance, lejano.dist * 3) * 1.05 } : null;
-    if (tEntrada !== null && SOLARES.has(id) !== (escenaActiva === 'solar')) return entrarOSalir(id, { duracion });
+    if (tEntrada !== null && SOLARES.has(id) !== (escenaActiva === 'solar')) return entrarOSalir(id, { duracion, ritmoPropio });
     cosmos.supernova.visitada = id === 'supernova';
-    if (ID_LEJANOS.has(id)) return viajarLejos(id, { duracion: id === destinoActual ? 3 : undefined });
+    if (ID_LEJANOS.has(id)) return viajarLejos(id, { duracion: id === destinoActual && !continuacion ? 3 : undefined, esViaje });
     soltarCielo();
     const d = DESTINOS.find(d => d.id === id);
     if (!d && id !== 'cometa') return Promise.resolve(false);
@@ -768,8 +804,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // Volver a casa desde lejos: vuelo por fases. El crucero apunta al centro de la galaxia y termina
     // a 12 000 de ella (fuera de su disco); el arco final, amplio, llega de frente al encuadre de casa.
     if (id === 'hogar' && recorrido > 20000 && escenaActiva === 'principal') return volarCinematico(hasta, objetivo, { centro: new THREE.Vector3(), rAprox: 12000 });
-    if (recorrido > 60000) { duracion = Math.max(duracion, Math.min(22, 6 + recorrido / 120000)); opciones.corriente = 1; }
-    return desplazar(hasta, objetivo, duracion, undefined, opciones);
+    if (recorrido > 60000) opciones.corriente = 1;
+    return desplazar(hasta, objetivo, duracion, undefined, { ...opciones, viaje: esViaje });
   }
   // Reencuadre al cambiar la ventana (girar el móvil, redimensionar, mostrar u ocultar la
   // tarjeta): la distancia a la que el destino se ve entero depende del aspecto y de la franja
@@ -892,15 +928,10 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
         const e = vuelo.plan.evaluar(vuelo.transcurrido);
         camera.position.copy(e.pos); controls.target.copy(e.mira); camera.lookAt(controls.target);
         vuelo.corriente = e.corriente; vuelo.fase = e.fase; if (canvas.dataset.fase !== e.fase) canvas.dataset.fase = e.fase; if (diagnosticar) canvas.dataset.recorrido = e.avance.toFixed(3);   // (solo para diagnóstico: cambiaba un atributo del lienzo en cada cuadro)
-        const [r0, r1] = vuelo.plan.ruptura;
-        if (e.fase === 'ruptura' && !vuelo.rupturaHecha) { vuelo.rupturaHecha = true; campoVelocidad.impulsar(); }
         // Dónde estamos: región, encuentro a la vista y distancia recorrida (para la interfaz y las pruebas).
         if (cuadrosDibujados % 6 === 0) informarViaje(e);
-        campoVelocidad.ruptura(e.ruptura, THREE.MathUtils.clamp((vuelo.transcurrido - r0) / Math.max(1e-3, r1 - r0), 0, 1));
-        campoVelocidad.direccion(e.fase === 'ruptura' || e.fase === 'crucero' || e.fase === 'aproximacion' ? tmpDir.subVectors(vuelo.plan.recta.v2, vuelo.plan.recta.v1) : null);
-        // Al romper, el campo de visión se abre un poco y vuelve en el crucero: sensación de aceleración.
-        const fov = FOV_BASE + (movimientoReducido ? 0 : 9 * e.ruptura + 3 * (e.fase === 'crucero' ? 1 : 0) * Math.min(1, (vuelo.transcurrido - r1) / 1.5) * Math.max(0, 1 - e.avance * 1.1));
-        if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
+        // Sin salto: ni destello, ni anillo, ni campo de visión que se abre; las estelas siguen la velocidad del vuelo.
+        campoVelocidad.direccion(e.fase === 'crucero' || e.fase === 'aproximacion' ? tmpDir.subVectors(vuelo.plan.recta.v2, vuelo.plan.recta.v1) : null);
         actualizarMarca(e.fase, vuelo.centroDestino);
       } else {
       // En los saltos lejanos, primero la cámara se gira y fija el centro del destino (casi sin
@@ -922,12 +953,15 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       camera.lookAt(controls.target);
       }
       if (k >= 1) {
-        delete canvas.dataset.viaje; delete canvas.dataset.fase; delete canvas.dataset.region; delete canvas.dataset.encuentro; delete canvas.dataset.distanciaMal; marca.classList.remove('activa'); campoVelocidad.ruptura(0, 0); campoVelocidad.direccion(null);
+        delete canvas.dataset.viaje; delete canvas.dataset.fase; delete canvas.dataset.region; delete canvas.dataset.encuentro; delete canvas.dataset.distanciaMal; marca.classList.remove('activa'); campoVelocidad.direccion(null);
         if (camera.fov !== FOV_BASE) { camera.fov = FOV_BASE; camera.updateProjectionMatrix(); }
         const fin = vuelo; vuelo = null; controls.enabled = true; controls.autoRotate = !pausa && giraSolo();
         // Encuadres cercanos con límites propios: explorar sin entrar en superficies.
         controls.minDistance = CERCA[destinoActual] ?? (lejano ? lejano.dist * 0.3 : 300);
         controls.maxDistance = destinoActual === 'hogar' ? 14000 : lejano ? lejano.dist * 3 : 4200;
+        // Fin del viaje (en un viaje que cruza al sistema solar, solo el del último tramo): la música del destino empieza
+        // en este mismo cuadro, a la vez que su animación.
+        if (!compuesto || fin.continuacion) alLlegar(destinoActual);
         controls.update(); fin.resolver(true); fin.alLlegar?.(); entradaResuelta = true; medirZonaLibre();
         fijarEncuadre(); ajuste = null;
         // Si la pantalla giró o cambió la interfaz DURANTE el vuelo, la curva llevó la cámara al
@@ -1023,7 +1057,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     if (!vuelo) ctx.velocidadPolvo.copy(adelanteCamara).multiplyScalar(radial);   // solo cuenta acercarse o alejarse
     camaraAntes.copy(camera.position);
     camera.updateMatrixWorld();
-    campoVelocidad.actualizar(dt,{vuelo,radial,ceremonia:document.body.classList.contains('supernova-en-escena') && cosmos.supernova.estado!=='remanente' && !(cosmos.supernova.desdeEstallido>=19),entrada:tEntrada!==null});
+    campoVelocidad.actualizar(dt,{vuelo,radial,ceremonia:document.body.classList.contains('supernova-en-escena') && cosmos.supernova.estado!=='remanente' && !(cosmos.supernova.desdeEstallido>=TIEMPOS_AMOR.revelar),entrada:tEntrada!==null});
     velo.visible = u.value > 0.004;
     // El fondo (nebulosas, galaxias, estrellas lejanas) acompaña siempre a la cámara: está
     // infinitamente lejos y se ve igual desde cualquier punto. Solo lo que se visita (cosmos:
@@ -1119,7 +1153,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       nucleo.salto.uniforms.uAspecto.value = camera.aspect;
       const e = cosmos.supernova.desdeEstallido;
       const ceremonia = document.body.classList.contains('supernova-en-escena');
-      const penumbra = ceremonia ? (cosmos.supernova.estado === 'inestable' ? 0.65 : e !== null ? 0.65 * (1-THREE.MathUtils.smoothstep(e,3,12)) : 0) : 0;
+      const penumbra = ceremonia ? (cosmos.supernova.estado === 'inestable' ? 0.65 : e !== null ? 0.65 * (1-THREE.MathUtils.smoothstep(desdeAnimacion(e),3,12)) : 0) : 0;
       nucleo.salto.uniforms.uPenumbra.value = penumbra;
       // La penumbra se dibuja con CSS (#supernova-amor::before): esta pasada, antes del brillo,
       // dejaba bloques grises en los bordes.
@@ -1223,6 +1257,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     get interno() { return diagnosticar ? { THREE, scene, camera, controls, renderer, bloom, nucleo, telarana, capaVolumen, cosmos, galaxia, planetas, solar, get escenaActiva() { return escenaActiva; }, lento: v => { escalaTiempo = v; }, get encuadre() { return estadoEncuadre(); }, get tiempo() { return tiempo; }, get estelas() { return campoVelocidad.mesh.material.uniforms.uFuerza.value; }, nube: { MUESTRAS: muestrasNube }, get curvaVuelo() { return vuelo ? { curva: vuelo.curva, desde: vuelo.curva.getPoint(0), hasta: vuelo.curva.getPoint(1), duracion: vuelo.duracion, transcurrido: vuelo.transcurrido, real: vuelo.real ?? vuelo.transcurrido, plan: vuelo.plan } : null; }, lejanas, cercania: cercaniaUniverso, get lente() { return { activa: nucleo.lente.enabled, uL: nucleo.lente.uniforms.uL.value.map(v => v.toArray()) }; } } : null; },
     get destino() { return destinoActual; },
     get viajando() { return !!vuelo; },
+    // Segundos que le quedan al viaje en curso, de principio a fin (también el que cruza al sistema solar en dos tramos):
+    // la música de los viajes empieza en 15 − esto para terminar justo al llegar.
+    get restanteViaje() { if (compuesto) return Math.max(0, (compuesto.fin - performance.now()) / 1000); return vuelo && !vuelo.fija ? Math.max(0, vuelo.duracion - vuelo.transcurrido) : 0; },
     get cometaVisible() { return mundos.cometaVisible; },
     get supernovaActiva() { return cosmos.supernovaActiva; },
     get estadoSupernova() { return cosmos.supernova.estado; },
@@ -1240,7 +1277,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       if (destinoActual === 'supernova') controls.autoRotate = false;
       return ok;
     },
-    async verEstallido({ repetir = false, alFase = () => {} } = {}) {
+    async verEstallido({ repetir = false, alFase = () => {}, alEmpezar = () => {} } = {}) {
       if (!lejano || lejano.id !== 'supernova' || vuelo) return false;
       const sn = cosmos.supernova;
       if (repetir) {
@@ -1254,6 +1291,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       }
       const espera = sn.preparar({ repetir });
       if (espera < 0) return false;
+      // La cuenta atrás empieza ahora (al repetir, tras acercarse): su canción, en el mismo instante.
+      alEmpezar(espera);
       // La interfaz serializa las repeticiones; los cambios de destino cancelan.
       const inicio = sn;
       let ultima = '', retrayendo = false; const t0Estallido = performance.now();
@@ -1263,8 +1302,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
           if (!document.hidden) {
             const fase = sn.fase;
             if (fase !== ultima) { ultima = fase; alFase(fase); }
-            // Se aleja durante los últimos latidos (≈ 3 s antes): la bola de fuego se ve crecer desde fuera.
-            if (!retrayendo && (sn.desdeEstallido !== null || fase === 'silencio' || performance.now() - t0Estallido > (espera - 7) * 1000)) {
+            // Se aleja durante el infinito (a 7 s del estallido en el reloj de la animación): la bola de fuego se ve crecer desde fuera.
+            if (!retrayendo && (sn.desdeEstallido !== null || fase === 'silencio' || performance.now() - t0Estallido > (espera - faltaReal(7)) * 1000)) {
               retrayendo = true;
               const { posicion, objetivo, distancia } = encuadreCorazon('lugar');   // el mismo encuadre que al llegar: al terminar no hay saltos
               lejano.dist = distancia;   // los límites del zoom al llegar son los del remanente, no los de la estrella

@@ -338,6 +338,10 @@ body.en-ruta #supernova-aviso{display:none;}
 /* Destello al entrar o salir del sistema solar (el salto a la velocidad de la luz) */
 #destello-viaje{position:fixed;inset:0;pointer-events:none;z-index:4;opacity:0;background:radial-gradient(circle at 50% 50%,#ffffff 0%,#ffeef8 30%,#ffd6ec66 55%,#ffffff00 80%);}
 #destello-viaje.activo{animation:destelloViaje 1.1s ease-out;}
+/* Paso al sistema solar (o fuera de él): un fundido suave a oscuro que tapa el cambio de escena mientras la cámara sigue
+   volando (js/escena/index.js, entrarOSalir). Color liso, sin destellos. */
+#fundido-escena{position:fixed;inset:0;pointer-events:none;z-index:4;background:#05010c;opacity:0;transition:opacity .6s ease;}
+#fundido-escena.activo{opacity:1;transition-duration:.45s;}
 @keyframes destelloViaje{0%{opacity:0}18%{opacity:.48}35%{opacity:.22}100%{opacity:0}}
 @media(prefers-reduced-motion:reduce){#destello-viaje.activo{animation-duration:.4s}}
 

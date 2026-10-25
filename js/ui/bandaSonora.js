@@ -22,14 +22,19 @@ const SILENCIO = (() => {
 })();
 // Se cuentan en la pantalla de carga (se descargan con ella); los demás, al viajar hacia su destino o en segundo plano.
 const CON_LA_CARGA = new Set(['inicio', 'viajes']);
+const FUNDIDO_ESTANCIA = 3;   // de la canción de un lugar a su versión instrumental (estancia): más lento, sin que se note
 
 export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
   const { carpeta, momentos } = configuracionActiva();
   const pistas = new Map();
-  for (const [nombre, conf] of Object.entries(momentos)) if (conf?.archivo) pistas.set(nombre, { nombre, conf, url: carpeta + conf.archivo, estado: 'pendiente', contar: CON_LA_CARGA.has(nombre), previsto: 0, nivel: 0, previo: -1e-3 });
+  for (const [nombre, conf] of Object.entries(momentos)) if (conf?.archivo) {
+    // existe: se resuelve en cuanto el servidor responde (true) o falla (false: 404 en GitHub Pages, sin red…).
+    let avisar; const existe = new Promise(r => { avisar = r; });
+    pistas.set(nombre, { nombre, conf, url: carpeta + conf.archivo, estado: 'pendiente', contar: CON_LA_CARGA.has(nombre), previsto: 0, nivel: 0, previo: -1e-3, existe, avisar });
+  }
   const ambiente = { nombre: 'ambiente', nivel: 0, encendido: false, registro: null };
   const oyentes = new Set();
-  let ctx = null, maestro = null, activa = false, objetivo = null, lugar = 'hogar', protegerInicio = false, vigia = 0, vigiaViaje = 0;
+  let ctx = null, maestro = null, activa = false, objetivo = null, lugar = 'hogar', protegerInicio = false, vigia = 0, vigiaViaje = 0, viajeId = null, viajeEnCurso = null, primeraLlegada = false;
 
   // Índice que escribe scripts/preparar-audio.mjs: bytes (total de MB de la carga, conocido antes de descargar) y duración.
   const indice = pistas.size ? fetch(carpeta + 'indice.json').then(r => r.ok ? r.json() : {}).catch(() => ({})) : Promise.resolve({});
@@ -48,6 +53,7 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
         await indice;
         const r = await fetch(p.url, { priority: p.contar ? 'high' : 'low' });
         if (!r.ok) throw Error(`HTTP ${r.status}`);
+        p.avisar(true);
         // Sin entrada en el índice, al menos lo que diga el servidor (el total crece un poco al empezar).
         if (p.contar && !p.previsto) { p.previsto = Number(r.headers.get('content-length')) || 0; if (p.previsto) descargas.previsto(p.previsto); }
         const trozos = [];
@@ -59,10 +65,12 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
         p.blobUrl = URL.createObjectURL(new Blob(trozos, { type: /\.m4a$/i.test(p.url) ? 'audio/mp4' : r.headers.get('content-type') || '' }));
         p.estado = 'lista';
         if (p.el) { p.conSilencio = false; p.el.src = p.blobUrl; }
+        // Su estancia (la instrumental para después), detrás y sin prisa.
+        const e = pistas.get(`${p.nombre}-estancia`); if (e) setTimeout(() => descargar(e), 1000);
         if (objetivo === p.nombre) aplicar();
       } catch (e) {
         console.warn(`Banda sonora: sin «${p.nombre}» (${e.message}); suena el ambiente.`);
-        p.estado = 'fallo'; if (contados < p.previsto) descargas.previsto(contados - p.previsto);
+        p.estado = 'fallo'; p.avisar(false); if (contados < p.previsto) descargas.previsto(contados - p.previsto);
         if (objetivo === p.nombre) ir('reposo');
       }
     })();
@@ -86,7 +94,7 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
     const el = p.el = new Audio(); el.preload = 'auto'; el.loop = !!p.conf.bucle; el.setAttribute('playsinline', '');
     p.ganancia = ctx.createGain(); p.ganancia.gain.value = 0;
     ctx.createMediaElementSource(el).connect(p.ganancia); p.ganancia.connect(maestro);
-    el.addEventListener('ended', () => { p.sonando = false; p.fin = { t: duracionDe(p) || el.currentTime, en: performance.now() }; if (objetivo === p.nombre) ir('reposo'); });
+    el.addEventListener('ended', () => { p.sonando = false; p.fin = { t: duracionDe(p) || el.currentTime, en: performance.now() }; if (objetivo === p.nombre) despues(p); });
     el.addEventListener('error', () => { if (!p.conSilencio && p.estado === 'lista') { p.estado = 'fallo'; console.warn(`Banda sonora: «${p.nombre}» no se puede reproducir en este navegador.`); if (objetivo === p.nombre) ir('reposo'); } });
     if (p.blobUrl) el.src = p.blobUrl;
   }
@@ -166,20 +174,25 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
       const t = reloj(p), dur = duracionDe(p);
       if (oyentes.size) for (const marca of marcasCruzadas(p.conf.marcas, p.previo, t, { duracion: dur, bucle: p.conf.bucle })) emitir({ momento: p.nombre, marca, segundo: p.conf.marcas[marca] });
       p.previo = t;
-      // El fragmento ya trae su fundido de salida: el reposo entra a la vez, sin hueco de silencio.
-      if (!p.conf.bucle && dur && objetivo === p.nombre && t >= dur - FUNDIDO) ir('reposo');
+      // El fragmento ya trae su fundido de salida: el reposo entra a la vez, sin hueco de silencio. (La de los viajes no:
+      // su final es la llegada, y al llegar se funde con lo que toque.)
+      if (!p.conf.bucle && !p.conf.hastaLlegar && dur && objetivo === p.nombre && t >= dur - fundidoTras(p)) despues(p);
     }
     if (!alguna) { clearInterval(vigia); vigia = 0; }
   }
+  // Al acabar un fragmento: su estancia, si la tiene (fundido de 3 s), y si no (o al acabar la estancia), el reposo.
+  const estanciaDe = p => pistas.get(`${p.nombre}-estancia`);
+  const fundidoTras = p => estanciaDe(p) && estanciaDe(p).estado !== 'fallo' ? FUNDIDO_ESTANCIA : FUNDIDO;
+  function despues(p) { const e = estanciaDe(p); if (e && e.estado !== 'fallo') ir(e.nombre, { desde: 0, fundido: FUNDIDO_ESTANCIA }); else ir('reposo'); }
   function emitir(aviso) { for (const f of oyentes) { try { f(aviso); } catch (e) { console.error(e); } } }
 
-  function ir(nombre, { desde } = {}) {
+  function ir(nombre, { desde, fundido = FUNDIDO } = {}) {
     if (nombre === 'reposo' || (nombre !== 'ambiente' && !pistas.has(nombre)) || pistas.get(nombre)?.estado === 'fallo') nombre = reposo();
     const p = pistas.get(nombre);
     if (p && desde !== undefined && desde !== null) p.saltarA = desde;
     objetivo = nombre;
     if (p && p.estado !== 'lista') descargar(p);
-    aplicar();
+    aplicar(fundido);
   }
 
   // Pausa al cambiar de aplicación o bloquear el teléfono; al volver, entra con un fundido.
@@ -220,11 +233,15 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
   function vigilarEstado() { if (ctx && !ctx.__vigilado) { ctx.__vigilado = true; ctx.addEventListener('statechange', () => { if (ctx.state !== 'running' && !document.hidden && activa) setTimeout(reanudar, 300); }); } }
 
   return {
+    // Hay canción de portada configurada (aún sin saber si su archivo está).
     get conInicio() { return pistas.has('inicio'); },
+    // Promesa: true si el archivo de la canción de portada está (el servidor respondió bien), false si no.
+    get inicioDisponible() { return pistas.get('inicio')?.existe ?? Promise.resolve(false); },
     get activa() { return activa; },
     get objetivo() { return objetivo; },
     tiene: nombre => pistas.has(nombre) && pistas.get(nombre).estado !== 'fallo',
     marcas: nombre => ({ ...(pistas.get(nombre)?.conf.marcas || {}) }),
+    config: nombre => ({ ...(pistas.get(nombre)?.conf || {}) }),
     // El contexto de audio compartido (también el ambiente y la supernova sintética); se crea parado hasta un toque.
     contexto: crearContexto,
     entradaAmbiente() { crearContexto(); return ambiente.ganancia; },
@@ -245,7 +262,7 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
     activar(valor) { activa = !!valor; if (activa && objetivo === null) objetivo = reposo(); if (activa && ctx && ctx.state !== 'running') { ctx.resume().catch(() => {}); maestro.gain.setValueAtTime(1, ctx.currentTime); } aplicar(activa ? 0.8 : 0.3); },
     ir,
     // La ceremonia de un lugar (la supernova): su canción desde el principio, a la vez que la animación.
-    ceremonia: nombre => ir(nombre, { desde: 0 }),
+    ceremonia: (nombre, desde = 0) => ir(nombre, { desde }),
     // Segundo dentro del fragmento de ese momento (null si no tiene canción o no se pudo cargar; 0 hasta que suena).
     tiempo(nombre) {
       const p = pistas.get(nombre);
@@ -259,25 +276,39 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
     // fn({ momento, marca, segundo }) al cruzar cada marca; devuelve cómo dejar de escuchar.
     alMarca(fn) { oyentes.add(fn); return () => oyentes.delete(fn); },
     // Al entrar: el vuelo de entrada no corta la canción de la portada (termina sola y se funde con el reposo).
-    entrar() { protegerInicio = objetivo === 'inicio'; },
+    entrar() { protegerInicio = objetivo === 'inicio'; primeraLlegada = true; },
     // Un viaje empieza (alViajar de la escena): su canción se pide ya; al despegar de verdad, la de los viajes; al llegar
     // (viajando() vuelve a ser falso), la del destino o el reposo. Si en 1,5 s no hay vuelo, es un cambio en el sitio.
     // ceremoniaPendiente(): al llegar, el lugar va a empezar su ceremonia (la supernova que aún no ha estallado); entonces
     // su canción espera a ella (ceremonia()) para que las fases caigan en sus marcas.
-    viajar(id, { viajando, ceremoniaPendiente = () => false }) {
+    // restante(): segundos que le quedan al viaje entero. La música de los viajes (hastaLlegar) entra en el segundo
+    // duración − restante para acabar justo al llegar, y el fundido hacia la del destino empieza un poco antes de parar.
+    viajar(id, { viajando, restante = () => 0, ceremoniaPendiente = () => false }) {
       const p = pistas.get(id); if (p && p.estado === 'pendiente') descargar(p);
-      clearInterval(vigiaViaje);
+      // El segundo tramo de un viaje que cruza al sistema solar vuelve a avisar del mismo destino: el viaje sigue.
+      if (vigiaViaje && viajeId === id) return;
+      clearInterval(vigiaViaje); viajeId = id;
       const antes = objetivo, t0 = performance.now(); let visto = false;
+      const fin = () => { clearInterval(vigiaViaje); vigiaViaje = 0; viajeId = null; llegar(id, antes, ceremoniaPendiente(id)); };
+      viajeEnCurso = { id, fin };
       vigiaViaje = setInterval(() => {
         const v = viajando();
-        if (v && !visto) { visto = true; if (pistas.get('viajes')?.estado !== 'fallo' && pistas.has('viajes') && !(protegerInicio && objetivo === 'inicio')) ir('viajes'); }
-        if ((visto && !v) || (!visto && performance.now() - t0 > 1500)) { clearInterval(vigiaViaje); vigiaViaje = 0; llegar(id, antes, ceremoniaPendiente(id)); }
+        if (v && !visto) {
+          visto = true;
+          const m = pistas.get('viajes');
+          if (m && m.estado !== 'fallo' && !(protegerInicio && objetivo === 'inicio')) ir('viajes', m.conf.hastaLlegar ? { desde: Math.max(0, (duracionDe(m) || 15) - restante()) } : {});
+        }
+        // (La llegada la avisa la escena en el cuadro exacto, llegada(); esto es por si no lo hiciera.)
+        if ((visto && !v) || (!visto && performance.now() - t0 > 1500)) fin();
       }, 120);
     },
+    // El viaje terminó en este cuadro (la escena lo avisa): la canción del destino empieza a la vez que su animación.
+    llegada(id) { if (viajeEnCurso && viajeEnCurso.id === id && vigiaViaje) viajeEnCurso.fin(); },
     // La carga terminó: el resto de canciones (la del mes, primero) se descarga despacio, de una en una.
     cargaTerminada() {
       const mes = `mes-${partesEnZona().mes}`;
-      const cola = [...pistas.values()].filter(p => !p.nombre.startsWith('mes-') || p.nombre === mes).sort((a, b) => (b.nombre === mes) - (a.nombre === mes));
+      // (Las estancias no: cada una se pide al terminar de bajar su canción.)
+      const cola = [...pistas.values()].filter(p => !p.conf.esEstancia && (!p.nombre.startsWith('mes-') || p.nombre === mes)).sort((a, b) => (b.nombre === mes) - (a.nombre === mes));
       const siguiente = () => { const p = cola.shift(); if (p) descargar(p).then(() => setTimeout(siguiente, 1500)); };
       setTimeout(siguiente, 3000);
     },
@@ -289,8 +320,11 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
     }
   };
   function llegar(id, antes, espera) {
-    lugar = id;
+    lugar = id; viajeEnCurso = null;
+    const entrada = primeraLlegada; primeraLlegada = false;
     if (protegerInicio) { protegerInicio = false; if (objetivo === 'inicio') return; }
+    // La canción de casa es la de volver: al terminar el vuelo de entrada, el reposo.
+    if (id === 'hogar' && entrada) { ir('reposo'); return; }
     // Si el lugar va a empezar su ceremonia, su canción espera a ella (ceremonia()); mientras, el reposo.
     if (pistas.has(id) && !espera) ir(id, { desde: antes === id ? null : 0 }); else ir('reposo');
   }

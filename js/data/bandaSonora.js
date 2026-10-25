@@ -1,7 +1,8 @@
 /* ════════════════════════════════════════════════════════════════
    🎵  BANDA SONORA
-   Una canción (o un fragmento) para cada momento del viaje. Mientras un momento tenga archivo: null, suena lo de
-   siempre: la música ambiental original que se genera en el dispositivo (js/ui/musica.js). Para añadir una canción:
+   Una canción (o un fragmento) para cada momento del viaje. Mientras un momento tenga archivo: null (o si su archivo no
+   está, por ejemplo en GitHub Pages, donde los .m4a no se publican), suena lo de siempre: la música ambiental original que
+   se genera en el dispositivo (js/ui/musica.js). Para añadir una canción:
      1. Cortar el fragmento con   node scripts/preparar-audio.mjs canciones/mia.mp3 --inicio 0:41 --fin 1:52 --nombre inicio
         (lo deja en assets/musica/inicio.m4a con su volumen igualado y apunta sus bytes y su duración en
         assets/musica/indice.json, que es de donde la web los lee).
@@ -10,8 +11,12 @@
    Cada momento:  archivo  nombre dentro de assets/musica/ (o null)
                   duracion segundos; null = la del índice (la mide el script)
                   volumen  0–1, sobre el volumen general de CONFIG.volumen
-                  bucle    true = vuelve a empezar al terminar; false = al terminar se funde con el ambiente
+                  bucle    true = vuelve a empezar al terminar; false = al terminar se funde con lo siguiente
                   marcas   { nombre: segundo }: avisos para las animaciones (bandaSonora.alMarca); null = sin marca
+                  estancia (opcional) { archivo, volumen }: versión instrumental tranquila de la misma canción (Demucs, a
+                           −20 LUFS) que entra con un fundido de 3 s cuando acaba el fragmento, mientras se sigue mirando el
+                           lugar; al acabar ella, el ambiente generativo (que nunca se repite). Nada va en bucle salvo el
+                           ambiente. Se descarga en segundo plano después de su canción, no en la carga.
    ════════════════════════════════════════════════════════════════ */
 import { TIEMPOS_AMOR } from '../util/supernovaAmor.js';
 import { ESCENA_PULSAR, ESCENA_CUASAR, ESCENA_DENEB } from '../util/escenasGigantes.js';
@@ -33,6 +38,7 @@ export const FASES_SUPERNOVA = Object.freeze({
 });
 
 const momento = (otros = {}) => ({ archivo: null, duracion: null, volumen: 0.9, bucle: false, marcas: {}, ...otros });
+const estancia = (archivo, volumen = 0.9) => ({ archivo, volumen });
 
 export const MOMENTOS = {
   // Canción de la portada: suena desde el toque «Toca para empezar ♡» y la animación sigue su reloj. Las marcas son los
@@ -41,25 +47,29 @@ export const MOMENTOS = {
   //   galaxia    la galaxia empieza a desplegarse      tarjeta  aparece la tarjeta con el botón para entrar
   // (sin marcas, la animación va a su ritmo de siempre: encuentro a los 4,6 s, tarjeta a los 8,9 s).
   inicio: momento({ marcas: { encuentro: null, corazon: null, galaxia: null, tarjeta: null } }),
-  // Instrumental de los viajes: entra al despegar y sale al llegar (se retoma donde se dejó).
-  viajes: momento({ volumen: 0.75, bucle: true }),
-  // Destinos gigantes (ids de js/data/universo.js): su canción entra al llegar, desde el principio.
-  supernova: momento({ marcas: { ...FASES_SUPERNOVA } }),
-  // Púlsar, cuásar y Deneb: su escena al llegar sigue el reloj de su canción (js/ui/escenasGigantes.js). Las marcas
-  // son las de la escena (js/util/escenasGigantes.js, ESCENA_PULSAR…): se ajustan allí y valen para las dos cosas.
-  //   pulsar  la parte de amor de «Neo Romeo» (Rusowsky), 108 BPM, 33,65 s;  cuasar  la voz que cuenta cómo se
-  //   enamoró, 31 s;  deneb  «Middle» (DJ Snake), 103 BPM, 43,4 s. Al terminar la escena de Deneb queda en calma con su
-  //   mundo nuevo (no vuelve a empezar).
-  pulsar: momento({ archivo: 'pulsar.m4a', marcas: { ...ESCENA_PULSAR.marcas } }),
-  deneb: momento({ archivo: 'deneb.m4a', marcas: { ...ESCENA_DENEB.marcas } }),
-  cuasar: momento({ archivo: 'cuasar.m4a', marcas: { ...ESCENA_CUASAR.marcas } }),
-  ton618: momento(),
-  sagitario: momento(),
+  // Instrumental de los viajes («Duvet», bôa): 15 s, lo que dura el viaje más largo, sin bucle. hastaLlegar: al despegar
+  // empieza en el segundo 15 − duración del viaje, para que su final caiga justo en la llegada (allí se funde con la canción
+  // del destino o con el ambiente).
+  viajes: momento({ archivo: 'viajes.m4a', duracion: 15, volumen: 0.75, hastaLlegar: true }),
+  // Destinos (ids de js/data/universo.js): su canción entra al llegar, desde el principio y a la vez que la animación del
+  // lugar (en el mismo cuadro en que termina el viaje). Casa («hogar»): al volver a ella tras un viaje (no al entrar).
+  // La supernova («Sparks», Coldplay, 62,3 s desde «My heart is yours»): su ceremonia dura lo mismo y empieza con ella;
+  // las marcas son sus fases (js/util/supernovaAmor.js, TIEMPOS_AMOR).
+  supernova: momento({ archivo: 'supernova.m4a', duracion: 62.3, marcas: { ...FASES_SUPERNOVA }, estancia: estancia('supernova-estancia.m4a') }),
+  // Púlsar, cuásar y Deneb: su escena al llegar sigue el reloj de su canción (js/ui/escenasGigantes.js); sus marcas son
+  // las de la escena (js/util/escenasGigantes.js): se ajustan allí y valen para las dos cosas.
+  pulsar: momento({ archivo: 'pulsar.m4a', marcas: { ...ESCENA_PULSAR.marcas }, estancia: estancia('pulsar-estancia.m4a') }),
+  deneb: momento({ archivo: 'deneb.m4a', marcas: { ...ESCENA_DENEB.marcas }, estancia: estancia('deneb-estancia.m4a') }),                    // «Middle»
+  // (La voz del cuásar es un mensaje; su estancia es la instrumental de «I Saw Your Face Today».)
+  cuasar: momento({ archivo: 'cuasar.m4a', marcas: { ...ESCENA_CUASAR.marcas }, estancia: estancia('cuasar-estancia.m4a') }),
+  ton618: momento({ archivo: 'ton618.m4a', estancia: estancia('ton618-estancia.m4a') }),                 // «I Wanna Be Yours»
+  sagitario: momento({ archivo: 'sagitario.m4a', estancia: estancia('sagitario-estancia.m4a') }),        // «Say Yes to Heaven»
   gigante: momento(),
+  hogar: momento({ archivo: 'hogar.m4a', estancia: estancia('hogar-estancia.m4a') }),                    // «I Saw Your Face Today»
   // Una canción por mes (1 = enero … 12 = diciembre, en la hora de Argentina): suena en casa durante ese mes en lugar
   // del ambiente. Basta con añadir más meses con la misma forma.
   mes: {
-    10: momento({ volumen: 0.8, bucle: true })
+    10: momento({ volumen: 0.8 })
   }
 };
 
@@ -69,7 +79,8 @@ export const PRUEBA = {
   carpeta: 'assets/musica/prueba/',
   momentos: {
     inicio: momento({ archivo: 'inicio.m4a', marcas: { encuentro: 6, corazon: 7.5, galaxia: 10, tarjeta: 18 } }),
-    viajes: momento({ archivo: 'viajes.m4a', volumen: 0.75, bucle: true })
+    viajes: momento({ archivo: 'viajes.m4a', duracion: 15, volumen: 0.75, hastaLlegar: true }),
+    hogar: momento({ archivo: 'hogar.m4a', estancia: estancia('hogar-estancia.m4a') })
   }
 };
 
@@ -79,5 +90,7 @@ export function configuracionActiva(busqueda = typeof location === 'undefined' ?
   const { mes, ...resto } = MOMENTOS, momentos = { ...resto };
   for (const [n, m] of Object.entries(mes)) momentos[`mes-${n}`] = m;
   if (prueba) Object.assign(momentos, PRUEBA.momentos);
+  // Cada estancia es un momento más («deneb-estancia»), sin marcas, al que su canción pasa al acabar.
+  for (const [n, m] of Object.entries(momentos)) if (m.estancia?.archivo) momentos[`${n}-estancia`] = momento({ ...m.estancia, esEstancia: true });
   return { carpeta: prueba ? PRUEBA.carpeta : CARPETA, momentos };
 }

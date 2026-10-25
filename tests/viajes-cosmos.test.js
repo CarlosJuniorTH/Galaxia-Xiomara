@@ -11,9 +11,11 @@ test('la aproximación llega exactamente y conserva movimiento continuo a cualqu
     assert.ok((1-avanceAproximacion(0.99,d,1000))*d<5,'el último 1% no contiene un salto de cientos de unidades');
   }
 });
-test('los viajes largos reservan tiempo para llegar y los cercanos conservan su duración',()=>{
-  assert.equal(duracionViaje(1000,4.8),4.8);
-  assert.ok(duracionViaje(2e6,4.8)>15);assert.equal(duracionViaje(1e10,4.8),24);
+test('cada viaje dura 10–15 s según la distancia (logarítmico): el más largo del universo, 15 s',()=>{
+  assert.equal(duracionViaje(500),10); assert.equal(duracionViaje(1000),10);
+  assert.ok(Math.abs(duracionViaje(7.74e7)-15)<0.01,'TON 618 ↔ Deneb'); assert.equal(duracionViaje(1e10),15);
+  const casaGigante=duracionViaje(1.96e7); assert.ok(casaGigante>14&&casaGigante<14.7,`casa → gigante ${casaGigante.toFixed(2)} s`);
+  let antes=0; for(let d=100;d<1e9;d*=1.3){const t=duracionViaje(d);assert.ok(t>=antes&&t>=10&&t<=15);antes=t;}
 });
 test('la nebulosa tiene profundidad, bordes vacíos y densidad reproducible sin ruido temporal',()=>{
   const a=crearAtlasNebulosa(11), b=crearAtlasNebulosa(11), c=crearAtlasNebulosa(12);

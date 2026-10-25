@@ -1,12 +1,12 @@
-// Vuelo cinematográfico por fases (convención de película: el salto y la compresión del tiempo no
-// son física). Planificación pura, sin escena: se calcula TODO antes de empezar, incluido el
+// Vuelo cinematográfico por fases (convención de película: la compresión del tiempo no es física). Planificación pura, sin escena: se calcula TODO antes de empezar, incluido el
 // corredor recto del crucero y su perfil de velocidad, y después se evalúa por tiempo.
 //
 //  A seleccion    se fija el destino (señal discreta anclada a él); empieza a la vez que la maniobra.
 //  B maniobra     si el corredor recto no está libre desde donde estamos (anillos, discos, la propia
 //                 galaxia), se va con suavidad a un punto despejado cercano.
 //  C alineacion   la mirada gira de forma continua hasta coincidir con la dirección del corredor.
-//  D ruptura      destello, expansión luminosa y arranque de las estelas.
+//  D ruptura      (ya no se usa: era un «salto» con destello, campo de visión abierto y estelas de golpe; el viaje es ahora
+//                 un vuelo continuo y la fase dura 0 s. Se conserva el nombre para el orden de las fases.)
 //  E crucero      rectilíneo en coordenadas del universo, mucho más rápido que la luz y mirando
 //                 siempre al destino (sin giros de cámara). La velocidad sigue con suavidad la
 //                 distancia a lo más cercano (raíz cuadrada: sin pararse en cada galaxia): las
@@ -17,19 +17,13 @@
 // D, E, F y G comparten un único perfil de avance (velocidad continua).
 import * as THREE from 'three';
 import { cercanoSegmento, segmentoLibre as libreSegmento, CurvaPorDistancia } from './ruta.js';
+import { duracionViaje } from './aproximacion.js';
 
 const V = () => new THREE.Vector3();
 const suave = t => t * t * t * (t * (t * 6 - 15) + 10);
 export const FASES = Object.freeze(['seleccion', 'maniobra', 'alineacion', 'ruptura', 'crucero', 'aproximacion', 'llegada']);
 
-// Duración objetivo del tramo de viaje (ruptura → llegada) según su longitud: el viaje completo a la
-// supernova (100 Mal) dura ~12 s; al cuásar (30 Mal), ~10 s; uno de 1 Mal, ~4 s. Modalidad breve: ×0,6.
-// Movimiento reducido: ×0,8. Referencia ajustable tras verlo (DURACION.escala).
-export const DURACION = { escala: 1 };
-export function duracionCrucero(longitud, { breve = false, reducido = false } = {}) {
-  const base = THREE.MathUtils.clamp(3.5 + 4.2 * Math.log10(Math.max(1, longitud) / 20000), 3.5, 15) * DURACION.escala;
-  return Math.max(3, base * (breve ? 0.6 : 1) * (reducido ? 0.8 : 1));
-}
+// (La duración la decide duracionViaje, js/util/aproximacion.js: el viaje entero dura 10–15 s según la distancia.)
 
 // ¿El segmento a→b libra los obstáculos? (mismas reglas que ruta.js: salida y llegada propias)
 const segmentoLibre = (a, b, obstaculos, desde, hasta, margen = 1.05) => libreSegmento(a, b, obstaculos, desde, hasta, margen, 80);
@@ -132,6 +126,17 @@ function* perfilViaje({ camino, longitud, cercania, interes, desde, salidaCentro
     if (i % 128 === 127) yield;
   }
   const escala = longitud / tabla[nf]; for (let i = 0; i <= nf; i++) tabla[i] = Math.min(longitud, tabla[i] * escala);
+  // La duración en función de k puede dar un salto: si con algo más de velocidad la frenada empieza ya en un vacío
+  // rapidísimo, se salta de golpe la parte lenta del final (al volver a casa desde la supernova salía 1,5 s más corto).
+  // Entonces se estira (o encoge) el tiempo de toda la tabla por igual hasta la duración pedida: el mismo vuelo, igual
+  // de suave, solo un poco más lento.
+  const n2 = Math.round(duracion / dt);
+  if (Math.abs(n2 - nf) > 1) {
+    const r = nf / n2, otra = new Array(n2 + 1);
+    for (let i = 0; i <= n2; i++) { const x = i * r, j = Math.min(nf - 1, Math.floor(x)), f = x - j; otra[i] = tabla[j] + (tabla[j + 1] - tabla[j]) * f; }
+    otra[n2] = longitud;
+    return { k, dt, tabla: otra, duracion: n2 * dt, distancia: dEn };
+  }
   return { k, dt, tabla, duracion: nf * dt, distancia: dEn };
 }
 
@@ -149,7 +154,9 @@ function girarMirada(a, b, k, sentido = 0) {
   return new THREE.Vector3(Math.sin(g) * c, Math.sin(i), Math.cos(g) * c);
 }
 
-export function planificarVuelo({ desde, miraDesde, hasta, mira, centro = mira, obstaculos = [], reducido = false, rAprox: rAproxPedido, cercania = null, interes = null, breve = false, duracion: duracionPedida, salidaFrente = null }) {
+// duracionTotal: lo que dura TODO el viaje, del clic a la llegada (por defecto, la regla de duracionViaje: 10–15 s según
+// la distancia; con la modalidad breve, ×0,7). duracion (solo pruebas): la del tramo de viaje, sin las fases previas.
+export function planificarVuelo({ desde, miraDesde, hasta, mira, centro = mira, obstaculos = [], reducido = false, rAprox: rAproxPedido, cercania = null, interes = null, breve = false, duracion: duracionPedida, duracionTotal, salidaFrente = null }) {
   desde = desde.clone(); hasta = hasta.clone(); mira = mira.clone(); centro = centro.clone();
   const dLlegada = hasta.distanceTo(centro);
   // El crucero termina a esta distancia del destino (allí empieza el arco de llegada).
@@ -209,15 +216,20 @@ export function planificarVuelo({ desde, miraDesde, hasta, mira, centro = mira, 
   const dirInicial = miraDesde.clone().sub(desde).normalize(), dirCorredor = centro.clone().sub(salida).normalize();
   const anguloAlinear = arcoSalida ? Math.PI : Math.acos(THREE.MathUtils.clamp(dirInicial.dot(dirCorredor), -1, 1));
   const lSalida = desde.distanceTo(salida);
-  const tSeleccion = reducido ? 0.2 : 0.55;
+  // El viaje entero dura lo que dice la regla: las fases previas (selección, salida del gigante y giro hacia el destino)
+  // se acortan a la vez si pasarían del 40 % (saliendo de un gigante podían sumar 8–10 s) y el resto es el vuelo.
+  const totalViaje = duracionTotal ?? duracionViaje(desde.distanceTo(hasta)) * (breve ? 0.7 : 1);
+  let tSeleccion = reducido ? 0.2 : 0.55;
   // Sentido en que gira la mirada mientras rodea el gigante (la vuelta hacia el destino sigue en ese mismo sentido).
   let sentidoGiro = 0;
   if (arcoSalida) { const gu = v => Math.atan2(-v.x, -v.z); let d = gu(arcoSalida.d1) - gu(arcoSalida.d0); d -= Math.PI * 2 * Math.round(d / (Math.PI * 2)); sentidoGiro = Math.sign(d) || 1; }
   // Cuánto tiene que acercarse o alejarse al salir de un gigante (0: ya está a su distancia).
   const radial = arcoSalida ? Math.min(1, Math.abs(Math.log2(arcoSalida.r0 / Math.max(1e-6, arcoSalida.r1)))) : 0;
-  const tManiobra = (lSalida > 1 || arcoSalida) ? (arcoSalida ? THREE.MathUtils.clamp(2.0 + arcoSalida.d0.angleTo(arcoSalida.d1) * 1.4 + Math.abs(Math.log2(arcoSalida.r0 / arcoSalida.r1)) * 1.0, 2.0, 7.0) : THREE.MathUtils.clamp(1.3 + Math.log10(1 + lSalida / 500) * 0.8, 1.3, 2.6)) * (reducido ? 0.6 : 1) : 0;
-  const tAlinear = THREE.MathUtils.clamp(1.0 + anguloAlinear / Math.PI * 2.2, 1.0, 3.0) * (reducido ? 0.6 : 1);   // giro suave hacia el destino
-  const tRuptura = reducido ? 0 : 0.7;
+  let tManiobra = (lSalida > 1 || arcoSalida) ? (arcoSalida ? THREE.MathUtils.clamp(2.0 + arcoSalida.d0.angleTo(arcoSalida.d1) * 1.4 + Math.abs(Math.log2(arcoSalida.r0 / arcoSalida.r1)) * 1.0, 2.0, 7.0) : THREE.MathUtils.clamp(1.3 + Math.log10(1 + lSalida / 500) * 0.8, 1.3, 2.6)) * (reducido ? 0.6 : 1) : 0;
+  let tAlinear = THREE.MathUtils.clamp(1.0 + anguloAlinear / Math.PI * 2.2, 1.0, 3.0) * (reducido ? 0.6 : 1);   // giro suave hacia el destino
+  { const previo = Math.max(tSeleccion, tManiobra > 0 ? tManiobra + 0.25 : 0) + tAlinear, tope = totalViaje * 0.4;
+    if (previo > tope) { const f = tope / previo; tSeleccion *= f; tManiobra *= f; tAlinear *= f; } }
+  const tRuptura = 0;   // sin salto: del giro hacia el destino se pasa al vuelo sin destello
   const inicioManiobra = Math.min(tSeleccion * 0.4, 0.25), finManiobra = inicioManiobra + tManiobra;
   // La mirada empieza a girar hacia el destino mientras la cámara aún rodea el gigante (antes esperaba a que se parara:
   // rodear, parar, girar, parar… se notaba a tirones). Un solo movimiento continuo.
@@ -227,7 +239,7 @@ export function planificarVuelo({ desde, miraDesde, hasta, mira, centro = mira, 
   const salidaCentro = Math.max(400, desde.distanceTo(miraDesde));
   // El perfil del viaje (lo más costoso) no hace falta hasta la ruptura: se prepara a trozos con preparar(ms) en los
   // cuadros de la selección y la alineación (al menos 0,6 s). Si algo lo pide antes de estar listo, se termina en el acto.
-  const duracionObjetivo = duracionPedida ?? duracionCrucero(total, { breve, reducido });
+  const duracionObjetivo = duracionPedida ?? Math.max(4, totalViaje - inicioViaje);
   let perfil = null, nT = 0, desvio = null, sAprox = 0, tAprox = 0, tLlegada = 0, listo = false;
   const preparacion = (function* () {
     perfil = yield* perfilViaje({ camino, longitud: total, cercania, interes, desde: salida, salidaCentro, centro, dLlegada,
@@ -296,10 +308,10 @@ export function planificarVuelo({ desde, miraDesde, hasta, mira, centro = mira, 
       camino.getPointAt(Math.min(1, avance), pos);
       if (s <= L) { desvioEn(tv, tmpDesvio); if (tmpDesvio.lengthSq() > 1e-10) m.copy(pos).addScaledVector(tmpDesvio.add(dirCorredor).normalize(), pos.distanceTo(centro)); else m.copy(centro); }
       else { const ka = (s - L) / Math.max(1e-6, A); m.copy(centro).lerp(mira, suave(ka)); }
-      ruptura = tRuptura > 0 ? THREE.MathUtils.clamp(1 - Math.abs(tv - tRuptura * 0.35) / (tRuptura * 0.65), 0, 1) : 0;
-      fase = tv < tRuptura ? 'ruptura' : s < sAprox ? 'crucero' : s < L * 0.999 ? 'aproximacion' : 'llegada';
-      // Estelas: entran con la ruptura, acompañan el crucero y se apagan al aproximarse.
-      corriente = fase === 'ruptura' ? THREE.MathUtils.smoothstep(tv, 0, tRuptura * 0.5) : fase === 'crucero' ? 1 : fase === 'aproximacion' ? Math.max(0, 1 - (s - sAprox) / Math.max(1, L - sAprox)) : 0;
+      fase = s < sAprox ? 'crucero' : s < L * 0.999 ? 'aproximacion' : 'llegada';
+      // Estelas: entran poco a poco con la velocidad (1,5 s), acompañan el crucero y se apagan al aproximarse, por tiempo
+      // (por distancia, a toda velocidad se apagaban en unos cuadros).
+      corriente = Math.min(THREE.MathUtils.smoothstep(tv, 0, 1.5), 1 - THREE.MathUtils.smoothstep(t, tAprox, Math.max(tAprox + 1.2, tLlegada)));
     }
     return { pos, mira: m, fase, corriente: reducido ? 0 : corriente, ruptura, avance, velocidad };
   }

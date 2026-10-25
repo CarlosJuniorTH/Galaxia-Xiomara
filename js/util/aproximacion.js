@@ -7,8 +7,15 @@ export function avanceAproximacion(k, distancia, llegada) {
   if (razon < 8) return suave;
   return Math.max(0, Math.min(1, 1 - Math.expm1(Math.log1p(razon) * (1 - suave)) / razon));
 }
-export function duracionViaje(distancia, propuesta) {
-  return distancia < 20000 ? propuesta : Math.max(propuesta, Math.min(24, 8 + Math.log10(distancia / 20000) * 6));
+// Duración de un viaje entre dos lugares (de pulsar a llegar), según la distancia en línea recta: el más largo del universo
+// (TON 618 ↔ Deneb, 7,7·10⁷) dura 15 s y los demás entre 10 y 15 s en escala logarítmica (cada factor 10 de distancia
+// añade lo mismo): un paseo dentro de casa (~1000) dura 10 s; de casa a cualquier gigante (~2·10⁷), ~14,4 s. La música de
+// los viajes (15 s) empieza en el segundo 15 − duración para que su final caiga en la llegada.
+export const DURACION_VIAJE = Object.freeze({ minima: 10, maxima: 15, cerca: 1000, lejos: 7.8e7 });
+export function duracionViaje(distancia) {
+  const { minima, maxima, cerca, lejos } = DURACION_VIAJE;
+  const f = Math.log(Math.max(cerca, distancia) / cerca) / Math.log(lejos / cerca);
+  return minima + (maxima - minima) * Math.min(1, Math.max(0, f));
 }
 
 // Viaje a escala cósmica («potencias de diez»): cada factor 10 de distancia dura lo mismo, al

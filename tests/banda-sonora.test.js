@@ -43,15 +43,18 @@ test('en casa suena la canción del mes si la hay; si no, y fuera de casa, el am
   assert.equal(momentoReposo('rosa', 10, tiene), 'ambiente');
 });
 
-test('la configuración tiene todos los momentos, con ids reales y solo audios reales preparados', () => {
+test('la configuración tiene todos los momentos, con ids reales, y solo los audios preparados', () => {
   const ids = new Set([...DESTINOS, ...LEJANOS].map(d => d.id));
   for (const id of ['supernova', 'pulsar', 'deneb', 'cuasar', 'ton618', 'sagitario', 'gigante']) { assert.ok(MOMENTOS[id], id); assert.ok(ids.has(id), `${id} existe en universo.js`); }
   assert.ok(MOMENTOS.inicio && MOMENTOS.viajes && MOMENTOS.mes[10]);
-  assert.equal(MOMENTOS.viajes.bucle, true);
+  assert.equal(MOMENTOS.viajes.bucle, false); assert.equal(MOMENTOS.viajes.hastaLlegar, true); assert.equal(MOMENTOS.viajes.duracion, 15);
   for (const k of ['encuentro', 'corazon', 'galaxia', 'tarjeta']) assert.ok(k in MOMENTOS.inicio.marcas, k);
-  for (const [n, m] of Object.entries(configuracionActiva('').momentos)) {
-    // Los audios reales se añaden a mano (.m4a de scripts/preparar-audio.mjs: hoy el púlsar y el cuásar); las pruebas, solo con ?pruebaAudio.
-    assert.ok(m.archivo === null || (/^[\w-]+\.m4a$/.test(m.archivo) && !m.archivo.includes('prueba')), `${n}: ${m.archivo}`);
+  // Cada momento con canción usa su archivo con su nombre; las estancias, «<lugar>-estancia.m4a». Nada en bucle.
+  const activos = configuracionActiva('').momentos;
+  for (const n of ['viajes', 'supernova', 'pulsar', 'deneb', 'cuasar', 'ton618', 'sagitario', 'hogar']) assert.equal(activos[n].archivo, `${n}.m4a`, n);
+  for (const n of ['supernova', 'pulsar', 'deneb', 'cuasar', 'ton618', 'sagitario', 'hogar']) { assert.equal(activos[`${n}-estancia`].archivo, `${n}-estancia.m4a`); assert.ok(activos[`${n}-estancia`].esEstancia); }
+  for (const [n, m] of Object.entries(activos)) {
+    assert.equal(m.bucle, false, `${n}: nada va en bucle salvo el ambiente`);
     for (const k of ['archivo', 'duracion', 'volumen', 'bucle', 'marcas']) assert.ok(k in m, `${n}.${k}`);
     assert.ok(m.volumen > 0 && m.volumen <= 1);
   }
