@@ -3,6 +3,30 @@
 // `texturasListas()` resuelve cuando todas están rellenas: la pantalla de carga la espera.
 import * as THREE from 'three';
 import { GENERADORES } from './texturasPlaneta.js';
+import { huellaTextura } from './huellaTextura.js';
+import { descargas } from '../util/descargas.js';
+
+// Texturas HORNEADAS (scripts/hornear-texturas.mjs): las mismas, ya calculadas, en imágenes WebP sin pérdidas. Se descargan
+// y el navegador las decodifica (nativo y rápido en cualquier aparato); calcularlas aquí queda solo de respaldo. En un
+// iPhone, calcular las 105 texturas en JavaScript tardaba minutos (la carga se quedaba en el 85 %).
+const enNavegador = typeof window !== 'undefined' && typeof fetch === 'function' && typeof createImageBitmap === 'function';
+const indiceHorneadas = enNavegador ? fetch('assets/texturas/indice.json').then(r => (r.ok ? r.json() : {})).catch(() => ({})) : Promise.resolve({});
+let bajando = 0; const esperando = [];
+const turnoDescarga = () => (bajando < 6 ? (bajando++, Promise.resolve()) : new Promise(r => esperando.push(r)));
+const finDescarga = () => { const s = esperando.shift(); if (s) s(); else bajando--; };
+let lienzoLectura = null;
+async function bajarImagen(nombre, ancho, alto, bytes) {
+  await turnoDescarga();
+  try {
+    const r = await fetch('assets/texturas/' + nombre); if (!r.ok) throw new Error(nombre + ': ' + r.status);
+    const bmp = await createImageBitmap(await r.blob(), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
+    lienzoLectura ||= typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(ancho, alto) : document.createElement('canvas');
+    if (lienzoLectura.width !== ancho || lienzoLectura.height !== alto) { lienzoLectura.width = ancho; lienzoLectura.height = alto; }
+    const ctx = lienzoLectura.getContext('2d', { willReadFrequently: true }); ctx.clearRect(0, 0, ancho, alto); ctx.drawImage(bmp, 0, 0); bmp.close?.();
+    const datos = ctx.getImageData(0, 0, ancho, alto).data;
+    descargas.hecho(bytes); return datos;
+  } finally { finDescarga(); }
+}
 
 // Reparto como en los juegos: una COLA común de texturas por calcular (primero las que bloquean la carga). Cada obrero
 // coge la siguiente cuando termina la suya, y si los obreros van lentos (en un iPhone tardaban ~25 s por textura), el hilo
@@ -81,6 +105,7 @@ function dataTextura(ancho, alto, relleno) {
 const soltarCopia = t => { t.image = { width: t.image.width, height: t.image.height, data: null }; t.onUpdate = null; };
 export function texturaPlaneta(tipo, opciones, { claves = ['pixeles'], relleno = [120, 110, 140], bloquea = true, liberable = false } = {}) {
   const { ancho, alto } = opciones;
+  if (typeof window !== 'undefined') (window.__pedidosTextura ||= []).push({ tipo, opciones, claves });
   const texturas = Object.fromEntries(claves.map(c => [c, dataTextura(ancho, alto, relleno)]));
   const promesa = new Promise(resolve => {
     const clave = `${tipo} ${ancho}×${alto}`; enCurso.set(promesas.length + todas.length + Math.random(), clave);
@@ -97,8 +122,19 @@ export function texturaPlaneta(tipo, opciones, { claves = ['pixeles'], relleno =
       enCurso.delete(marca); resolve();
     } };
     const enviar = () => { iniciarObreros(); (bloquea ? colaBloquea : colaResto).push(pedido); despachar(); };
-    // A la cola (las que no bloquean la carga, detrás de las imprescindibles: no retrasan la entrada).
-    enviar();
+    // Horneada si está (se descarga); si no, a la cola de cálculo (las que no bloquean, detrás de las imprescindibles).
+    const h = huellaTextura(tipo, opciones);
+    indiceHorneadas.then(indice => {
+      const nombres = claves.map(c => `${h}-${c}.webp`);
+      if (!nombres.every(n => indice[n] != null)) { enviar(); return; }
+      const bytes = c => indice[`${h}-${c}.webp`] + (indice[`${h}-${c}-a.webp`] || 0);
+      descargas.previsto(claves.reduce((a, c) => a + bytes(c), 0));
+      Promise.all(claves.map(async c => {
+        const rgba = await bajarImagen(`${h}-${c}.webp`, ancho, alto, indice[`${h}-${c}.webp`]);
+        if (indice[`${h}-${c}-a.webp`]) { const a = await bajarImagen(`${h}-${c}-a.webp`, ancho, alto, indice[`${h}-${c}-a.webp`]); for (let i = 3; i < rgba.length; i += 4) rgba[i] = a[i - 3]; }
+        return [c, rgba];
+      })).then(pares => pedido.resolver(Object.fromEntries(pares)), e => { errores.push('horneada: ' + (e.message || e)); enviar(); });
+    });
   });
   if (bloquea) promesas.push(promesa);
   todas.push(promesa);

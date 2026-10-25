@@ -1,3 +1,4 @@
+import { descargas } from '../util/descargas.js';
 // Entrada: portada animada (dos luces que se encuentran y forman un universo), una breve
 // presentación y la tarjeta para entrar. Se ve en cada visita (se puede saltar) y quien
 // vuelve puede continuar donde lo dejó.
@@ -70,6 +71,9 @@ export function crearEntrada(config, { viaje } = {}) {
   // retroceder. Cada paso dice dónde está (meta) y hasta dónde llegará (techo): el número alcanza la meta enseguida
   // y, mientras el paso trabaja, sigue subiendo despacio hacia su techo (nunca lo pasa): no parece parado.
   const textoCarga = $('#carga-texto'), barraCarga = document.querySelector('.carga-barra .carga-relleno'), pcCarga = $('#carga-pc');
+  // Megas descargados de los previstos (texturas horneadas y cielo): con una conexión lenta se ve que avanza y cuánto falta.
+  const textoInicial = textoCarga.textContent, mb = b => (b / 1048576).toFixed(1).replace('.', ',');
+  descargas.escuchar(({ total, hechos }) => { if (!total || preparado) return; const t = hechos >= total ? textoInicial : `Descargando el universo · ${mb(hechos)} de ${mb(total)} MB`; if (textoCarga.textContent !== t) textoCarga.textContent = t; });
   let meta = 0, techo = 0, mostrado = 0, animando = false, anterior = 0, alCompletar = null;
   const pintar = () => { const pc = Math.floor(mostrado * 100 + 1e-6); barraCarga.style.transform = `scaleX(${mostrado.toFixed(4)})`; if (pcCarga.textContent !== pc + ' %') pcCarga.textContent = pc + ' %'; };
   const avanzar = ahora => {
