@@ -112,7 +112,8 @@ export function reposoSagitario(o = {}) {
 // Coordenadas del grupo de Sagitario (sin giro: los mismos ejes que el cosmos), en unidades del radio de encuadre
 // (cosmos.objetivo('sagitario').distancia = 12,6 radios de la sombra). pos: [azimut°, elevación°, distancia] con
 // azimut 0 = eje +Z (desde donde las órbitas se ven como en el cielo de la Tierra), azimut 90 = +X, elevación 90 = +Y
-// (convención de posicionPista, abajo). Medidas de lo que se ve, en esas unidades: sombra 0,08 · flujo hasta 0,23 (más cerca de 0,45 todo se ve
+// (convención de posicionPista, abajo). Las distancias son para una pantalla apaisada: en vertical se multiplican por
+// el mismo factor que la llegada (index.js: max(1, min(1,6, 0,95 / aspecto))), o en el móvil la sombra llena el ancho. Medidas de lo que se ve, en esas unidades: sombra 0,08 · flujo hasta 0,23 (más cerca de 0,45 todo se ve
 // disperso: la cámara no baja de 0,5) ·
 // pericentro de S2 0,14 · su apocentro 0,42 · la minispiral hasta 0,7.
 export const RS_POR_RADIO = 1500 / 119;   // 12,6 (objetivo 1500·ESCALA_SGR; sombra 170·0,7·ESCALA_SGR)
