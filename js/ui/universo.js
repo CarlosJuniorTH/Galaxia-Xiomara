@@ -12,7 +12,7 @@ const $ = id => document.getElementById(id);
 function el(tag, clase, texto) { const n = document.createElement(tag); if (clase) n.className = clase; if (texto !== undefined) n.textContent = texto; return n; }
 function boton(texto, clase, accion) { const b = el('button', clase, texto); b.type = 'button'; b.addEventListener('click', accion); return b; }
 
-export function crearInterfazUniverso({ config, escena, progreso, recuerdos, estrellas, efectos, musica, viaje }) {
+export function crearInterfazUniverso({ config, escena, progreso, recuerdos, estrellas, efectos, musica, viaje, banda = null }) {
   const panel = $('panel-universo'), contenido = $('panel-contenido'), lectura = $('lectura');
   lectura.querySelector('.firma').textContent = config.firma;
   let panelActual = '', actual = 'hogar', avisoT = 0, postalURL = null, celebrando = false, celebracionRevision = 0, constelacionElegida = 'hilo';
@@ -24,7 +24,7 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
   crearPresentacionViajes({ canvas: $('galaxia'), escena, nombre: id => id === 'supernova' ? 'nuestra supernova' : id === 'hogar' ? 'nuestra galaxia' : datos(id).nombre, elegirDestino: () => abrirPanel('lugares') });
   const supernovaAmor = crearSupernovaAmor({ escena, progreso, musica, alDescubrir: () => { if (actual === 'supernova') situar('supernova'); } });
   // El púlsar y Deneb: su escena al llegar (sincronizable con su audio: relojDe).
-  const escenasGigantes = crearEscenasGigantes({ escena });
+  const escenasGigantes = crearEscenasGigantes({ escena, banda });
   // El faro del cuásar: su recorrido con frases y la carta que espera al final.
   const faro = crearFaroCuasar({ escena, progreso, mostrarLectura, alCambiar: () => { if (actual === 'cuasar') situar('cuasar'); } });
   $('faro-carta').addEventListener('click', () => { if (actual === 'cuasar' && !escena.viajando) faro.abrirCarta(); });
@@ -156,7 +156,7 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
       else if (id === 'calma') { modoCalma(true); escena.accion('calma'); }
       else if (id === 'cometa') sorpresa();
       else if (id === 'supernova') await verSupernova();
-      else if (id === 'cuasar') { $('lugar-faro').hidden = true; await faro.iniciar(); if (actual === 'cuasar') situar('cuasar'); }
+      else if (id === 'cuasar') { $('lugar-faro').hidden = true; escenasGigantes.cancelar('cuasar'); await faro.iniciar(); if (actual === 'cuasar') situar('cuasar'); }   // el faro (con sus frases) sustituye a la escena de llegada
       else if (LEJANOS.some(l => l.id === id)) await escena.accion(id);
       else if (id === 'cartas') { await abrirSobre(); abrirPanel('cartas'); }
       else if (id === 'azul') { await escena.accion('azul'); if (actual === 'azul') abrirPanel('horarios'); }

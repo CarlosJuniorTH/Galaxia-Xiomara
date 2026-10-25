@@ -398,7 +398,7 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
         float perfil = smoothstep(0.0, 0.02, t) * pow(1.0 - t, 1.1) * mix(1.5, 0.85, smoothstep(0.0, 0.35, t));
         float isco = exp(-pow((t - 0.012) / 0.01, 2.0)) * 1.6;
         float b = (perfil * (0.25 + 1.2 * fil * fil + 0.3 * fino) + isco) * (0.5 + 0.6 * dop);
-        gl_FragColor = vec4(c * b * 1.35, min(1.0, b)); }`));
+        gl_FragColor = vec4(c * b * 1.7, min(1.0, b)); }`));   // más brillante: el disco es lo que más luce del cuásar
   disco.rotation.x = Math.PI / 2; grupo.add(disco); animados.push(disco);
 
   yield;
@@ -447,10 +447,11 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
   let hazMedida = null;
   for (const s of [1, -1]) {
     const lado = new THREE.Group(); if (s < 0) lado.rotation.x = Math.PI; chorros.add(lado);
-    const vaina = capaChorro({ rBase: 40, rPunta: 620, colorA: '#bcd4ff', colorB: '#5f6dff', intensidad: 0.55, helice: 1 });
+    // Chorro largo y fino (la vaina se abría hasta 620: parecía un cono ancho).
+    const vaina = capaChorro({ rBase: 40, rPunta: 380, colorA: '#bcd4ff', colorB: '#5f6dff', intensidad: 0.55, helice: 1 });
     // Nubes de plasma alrededor del chorro (como en la imagen: hebras azules y blancas retorcidas, con toques naranjas
     // donde el chorro atraviesa el gas): ruido con estructura (no un resplandor liso), más ancho hacia la punta.
-    const geoN = new THREE.CylinderGeometry(1300, 140, LARGO * 0.95, 96, 48, true); geoN.translate(0, LARGO * 0.475, 0);
+    const geoN = new THREE.CylinderGeometry(820, 120, LARGO * 0.95, 96, 48, true); geoN.translate(0, LARGO * 0.475, 0);
     const nubeChorro = new THREE.Mesh(geoN, aditivo({ uT: { value: 0 }, uS: { value: s > 0 ? 1.7 : 5.3 }, uRuido: { value: texturaRuido() } },
       'varying vec2 vU; varying float vCara; void main(){ vU = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vCara = abs(dot(normalize(normalMatrix * normal), normalize(-mv.xyz))); gl_Position = projectionMatrix * mv; }',
       /* glsl */`uniform float uT, uS; varying vec2 vU; varying float vCara; ${RUIDO_RAPIDO}
@@ -489,7 +490,7 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
           gl_FragColor = vec4(c * f, f); }`));
     nubeFin.position.y = LARGO * 0.97; nubeFin.scale.set(1.0, 1.3, 1.0); nubeFin.renderOrder = 20; lado.add(nubeFin); animados.push(nubeFin);
     // Hebras de plasma en espiral alrededor del haz (tres, enroscadas), con pulsos que suben.
-    const geoH = new THREE.CylinderGeometry(420, 70, LARGO * 0.9, 64, 64, true); geoH.translate(0, LARGO * 0.45, 0);
+    const geoH = new THREE.CylinderGeometry(270, 60, LARGO * 0.9, 64, 64, true); geoH.translate(0, LARGO * 0.45, 0);
     const helices = new THREE.Mesh(geoH, aditivo({ uT: { value: 0 } },
       'varying vec2 vU; varying float vCara; void main(){ vU = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vCara = abs(dot(normalize(normalMatrix * normal), normalize(-mv.xyz))); gl_Position = projectionMatrix * mv; }',
       /* glsl */`uniform float uT; varying vec2 vU; varying float vCara; ${RUIDO}
@@ -509,7 +510,7 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
   const particulasChorro = new THREE.Points(gCh, aditivo({ uT: { value: 0 }, uScale, uPR, uL: { value: LARGO } },
     /* glsl */`uniform float uT, uScale, uPR, uL; varying vec3 vC; varying float vA;
       void main(){ float f = fract(position.y + uT * 0.09), lado = position.z < 0.5 ? 1.0 : -1.0;
-        float r = 18.0 + f * 520.0 * pow(fract(position.x * 7.3), 2.0), giro = position.x + f * 22.0 + uT * 1.4;
+        float r = 16.0 + f * 330.0 * pow(fract(position.x * 7.3), 2.0), giro = position.x + f * 22.0 + uT * 1.4;
         vec4 mv = modelViewMatrix * vec4(cos(giro) * r, lado * f * uL, sin(giro) * r, 1.0); gl_Position = projectionMatrix * mv;
         vC = mix(vec3(1.0), vec3(0.45, 0.55, 1.0), f);
         float s = (34.0 - f * 18.0) * length(modelViewMatrix[0].xyz) * uScale / max(1e-3, -mv.z);

@@ -14,6 +14,7 @@
                   marcas   { nombre: segundo }: avisos para las animaciones (bandaSonora.alMarca); null = sin marca
    ════════════════════════════════════════════════════════════════ */
 import { TIEMPOS_AMOR } from '../util/supernovaAmor.js';
+import { ESCENA_PULSAR, ESCENA_CUASAR, ESCENA_DENEB } from '../util/escenasGigantes.js';
 
 export const CARPETA = 'assets/musica/';
 export const FUNDIDO = 1.6;   // segundos del fundido entre dos momentos (1–2 s: ni corte ni espera)
@@ -44,9 +45,14 @@ export const MOMENTOS = {
   viajes: momento({ volumen: 0.75, bucle: true }),
   // Destinos gigantes (ids de js/data/universo.js): su canción entra al llegar, desde el principio.
   supernova: momento({ marcas: { ...FASES_SUPERNOVA } }),
-  pulsar: momento(),
-  deneb: momento(),
-  cuasar: momento(),
+  // Púlsar, cuásar y Deneb: su escena al llegar sigue el reloj de su canción (js/ui/escenasGigantes.js). Las marcas
+  // son las de la escena (js/util/escenasGigantes.js, ESCENA_PULSAR…): se ajustan allí y valen para las dos cosas.
+  //   pulsar  la parte de amor de «Neo Romeo» (Rusowsky), 108 BPM, 33,65 s;  cuasar  la voz que cuenta cómo se
+  //   enamoró, 31 s;  deneb  «Middle» (DJ Snake), 103 BPM, 43,4 s. Al terminar la escena de Deneb queda en calma con su
+  //   mundo nuevo (no vuelve a empezar).
+  pulsar: momento({ archivo: 'pulsar.m4a', marcas: { ...ESCENA_PULSAR.marcas } }),
+  deneb: momento({ archivo: 'deneb.m4a', marcas: { ...ESCENA_DENEB.marcas } }),
+  cuasar: momento({ archivo: 'cuasar.m4a', marcas: { ...ESCENA_CUASAR.marcas } }),
   ton618: momento(),
   sagitario: momento(),
   gigante: momento(),

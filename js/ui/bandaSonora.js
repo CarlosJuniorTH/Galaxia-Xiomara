@@ -253,6 +253,8 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
       if (!p.el || p.conSilencio || p.estado !== 'lista') return 0;
       return reloj(p);
     },
+    // ¿Suena ahora mismo la canción de ese momento? (sin memoria nueva: lo pregunta una escena en cada cuadro)
+    suena(nombre) { const p = pistas.get(nombre); return !!p && p.sonando && !!p.el && !p.el.paused && !p.conSilencio && p.estado === 'lista'; },
     pasada(nombre, marca) { const s = pistas.get(nombre)?.conf.marcas?.[marca], t = this.tiempo(nombre); return Number.isFinite(s) && t !== null && t >= s; },
     // fn({ momento, marca, segundo }) al cruzar cada marca; devuelve cómo dejar de escuchar.
     alMarca(fn) { oyentes.add(fn); return () => oyentes.delete(fn); },

@@ -1034,9 +1034,10 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     giroSuave += ((controls.autoRotate ? 1 : 0) - giroSuave) * Math.min(1, dt * 0.7);
     controls.autoRotateSpeed = giroBase * giroSuave;
     ctx.lejano = lejano ? lejano.id : null;
-    // Las escenas del púlsar y de Deneb terminan (suaves) en cuanto se elige otro destino.
+    // Las escenas del púlsar, del cuásar y de Deneb terminan (suaves) en cuanto se elige otro destino.
     if (destinoActual !== 'pulsar') cosmos.escenas.cancelar('pulsar');
     if (destinoActual !== 'deneb') cosmos.escenas.cancelar('deneb');
+    if (destinoActual !== 'cuasar') cosmos.escenas.cancelar('cuasar');
     telarana.penumbra = 1 - cosmos.escenas.foco;
     // Exposición automática (como en los juegos): la luz que se suma (telaraña, polvo) tiene puntos de tamaño fijo en
     // pantalla; al alejar la cámara de un gigante más allá de su encuadre normal (el del PC), se amontonan y se
@@ -1277,7 +1278,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
         seguir();
       });
     },
-    // Escena de llegada del púlsar o de Deneb (js/escena/escenasGigantes.js). reloj: segundos desde el inicio de
+    // Escena de llegada del púlsar, del cuásar o de Deneb (js/escena/escenasGigantes.js). reloj: segundos desde el inicio de
     // su audio (bandaSonora.tiempo(id)); sin él, el tiempo propio desde ahora. La cámara deja de girar sola
     // mientras dura. Devuelve true al terminar y false si se cancela (al irse a otro destino).
     async escenaGigante(id, { reloj = null, config = null } = {}) {

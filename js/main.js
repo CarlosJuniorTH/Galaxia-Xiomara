@@ -90,7 +90,7 @@ try {
     alEncontrar: i => { escena.marcarEstrella(i); navigator.vibrate?.(40); },
     alCompletar: () => interfaz.celebrar(),
   });
-  interfaz = crearInterfazUniverso({ config: CONFIG, escena, progreso, recuerdos, estrellas, efectos, musica, viaje });
+  interfaz = crearInterfazUniverso({ config: CONFIG, escena, progreso, recuerdos, estrellas, efectos, musica, viaje, banda });
   contemplacion = crearContemplacion({
     permitido: () => document.body.classList.contains('dentro') && !document.body.classList.contains('supernova-en-escena') && !interfaz.enRuta && !interfaz.celebrando && !document.querySelector('dialog[open], .ventana.abierta')
   });
