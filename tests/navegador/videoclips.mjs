@@ -3,9 +3,11 @@
 // acercar o alejar); al terminar, la cámara vuelve con un fundido a un encuadre normal del gigante (a su distancia de
 // llegada) y los límites del zoom son razonables (como mucho ~2,5 veces el encuadre: antes, en la supernova, se podía
 // alejar muchísimo y la cámara quedaba lejísimos). «Volver a sentirlo» relanza clip, canción y cámara desde el 0.
+// El panel de abajo (Explorar, Mi álbum…) vuelve siempre: al terminar, tras «Volver a sentirlo» y al irse a mitad.
 // VIDEOCLIPS=pulsar,deneb limita los gigantes (por defecto, los seis). Con las canciones si están en assets/musica.
 import { existsSync } from 'fs';
 import { abrir, visitar } from './arnes.mjs';
+import { estadoPanel, panelVisible } from './panelTrasClip.mjs';
 
 const TODOS = ['pulsar', 'cuasar', 'deneb', 'ton618', 'sagitario', 'supernova'];
 export default async function ({ base, informe }) {
@@ -53,6 +55,10 @@ export default async function ({ base, informe }) {
       const razonable = c.zoom.distancia > c.zoom.encuadre * 0.7 && c.zoom.distancia < c.zoom.encuadre * 1.6;
       informe.comprobar(razonable, `${id}: al terminar la cámara queda en un encuadre normal (cerca de su distancia de llegada)`, { distancia: Math.round(c.zoom.distancia), encuadre: Math.round(c.zoom.encuadre) });
       informe.comprobar(c.zoom.max <= c.zoom.encuadre * 3.01 && c.zoom.max >= c.zoom.encuadre * 1.5 && c.zoom.min < c.zoom.distancia, `${id}: límites del zoom razonables (máximo ≤ 3× el encuadre)`, { min: Math.round(c.zoom.min), max: Math.round(c.zoom.max), encuadre: Math.round(c.zoom.encuadre) });
+      await pagina.waitForFunction(() => !document.body.classList.contains('escena-gigante'), null, { timeout: 60000, polling: 250 });
+      await pagina.waitForTimeout(1500);
+      const panel = await estadoPanel(pagina);
+      informe.comprobar(panelVisible(panel), `${id}: al terminar el clip el panel de abajo vuelve`, panel);
       informe.comprobar(!c.zoom.bloqueada && Math.abs(c.zoom.fov - 60) < 0.01, `${id}: el control vuelve y el campo de visión es el normal`, { bloqueada: c.zoom.bloqueada, fov: c.zoom.fov });
       // Alejar del todo con la rueda: no se puede ir más allá del máximo (ni crece después).
       await pagina.waitForFunction(() => !document.body.classList.contains('escena-gigante'), null, { timeout: 60000, polling: 250 });
@@ -72,7 +78,23 @@ export default async function ({ base, informe }) {
       if (cancion) informe.comprobar(cancion.objetivo === id && cancion.t < 6, `${id}: y su canción vuelve a empezar`, cancion);
       // Irse no se puede mientras dura; se espera al final para pasar al siguiente gigante.
       await pagina.waitForFunction(() => !window.__galaxia.escena.clip && !document.body.classList.contains('escena-gigante'), null, { timeout: 120000, polling: 250 });
-      await pagina.waitForTimeout(800);
+      await pagina.waitForTimeout(1500);
+      const panel2 = await estadoPanel(pagina);
+      informe.comprobar(panelVisible(panel2), `${id}: tras «Volver a sentirlo», el panel de abajo vuelve`, panel2);
+    }
+    // Irse a mitad: con un clip en curso, la supernova que quiere estallar se lleva la cámara a la fuerza (el único viaje
+    // posible durante un clip); al llegar el panel no puede quedarse oculto por el clip que se dejó.
+    const otro = ids.find(id => id !== 'supernova');
+    if (otro && !ids.includes('supernova')) {
+      await visitar(pagina, otro);
+      await pagina.waitForTimeout(3000);
+      await pagina.evaluate(() => window.__galaxia.escena.aplazarSupernova(0));
+      await pagina.waitForFunction(() => window.__galaxia.escena.destino === 'supernova', null, { timeout: 15000, polling: 100 });
+      await pagina.waitForFunction(() => !window.__galaxia.escena.viajando, null, { timeout: 120000, polling: 250 });
+      await pagina.waitForFunction(() => !window.__galaxia.escena.clip && !document.body.classList.contains('escena-gigante'), null, { timeout: 150000, polling: 250 });
+      await pagina.waitForTimeout(1500);
+      const panel3 = await estadoPanel(pagina);
+      informe.comprobar(panelVisible(panel3), `irse a mitad del clip de ${otro}: al acabar lo que siga, el panel de abajo vuelve`, panel3);
     }
     informe.comprobar(errores.length === 0, 'sin errores en la consola', errores.slice(0, 5));
   } finally { await navegador.close(); }

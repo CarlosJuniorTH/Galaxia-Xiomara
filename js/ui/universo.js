@@ -55,6 +55,18 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     if (escena.mirandoCasa) escena.mirarCasa(false);
     document.dispatchEvent(new CustomEvent('escena-gigante', { detail: { id, duracion, activa: true } }));
   }
+  // Vigía del bloqueo común: el panel de abajo y los controles vuelven SIEMPRE. Si la escena sigue abierta pero ya se está
+  // en otro sitio (se viajó a mitad), se cierra; si no hay escena, no queda ninguna clase que los oculte; y al terminar el
+  // videoclip (la cámara vuelve al control) la interfaz se despierta.
+  let clipAntes = null;
+  setInterval(() => {
+    if (escenaActual && !escena.viajando && escena.destino !== escenaActual.id) terminarEscena();
+    if (!escenaActual && document.body.classList.contains('escena-gigante')) { document.body.classList.remove('escena-gigante'); document.dispatchEvent(new Event('despertar-interfaz')); }
+    if (!accionEnCurso && document.body.classList.contains('accionando')) document.body.classList.remove('accionando');
+    const clip = escena.clip?.id ?? null;
+    if (clipAntes && !clip) document.dispatchEvent(new Event('despertar-interfaz'));
+    clipAntes = clip;
+  }, 400);
   function terminarEscena(id) {
     if (!escenaActual || (id && escenaActual.id !== id)) return;
     const fin = escenaActual; clearTimeout(fin.temporizador); escenaActual = null;
@@ -229,6 +241,9 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
   async function accionLugar(id) {
     if (accionEnCurso || escena.viajando) return;
     if (escenasGigantes.enCurso === id) return;   // las escenas de llegada no se pueden saltar ni interrumpir con la acción del lugar
+    // Los gigantes: su videoclip ya bloquea la navegación (escenaEnCurso) y la devuelve al terminar; no retiene «accionando»
+    // (que oculta tarjeta y panel) durante todo el clip.
+    if (GIGANTES.has(id) && id !== 'supernova') { volverASentirlo(id); return; }
     accionEnCurso = true; document.body.classList.add('accionando');
     try {
       if (id === 'hogar') abrirPanel('lugares');
