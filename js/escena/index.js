@@ -24,13 +24,15 @@ import { crearUniversoLocal } from './universoLocal.js';
 import { EXPOSICION } from './exposicion.js';
 import { crearTelaranaCosmica, pedirDatosTelarana } from './telarana.js';
 import { crearCieloProfundo } from './cieloProfundo.js';
+import { crearPreparacion } from './carga/preparacion.js';
+import { crearGestorCalidad } from './calidad/gestor.js';
+import { crearRutas } from './camara/rutas.js';
 import { crearMaravillas } from './maravillas.js';
 import { crearPolvo } from './polvo.js';
 import { texturasListas, texturasTodas } from './fabricaTexturas.js';
 import { DESTINOS, LEJANOS } from '../data/universo.js';
 import { encuadreHogar, escalaSimbolos, desplazamientoZonaLibre, compensacionPuntos, distanciaDestino, correccionAlLlegar, cambioInterfazApreciable } from '../util/encuadre.js';
 import { esMovil } from '../util/dispositivo.js';
-import { crearReguladorResolucion } from '../util/resolucion.js';
 import { crearPlanificador } from '../util/planificador.js';
 import { MUESTRAS as muestrasNube } from './nube.js';
 import { crearGiro } from '../util/giro.js';
@@ -261,63 +263,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // muestra «Preparando tu universo». Antes ocurría al aparecer cada objeto en
   // pantalla por primera vez y provocaba tirones al girar la cámara.
   // Con KHR_parallel_shader_compile la compilación no congela la pantalla de carga.
-  const anisotropiaMax = renderer.capabilities.getMaxAnisotropy();
-  const subirTexturas = (escena = scene) => escena.traverse(o => {
-    for (const m of [].concat(o.material || [])) {
-      for (const v of [...Object.values(m), ...Object.values(m.uniforms || {}).map(u => u.value)]) if (v?.isTexture) {
-        // Filtrado anisótropo al máximo del aparato en las que ya lo pedían (planetas, lunas, superficies): de lado, en el
-        // borde de un planeta, la textura se veía emborronada con 4 u 8.
-        if (v.anisotropy > 1 && v.anisotropy < anisotropiaMax) v.anisotropy = anisotropiaMax;
-        renderer.initTexture(v);
-        // Ya en la tarjeta gráfica: las imágenes que nadie vuelve a leer sueltan su copia en memoria (decenas de MB en un iPhone).
-        if (v.userData.liberable && v.image?.data && v.version > 0) v.image = { width: v.image.width, height: v.image.height, data: null };
-      }
-    }
-  });
-  const paralela = renderer.compileAsync && renderer.extensions.has('KHR_parallel_shader_compile');
-  // Las texturas de los planetas llegan del Web Worker en paralelo a la compilación.
-  // También lo que aún no se ve (el vecindario de la supernova, la otra galaxia, la explosión):
-  // compile solo prepara lo visible, así que se muestra todo un momento (tras la pantalla de
-  // carga) y luego se devuelve como estaba. Así nada se compila por primera vez durante un viaje.
-  const compilarTodo = escena => {
-    const ocultos = []; escena.traverse(o => { if (!o.visible) { ocultos.push(o); o.visible = true; } });
-    const fin = () => { for (const o of ocultos) o.visible = false; };
-    // La compilación se registra al llamarla: se devuelve la visibilidad en el acto (ni un cuadro).
-    // Se compila para el mismo destino en el que se dibuja (la imagen intermedia del resplandor): si no, three.js
-    // los compila otra vez al primer cuadro (otro espacio de color) y la entrada da un tirón.
-    const previo = renderer.getRenderTarget(), destino = nucleo.post?.readBuffer ?? null;
-    renderer.setRenderTarget(destino);
-    let promesa; try { promesa = paralela ? renderer.compileAsync(escena, camera) : Promise.resolve(renderer.compile(escena, camera)); } catch (e) { promesa = Promise.reject(e); }
-    renderer.setRenderTarget(previo);
-    fin();
-    return promesa.catch(() => renderer.compile(escena, camera));
-  };
+  const { subirTexturas, compilarTodo, calentar } = crearPreparacion({ renderer, camera, scene, nucleo, solar, telarana, composer, obtenerCapaVolumen: () => capaVolumen });   // carga/preparacion.js
   restaurarAzar();
-  // Calentamiento: un cuadro completo (escena, fondo y resplandor) dibujado una vez tras la portada, con todo
-  // visible, para que ningún programa de GPU se compile por primera vez al entrar o durante un viaje.
-  // Todo (también lo oculto) se dibuja una vez en una imagen diminuta de 128×128 con el mismo formato que la escena: se
-  // preparan programas, búferes y texturas igual, pero la GPU apenas pinta. Antes se dibujaba TODO a la vez a pantalla
-  // completa en un único cuadro enorme: en un iPhone caliente o con poca batería tardaba tanto que iOS daba la página por
-  // colgada y la cerraba. Después, un cuadro normal (con lo visible) prepara el resplandor y la pasada final.
-  const calentar = () => {
-    // Todo visible y sin descartar lo que queda fuera de la cámara: así cada geometría se sube ya a la tarjeta gráfica
-    // (si no, la primera vez que entra en pantalla —al volver a casa, al llegar a un universo— se sube en pleno viaje).
-    // También las escenas que se dibujan aparte: el sistema solar (Rosa, Azul, la luna de las cartas) y la capa de las
-    // galaxias de la telaraña (sus bloques fuera de la vista se estrenaban al salir de casa en el primer viaje).
-    const ocultos = [], recortados = [], aparte = [scene, solar.escena, telarana.capaGalaxias].filter(Boolean);
-    for (const esc of aparte) esc.traverse(o => { if (!o.visible) { ocultos.push(o); o.visible = true; } if (o.frustumCulled) { recortados.push(o); o.frustumCulled = false; } });
-    const leer = nucleo.post?.readBuffer, rt = new THREE.WebGLRenderTarget(128, 128, { type: leer?.texture?.type ?? THREE.UnsignedByteType });
-    try { const previo = renderer.getRenderTarget(); renderer.setRenderTarget(rt); for (const esc of aparte) renderer.render(esc, camera); renderer.setRenderTarget(previo); } catch (e) { console.warn('Calentamiento', e); }
-    for (const o of ocultos) o.visible = false;
-    for (const o of recortados) o.frustumCulled = true;
-    rt.dispose();
-    // La lente (cerca de los universos) y el salto (el destello de los viajes) solo se activan allí: se encienden en
-    // este cuadro para que su programa quede listo y el primer viaje no los estrene con un tirón.
-    const pasadas = [nucleo.lente, nucleo.salto].filter(Boolean), antes = pasadas.map(p => p.enabled);
-    for (const p of pasadas) p.enabled = true;
-    try { capaVolumen.dibujar(camera, 64); telarana.dibujarGalaxias(renderer, camera); composer.render(); } catch (e) { console.warn('Calentamiento', e); }
-    pasadas.forEach((p, i) => { p.enabled = antes[i]; });
-  };
   // Carga completa, como un videojuego: antes de entrar se crean todas las nebulosas, se calculan todas las texturas,
   // llega el cielo, se compilan todos los programas de GPU (también los del sistema solar) y todo se sube a la
   // tarjeta gráfica. Después ya no se prepara nada mientras se viaja: sin tirones.
@@ -352,31 +299,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   const centroVia = cosmos.objetivo('sagitario')?.centro?.clone() ?? new THREE.Vector3();
   let destinoActual = 'hogar', pausa = false, captura = null, retornoGiro = 0;
   let cuadros = 0, acumulado = 0, entradaResuelta = false, coste = 0;
-  // Resolución dinámica medida (ver util/resolucion.js).
-  // En móvil empieza en 2 como mucho (más no se nota en pantalla) y baja hasta 1,5 (nítido) si el aparato no llega a 60 FPS; sube
-  // solo tras seis ventanas estables; si la subida no se sostiene, vuelve y fija ese techo.
-  // Si con la resolución mínima el aparato sigue sin llegar a 60 FPS, se aligera lo más caro (las nebulosas con
-  // volumen, con menos muestras por rayo), en dos escalones como mucho: fluido antes que perfecto en un móvil modesto.
-  // Escalones (como la calidad automática de los juegos): si el aparato no llega —un móvil modesto o uno caliente que ha
-  // bajado su GPU— se aligera paso a paso; cuando vuelve a ir sobrado durante un rato, se recupera en orden inverso.
-  const muestrasBase = muestrasNube.value;
-  const ESCALONES = [
-    [() => { muestrasNube.value = Math.max(8, Math.round(muestrasBase * 0.7)); }, () => { muestrasNube.value = muestrasBase; }],
-    [() => { muestrasNube.value = Math.max(8, Math.round(muestrasBase * 0.5)); }, () => { muestrasNube.value = Math.max(8, Math.round(muestrasBase * 0.7)); }],
-    [() => telarana.escalarCapaGalaxias(telarana.escalaCapaInicial * 0.75), () => telarana.escalarCapaGalaxias(telarana.escalaCapaInicial)],
-    [() => telarana.fijarMuestra(telarana.muestraInicial * 0.65), () => telarana.fijarMuestra(telarana.muestraInicial)]
-  ];
-  let aligerado = 0;
-  const aligerar = () => { if (aligerado >= ESCALONES.length) return; ESCALONES[aligerado][0](); aligerado++; canvas.dataset.aligerado = String(aligerado); };
-  const recuperar = () => { if (!aligerado) return false; aligerado--; ESCALONES[aligerado][1](); canvas.dataset.aligerado = String(aligerado); return true; };
-  const regular = crearReguladorResolucion({ minimo: esMovil ? Math.min(1.5, nucleo.resolucion) : 1, maximo: nucleo.prTope,   // lo reservado (nucleo.js): subir hasta ahí no rehace nada
-    inicial: nucleo.resolucion, alAgotar: aligerar, alRecuperar: recuperar });
-  // (El cambio de resolución ya no rehace búferes, zona.js: se aplica en el acto.)
-  let resolucionPendiente = null;
-  function regularResolucion(ms) { const nueva = regular(ms); if (nueva !== null) resolucionPendiente = nueva; aplicarResolucionPendiente(); }
-  // Cambiar de resolución ya no rehace ningún búfer (solo la zona en la que se dibuja, zona.js): se aplica en el acto.
-  // Antes esperaba 2,5 s tras soltar el dedo… y caía justo en la cola de la inercia: un cuadro de 30–100 ms en un móvil.
-  function aplicarResolucionPendiente() { if (resolucionPendiente === null) return; nucleo.fijarResolucion(resolucionPendiente); resolucionPendiente = null; regular.reiniciar(); }
+  // Calidad automática: resolución dinámica y escalones (calidad/gestor.js).
+  const { regular, regularResolucion } = crearGestorCalidad({ canvas, nucleo, telarana, muestrasNube });
 
   // Ritmo de dibujo (ver util/planificador.js). En el móvil, igual que en el PC: siempre a 60 FPS, también en
   // reposo (a 30 los gigantes animados se veían a saltos). ?ritmo=ahorro vuelve a 30 en reposo en pantallas táctiles.
@@ -427,7 +351,10 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     if (destinoActual === 'hogar') desplazamientoMeta -= vista.alto * 0.13;
     fraccionZona = Math.max(0, abajo - arriba) / vista.alto;
   }
-  setInterval(medirZonaLibre, 1500);
+  // Cada 1,5 s, pero nunca en mitad de un gesto, una inercia o un viaje (medir obliga al navegador a recalcular la
+  // maquetación de la página, y el contador la cambia cada segundo) y cuando el navegador está libre.
+  const libre = window.requestIdleCallback ? f => requestIdleCallback(f, { timeout: 500 }) : f => setTimeout(f, 0);
+  setInterval(() => { if (!gesto && !vuelo && !giro.moviendo && !zoom.moviendo) libre(medirZonaLibre); }, 1500);
   function aplicarDesplazamiento(dt) {
     const anterior = desplazamiento;
     desplazamiento += (desplazamientoMeta - desplazamiento) * Math.min(1, dt * 2.5);
@@ -697,46 +624,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     const dpr = devicePixelRatio || 1;
     marca.style.transform = `translate(${Math.round(marcaEstado.x * dpr) / dpr}px, ${Math.round(marcaEstado.y * dpr) / dpr}px)`;
   }
-  // Llegada en órbita: la cámara se acerca hasta una esfera amplia alrededor del destino
-  // (por el lado desde el que viene), lo BORDEA girando a su alrededor hasta el ángulo final
-  // y termina acercándose para encuadrarlo. Nunca pasa por dentro del lugar.
-  function llegadaEnOrbita(desde, hasta, objetivo) {
-    // Tramo rápido EN LÍNEA RECTA hacia el destino (el punto de fuga de las estelas coincide
-    // con lo que se mira) hasta una esfera de aproximación; después, ya frenando, un arco
-    // corto alrededor del destino hasta el encuadre final. Nunca se entra en él.
-    const D = hasta.distanceTo(objetivo), inicio = desde.clone().sub(objetivo), r0 = inicio.length();
-    inicio.normalize(); const fin = hasta.clone().sub(objetivo).normalize();
-    const rAprox = Math.min(r0, Math.max(D * 1.45, D + 180));
-    const paso = [];
-    // Puntos sobre la recta que une la cámara con el centro del destino: la curva no se tuerce
-    // antes de tiempo y el punto de fuga de las estelas coincide con lo que se mira.
-    if (r0 > rAprox * 1.1) for (const f of [0.4, 0.75, 0.93, 1]) paso.push(objetivo.clone().addScaledVector(inicio, r0 + (rAprox - r0) * f));
-    const angulo = inicio.angleTo(fin);
-    if (angulo > 0.05) {
-      let eje = new THREE.Vector3().crossVectors(inicio, fin);
-      if (eje.lengthSq() < 1e-6) eje.set(0, 1, 0); eje.normalize();
-      const tramos = Math.max(2, Math.ceil(angulo / 0.25));
-      for (let k = 1; k < tramos; k++) {
-        const f = k / tramos, dir = inicio.clone().applyAxisAngle(eje, angulo * f);
-        paso.push(objetivo.clone().addScaledVector(dir, rAprox + (D - rAprox) * f));
-      }
-    }
-    return paso;
-  }
-  // Puntos sobre la recta: el trayecto no se curva (CatmullRom pasa por ellos).
-  const recta = (desde, hasta) => [0.3, 0.6, 0.85].map(f => desde.clone().lerp(hasta, f));
-  function pasoHacia(id, hasta, objetivo) {
-    if (id === 'cometa') return { paso: [objetivo.clone().add(mundos.colaCometa().multiplyScalar(650)).add(new THREE.Vector3(0, 60, 0))], mirarAntes: 1.7, corriente: 1 };
-    // De vuelta al centro el encuadre es fijo (compone el cielo de fondo): estelas suaves.
-    // Desde lejos se vuelve en recta hasta un punto en el eje del encuadre de casa y desde ahí se
-    // llega de frente: la galaxia crece centrada, sin cruzarla ni rozarla.
-    if (id === 'hogar') {
-      if (camera.position.distanceTo(hasta) <= 20000) return { corriente: 0.35 };
-      const eje = hasta.clone().sub(objetivo).normalize(), entrada = hasta.clone().addScaledVector(eje, 6000);   // se entra de frente por el eje del encuadre
-      return { paso: [...recta(camera.position, entrada), entrada, hasta.clone().lerp(entrada, 0.3)], mirarAntes: 1, corriente: 1 };
-    }
-    return { paso: llegadaEnOrbita(camera.position, hasta, objetivo), mirarAntes: 1.7, corriente: 1 };
-  }
+  // Rutas de los viajes cortos (camara/rutas.js).
+  const { recta, pasoHacia } = crearRutas({ camera, mundos });
   // Encuadre del corazón de la supernova: mide su tamaño real y la franja de pantalla que dejan
   // libre la cabecera y el texto, y coloca el centro del corazón en el centro de esa franja,
   // entero y con margen, en vertical y en horizontal.
@@ -993,7 +882,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
         if (!vuelo.plan.listo) vuelo.plan.preparar(esMovil ? 3 : 2);
         const e = vuelo.plan.evaluar(vuelo.transcurrido);
         camera.position.copy(e.pos); controls.target.copy(e.mira); camera.lookAt(controls.target);
-        vuelo.corriente = e.corriente; vuelo.fase = e.fase; if (canvas.dataset.fase !== e.fase) canvas.dataset.fase = e.fase; canvas.dataset.recorrido = e.avance.toFixed(3);
+        vuelo.corriente = e.corriente; vuelo.fase = e.fase; if (canvas.dataset.fase !== e.fase) canvas.dataset.fase = e.fase; if (diagnosticar) canvas.dataset.recorrido = e.avance.toFixed(3);   // (solo para diagnóstico: cambiaba un atributo del lienzo en cada cuadro)
         const [r0, r1] = vuelo.plan.ruptura;
         if (e.fase === 'ruptura' && !vuelo.rupturaHecha) { vuelo.rupturaHecha = true; campoVelocidad.impulsar(); }
         // Dónde estamos: región, encuentro a la vista y distancia recorrida (para la interfaz y las pruebas).

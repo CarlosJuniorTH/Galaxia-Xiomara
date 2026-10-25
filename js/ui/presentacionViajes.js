@@ -24,16 +24,17 @@ export function crearPresentacionViajes({ canvas, nombre, elegirDestino, escena 
       if(activo&&!document.body.classList.contains('en-ruta')){for(const e of document.querySelectorAll('#hud .lugar,#hud .muelle,#hud #btn-tour,#cometa-aviso,#supernova-aviso')){bloqueados.set(e,e.inert);e.inert=true;}}
       else{for(const [e,inert] of bloqueados)e.inert=inert;bloqueados.clear();}
     }
-    caja.hidden=!activo;
+    if(caja.hidden!==!activo)caja.hidden=!activo;
     if(destino!==anterior){titulo.textContent=activo?`Hacia ${nombre(destino)}`:'';anterior=destino;}
     // Saltar solo tiene sentido en los viajes largos por fases, antes de la aproximación.
-    const fase=canvas.dataset.fase||'';saltar.hidden=!fase||fase==='aproximacion'||fase==='llegada';
+    const fase=canvas.dataset.fase||'',ocultarSaltar=!fase||fase==='aproximacion'||fase==='llegada';if(saltar.hidden!==ocultarSaltar)saltar.hidden=ocultarSaltar;
     const partes=[canvas.dataset.region,canvas.dataset.encuentro,canvas.dataset.distanciaMal?`a ${canvas.dataset.distanciaMal} millones de años luz de casa`:''].filter(Boolean);
-    lugar.textContent=partes.join(' · ');lugar.hidden=!partes.length;
-    const avance=Number(canvas.dataset.avance||0);luz.style.transform=`scaleX(${avance/100})`;hilo.setAttribute('aria-valuenow',String(avance));
-    const mirando=canvas.dataset.mirandoCasa==='si';casa.setAttribute('aria-pressed',String(mirando));casa.textContent=mirando?'Volver a la vista':'⌂ Mirar hacia casa';
+    // (Solo lo que cambia: cada escritura obliga a rehacer la maquetación, y esto corre con cada punto de avance.)
+    const texto=partes.join(' · ');if(lugar.textContent!==texto)lugar.textContent=texto;if(lugar.hidden!==!partes.length)lugar.hidden=!partes.length;
+    const avance=Number(canvas.dataset.avance||0);luz.style.transform=`scaleX(${avance/100})`;if(hilo.getAttribute('aria-valuenow')!==String(avance))hilo.setAttribute('aria-valuenow',String(avance));
+    const mirando=canvas.dataset.mirandoCasa==='si',textoCasa=mirando?'Volver a la vista':'⌂ Mirar hacia casa';if(casa.getAttribute('aria-pressed')!==String(mirando))casa.setAttribute('aria-pressed',String(mirando));if(casa.textContent!==textoCasa)casa.textContent=textoCasa;
   };
   new MutationObserver(actualizar).observe(canvas,{attributes:true,attributeFilter:['data-viaje','data-avance','data-fase','data-region','data-encuentro','data-distancia-mal','data-mirando-casa']});actualizar();
   // El botón de casa aparece lejos de Xiomara, sin viaje en curso.
-  setInterval(()=>{casa.hidden=!escena||!!canvas.dataset.viaje||!escena.lejosDeCasa||document.body.classList.contains('supernova-en-escena');},700);
+  setInterval(()=>{const oculto=!escena||!!canvas.dataset.viaje||!escena.lejosDeCasa||document.body.classList.contains('supernova-en-escena');if(casa.hidden!==oculto)casa.hidden=oculto;},700);
 }

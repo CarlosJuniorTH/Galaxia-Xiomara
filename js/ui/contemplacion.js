@@ -3,7 +3,9 @@
 // ese primer toque solo despierta la interfaz (no envía un beso ni abre nada).
 export function crearContemplacion({ espera = 9000, permitido = () => true } = {}) {
   let temporizador = 0, despertadoEn = -Infinity;
-  const cuerpo = document.body;
+  // La clase va en #hud (todo lo que se retira está dentro), no en body: cambiarla en body recalculaba los estilos de toda
+  // la página justo con el primer toque tras el reposo.
+  const cuerpo = document.getElementById('hud') || document.body;
   function dormir() {
     if (permitido()) cuerpo.classList.add('contemplando');
     else temporizador = setTimeout(dormir, espera);

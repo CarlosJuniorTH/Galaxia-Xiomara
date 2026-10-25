@@ -173,9 +173,9 @@ body.en-calma #hud>:not(.salir-calma){opacity:0;pointer-events:none;transition:o
    vuelve con cualquier toque. Título, relojes y música permanecen. */
 .muelle,.lugar,.cometa-aviso,#pastilla-estrellas,.boton-tour{transition:opacity 1.2s ease;}
 #mensaje{transition:opacity 1.2s ease,transform 1.2s ease;}
-body.contemplando .muelle,body.contemplando .lugar,body.contemplando .cometa-aviso,
-body.contemplando #pastilla-estrellas,body.contemplando .boton-tour,body.contemplando #mensaje{opacity:0;pointer-events:none;}
-body.contemplando .muelle{transform:translateX(-50%) translateY(8px);}
+#hud.contemplando .muelle,#hud.contemplando .lugar,#hud.contemplando .cometa-aviso,
+#hud.contemplando #pastilla-estrellas,#hud.contemplando .boton-tour,#hud.contemplando #mensaje{opacity:0;pointer-events:none;}
+#hud.contemplando .muelle{transform:translateX(-50%) translateY(8px);}
 
 /* Móvil: los textos auxiliares eran demasiado pequeños para leerlos con comodidad. */
 @media(max-width:600px){
@@ -238,7 +238,7 @@ body:has(.brindis.visible) #mensaje{opacity:0;}
 @keyframes latido-mapa{50%{transform:scale(1.35);opacity:.5}}
 .mapa-lugar:focus-visible .mapa-punto{stroke:#fff;stroke-width:2;}
 .mapa-nota{margin:4px 2px 2px;font-size:.62rem;color:#d9c3d6aa;line-height:1.4;}
-body.contemplando .btn-mapa{opacity:0;pointer-events:none;}
+#hud.contemplando .btn-mapa{opacity:0;pointer-events:none;}
 body.en-ruta .btn-mapa,body.en-calma .btn-mapa{display:none;}
 @media(max-width:600px){
   .btn-mapa{left:16px;top:calc(var(--arriba) + 176px);width:34px;height:34px;}
