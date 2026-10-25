@@ -12,7 +12,8 @@ export default async function ({ base, informe }) {
   const ids = (process.env.VIDEOCLIPS || TODOS.join(',')).split(',').filter(id => TODOS.includes(id));
   const musica = existsSync('assets/musica/pulsar.m4a');
   if (!musica) informe.nota('sin las canciones: los clips siguen su tiempo propio');
-  const { navegador, pagina, errores } = await abrir(base, 'pc', { musica, toque: musica, espera: 800 });
+  // Sin la intro (?sinIntro): el clic en «Entrar» ya desbloquea el audio. VIDEOCLIPS_TOQUE=1 pasa por la intro entera.
+  const { navegador, pagina, errores } = await abrir(base, 'pc', { musica, toque: musica && !!process.env.VIDEOCLIPS_TOQUE, espera: 800 });
   const estado = () => pagina.evaluate(() => {
     const e = window.__galaxia.escena, cam = e.interno.camera;
     return { clip: e.clip, zoom: e.camaraZoom, pos: cam.position.toArray(), destino: e.destino, viajando: e.viajando, escena: document.body.classList.contains('escena-gigante'),
@@ -26,6 +27,8 @@ export default async function ({ base, informe }) {
     return antes;
   }
   try {
+    // La supernova que quiere estallar viajaría a ella a la fuerza en mitad de otro clip: se aplaza (se visita al final).
+    await pagina.evaluate(() => window.__galaxia.escena.aplazarSupernova(1e6));
     for (const id of ids) {
       informe.nota(`— ${id}`);
       await visitar(pagina, id);
