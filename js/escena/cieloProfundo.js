@@ -15,6 +15,11 @@ export function crearCieloProfundo({ renderer, scene }) {
   // Las imágenes se decodifican fuera del hilo principal (createImageBitmap) y se suben a la GPU nada más llegar,
   // mientras se presenta el universo: ningún congelón al decodificarlas.
   const textura = new THREE.CubeTexture(); textura.colorSpace = THREE.SRGBColorSpace; textura.flipY = false;
+  // Sin mipmaps donde nunca se ve reducido: con caras de 2048 (≈23 texels por grado) y una pantalla densa (un móvil:
+  // ≥ 20 píxeles de escena por grado) cada texel ocupa más de un píxel, así que sus niveles reducidos no se usaban y
+  // ocupaban un tercio más de memoria de la tarjeta gráfica (~32 MB en un iPhone). En un PC de pantalla normal sí se reduce: con mipmaps.
+  const lado = sufijo === 'alta' ? 2048 : 1024, pxPorGrado = innerHeight * Math.min(devicePixelRatio, 2) / 60;
+  if (pxPorGrado >= lado / 90 * 0.88) { textura.generateMipmaps = false; textura.minFilter = THREE.LinearFilter; }
   let listo = 0;
   const cargado = Promise.all(CARAS.map(c => fetch(`assets/cielo/${c}-${sufijo}.webp`).then(r => { if (!r.ok) throw Error(r.status); return r.blob(); })
     .then(b => createImageBitmap(b, { imageOrientation: 'none', premultiplyAlpha: 'none', colorSpaceConversion: 'none' }))))

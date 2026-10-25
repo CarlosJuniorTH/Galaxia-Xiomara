@@ -81,14 +81,17 @@ export function crearCielo({ scene, camera, uScale }) {
   });
   const puntos = new THREE.Points(crearEstrellas(), material);
   puntos.frustumCulled = false; puntos.renderOrder = -1001; puntos.name = 'Cielo de casa (estrellas)'; scene.add(puntos);
-  // El fondo de antes (sin estrellas): casi negro con un toque violeta, a la intensidad del fondo (0,5).
-  scene.background = new THREE.Color().setRGB(0.001, 0.0005, 0.002, THREE.LinearSRGBColorSpace);
+  // El fondo de antes (sin estrellas): casi negro con un toque violeta (0,002/0,001/0,004) por la intensidad del fondo, que
+  // three.js no aplica a un color: se escala aquí en cada cuadro (lejos de casa se oscurece, como el cubo de antes).
+  const fondo = new THREE.Color(); scene.background = fondo;
+  const fijarFondo = k => fondo.setRGB(0.002 * k, 0.001 * k, 0.004 * k, THREE.LinearSRGBColorSpace);
+  fijarFondo(0.5);
   scene.backgroundIntensity = 0.5;   // cielo profundo y oscuro: así la galaxia resalta (index.js lo baja lejos de casa)
   return {
     puntos,
     actualizar() {
       // Sigue a la intensidad del fondo que index.js ajusta (lejos de casa, con el teleobjetivo) y al campo de visión.
-      uI.value = scene.backgroundIntensity; puntos.visible = uI.value > 0.003;
+      uI.value = scene.backgroundIntensity; puntos.visible = uI.value > 0.003; fijarFondo(uI.value);
       uPxRad.value = uScale.value / Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
     }
   };
