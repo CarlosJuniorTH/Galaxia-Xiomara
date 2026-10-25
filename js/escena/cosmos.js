@@ -18,7 +18,8 @@ import { construirCuasar, CUASAR } from './cuasar.js';
 import { ESCALA_SUPERNOVA, PROGENITORA_RELATIVA, ESCALA_CUASAR, ESCALA_TON, ESCALA_PULSAR, ESCALA_DENEB, ESCALA_SGR } from '../data/escalaCosmica.js';
 import { SITIOS_DESTINO } from '../data/sitios.js';
 import { materialSombra } from './materiales.js';
-import { crearEscenaPulsar, crearEscenaDeneb, crearEscenaCuasar, RADIO_DENEB } from './escenasGigantes.js';
+import { crearEscenaPulsar, crearEscenaCuasar } from './escenasGigantes.js';
+import { crearDeneb, RADIO_DENEB } from './deneb.js';
 import { ESCENA_PULSAR, ESCENA_CUASAR, ESCENA_DENEB, estadoPulsar, estadoCuasar, estadoDeneb, crearDirector } from '../util/escenasGigantes.js';
 const reducido = !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
@@ -121,8 +122,7 @@ export function* construirCosmos({ uScale, uPR }) {
   // deslumbrante, brillo ceñido, destellos de difracción como en un telescopio, estrellas más
   // cercanas que pasan por delante y, las hipergigantes, la nebulosa que expulsan ──
   const estrellas = [], superficies = [], envolturas = [], cercanas = [], gruposEstrella = {};
-  let escenaDeneb = null, superficieDeneb = null, suavesDeneb = null;
-  const ESCALA_DISCO_DENEB = RADIO_DENEB / (1400 * 0.006);   // su disco, de 8,4 a 30 unidades (los halos de lejos, como antes)
+  let denebCerca = null, suavesDeneb = null;   // Deneb de cerca: la estrella, su mundo y su videoclip (deneb.js)
   for (const [nombre, color, tam, acimut, elevacion] of ESTRELLAS_REALES) {
     yield;
     const g = new THREE.Group(); g.position.copy(direccionCielo(acimut, elevacion, DIST_ESTRELLAS)); g.lookAt(0, 0, 0); (nombre === 'Deneb' ? raiz : decor).add(g); gruposEstrella[nombre] = g;
@@ -203,10 +203,9 @@ export function* construirCosmos({ uScale, uPR }) {
       g.position.copy(direccionCielo(...SITIOS_DESTINO.deneb)); g.lookAt(0, 0, 0); g.userData.base = ESCALA_DENEB;   // tan lejos como la supernova: una estrella colosal
       g.add(...extra); halos.push(...extra);
       rayos.material.opacity = 0.12; rayos.scale.setScalar(tam * 0.5);
-      // Su escena (escenasGigantes.js): la corona de motas y el mundo nuevo, alrededor de la estrella.
-      yield; escenaDeneb = crearEscenaDeneb({ uScale, uPR }); g.add(escenaDeneb.nebulosa, escenaDeneb.corona, escenaDeneb.mundo); superficieDeneb = superficie; superficie.material.uniforms.uC.value = new THREE.Color('#cddcff'); superficie.material.uniforms.uCel.value = 8; yield;   // blanco azulada, con sus células visibles
-      // De cerca, una supergigante enorme (radio RADIO_DENEB) con su viento y su nebulosa de motas: su brillo difuso de lejos
-      // (los destellos y halos) se apaga al acercarse (actualizar), y lo que se ve es la estrella.
+      // De cerca, la supergigante (radio RADIO_DENEB) y su mundo, con su videoclip (deneb.js): sustituye al disco genérico;
+      // su brillo de lejos (los destellos y halos) se apaga al acercarse (actualizar), y lo que se ve es la estrella.
+      yield; denebCerca = crearDeneb({ uScale, uPR }); g.add(denebCerca.marco); superficie.visible = false; yield;
     }
     // El brillo y los destellos son un efecto óptico: al acercarse conservan su tamaño en el
     // cielo (encogen en el espacio) mientras el disco de la estrella sí se ve más grande.
@@ -363,12 +362,12 @@ export function* construirCosmos({ uScale, uPR }) {
   // Cada una con su director: su segundo (del reloj que se le pase: el del audio, o el tiempo propio desde la
   // llegada) y su peso (al cancelarla baja suave a 0 y el gigante vuelve a su estado normal).
   const directores = { pulsar: crearDirector(ESCENA_PULSAR, { salida: reducido ? 2.5 : 1.5 }), cuasar: crearDirector(ESCENA_CUASAR, { salida: reducido ? 2.5 : 1.5 }), deneb: crearDirector(ESCENA_DENEB, { salida: reducido ? 3 : 2 }) };
-  const estadoP = estadoPulsar(0, ESCENA_PULSAR, {}), estadoC = estadoCuasar(0, ESCENA_CUASAR, {}), estadoD = estadoDeneb(0, ESCENA_DENEB, {});
+  const estadoP = estadoPulsar(0, ESCENA_PULSAR, {}), estadoC = estadoCuasar(0, ESCENA_CUASAR, {}), estadoD = estadoDeneb(0, ESCENA_DENEB, {}), normalD = estadoDeneb(ESCENA_DENEB.duracion, ESCENA_DENEB, {});   // normalD: Deneb fuera de su escena
   // El púlsar se para con los haces de lado a la cámara (barriendo la pantalla, ni de frente ni de canto): al
   // empezar se elige cuánto girar hasta «quieto» y la fase se calcula por el segundo de la escena (también con
   // el reloj del audio). Tablas de ∫giro y ∫giro·u (u: fracción hasta «quieto»), una vez por escena.
   const PASOS = 64, integral = new Float32Array(PASOS + 1), integralU = new Float32Array(PASOS + 1), aux = {};
-  const ejeLocal = new THREE.Vector3(), qInversa = new THREE.Quaternion(), camaraDeneb = new THREE.Vector3();
+  const ejeLocal = new THREE.Vector3(), qInversa = new THREE.Quaternion(), camaraDeneb = new THREE.Vector3(), arribaDeneb = new THREE.Vector3(), qDeneb = new THREE.Quaternion();
   let paradaPulsar = null, camaraMundo = null, tActual = 0;
   const OMEGA = 2.2, INCLINACION = 0.75;   // giro del púlsar (rad/s) y ángulo del eje magnético (magnetico.rotation.z)
   function planearParada() {
@@ -395,7 +394,7 @@ export function* construirCosmos({ uScale, uPR }) {
       return new Promise(resolve => {
         d.iniciar(tActual, { reloj, config, alFin: resolve });
         if (id === 'pulsar') planearParada();
-        if (id === 'deneb' && camaraMundo) escenaDeneb.orientar(gruposEstrella.Deneb.worldToLocal(camaraDeneb.copy(camaraMundo)));
+        if (id === 'deneb' && camaraMundo) { const gD = gruposEstrella.Deneb; gD.updateMatrixWorld(); denebCerca.orientar(gD.worldToLocal(camaraDeneb.copy(camaraMundo)), arribaDeneb.set(0, 1, 0).applyQuaternion(gD.getWorldQuaternion(qDeneb).invert())); }
       });
     },
     cancelar(id = null) { for (const k in directores) if (!id || k === id) directores[k].cancelar(); },
@@ -404,6 +403,8 @@ export function* construirCosmos({ uScale, uPR }) {
     get enCurso() { for (const k in directores) if (directores[k].activa) return k; return null; },
     // Penumbra del resto del cielo mientras dura una escena (index.js la aplica a la telaraña).
     get foco() { return Math.max(estadoP.foco * directores.pulsar.peso, estadoC.foco * directores.cuasar.peso, estadoD.foco * directores.deneb.peso); },
+    // Las nebulosas lejanas se apagan en la escena de Deneb (nace de la nada: delante de un cielo casi negro).
+    get focoNubes() { return estadoD.nubes * directores.deneb.peso; },
     get animando() { for (const k in directores) { const d = directores[k]; if (d.activa || (d.visible && !d.terminada)) return true; } return false; },
     // Para las pruebas y el diagnóstico: segundo, peso y estado de cada una.
     estado(id) { const d = directores[id]; return d ? { activa: d.activa, terminada: d.terminada, segundo: d.segundo, peso: d.peso, ...(id === 'pulsar' ? estadoP : id === 'cuasar' ? estadoC : estadoD) } : null; }
@@ -463,7 +464,7 @@ export function* construirCosmos({ uScale, uPR }) {
       return {
         xiomara: { distancia: 0, disco: 980, navegacion: 1600 },
         ton618: ton, sagitario: sgr, cuasar: cua, pulsar: pul, supernova: sup,
-        deneb: { distancia: d(gruposEstrella.Deneb), estrella: r(1400 * 0.016 * e(gruposEstrella.Deneb)) },
+        deneb: { distancia: d(gruposEstrella.Deneb), estrella: r(RADIO_DENEB * e(gruposEstrella.Deneb)) },
         // Compatibilidad con la tabla (js/data/escalaCosmica.js).
         progenitora: { distancia: d(sn.grupo), radio: r(progenitora) },
         corazon: { distancia: d(sn.grupo), semiancho: r(tam.x), semialto: r(tam.y), semiespesor: r(tam.z) }
@@ -552,17 +553,13 @@ export function* construirCosmos({ uScale, uPR }) {
       const luzHaz = 1.2 * (1 + (estadoP.haces - 1) * wP), abre = 1 + (estadoP.apertura - 1) * wP;
       for (const h of hacesPulsar) { h.material.uniforms.uI.value = luzHaz; h.scale.set(abre, 1, abre); }
       escenaPulsar.actualizar(estadoP, wP, sP, t, reducido);
-      // Deneb: late suave, su luz crece (corona de motas) y nace el mundo nuevo a su alrededor.
+      // Deneb: su videoclip (nace de la nada con «Middle») sobre su estado de siempre (deneb.js, js/util/escenaDeneb.js).
       const dD = directores.deneb, sD = dD.avanzar(t, dt), wD = dD.peso; estadoDeneb(sD, dD.config, estadoD, reducido);
-      const late = estadoD.pum * estadoD.latido * wD;
-      superficieDeneb.scale.setScalar(ESCALA_DISCO_DENEB * (1 + (reducido ? 0 : 0.04) * late + 0.06 * estadoD.luz * wD));
       // Su brillo de lejos (sprites suaves) se apaga al acercarse: a menos de ~12 veces la distancia de llegada no hay halos.
       suavesDeneb ??= gruposEstrella.Deneb.children.filter(o => o.isSprite).map(o => [o, o.material.opacity]);
       const lejosDeneb = THREE.MathUtils.smoothstep(camara.distanceTo(gruposEstrella.Deneb.position) / (450 * ESCALA_DENEB), 4, 14);
       for (const [o, base] of suavesDeneb) { o.material.opacity = base * lejosDeneb; o.visible = lejosDeneb > 0.001; }
-      // Sin quemarse en blanco: se ven sus células de convección y el borde más oscuro (crece con la canción y late).
-      superficieDeneb.material.uniforms.uLuz.value = 0.72 + 0.14 * estadoD.luz * wD + 0.08 * late;
-      escenaDeneb.actualizar(estadoD, wD, dt, t, reducido);
+      denebCerca.actualizar(estadoD, normalD, wD, dt, t, reducido, camera.position);
       // Cuásar: en su escena su gas se calma (tiempo propio, acumulado) y se va encendiendo con la historia.
       const dC = directores.cuasar, sC = dC.avanzar(t, dt), wC = dC.peso; estadoCuasar(sC, dC.config, estadoC, reducido);
       tCuasar += dt * (1 + (estadoC.tiempo - 1) * wC);

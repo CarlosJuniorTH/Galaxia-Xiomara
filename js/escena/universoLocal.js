@@ -36,7 +36,7 @@ const CIELOS = {
   ton618: [['corazon', 24, 320, 4.5], ['infinito', 24, 140, 4.5]],
   pulsar: [['corazon', 23, 135, 4.5], ['infinito', 24, 315, 4.5]],
   sagitario: [['corazon', 23, 45, 4.5], ['infinito', 24, 225, 4.5]],
-  deneb: [['corazon', 23, 150, 4.5], ['infinito', 24, 30, 4.5]]
+  deneb: []   // sin figuras de estrellas: su historia la cuenta la estrella que nace (deneb.js)
 };
 
 function azarSemilla(semilla) { let s = semilla >>> 0; return () => { s = (s + 0x6d2b79f5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -64,13 +64,16 @@ export function* construirUniversoLocal({ scene, uPR, uScale, centros }) {
     const paleta = PALETAS[id].map(c => new THREE.Color(c)), A = LLEGADA_GIGANTE[id], R = RADIO_GIGANTE[id];
     const eje = centro.clone().normalize(), camara = centro.clone().addScaledVector(eje, -A), azar = azarSemilla(id.length * 977 + id.charCodeAt(0));
     const dentro = Math.max(A * 1.25, R * 1.6), fuera = id === 'pulsar' ? A * 3.5 : Math.max(A * 4, R * 3);   // grande: se sigue en su cielo aunque la cámara se aleje del gigante
+    // Deneb: su estrella (radio 100 en su espacio, A = 100) y su mundo llegan a 2,6 radios y la cámara la ve desde 450–720: su
+    // cielo, de 3,2 a 16 veces A (por fuera de su mundo y alrededor de la cámara, no una bola de puntos delante).
+    const [dentroCielo, fueraCielo] = id === 'deneb' ? [A * 3.2, A * 16] : [dentro, fuera];
     const grupo = new THREE.Group(); grupo.position.copy(centro); raiz.add(grupo);
     // ── Estrellas del cielo nuevo: una cáscara alrededor del destino (la cámara de llegada queda dentro) ──
     const n = id === 'pulsar' ? 2200 : 5200;
     const pos = new Float32Array(n * 3), col = new Float32Array(n * 3), tam = new Float32Array(n), fase = new Float32Array(n), c = new THREE.Color();
     for (let i = 0; i < n; i++) {
       if (i % 1500 === 1499) yield;
-      const u = azar() * 2 - 1, a = azar() * Math.PI * 2, r = dentro + Math.pow(azar(), 0.7) * (fuera - dentro), s = Math.sqrt(1 - u * u);
+      const u = azar() * 2 - 1, a = azar() * Math.PI * 2, r = dentroCielo + Math.pow(azar(), 0.7) * (fueraCielo - dentroCielo), s = Math.sqrt(1 - u * u);
       pos.set([s * Math.cos(a) * r, u * r, s * Math.sin(a) * r], i * 3);
       c.copy(paleta[azar() < 0.55 ? 0 : 1]).lerp(new THREE.Color(1, 1, 1), azar() * 0.5).multiplyScalar(0.55 + azar() * 0.6);
       col.set([c.r, c.g, c.b], i * 3); tam[i] = azar() < 0.04 ? 3.4 + azar() * 3.2 : 1.1 + Math.pow(azar(), 2) * 2; fase[i] = azar();

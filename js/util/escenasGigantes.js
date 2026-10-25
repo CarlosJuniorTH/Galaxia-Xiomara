@@ -1,4 +1,4 @@
-// Escenas propias de tres gigantes al llegar (como la de la supernova): el púlsar del Cangrejo, el cuásar y Deneb.
+// Escenas propias de tres gigantes al llegar (como la de la supernova): el púlsar del Cangrejo, el cuásar y Deneb (esta, en escenaDeneb.js).
 // Cada una va con un fragmento de audio (js/data/bandaSonora.js) y se define solo por su DURACIÓN y unas MARCAS en
 // segundos dentro del fragmento: si cambia el audio, basta con ajustar estos números (o escalarlos con
 // `escalarEscena`). El reloj es el del audio (`bandaSonora.tiempo(id)`, js/ui/escenasGigantes.js); sin audio, el
@@ -53,17 +53,9 @@ export const ESCENA_CUASAR = { id: 'cuasar', duracion: 31, camara: [
     { t: 27.7, pos: [138, 27, 0.97], curva: 'suave' }
   ], marcas: { inicio: 0, vi: 3.2, salir: 4.4, novios: 8, increible: 10.6, otras: 14.5, otrasFin: 20.2, reir: 21, risaFin: 25.5, disfrutar: 26, ideal: 27.6, cima: 28.7, fin: 31 } };
 
-// Deneb → deneb.m4a (43,4 s): «Middle» (DJ Snake), a 103 BPM (un compás cada 2,33 s). La supergigante late suave con
-// cada pulso de la canción (más en el primero de cada compás) y, con la canción, nace a su alrededor un mundo nuevo con ella en el medio.
-//  atras       «I hope that I can turn back the time» (3,1–5,2): el tiempo retrocede: el viento de motas vuelve a la estrella;
-//  bien        «to make it all alright… for us» (5,7–9,6): su luz crece;
-//  prometo     «I promise to build a new world for us two» (11–15,4): nace un disco de motas que se ordena en un corazón
-//              (su órbita) con un mundo pequeño y luminoso que lo recorre (prometoFin: ya ordenado);
-//  contigo     «with you…» (16–17,5): el mundo ya formado brilla;
-//  estribillo  «…in the middle» (20,6): el gran momento: una onda de luz sale de Deneb, en el centro, y enciende el corazón;
-//  segunda     segunda vuelta del estribillo: otra onda, aún más cálida;
-//  fundido     fundido final (41–43,4): se serena; en `fin` queda en calma con el mundo nuevo orbitando, sin volver a empezar.
-export const ESCENA_DENEB = { id: 'deneb', duracion: 43.4, pulso: 60 / 103, compas: 4, desfase: 0, persiste: true, marcas: { inicio: 0, atras: 3.1, atrasFin: 5.2, bien: 5.7, prometo: 11, prometoFin: 15.4, contigo: 16, estribillo: 20.6, segunda: 32, fundido: 41, fin: 43.4 } };
+// Deneb: su escena, su pista de cámara y su estado viven aparte (js/util/escenaDeneb.js).
+import { ESCENA_DENEB, estadoDeneb } from './escenaDeneb.js';
+export { ESCENA_DENEB, estadoDeneb };
 
 export const ESCENAS_GIGANTES = { pulsar: ESCENA_PULSAR, cuasar: ESCENA_CUASAR, deneb: ESCENA_DENEB };
 
@@ -141,33 +133,6 @@ export function estadoCuasar(s, { marcas: m }, e = {}, reducido = false) {
   const dura = m.cima - m.ideal + 1.2;
   e.acento = s >= m.ideal && s < m.ideal + dura ? (s - m.ideal) / dura : -1;
   e.foco = 0.55 * calma * (1 - vuelve);
-  return e;
-}
-
-// Estado de Deneb en el segundo `s`. Al terminar (s ≥ fin) queda el estado de calma con el mundo nuevo.
-//  latido  fuerza del latido (0–1) y `pum` su valor en este instante (0–1, doble: «pum-pum»);
-//  viento  velocidad del viento de motas (1 hacia fuera; negativa: el tiempo vuelve atrás);
-//  luz     luz que crece con la canción (0–1);  nace  aparición del disco de motas (0–1);
-//  forma   cuánto se ha ordenado en el corazón (0–1);  mundo  el mundo pequeño ya formado (0–1);
-//  onda    luz de la onda que sale de Deneb en el estribillo (0–1) y `ondaR` su radio (unidades de Deneb);
-//  calma   serenidad del final (0–1);  foco  cuánto se atenúa el resto del cielo alrededor (0–0,55).
-export function estadoDeneb(s, config, e = {}, reducido = false) {
-  const m = config.marcas, fin = Math.min(s, m.fin);
-  e.calma = suave(fin, m.fundido, m.fin);
-  e.latido = suave(fin, m.inicio, m.inicio + 2) * (1 - 0.55 * e.calma);
-  e.pum = latidoPulso(Math.max(0, s), config, e, reducido);   // al compás de la canción (pulsos de 0,58 s, compases de 2,33 s)
-  e.viento = 1 - (reducido ? 1.3 : 2.6) * suave(fin, m.atras - 0.2, m.atras + 0.6) * (1 - suave(fin, m.atrasFin, m.bien));
-  e.luz = suave(fin, m.bien - 0.3, m.prometo) * (1 - 0.45 * e.calma);
-  const formacion = m.prometoFin - m.prometo;
-  e.nace = suave(fin, m.prometo - 0.4, m.prometo + formacion * (reducido ? 0.6 : 0.4));
-  e.forma = suave(fin, m.prometo + formacion * 0.2, m.prometoFin);
-  e.mundo = suave(fin, m.prometoFin - 1.5, m.contigo + 1.5);
-  // Ondas del estribillo: salen de Deneb a unas 190 unidades por segundo y se apagan al pasar el corazón.
-  const onda = (marca, fuerza) => { const t = fin - marca; return t >= 0 && t < 2.2 ? [t * 190, fuerza * Math.min(1, t * 6) * (1 - suave(t, 1.2, 2.2))] : null; };
-  const o = onda(m.segunda, 1) || onda(m.estribillo, 1);
-  e.ondaR = o ? o[0] : 0; e.onda = o ? o[1] * (reducido ? 0.5 : 1) : 0;
-  e.calido = suave(fin, m.segunda - 0.3, m.segunda + 1.5) * (1 - 0.5 * e.calma);
-  e.foco = 0.55 * suave(fin, m.bien, m.prometo) * (1 - 0.4 * e.calma);
   return e;
 }
 

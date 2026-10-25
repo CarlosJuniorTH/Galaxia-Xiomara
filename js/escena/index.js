@@ -263,7 +263,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   const proyectado = new THREE.Vector3();
   const camaraAntes = new THREE.Vector3();
   let distanciaAnterior = camera.position.distanceTo(controls.target), cuerposLente = null;
-  let nubesFoco = null, focoNubes = 1, focoAplicado = false; const tmpFoco = new THREE.Vector3();
+  let nubesFoco = null, focoNubes = 1, focoAplicado = false, cieloEscena = 1; const tmpFoco = new THREE.Vector3();
   let cometaAntes = null, escalaTiempo = 1;   // escalaTiempo: cámara lenta solo para pruebas (#debug)
   const VELO = { gigante: 0.2, deneb: 0, pulsar: 0, cuasar: 0, ton618: 0, sagitario: 0, supernova: 0, hogar: 0, constelacion: 0.62, calma: 0.45, capsulas: 0.4, suenos: 0.4, cartas: 0.35, rosa: 0.3, azul: 0.32, cometa: 0.2 };
 
@@ -1173,12 +1173,14 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // brillo con suavidad; siguen ahí, con su forma y su color, pero no compiten con el protagonista.
     // Las nebulosas del catálogo se crean al acercarse: la lista se rehace de vez en cuando.
     if (!nubesFoco || cuadrosDibujados % 90 === 0) { nubesFoco = []; scene.traverse(o => { if (o.userData.volumen3D && !o.userData.brilloPropio && o.material.uniforms?.uBrillo) { o.userData.brilloBase ??= o.material.uniforms.uBrillo.value; nubesFoco.push({ o, base: o.userData.brilloBase }); } }); }
-    const centroFoco = lejano && !vuelo ? lejano.centro : null, metaFoco = centroFoco ? (cosmos.enEscenaAgujero ? 0.5 : 0.78) : 1;   // en la escena de un gigante, aún más
+    const centroFoco = lejano && !vuelo ? lejano.centro : null, metaFoco = centroFoco ? (cosmos.enEscenaAgujero ? 0.5 : 0.78) * (1 - (cosmos.escenas.focoNubes ?? 0)) : 1;   // en la escena de un gigante, aún más (y lo que pida la suya: Deneb, que nace de la nada)
     focoNubes += (metaFoco - focoNubes) * Math.min(1, dtInterfaz * 1.2);
     if (Math.abs(focoNubes - 1) > 0.001 || focoAplicado) {
       for (const n of nubesFoco) { const propia = centroFoco && n.o.getWorldPosition(tmpFoco).distanceTo(centroFoco) < 6000; n.o.material.uniforms.uBrillo.value = n.base * (propia ? 1 : focoNubes); }
       focoAplicado = Math.abs(focoNubes - 1) > 0.001;
     }
+    // El cielo profundo (sus paredes de polvo) también se apaga en la escena que lo pide (Deneb nace de la nada).
+    const kCielo = 1 - (cosmos.escenas.focoNubes ?? 0); if (!mirada && Math.abs(kCielo - cieloEscena) > 0.002) { cieloEscena = kCielo; cieloProfundo.ampliar(kCielo); }
     const u = velo.material.uniforms.uVelo; u.value += (veloMeta - u.value) * Math.min(1, dt * 2.2);
     // Corriente: su fuerza sigue la velocidad de la cámara durante el vuelo.
     const rapidez = dt > 0 ? camera.position.distanceTo(camaraAntes) / dt : 0;

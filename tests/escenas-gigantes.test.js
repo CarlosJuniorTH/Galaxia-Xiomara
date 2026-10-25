@@ -50,18 +50,7 @@ test('las marcas de las canciones son las de las escenas', async () => {
   assert.deepEqual(MOMENTOS.pulsar.marcas, ESCENA_PULSAR.marcas); assert.equal(MOMENTOS.deneb.archivo, 'deneb.m4a'); assert.deepEqual(MOMENTOS.deneb.marcas, ESCENA_DENEB.marcas); assert.deepEqual(MOMENTOS.cuasar.marcas, ESCENA_CUASAR.marcas);
 });
 
-test('Deneb: el tiempo vuelve atrás, nace el mundo con la promesa, la onda en el estribillo y queda en calma', () => {
-  const m = ESCENA_DENEB.marcas, d = s => ({ ...estadoDeneb(s, ESCENA_DENEB) });
-  assert.equal(d(0).nace, 0); assert.equal(d(0).luz, 0); assert.ok(d(1).viento > 0.99);
-  assert.ok(d((m.atras + m.atrasFin) / 2).viento < 0, 'el viento vuelve hacia la estrella');
-  assert.ok(d(m.bien + 0.5).viento > 0.99);
-  assert.ok(d(m.prometo - 1).nace === 0 && d(m.prometoFin).forma > 0.99 && d(m.contigo + 2).mundo > 0.99);
-  assert.ok(d(m.estribillo - 0.1).onda === 0 && d(m.estribillo + 0.5).onda > 0.9 && d(m.estribillo + 0.5).ondaR > 50);
-  assert.ok(d(m.segunda + 0.5).onda > 0.9);
-  const final = d(m.fin), despues = d(m.fin + 100);
-  assert.ok(final.calma > 0.99 && final.nace > 0.99 && final.forma > 0.99, 'al final queda el mundo nuevo');
-  for (const k of ['luz', 'nace', 'forma', 'mundo', 'calma', 'latido', 'viento']) assert.ok(cerca(final[k], despues[k]), k);
-});
+// Deneb: tests/escena-deneb.test.js.
 
 test('el director sigue el reloj que se le pasa, espera si no sabe y se cancela suave', () => {
   let audio = null, fin = null;
@@ -76,8 +65,8 @@ test('el director sigue el reloj que se le pasa, espera si no sabe y se cancela 
   // Sin reloj: el tiempo propio desde que empezó.
   const p = crearDirector(ESCENA_PULSAR); p.iniciar(5, { alFin: v => { fin = v; } }); p.avanzar(9, 0); assert.equal(p.segundo, 4);
   p.avanzar(5 + ESCENA_PULSAR.duracion + 1, 0); assert.equal(fin, true); assert.equal(p.peso, 0);
-  // Deneb persiste al terminar hasta que se cancela.
-  const n = crearDirector(ESCENA_DENEB); n.iniciar(0); n.avanzar(ESCENA_DENEB.duracion + 1, 0);
+  // Una escena que persiste al terminar se queda hasta que se cancela.
+  const n = crearDirector({ ...ESCENA_PULSAR, persiste: true }); n.iniciar(0); n.avanzar(ESCENA_PULSAR.duracion + 1, 0);
   assert.ok(n.terminada && n.peso === 1 && n.visible); n.cancelar(); n.avanzar(0, 10); assert.equal(n.peso, 0);
 });
 
