@@ -82,9 +82,9 @@ export function crearNucleo(canvas) {
       lente = crearPasadaLente(); post.addPass(lente); salto = crearPasadaSalto(); post.addPass(salto);
       const Brillo = location.hash === '#debug' && new URLSearchParams(location.search).get('comparar') === 'original' ? UnrealBloomPass : BrilloEficiente;
       bloom = new Brillo(new THREE.Vector2(innerWidth, innerHeight), BRILLO_BASE, 0.3, 0.78);
-      // Resplandor a ¼ de la escena en el móvil (½ en el PC): ?brillo=medio|cuarto para compararlos.
-      const pb = new URLSearchParams(location.search).get('brillo');
-      bloom.escalaBrillo = pb === 'medio' ? 0.5 : pb === 'cuarto' ? 0.25 : esMovil ? 0.25 : 0.5;
+      // Resplandor a ½ de la escena en todos los aparatos (a ¼ se difuminaba más ancho y se derramaba sobre lo que tapa a
+      // los agujeros negros: la prueba de profundidad lo detecta). ?brillo=cuarto para compararlo.
+      bloom.escalaBrillo = new URLSearchParams(location.search).get('brillo') === 'cuarto' ? 0.25 : 0.5;
       canvas.dataset.brilloMotor = Brillo === BrilloEficiente ? 'eficiente' : 'original';
       // El brillo solo se calcula; la pasada de salida lo combina con la escena,
       // limpia valores no válidos y comprime las altas luces en lugar de quemarlas.

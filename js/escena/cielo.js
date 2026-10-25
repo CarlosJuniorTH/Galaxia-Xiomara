@@ -77,7 +77,9 @@ export function crearCielo({ scene, camera, uScale }) {
         gl_PointSize = s; vC = aColor * uI * e / (s * s * ${PERFIL});
       }`,
     fragmentShader: 'varying vec3 vC; void main(){ float d = length(gl_PointCoord - 0.5); gl_FragColor = vec4(vC * pow(max(1.0 - d * 2.0, 0.0), 1.6), 1.0); }',
-    transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending
+    // Con prueba de profundidad (están en el plano lejano, como el fondo de three.js): solo donde no hay nada delante. Se
+    // dibujan con lo transparente, después de lo opaco: sin ella salían encima de planetas y sombras.
+    transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending
   });
   const puntos = new THREE.Points(crearEstrellas(), material);
   puntos.frustumCulled = false; puntos.renderOrder = -1001; puntos.name = 'Cielo de casa (estrellas)'; scene.add(puntos);
