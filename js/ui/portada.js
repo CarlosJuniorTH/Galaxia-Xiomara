@@ -16,10 +16,13 @@ function brillo(color, tam) {
 // y aparece la tarjeta (se forma a los 3,4 s del encuentro y la tarjeta entra 0,9 s después, js/ui/entrada.js). Con
 // canción en la portada, su reloj se reescala para que cada hito caiga en la marca del mismo nombre (js/util/sincronia.js).
 const ENCUENTRO = 4.6;
-export const HITOS = Object.freeze({ encuentro: ENCUENTRO, corazon: ENCUENTRO + 0.5, galaxia: ENCUENTRO + 1.5, tarjeta: ENCUENTRO + 3.4 + 0.9 });
+// voz: la primera frase de la presentación.
+export const HITOS = Object.freeze({ voz: 0.25, encuentro: ENCUENTRO, corazon: ENCUENTRO + 0.5, galaxia: ENCUENTRO + 1.5, tarjeta: ENCUENTRO + 3.4 + 0.9 });
 
 // reloj(): si devuelve un número, es el tiempo t de la animación (guiado por la canción); null = a su ritmo, por cuadros.
-export function crearPortada(lienzo, { alFormarse = () => {}, frases = [], textoFrase = () => {}, empezar = true, reloj = null } = {}) {
+// latido(): fase del pulso de la canción (0–1, 0 en el golpe) para que el corazón lata al compás; null = su latido propio.
+// destello(): segundos del destello del encuentro a tiempo real (no estirados con la animación); null = los de t.
+export function crearPortada(lienzo, { alFormarse = () => {}, frases = [], textoFrase = () => {}, empezar = true, reloj = null, latido = null, destello = null } = {}) {
   let empezada = empezar;
   const x = lienzo.getContext('2d');
   const movil = matchMedia('(pointer:coarse)').matches;
@@ -96,9 +99,9 @@ export function crearPortada(lienzo, { alFormarse = () => {}, frases = [], texto
       }
     }
     // Encuentro: destello y onda.
-    const desde = t - ENCUENTRO;
-    if (desde > 0 && desde < 1.6) {
-      const k = desde / 1.6;
+    const desde = t - ENCUENTRO, dDestello = destello?.() ?? desde;
+    if (dDestello > 0 && dDestello < 1.6) {
+      const k = dDestello / 1.6;
       sprite(blanco, cx, cy, R * (0.4 + k * 1.6), (1 - k) * 0.9);
       // Onda de choque (dos anillos, rosa y azul) y chispas disparadas.
       for (const [col, retr] of [['rgba(255,200,230,1)', 0], ['rgba(190,205,255,1)', 0.12]]) { const kk = Math.max(0, k - retr) / (1 - retr);
@@ -110,7 +113,9 @@ export function crearPortada(lienzo, { alFormarse = () => {}, frases = [], texto
     // Del encuentro nace un corazón de luz (hecho de las dos luces, rosa y azul) que late; de su latido se despliega
     // la galaxia: cada mota sale de su sitio en el corazón hacia su brazo.
     if (desde > 0) {
-      const giro = t * 0.05, kH = salida(Math.min(1, desde / 0.7)), lat = 1 + Math.pow(Math.max(0, Math.sin((desde - 0.5) * 4.4)), 10) * 0.12 * (desde < 2.4 ? 1 : 0);
+      // Latido: al compás de la canción si la hay (un golpe en cada pulso), si no el suyo.
+      const fl = latido?.(), golpe = fl === null || fl === undefined ? null : Math.max(0, Math.cos(fl * TAU));
+      const giro = t * 0.05, kH = salida(Math.min(1, desde / 0.7)), lat = 1 + (golpe === null ? Math.pow(Math.max(0, Math.sin((desde - 0.5) * 4.4)), 10) : Math.pow(golpe, 10)) * 0.12 * (desde < 2.4 ? 1 : 0);
       const S = R * (vertical() ? 0.3 : 0.26) * lat;
       for (const p of particulas) {
         const kG = salida(Math.min(1, Math.max(0, (desde - 1.5 - p.retraso) / 2.4)));
@@ -123,7 +128,7 @@ export function crearPortada(lienzo, { alFormarse = () => {}, frases = [], texto
         sprite(p.tono, px, py, p.tam * (2.2 + (1 - p.r) * 1.6) * (1 + (1 - kG) * (lat - 1) * 3), (0.55 + 0.4 * (1 - p.r)) * Math.min(1, desde / 0.4));
       }
       // Corazón luminoso en el centro, latiendo (ya dentro de la galaxia).
-      const k = Math.min(1, Math.max(0, desde - 1.2) / 1.5), lat2 = 1 + Math.pow(Math.max(0, Math.sin(t * 2.2)), 8) * 0.18;
+      const k = Math.min(1, Math.max(0, desde - 1.2) / 1.5), lat2 = 1 + Math.pow(golpe === null ? Math.max(0, Math.sin(t * 2.2)) : golpe, 8) * 0.18;
       sprite(rosa, cx, cy, R * 0.55 * k * lat2, 0.8 * k);
       sprite(blanco, cx, cy, R * 0.18 * k * lat2, k);
       if (!formado && desde > 3.4) { formado = true; alFormarse(); }

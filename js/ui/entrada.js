@@ -32,10 +32,15 @@ export function crearEntrada(config, { viaje, banda } = {}) {
   let alEntrar = () => {}, preparado = false;
   const reducido = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const yaVista = !!viaje?.portadaVista;
-  const cancion = !!banda?.conInicio, toque = $('#toque');
+  const toque = $('#toque');
+  // cancion: hay canción de portada Y su archivo está (se sabe en cuanto responde el servidor; si falta, por ejemplo en
+  // GitHub Pages, todo como siempre y sin pantalla de toque). decidido: promesa que se resuelve al saberlo.
   // Con canción: la tarjeta espera a su marca (o, sin esa marca, a que se forme la galaxia); «libre», tras «Saltar».
-  let marcaTarjeta = false, libre = false, tocado = false;
-  const marcas = cancion ? banda.marcas('inicio') : {};
+  let cancion = false, marcaTarjeta = false, libre = false, tocado = false;
+  const marcas = banda?.conInicio ? banda.marcas('inicio') : {}, pulso = banda?.conInicio ? banda.config('inicio').pulso : null;
+  // Latido y destello al compás: el corazón late con el pulso de la canción (fase 0–1, 0 en el primer tiempo) y el destello
+  // del encuentro dura dos latidos a tiempo real (estirado con la animación iba a cámara lenta).
+  const segundo = () => (cancion && !libre ? banda.tiempo('inicio') : null);
 
   function mostrarTarjeta() {
     entrada.classList.add('formado'); saltar.hidden = true; frase.classList.remove('visible');
@@ -47,7 +52,9 @@ export function crearEntrada(config, { viaje, banda } = {}) {
   entrada.classList.add('cargando');
   const portada = crearPortada($('#portada-lienzo'), { empezar: false,
     // Reloj de la canción llevado al de la animación; null (sin canción, si no se pudo cargar o tras «Saltar»): a su ritmo.
-    reloj: cancion ? () => { if (libre) return null; const s = banda.tiempo('inicio'); return s === null ? null : reescalar(s, marcas, HITOS); } : null,
+    reloj: () => { const s = segundo(); return s === null ? null : reescalar(s, marcas, HITOS); },
+    latido: () => { const s = segundo(); return s === null || !(pulso > 0) ? null : (s % pulso) / pulso; },
+    destello: () => { const s = segundo(); return s === null || !Number.isFinite(marcas.encuentro) ? null : (s - marcas.encuentro) * 1.6 / (2 * (pulso > 0 ? pulso : 1)); },
     frases: FRASES, alFormarse: () => {
       if (!cancion) { setTimeout(mostrarTarjeta, 900); return; }
       // Sin marca «tarjeta» (o sin canción que suene), como siempre: 0,9 s después de formarse.
@@ -65,9 +72,13 @@ export function crearEntrada(config, { viaje, banda } = {}) {
     // La canción sigue sonando; la animación deja su reloj y la tarjeta sale en cuanto la carga esté lista.
     libre = true; portada.saltar(); marcaTarjeta = true; saltar.hidden = true; frase.classList.remove('visible'); intentarTarjeta();
   });
-  if (cancion) {
+  // Mientras se sabe si el archivo está (unos milisegundos; como mucho 2,5 s), ni carga ni toque: así no parpadea.
+  if (banda?.conInicio) entrada.classList.add('con-toque');
+  const decidido = !banda?.conInicio ? Promise.resolve(false) : Promise.race([banda.inicioDisponible, new Promise(r => setTimeout(() => r(false), 2500))]).then(hay => {
+    cancion = hay;
+    if (!hay) { entrada.classList.remove('con-toque'); return false; }
     banda.alMarca(({ momento, marca }) => { if (momento === 'inicio' && marca === 'tarjeta') { marcaTarjeta = true; intentarTarjeta(); } });
-    entrada.classList.add('con-toque'); toque.hidden = false;
+    toque.hidden = false;
     toque.addEventListener('click', () => {
       if (tocado) return; tocado = true;
       // Todo síncrono dentro del toque: contexto de audio, desbloqueo de las pistas (iOS) y la canción desde el principio.
@@ -80,7 +91,8 @@ export function crearEntrada(config, { viaje, banda } = {}) {
       if (reducido) { libre = true; portada.saltar(); marcaTarjeta = true; saltar.hidden = true; }
       portada.empezar(); intentarTarjeta();
     }, { once: true });
-  }
+    return true;
+  });
 
   // Para quien vuelve: descubrirlo todo de nuevo (la presentación ya se ve siempre).
   if (yaVista) $('#entrada-opciones').hidden = false;
@@ -124,7 +136,9 @@ export function crearEntrada(config, { viaje, banda } = {}) {
     if (mostrado < 1) requestAnimationFrame(avanzar);
     else { animando = false; const fin = alCompletar; alCompletar = null; fin?.(); }
   };
-  function completar() { preparado = true; boton.disabled = continuar.disabled = false; boton.classList.add('preparado');
+  async function completar() {
+      await decidido;   // (casi siempre ya resuelto: la carga tarda mucho más que la respuesta del servidor)
+      preparado = true; boton.disabled = continuar.disabled = false; boton.classList.add('preparado');
       // Con canción, la presentación ya empezó con el toque (o empezará con él): la tarjeta, en su marca.
       if (cancion) { entrada.classList.remove('descargando'); intentarTarjeta(); return; }
       // Fase 2: con todo cargado, la presentación (nada pesado a la vez).

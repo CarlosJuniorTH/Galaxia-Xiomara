@@ -48,10 +48,12 @@ test('la configuración tiene todos los momentos, con ids reales, y solo los aud
   for (const id of ['supernova', 'pulsar', 'deneb', 'cuasar', 'ton618', 'sagitario', 'gigante']) { assert.ok(MOMENTOS[id], id); assert.ok(ids.has(id), `${id} existe en universo.js`); }
   assert.ok(MOMENTOS.inicio && MOMENTOS.viajes && MOMENTOS.mes[10]);
   assert.equal(MOMENTOS.viajes.bucle, false); assert.equal(MOMENTOS.viajes.hastaLlegar, true); assert.equal(MOMENTOS.viajes.duracion, 15);
+  // «Maps»: las marcas de la portada en orden y dentro del fragmento de 32 s.
+  const mi = MOMENTOS.inicio.marcas; assert.ok(mi.voz < mi.encuentro && mi.encuentro < mi.corazon && mi.corazon < mi.galaxia && mi.galaxia < mi.tarjeta && mi.tarjeta < 32);
   for (const k of ['encuentro', 'corazon', 'galaxia', 'tarjeta']) assert.ok(k in MOMENTOS.inicio.marcas, k);
   // Cada momento con canción usa su archivo con su nombre; las estancias, «<lugar>-estancia.m4a». Nada en bucle.
   const activos = configuracionActiva('').momentos;
-  for (const n of ['viajes', 'supernova', 'pulsar', 'deneb', 'cuasar', 'ton618', 'sagitario', 'hogar']) assert.equal(activos[n].archivo, `${n}.m4a`, n);
+  for (const n of ['inicio', 'viajes', 'supernova', 'pulsar', 'deneb', 'cuasar', 'ton618', 'sagitario', 'hogar']) assert.equal(activos[n].archivo, `${n}.m4a`, n);
   for (const n of ['supernova', 'pulsar', 'deneb', 'cuasar', 'ton618', 'sagitario', 'hogar']) { assert.equal(activos[`${n}-estancia`].archivo, `${n}-estancia.m4a`); assert.ok(activos[`${n}-estancia`].esEstancia); }
   for (const [n, m] of Object.entries(activos)) {
     assert.equal(m.bucle, false, `${n}: nada va en bucle salvo el ambiente`);

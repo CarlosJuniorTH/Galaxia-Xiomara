@@ -2,7 +2,7 @@
    🎵  BANDA SONORA
    Una canción (o un fragmento) para cada momento del viaje. Mientras un momento tenga archivo: null (o si su archivo no
    está, por ejemplo en GitHub Pages, donde los .m4a no se publican), suena lo de siempre: la música ambiental original que
-   se genera en el dispositivo (js/ui/musica.js). Para añadir una canción:
+   se genera en el dispositivo (js/ui/musica.js), y sin canción de portada no hay pantalla de toque. Para añadir una canción:
      1. Cortar el fragmento con   node scripts/preparar-audio.mjs canciones/mia.mp3 --inicio 0:41 --fin 1:52 --nombre inicio
         (lo deja en assets/musica/inicio.m4a con su volumen igualado y apunta sus bytes y su duración en
         assets/musica/indice.json, que es de donde la web los lee).
@@ -45,8 +45,15 @@ export const MOMENTOS = {
   // segundos del fragmento en los que deben caer los hitos de la portada (js/ui/portada.js, HITOS):
   //   encuentro  las dos luces se encuentran          corazon  el corazón de luz late
   //   galaxia    la galaxia empieza a desplegarse      tarjeta  aparece la tarjeta con el botón para entrar
+  //   voz        (opcional) entra la voz: la primera frase de la presentación
   // (sin marcas, la animación va a su ritmo de siempre: encuentro a los 4,6 s, tarjeta a los 8,9 s).
-  inicio: momento({ marcas: { encuentro: null, corazon: null, galaxia: null, tarjeta: null } }),
+  // pulso: segundos entre latidos del corazón de luz, al compás (con 0 en un primer tiempo); null = su latido de siempre.
+  // El destello del encuentro dura dos latidos, a tiempo real (no se estira con la animación).
+  // «Maps» (Maroon 5), el estribillo: 117,5 BPM, compases de 2,0 s desde el 0. Entra la voz a 1,17 («Oh, say, say, say»);
+  // primer «Wait, they don't love you like I love you» a 10,9 (las luces se encuentran) hasta 14,1 (el corazón, al final de
+  // «…like I love you»); segundo «Wait» a 15,7 (se despliega la galaxia, durante toda la frase); último «…like I love you»
+  // a 27,3 (la tarjeta).
+  inicio: momento({ archivo: 'inicio.m4a', duracion: 32, pulso: 1.0, marcas: { voz: 1.17, encuentro: 10.9, corazon: 14.1, galaxia: 15.7, tarjeta: 27.3 } }),
   // Instrumental de los viajes («Duvet», bôa): 15 s, lo que dura el viaje más largo, sin bucle. hastaLlegar: al despegar
   // empieza en el segundo 15 − duración del viaje, para que su final caiga justo en la llegada (allí se funde con la canción
   // del destino o con el ambiente).
@@ -78,7 +85,7 @@ export const MOMENTOS = {
 export const PRUEBA = {
   carpeta: 'assets/musica/prueba/',
   momentos: {
-    inicio: momento({ archivo: 'inicio.m4a', marcas: { encuentro: 6, corazon: 7.5, galaxia: 10, tarjeta: 18 } }),
+    inicio: momento({ archivo: 'inicio.m4a', pulso: 1.0, marcas: { encuentro: 6, corazon: 7.5, galaxia: 10, tarjeta: 18 } }),
     viajes: momento({ archivo: 'viajes.m4a', duracion: 15, volumen: 0.75, hastaLlegar: true }),
     hogar: momento({ archivo: 'hogar.m4a', estancia: estancia('hogar-estancia.m4a') })
   }
