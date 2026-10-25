@@ -23,7 +23,9 @@ async function cargar() {
     const r = await fetch('assets/horno/paquete.bin.gz'); if (!r.ok || !r.body) return;
     // Se cuentan los bytes según llegan (el total ya lo sabe la pantalla de carga por el índice de texturas).
     const contar = new TransformStream({ transform(trozo, c) { descargas.hecho(trozo.byteLength); c.enqueue(trozo); } });
-    const buf = await new Response(r.body.pipeThrough(contar).pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+    const bruto = new Uint8Array(await new Response(r.body.pipeThrough(contar)).arrayBuffer());
+    // Si el servidor ya lo entregó descomprimido (Content-Encoding: gzip), no se vuelve a descomprimir.
+    const buf = bruto[0] === 0x1f && bruto[1] === 0x8b ? await new Response(new Blob([bruto]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer() : bruto.buffer;
     const n = new DataView(buf).getUint32(0, true), cabecera = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 4, n)));
     const base = 4 + n + ((8 - ((4 + n) % 8)) % 8);
     const revivir = v => (v && typeof v === 'object' ? (v.$t ? new TIPOS[v.$t](buf, base + v.o, v.n) : Array.isArray(v) ? v.map(revivir) : Object.fromEntries(Object.entries(v).map(([k, x]) => [k, revivir(x)]))) : v);
