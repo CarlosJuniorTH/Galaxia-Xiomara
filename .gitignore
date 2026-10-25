@@ -9,3 +9,6 @@ audios-originales/
 
 # Audios de prueba de la banda sonora (los genera tests/navegador/banda.mjs con ffmpeg)
 assets/musica/prueba/
+
+# Fragmentos de canciones con derechos: fuera del repositorio público hasta decidir cómo publicarlos
+assets/musica/*.m4a
