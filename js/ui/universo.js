@@ -10,6 +10,8 @@ import { crearEscenasGigantes } from './escenasGigantes.js';
 import { FRASE_SUPERNOVA, TIEMPOS_AMOR } from '../util/supernovaAmor.js';
 import { crearAvisos } from './avisos.js';
 import { crearEscenaAgujeros } from './escenaAgujeros.js';
+import { ESCENAS_GIGANTES } from '../util/escenasGigantes.js';
+import { DURACION as DURACION_AGUJEROS } from '../util/guionAgujeros.js';
 const $ = id => document.getElementById(id);
 // Las seis grandes (supernova, cuásar, púlsar, Deneb, TON 618 y Sagitario A*): los lejanos salvo el gigante del corazón.
 const GRANDES = new Set(LEJANOS.filter(d => d.id !== 'gigante').map(d => d.id));
@@ -26,7 +28,7 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
   const datos = id => DESTINOS.find(d => d.id === id) || LEJANOS.find(d => d.id === id) || destinoCometa;
   const cieloNoche = crearCieloNoche();
   crearPresentacionViajes({ canvas: $('galaxia'), escena, nombre: id => id === 'supernova' ? 'nuestra supernova' : id === 'hogar' ? 'nuestra galaxia' : datos(id).nombre, elegirDestino: () => abrirPanel('lugares') });
-  const supernovaAmor = crearSupernovaAmor({ escena, progreso, musica, alDescubrir: () => { if (actual === 'supernova') situar('supernova'); } });
+  const supernovaAmor = crearSupernovaAmor({ escena, progreso, musica, banda, alDescubrir: () => { if (actual === 'supernova') situar('supernova'); } });
   // El púlsar y Deneb: su escena al llegar (sincronizable con su audio: relojDe).
   const escenasGigantes = crearEscenasGigantes({ escena, banda });
   // El faro del cuásar: su recorrido con frases y la carta que espera al final.
@@ -154,7 +156,8 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     const nacido = id === 'supernova' && corazonNacido();
     $('lugar-tipo').textContent = d.tipo; $('lugar-nombre').textContent = id === 'hogar' ? 'Nuestro pequeño infinito' : nacido ? 'Donde nuestra luz se encontró' : d.nombre;
     $('lugar-texto').textContent = id === 'hogar' ? 'Hay una historia escondida entre estas estrellas. La nuestra.' : nacido ? `De tanta luz, nacimos nosotros. ${FRASE_SUPERNOVA}` : d.texto;
-    const textoAccion = id === 'hogar' ? 'Explorar los lugares' : nacido ? 'Volver a sentirlo' : id === 'constelacion' && escena.constelada ? 'Elegir otra figura' : d.accion;
+    // En los seis gigantes, tras su videoclip: «Volver a sentirlo» (la supernova, cuando su corazón ya ha nacido).
+    const textoAccion = id === 'hogar' ? 'Explorar los lugares' : nacido || (GIGANTES.has(id) && id !== 'supernova') ? 'Volver a sentirlo' : id === 'constelacion' && escena.constelada ? 'Elegir otra figura' : d.accion;
     $('lugar-accion').replaceChildren(document.createTextNode(textoAccion), el('span', '', '↗'));
     // En el corazón ya nacido: contemplarlo aislado o con el universo, y guardar su postal.
     $('lugar-extra').hidden = !nacido;
@@ -181,6 +184,26 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     terminarEscena('supernova');
     if (actual === 'supernova') situar('supernova');
   }
+  // «Volver a sentirlo» en cualquiera de los seis gigantes: su canción, su escena y su cámara otra vez desde el segundo 0, y
+  // sin poder saltarlo (como la primera vez: escenaEnCurso). Solo con el clip anterior ya terminado y estando en él.
+  const duracionClip = id => banda?.duracion(id) || ESCENAS_GIGANTES[id]?.duracion || DURACION_AGUJEROS[id] || 0;
+  // El clip de llegada del púlsar, del cuásar o de Deneb (al terminar, el cuásar deja su carta a la vista).
+  async function clipGigante(id) {
+    const completo = await escenasGigantes.abrir(id);
+    if (completo && id === 'cuasar') faro.marcarVisto();
+    if (actual === id) situar(id);
+    return completo;
+  }
+  async function volverASentirlo(id) {
+    if (!GIGANTES.has(id) || escenaActual || escena.viajando || escena.destino !== id || escena.clip) return;
+    if (id === 'supernova') return verSupernova();
+    if (escenaAgujeros.propia(id)) return escenaAgujeros.repetir(id);
+    if (!escenasGigantes.tiene(id) || escenasGigantes.enCurso) return;
+    faro.cancelar();
+    banda?.ceremonia(id);
+    escenaEnCurso(id, duracionClip(id));
+    await clipGigante(id);
+  }
 
   // forzado: el viaje de la supernova que va a estallar (pasa por encima de la escena de otro gigante).
   async function visitar(id, { forzado = false } = {}) {
@@ -197,7 +220,7 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     // Si la estrella aún no ha estallado, al llegar empieza su cuenta atrás; el corazón ya nacido no.
     // En cuanto se llega (sin espera: la ceremonia y su canción empiezan con la llegada).
     if (llegado && id === 'supernova' && actual === 'supernova' && !corazonNacido() && !escena.viajando) accionLugar('supernova');
-    if (llegado && escenasGigantes.tiene(id) && actual === id) escenasGigantes.abrir(id);
+    if (llegado && escenasGigantes.tiene(id) && actual === id) clipGigante(id);
     if (llegado) { progreso.anotar('visitas', id); if (id === 'constelacion') avisar('La luz blanca te muestra por dónde empezar. Puedes tocar las luces o unirlas con el botón.'); }
   }
   // Cada lugar tiene su gesto propio antes de abrir su contenido: abrir un sobre, rodar
@@ -217,8 +240,7 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
       else if (id === 'calma') { modoCalma(true); escena.accion('calma'); }
       else if (id === 'cometa') sorpresa();
       else if (id === 'supernova') await verSupernova();
-      else if (id === 'cuasar') { $('lugar-faro').hidden = true; await faro.iniciar(); if (actual === 'cuasar') situar('cuasar'); }
-      else if (escenaAgujeros.propia(id)) await escenaAgujeros.repetir(id);   // su gesto: volver a vivir su escena
+      else if (GIGANTES.has(id)) await volverASentirlo(id);   // su gesto: volver a sentir su videoclip
       else if (LEJANOS.some(l => l.id === id)) await escena.accion(id);
       else if (id === 'cartas') { await abrirSobre(); abrirPanel('cartas'); }
       else if (id === 'azul') { await escena.accion('azul'); if (actual === 'azul') abrirPanel('horarios'); }

@@ -102,6 +102,8 @@ export function crearFaroCuasar({ escena, progreso, mostrarLectura, alCambiar = 
 
   return {
     iniciar, cancelar, abrirCarta,
+    // El videoclip del cuásar ya se ha visto entero: su carta queda a la vista (como al completar el recorrido del faro).
+    marcarVisto() { visto = true; },
     get estado() { return estado; },
     // La carta está a la vista si ya se completó (o saltó) el recorrido o si ya se leyó alguna vez.
     get cartaLista() { return visto || progreso.tiene('cartas', FARO_CUASAR.carta.id); },
