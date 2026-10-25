@@ -53,7 +53,8 @@ document.getElementById('btn-restaurar').addEventListener('click', () => { if (p
 // dónde se para en un aparato real. No sale de la red de casa.
 if (location.protocol === 'http:' && /^(192\.168\.|10\.)/.test(location.hostname)) {
   const t0 = performance.now(); let ultimo = '';
-  const informar = () => { const pc = document.getElementById('carga-pc')?.textContent || ''; const m = `${window.__pasoCarga || 'inicio'} · ${pc} · ${Math.round((performance.now() - t0) / 1000)} s · latidos ${window.__latidosTelarana || 0}${window.__respaldoTelarana ? ' · respaldo' : ''}`;
+  const errores = []; addEventListener('error', e => errores.push(String(e.message || e.error).slice(0, 200))); addEventListener('unhandledrejection', e => errores.push('promesa: ' + String(e.reason?.message || e.reason).slice(0, 200)));
+  const informar = () => { const pc = document.getElementById('carga-pc')?.textContent || ''; const tx = window.__texturas?.(); const m = `${window.__pasoCarga || 'inicio'} · ${pc} · ${Math.round((performance.now() - t0) / 1000)} s · latidos ${window.__latidosTelarana || 0}${window.__respaldoTelarana ? ' · respaldo' : ''}${tx ? ` · texturas que faltan ${tx.faltan.length} [${tx.faltan.slice(0, 6).join(', ')}] · en hilo principal ${tx.enHiloPrincipal} · obreros ${tx.obreros}${tx.errores.length ? ' · fallos ' + tx.errores.join(' | ') : ''}` : ''}${errores.length ? ' · errores ' + errores.slice(-3).join(' | ') : ''}`;
     if (m !== ultimo) { ultimo = m; fetch('./__diagnostico3d', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ etapa: 'progreso-carga', tipo: 'carga', mensaje: m, navegador: navigator.userAgent }) }).catch(() => {}); }
     if (!document.getElementById('btn-entrar')?.classList.contains('preparado')) setTimeout(informar, 1000); };
   setTimeout(informar, 500);

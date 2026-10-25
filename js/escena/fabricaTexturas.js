@@ -7,7 +7,9 @@ import { GENERADORES } from './texturasPlaneta.js';
 // Varios workers en paralelo (uno por núcleo libre, hasta 4): las texturas se calculan a la vez
 // durante la presentación y al entrar ya está todo.
 let obreros, siguiente = 0, turno = 0, diferidos = null;
-const pendientes = new Map(), promesas = [], todas = [];
+const pendientes = new Map(), promesas = [], todas = [], enCurso = new Map(), errores = [];
+// Diagnóstico de la carga (main.js lo envía al PC en la red local): qué texturas faltan y qué ha fallado.
+if (typeof window !== 'undefined') window.__texturas = () => ({ faltan: [...enCurso.values()], enHiloPrincipal: colaAqui.length, obreros: obreros ? obreros.length : null, errores: errores.slice(-3) });
 // En el móvil, dos como mucho: junto con el obrero de la telaraña y el hilo principal no se satura el procesador
 // (en un iPhone, más hilos a la vez solo calentaban y retrasaban todo).
 const movil = /Android|iPhone|iPad|Mobi/i.test(navigator.userAgent);
@@ -17,7 +19,7 @@ let ultimaRespuesta = performance.now();
 // Respaldo en el hilo principal: de una en una, cediendo entre ellas (calcularlas todas de golpe congelaba la página).
 const colaAqui = [];
 function aqui(pedido) { colaAqui.push(pedido); if (colaAqui.length === 1) setTimeout(siguienteAqui, 0); }
-function siguienteAqui() { const p = colaAqui[0]; if (!p) return; calcularAqui(p); colaAqui.shift(); if (colaAqui.length) setTimeout(siguienteAqui, 0); }
+function siguienteAqui() { const p = colaAqui[0]; if (!p) return; try { calcularAqui(p); } catch (e) { errores.push('hilo principal: ' + (e.message || e)); p.resolver(null); } colaAqui.shift(); if (colaAqui.length) setTimeout(siguienteAqui, 0); }   // (un fallo ya no bloquea la cola)
 function calcularAqui(pedido) {
   const r = GENERADORES[pedido.tipo](pedido.opciones);
   pedido.resolver(r instanceof Uint8ClampedArray ? { pixeles: r } : r);
@@ -67,9 +69,18 @@ export function texturaPlaneta(tipo, opciones, { claves = ['pixeles'], relleno =
   const { ancho, alto } = opciones;
   const texturas = Object.fromEntries(claves.map(c => [c, dataTextura(ancho, alto, relleno)]));
   const promesa = new Promise(resolve => {
+    const clave = `${tipo} ${ancho}×${alto}`; enCurso.set(promesas.length + todas.length + Math.random(), clave);
+    const marca = [...enCurso.keys()].at(-1);
+    // Nunca deja la carga colgada: si rellenar la textura falla (datos que no encajan, una copia ya soltada…), se anota el
+    // error, la textura se queda con su color de relleno y la carga sigue. Antes la promesa no se resolvía nunca.
+    let hecho = false;
     const pedido = { tipo, opciones, resolver: datos => {
-      for (const c of claves) { texturas[c].image.data.set(datos[c]); texturas[c].needsUpdate = true; texturas[c].userData.lista = performance.now(); if (liberable) texturas[c].onUpdate = soltarCopia; }
-      resolve();
+      if (hecho) return; hecho = true;
+      try {
+        for (const c of claves) { const t = texturas[c]; if (!t.image.data || !datos?.[c] || datos[c].length !== t.image.data.length) throw new Error(`${clave}: datos que no encajan (${datos?.[c]?.length} para ${t.image.data?.length})`);
+          t.image.data.set(datos[c]); t.needsUpdate = true; t.userData.lista = performance.now(); if (liberable) t.onUpdate = soltarCopia; }
+      } catch (e) { errores.push(String(e.message || e)); console.warn('Textura', e); }
+      enCurso.delete(marca); resolve();
     } };
     const enviar = () => {
       const w = obtenerObrero();
