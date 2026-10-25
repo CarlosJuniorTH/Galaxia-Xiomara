@@ -5,15 +5,17 @@
 // en pantalla (index.js activa la pasada).
 import { Vector2, Vector4 } from 'three';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { zonaDe, GLSL_ZONA } from './zona.js';
 
 export const MAX_LENTES = 2;
 
 export function crearPasadaLente() {
   const pasada = new ShaderPass({
-    uniforms: { tDiffuse: { value: null }, uAspecto: { value: 1 }, uL: { value: Array.from({ length: MAX_LENTES }, () => new Vector4()) }, uF: { value: Array.from({ length: MAX_LENTES }, () => new Vector2()) } },
+    uniforms: { tDiffuse: { value: null }, uZona: { value: new Vector4(1, 1, 1, 1) }, uAspecto: { value: 1 }, uL: { value: Array.from({ length: MAX_LENTES }, () => new Vector4()) }, uF: { value: Array.from({ length: MAX_LENTES }, () => new Vector2()) } },
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
     fragmentShader: /* glsl */`
-      uniform sampler2D tDiffuse; uniform float uAspecto; uniform vec4 uL[${MAX_LENTES}]; uniform vec2 uF[${MAX_LENTES}]; varying vec2 vUv;
+      uniform sampler2D tDiffuse; uniform vec4 uZona; uniform float uAspecto; uniform vec4 uL[${MAX_LENTES}]; uniform vec2 uF[${MAX_LENTES}]; varying vec2 vUv;
+      ${GLSL_ZONA}
       void main(){
         vec2 uv = vUv;
         for (int i = 0; i < ${MAX_LENTES}; i++) {
@@ -27,9 +29,11 @@ export function crearPasadaLente() {
           b = mix(b, r, smoothstep(uF[i].y, uF[i].x, r));
           uv = L.xy + d / r * b / vec2(uAspecto, 1.0);
         }
-        gl_FragColor = texture2D(tDiffuse, uv);
+        gl_FragColor = texture2D(tDiffuse, enZona(clamp(uv, 0.0, 1.0), uZona));
       }`
   });
+  // Lee la escena dentro de su zona (resolución dinámica sin reasignar, zona.js).
+  pasada.render = function (renderer, writeBuffer, readBuffer, ...resto) { zonaDe(readBuffer, this.uniforms.uZona.value); return ShaderPass.prototype.render.call(this, renderer, writeBuffer, readBuffer, ...resto); };
   pasada.enabled = false;
   return pasada;
 }

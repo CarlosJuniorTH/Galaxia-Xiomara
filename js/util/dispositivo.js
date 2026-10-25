@@ -30,11 +30,23 @@ try { estadoCarga = { ...estadoCarga, ...JSON.parse(localStorage.getItem(CLAVE_C
 const forzado = new URLSearchParams(location.search).get('seguro');
 export const nivelSeguro = forzado !== null ? Math.max(0, Math.min(2, Number(forzado) || 0))
   : estadoCarga.enCurso ? Math.min(2, (estadoCarga.nivel || 0) + 1) : (estadoCarga.nivel || 0);
-try { localStorage.setItem(CLAVE_CARGA, JSON.stringify({ enCurso: true, nivel: nivelSeguro, buenas: estadoCarga.enCurso ? 0 : estadoCarga.buenas || 0 })); } catch {}
+const buenasPrevias = estadoCarga.enCurso ? 0 : estadoCarga.buenas || 0;
+const marcarCarga = enCurso => { try { localStorage.setItem(CLAVE_CARGA, JSON.stringify({ enCurso, nivel: nivelSeguro, buenas: buenasPrevias })); } catch {} };
+marcarCarga(true);
+// Solo cuenta como cierre una página que muere VISIBLE en plena carga (iOS sin memoria). Si se oculta o se cierra mientras
+// carga (recargar, cambiar de app, cerrar la pestaña, bloquear el móvil), la marca se retira y vuelve al mostrarse otra vez.
+// Antes eso también contaba como cierre: la siguiente visita salía sin HDR ni resplandor y tardaba 4 cargas en volver.
+let cargando = true;
+if (typeof addEventListener === 'function') {
+  const alOcultar = () => { if (cargando) marcarCarga(false); };
+  addEventListener('pagehide', alOcultar);
+  addEventListener('visibilitychange', () => { if (!cargando) return; if (document.hidden) marcarCarga(false); else marcarCarga(true); });
+}
 // Texturas a la medida de la pantalla: el móvil usa los mismos tamaños que el PC (sus objetos se ven igual de grandes o más
 // en su pantalla; con la mitad se veían borrosos). Solo tras un cierre por memoria (modo seguro) se usan las reducidas.
 export const texturasLigeras = nivelSeguro >= 1;
 export function cargaTerminada() {
+  cargando = false;
   try {
     const buenas = (estadoCarga.enCurso ? 0 : estadoCarga.buenas || 0) + 1;
     const nivel = nivelSeguro > 0 && buenas >= 4 ? nivelSeguro - 1 : nivelSeguro;

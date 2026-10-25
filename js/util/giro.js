@@ -5,6 +5,7 @@
 // El acercamiento (pellizco y rueda) lo sigue haciendo OrbitControls. Ángulos: theta alrededor del eje vertical, phi desde
 // arriba (como THREE.Spherical).
 import * as THREE from 'three';
+import { vista } from './vista.js';   // tamaño guardado: leer clientHeight en cada movimiento del dedo forzaba a recalcular la maquetación
 
 // Retraso con el que se lee el dedo (ms): lo justo para tener siempre un aviso a cada lado del instante del cuadro. Se
 // adapta al ritmo real de los avisos del aparato (pantallas de 120 Hz: ~8 ms; ratones, paneles táctiles o un navegador
@@ -66,7 +67,7 @@ export function crearGiro({ canvas, camera, controls, sensibilidad = 1, alEmpeza
   addEventListener('pointermove', e => {
     const p = punteros.get(e.pointerId); if (p) { p.x = e.clientX; p.y = e.clientY; }
     if (!arrastrando || e.pointerId !== id) return;
-    const alto = canvas.clientHeight || innerHeight, k = 2 * Math.PI / alto * sensibilidad;
+    const alto = vista.alto, k = 2 * Math.PI / alto * sensibilidad;
     // Todas las posiciones intermedias del dedo (las pantallas de 120 Hz dan dos o más por cuadro), con su hora real.
     for (const ev of (e.getCoalescedEvents?.() || []).length ? e.getCoalescedEvents() : [e]) {
       objT -= (ev.clientX - x) * k; objP = limitar(objP - (ev.clientY - y) * k);
@@ -87,7 +88,10 @@ export function crearGiro({ canvas, camera, controls, sensibilidad = 1, alEmpeza
     get moviendo() { return arrastrando || Math.abs(velT) + Math.abs(velP) > 0.003 || Math.abs(resT) + Math.abs(resP) > 1e-4 || Math.abs(objT - camT) + Math.abs(objP - camP) > 1e-4; },
     detener() { velT = velP = resT = resP = 0; arrastrando = false; id = null; sincronizado = false; },
     // Cada cuadro, después de controls.update(): mueve la cámara (si hay giro en curso) con el tiempo real transcurrido.
-    actualizar(dt, puede) {
+    // ahora: la marca del cuadro (la del requestAnimationFrame), al mismo ritmo que la pantalla y con el reloj de los
+    // avisos del dedo. Antes se leía la hora al llegar aquí, que variaba unos milisegundos según lo que se hubiera hecho
+    // antes en el cuadro: el dedo se muestreaba a intervalos desiguales (un microtemblor al arrastrar).
+    actualizar(dt, puede, ahora = performance.now()) {
       if (!puede) { velT = velP = resT = resP = 0; sincronizado = false; if (arrastrando) { arrastrando = false; id = null; alTerminar(); } return; }
       if (!arrastrando && !(Math.abs(velT) + Math.abs(velP) > 0) && !(Math.abs(resT) + Math.abs(resP) > 0) && !(sincronizado && Math.abs(objT - camT) + Math.abs(objP - camP) > 1e-4)) { sincronizado = false; return; }
       if (!sincronizado) { leerCamara(); objT = camT; objP = camP; sincronizado = true; }
@@ -97,7 +101,7 @@ export function crearGiro({ canvas, camera, controls, sensibilidad = 1, alEmpeza
         // Con el dedo: la posición del dedo en ESTE instante (un poco en el pasado), interpolada entre sus avisos con su hora
         // real. Los avisos llegan a otro ritmo que los cuadros (1, 2 o 3 por cuadro en una pantalla de 120 Hz) y seguirlos
         // tal cual daba un avance a saltitos («raspaba»); así cada cuadro avanza lo que el dedo avanzó en ese tiempo.
-        const t = performance.now() - Math.min(RETRASO_MAX, Math.max(RETRASO, intervalo * 1.3 + 2)); let rT = objT, rP = objP;
+        const t = ahora - Math.min(RETRASO_MAX, Math.max(RETRASO, intervalo * 1.3 + 2)); let rT = objT, rP = objP;
         for (let i = muestras.length - 1; i > 0; i--) {
           const a = muestras[i - 1], b = muestras[i];
           if (a[0] <= t) { if (t < b[0]) { const f = (t - a[0]) / Math.max(1e-3, b[0] - a[0]); rT = a[1] + (b[1] - a[1]) * f; rP = a[2] + (b[2] - a[2]) * f; } break; }
@@ -112,7 +116,10 @@ export function crearGiro({ canvas, camera, controls, sensibilidad = 1, alEmpeza
         camT += velT * dt + dT; camP += velP * dt + dP;
         // Frenado como el roce del aire: más fuerte cuanto más rápido gira (un giro muy potente se calma enseguida, siempre
         // de forma continua; uno suave conserva su inercia larga). Sin topes que lo corten de golpe.
-        const f = Math.exp(-dt * (3.4 + 0.45 * Math.hypot(velT, velP))); velT *= f; velP *= f;
+        // Y al final, ya despacio, un roce algo mayor que crece con suavidad: se para en ~0,7–1,4 s recorriendo casi el mismo
+        // ángulo (antes 1,5–2,2 s, con una cola casi quieta en la que las estrellas avanzaban de píxel en píxel).
+        const v = Math.hypot(velT, velP), lento = 1 - THREE.MathUtils.smoothstep(v, 0, 0.9);
+        const f = Math.exp(-dt * (3.4 + 0.45 * v + 4.6 * lento)); velT *= f; velP *= f;
         // Límites de arriba y abajo: la velocidad vertical nunca supera la distancia que queda hasta el límite × 5, así que se
         // acerca a él cada vez más despacio y nunca choca (antes podía llegar con velocidad y pararse en seco).
         const bajo = Math.max(0, camP - controls.minPolarAngle), alto = Math.max(0, controls.maxPolarAngle - camP);

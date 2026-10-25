@@ -8,6 +8,8 @@
 #viaje-visual .viaje-botones button[hidden]{display:none}
 #viaje-visual .viaje-breve[aria-pressed=true]{color:#f2cfac}
 #btn-mirar-casa{position:fixed;right:calc(env(safe-area-inset-right) + 18px);bottom:calc(env(safe-area-inset-bottom) + 96px);z-index:23;font:500 .62rem 'Quicksand',sans-serif;color:#f4e2e9;background:#140c1acc;border:1px solid #e8c6a033;border-radius:18px;padding:10px 14px;min-height:44px;cursor:pointer;backdrop-filter:blur(6px)}
+/* En pantallas táctiles sin desenfoque (obligaba a componer la escena de debajo en cada cuadro): fondo algo más opaco. */
+@media (pointer:coarse){#btn-mirar-casa{backdrop-filter:none;background:#140c1aeb}}
 #btn-mirar-casa[hidden]{display:none}
 #btn-mirar-casa:focus-visible{outline:2px solid #e8c6a0;outline-offset:3px}
 /* Señal de Xiomara al mirar hacia casa: un anillo fino a su alrededor y su nombre con la distancia. */

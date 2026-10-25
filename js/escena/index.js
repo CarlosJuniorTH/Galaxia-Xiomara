@@ -328,7 +328,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   for (const luz of lucesFijas) { const ancla = new THREE.Object3D(); ancla.position.copy(luz.position); luz.parent.add(ancla); luz.removeFromParent(); scene.add(luz); luz.userData.ancla = ancla; }
   const seguirLuces = () => { for (const luz of lucesFijas) { const a = luz.userData.ancla; let o = a; while (o && o.visible) o = o.parent; if (!o) luz.position.setFromMatrixPosition(a.matrixWorld); } };
   // Gas volumétrico a media resolución (capaVolumen.js): las nebulosas con volumen se pintan en su propia capa.
-  const capaVolumen = crearCapaVolumen({ scene, renderer, uPR: nucleo.uPR, hdr: canvas.dataset.brillo3d === 'hdr' });
+  const capaVolumen = crearCapaVolumen({ scene, renderer, uPR: nucleo.uPR, prTope: nucleo.prTope, hdr: canvas.dataset.brillo3d === 'hdr' });
   const listo = (async () => {
     window.__pasoCarga = 'nebulosas'; await lejanas.prepararTodas((h, t) => avance(0.5 + 0.06 * h / t, 0.56));
     window.__pasoCarga = 'texturas'; await texturasTodas((h, t) => avance(0.56 + 0.28 * h / t, 0.84));
@@ -362,12 +362,15 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   let aligerado = 0;
   const aligerar = () => { if (aligerado >= ESCALONES.length) return; ESCALONES[aligerado][0](); aligerado++; canvas.dataset.aligerado = String(aligerado); };
   const recuperar = () => { if (!aligerado) return false; aligerado--; ESCALONES[aligerado][1](); canvas.dataset.aligerado = String(aligerado); return true; };
-  const regular = crearReguladorResolucion({ minimo: esMovil ? Math.min(1.5, nucleo.resolucion) : 1, maximo: esMovil ? Math.min(nucleo.prMaximo, Math.max(nucleo.resolucion, 2.5 - (nivelSeguro >= 2 ? 1 : nivelSeguro ? 0.5 : 0))) : nucleo.prMaximo, inicial: nucleo.resolucion, alAgotar: aligerar, alRecuperar: recuperar });
+  const regular = crearReguladorResolucion({ minimo: esMovil ? Math.min(1.5, nucleo.resolucion) : 1, maximo: nucleo.prTope,   // lo reservado (nucleo.js): subir hasta ahí no rehace nada
+    inicial: nucleo.resolucion, alAgotar: aligerar, alRecuperar: recuperar });
   // El cambio de resolución rehace los búferes de la imagen (en un móvil, una pausa visible): nunca en mitad de un gesto
   // o de un viaje; espera a que se suelte el dedo o se llegue.
   let resolucionPendiente = null;
   function regularResolucion(ms) { const nueva = regular(ms); if (nueva !== null) resolucionPendiente = nueva; aplicarResolucionPendiente(); }
-  function aplicarResolucionPendiente() { if (resolucionPendiente === null || gesto || vuelo || mirada || performance.now() - finGesto < 2500) return; nucleo.fijarResolucion(resolucionPendiente); resolucionPendiente = null; regular.reiniciar(); }
+  // Cambiar de resolución ya no rehace ningún búfer (solo la zona en la que se dibuja, zona.js): se aplica en el acto.
+  // Antes esperaba 2,5 s tras soltar el dedo… y caía justo en la cola de la inercia: un cuadro de 30–100 ms en un móvil.
+  function aplicarResolucionPendiente() { if (resolucionPendiente === null) return; nucleo.fijarResolucion(resolucionPendiente); resolucionPendiente = null; regular.reiniciar(); }
 
   // Ritmo de dibujo (ver util/planificador.js). En el móvil, igual que en el PC: siempre a 60 FPS, también en
   // reposo (a 30 los gigantes animados se veían a saltos). ?ritmo=ahorro vuelve a 30 en reposo en pantallas táctiles.
@@ -891,7 +894,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   const fijarEncuadre = () => { const n = distanciaIdeal(); encuadre = n ? { ...n, vw: vista.ancho, vh: vista.alto } : null; };
   function reencuadrar({ interfaz = false } = {}) {
     if (vuelo || !encuadre || tEntrada === null) return;
-    if (interfaz) { if (gesto || ajuste) return; }   // nunca contra un gesto ni encima de otro ajuste
+    if (interfaz) { if (gesto || ajuste || giro.moviendo || zoom.moviendo) return; }   // nunca contra un gesto, en plena inercia ni encima de otro ajuste
     else if (vista.ancho === encuadre.vw && Math.abs(vista.alto - encuadre.vh) / encuadre.vh < 0.2) return;
     medirZonaLibre(); const n = distanciaIdeal(); if (!n) return;
     if (interfaz && !cambioInterfazApreciable(encuadre.d, n.d)) return;
@@ -916,7 +919,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // Inicio y fin de un gesto (giro propio o acercamiento con OrbitControls): despiertan la interfaz y esperan a que la
   // cámara se quede quieta para cambiar la resolución.
   const empezarGesto = () => { ajuste = null; gesto = true; marcarActividad(); controls.autoRotate = false; clearTimeout(retornoGiro); };
-  const terminarGesto = () => { gesto = giro?.arrastrando ?? false; finGesto = performance.now(); marcarActividad(); setTimeout(aplicarResolucionPendiente, 2600); retornoGiro = setTimeout(() => { if (!vuelo && !pausa && giraSolo()) controls.autoRotate = true; }, 8000); };
+  const terminarGesto = () => { gesto = giro?.arrastrando ?? false; finGesto = performance.now(); marcarActividad(); retornoGiro = setTimeout(() => { if (!vuelo && !pausa && giraSolo()) controls.autoRotate = true; }, 8000); };
   controls.addEventListener('start', empezarGesto);
   // En los destinos lejanos no hay giro automático: daría vueltas todo el cielo alrededor.
   // La cámara no gira sola en ningún lugar: el cielo (telaraña, nubes, estrellas) se queda quieto mientras se mira;
@@ -1046,8 +1049,10 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       // el factor se ajusta a lo que ha durado este cuadro, así un cuadro más largo no frena el giro ni uno corto lo acelera.
       // OrbitControls (acercar/alejar) con su amortiguación ajustada al tiempo real; después, el giro propio (util/giro.js).
       if (!mirada) { controls.dampingFactor = 1 - Math.pow(1 - AMORTIGUACION, THREE.MathUtils.clamp(dtReal * 60, 0.25, 4)); controls.update(dt); }
-      giro.actualizar(Math.min(0.05, dtReal), !mirada && !vuelo);
-      zoom.actualizar(Math.min(0.05, dtReal), !mirada && !vuelo);
+      // Tope de 0,1 s (antes 0,05): tras un cuadro lento, la inercia avanza el tiempo que de verdad ha pasado (con un tope
+      // menor se quedaba atrás y se notaba un frenito).
+      giro.actualizar(Math.min(0.1, dtReal), !mirada && !vuelo, ahora);
+      zoom.actualizar(Math.min(0.1, dtReal), !mirada && !vuelo);
     }
     if (ajuste && !vuelo) {
       // Mantiene la dirección actual de la cámara (su órbita) y cambia la distancia y el punto de mira.
@@ -1170,7 +1175,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
         for (const g of raizC?.children ?? []) { if (!g.isGroup) continue; g.getWorldPosition(w); const c = cosmos.cuerpos().find(c => c.id !== 'xiomara' && c.centro.distanceTo(w) < c.radio * 4); if (c) l.push({ g, c }); }
         return l; })();
       const focal = vista.alto / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
-      for (const { g, c } of gruposGigantes) g.visible = c.id === destinoActual || !!mirada || c.visible * focal / Math.max(1, camera.position.distanceTo(c.centro)) > 3;
+      // Con histéresis (aparece a 3,5 px y se oculta a 2,5): en el umbral parpadeaba y la GPU daba saltos.
+      for (const { g, c } of gruposGigantes) { const px = c.visible * focal / Math.max(1, camera.position.distanceTo(c.centro)); g.visible = c.id === destinoActual || !!mirada || px > (g.visible ? 2.5 : 3.5); }
     }
     cieloProfundo.actualizar?.();
     planetas.actualizar(tiempo, dt, ctx); solar.actualizar(tiempo, camera);

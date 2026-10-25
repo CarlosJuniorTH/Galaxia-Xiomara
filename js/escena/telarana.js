@@ -6,6 +6,7 @@
 // píxeles y bordes suaves (no líneas de 1 px): se ven finas y limpias de lejos, sin temblar ni pixelarse.
 // Las galaxias del catálogo (con su imagen y sus estrellas) viven sobre ella; estas luces son el resto.
 import * as THREE from 'three';
+import { fijarZona, zonaDe, GLSL_ZONA } from './zona.js';
 import { esMovil, nivelSeguro } from '../util/dispositivo.js';
 import { generador, semillaDe, ceder } from '../util/azarSemilla.js';
 import { crearTelarana, puntoFilamento } from '../data/telarana.js';
@@ -188,9 +189,10 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   const capaGalaxias = new THREE.Scene(); capaGalaxias.add(bloquesGalaxias); bloquesGalaxias.updateMatrixWorld(true); bloquesGalaxias.matrixWorldAutoUpdate = false;
   const tipoCapa = renderer && (renderer.extensions.has('EXT_color_buffer_float') || renderer.extensions.has('EXT_color_buffer_half_float')) ? THREE.HalfFloatType : THREE.UnsignedByteType;   // la luz sumada puede pasar de 1
   const rtGalaxias = new THREE.WebGLRenderTarget(1, 1, { type: tipoCapa, depthBuffer: false, stencilBuffer: false });
-  const compuesto = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ uniforms: { uCapa: { value: rtGalaxias.texture } },
+  const uZonaCapa = { value: new THREE.Vector4(1, 1, 1, 1) };
+  const compuesto = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ uniforms: { uCapa: { value: rtGalaxias.texture }, uZona: uZonaCapa },
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
-    fragmentShader: 'uniform sampler2D uCapa; varying vec2 vUv; void main(){ gl_FragColor = vec4(texture2D(uCapa, vUv).rgb, 1.0); }',
+    fragmentShader: `uniform sampler2D uCapa; uniform vec4 uZona; varying vec2 vUv; ${GLSL_ZONA} void main(){ gl_FragColor = vec4(texture2D(uCapa, enZona(vUv, uZona)).rgb, 1.0); }`,
     transparent: true, depthTest: false, depthWrite: false, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor, blendEquation: THREE.AddEquation }));
   // Alternativa con una sola orden de dibujo por nube de puntos (sin trocear): en Safari para iPhone cada orden cuesta;
   // se elige la que vaya mejor en el aparato (unirBloques, medidor ?hud).
@@ -203,10 +205,12 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   });
   compuesto.frustumCulled = false; compuesto.renderOrder = -1.5; raiz.add(compuesto);
   const colorPrevio = new THREE.Color();
-  let escalaCapa = esMovil ? 0.8 : CAPA_PC;   // en el móvil, la capa de galaxias al 80 % (al 60 % se veían pixeladas); si el teléfono se calienta, la calidad automática la baja
+  let escalaCapa = esMovil ? 0.8 : CAPA_PC, escalaMax = escalaCapa;   // en el móvil, la capa de galaxias al 80 % (al 60 % se veían pixeladas); si el teléfono se calienta, la calidad automática la baja
   function dibujarGalaxias(renderer, camera) {
-    const w = Math.max(1, Math.round(vista.ancho * escalaCapa)), h = Math.max(1, Math.round(vista.alto * escalaCapa));
-    if (rtGalaxias.width !== w || rtGalaxias.height !== h) rtGalaxias.setSize(w, h);
+    // Reservada al tamaño de su escala más alta; bajar la escala (calidad automática) solo cambia la zona (zona.js).
+    const rw = Math.max(1, Math.round(vista.ancho * escalaMax)), rh = Math.max(1, Math.round(vista.alto * escalaMax));
+    if (rtGalaxias.width < rw || rtGalaxias.height < rh || rtGalaxias.width * rtGalaxias.height > rw * rh * 2.2) rtGalaxias.setSize(rw, rh);
+    fijarZona(rtGalaxias, vista.ancho * escalaCapa, vista.alto * escalaCapa); zonaDe(rtGalaxias, uZonaCapa.value);
     const previo = renderer.getRenderTarget(), alfa = renderer.getClearAlpha(); renderer.getClearColor(colorPrevio);
     renderer.setRenderTarget(rtGalaxias); renderer.setClearColor(0x000000, 0); renderer.clear(true, false, false);
     renderer.render(capaGalaxias, camera);
@@ -260,7 +264,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   const AREA_REF = 1440 * 900, TAN_REF = Math.tan(Math.PI / 6), CAL = 5.2, DENSIDAD_COMODA = 0.85;   // luz de telaraña por píxel CSS con la que se ve bien (la del PC en los gigantes: 0,7–1,1)
   return {
     raiz, web, galaxias: bloquesGalaxias, nubes: bloquesNubes, cercano, polvoFil: bloquesPolvo, capaGalaxias, dibujarGalaxias,
-    escalarCapaGalaxias(k) { escalaCapa = k; uPRgal.value = k; },
+    escalarCapaGalaxias(k) { escalaCapa = k; escalaMax = Math.max(escalaMax, k); uPRgal.value = k; },
     escalaCapaInicial: esMovil ? 0.8 : CAPA_PC, muestraInicial: MUESTRA,
     // Fracción de puntos que se dibuja en cada bloque (barajados), con la luz compensada.
     fijarMuestra(f) { muestraActual = f; for (const grupo of [bloquesGalaxias, bloquesNubes, bloquesPolvo]) for (const t of grupo.children) { const b = t.userData.bloque; t.geometry.setDrawRange(b.a, Math.max(1, Math.ceil(b.n * f * (grupo === bloquesGalaxias ? PROP_GAL : 1)))); } uComp.value = 1 / Math.sqrt(f); },

@@ -8,7 +8,8 @@
 //     pantalla (móvil), se amplía a la nativa y se recupera nitidez con un enfoque
 //     adaptativo limitado al mínimo y máximo de los vecinos: afina estrellas y bordes
 //     sin halos ni brillos nuevos. Con la misma resolución (PC) no se aplica.
-import { ShaderMaterial, Vector2 } from 'three';
+import { ShaderMaterial, Vector2, Vector4 } from 'three';
+import { zonaDe, GLSL_ZONA } from './zona.js';
 import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 
 export const CODO = 0.8;           // a partir de este valor (espacio de pantalla) empieza el hombro
@@ -44,11 +45,14 @@ const fragmentShader = /* glsl */`
   uniform float uBrillo;
   uniform vec2 uTexel;
   uniform float uNitidez;
+  uniform vec4 uZona, uZonaBrillo;   // zonas activas de la escena y del resplandor (zona.js)
   varying vec2 vUv;
+  ${GLSL_ZONA}
+  float h12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }   // hash de Hoskins
   // max/min devuelven el operando válido ante un NaN en las GPU habituales (Metal, NVIDIA, Mali).
   vec3 limpiar(vec3 c) { return min(max(c, vec3(0.0)), vec3(${LIMITE_HDR.toFixed(1)})); }
   vec3 aSrgb(vec3 c) { return mix(1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, c * 12.92, vec3(lessThanEqual(c, vec3(0.0031308)))); }
-  vec3 muestra(vec2 uv) { return aSrgb(limpiar(texture2D(tDiffuse, uv).rgb)); }
+  vec3 muestra(vec2 uv) { return aSrgb(limpiar(texture2D(tDiffuse, min(uv, uZona.zw)).rgb)); }
   // Ampliación bicúbica Catmull-Rom con 5 lecturas filtradas (la bilineal emborronaba bordes y estrellas al ampliar):
   // conserva la nitidez de lo que se dibujó a menos resolución que la pantalla.
   vec3 bicubica(vec2 uv) {
@@ -60,21 +64,25 @@ const fragmentShader = /* glsl */`
     return c / (w12.x * w0.y + w0.x * w12.y + w12.x * w12.y + w3.x * w12.y + w12.x * w3.y);
   }
   void main() {
-    vec3 c = uNitidez > 0.0 ? max(bicubica(vUv), vec3(0.0)) : muestra(vUv);
+    vec2 uv = vUv * uZona.xy;
+    vec3 c = uNitidez > 0.0 ? max(bicubica(uv), vec3(0.0)) : muestra(uv);
     if (uNitidez > 0.0) {
-      vec3 n = muestra(vUv + vec2(0.0, uTexel.y)), s = muestra(vUv - vec2(0.0, uTexel.y));
-      vec3 e = muestra(vUv + vec2(uTexel.x, 0.0)), o = muestra(vUv - vec2(uTexel.x, 0.0));
+      vec3 n = muestra(uv + vec2(0.0, uTexel.y)), s = muestra(uv - vec2(0.0, uTexel.y));
+      vec3 e = muestra(uv + vec2(uTexel.x, 0.0)), o = muestra(uv - vec2(uTexel.x, 0.0));
       vec3 mn = min(c, min(min(n, s), min(e, o))), mx = max(c, max(max(n, s), max(e, o)));
       c = clamp(c + (4.0 * c - (n + s + e + o)) * uNitidez, mn, mx);
     }
-    c += limpiar(texture2D(tBrillo, vUv).rgb) * uBrillo;
+    c += limpiar(texture2D(tBrillo, enZona(vUv, uZonaBrillo)).rgb) * uBrillo;
     float m = max(max(c.r, c.g), c.b);
     if (m > ${CODO.toFixed(3)}) {
       float s = ${CODO.toFixed(3)} + ${(1 - CODO).toFixed(3)} * (1.0 - exp(-(m - ${CODO.toFixed(3)}) / ${(1 - CODO).toFixed(3)}));
       float w = clamp((m - 1.0) / 4.0, 0.0, 1.0) * ${BLANQUEO.toFixed(2)};
       c = mix(c * (s / m), vec3(s), w);
     }
-    gl_FragColor = vec4(c, 1.0);
+    // Tramado (±0,5/255, ruido triangular por píxel): sin él, los degradados oscuros del gas y del cielo salían en
+    // bandas al pasar a los 8 bits de la pantalla. Invisible como ruido; las bandas desaparecen.
+    float t = h12(gl_FragCoord.xy) + h12(gl_FragCoord.xy + 71.37) - 1.0;
+    gl_FragColor = vec4(c + t / 255.0, 1.0);
   }`;
 
 export class SalidaPass extends Pass {
@@ -83,7 +91,7 @@ export class SalidaPass extends Pass {
     this.brillo = brillo;                 // UnrealBloomPass que deja su resultado sin mezclar (o null: sin brillo)
     this.needsSwap = false;
     this.material = new ShaderMaterial({
-      uniforms: { tDiffuse: { value: null }, tBrillo: { value: null }, uBrillo: { value: 1 }, uTexel: { value: new Vector2() }, uNitidez: { value: 0 } },
+      uniforms: { tDiffuse: { value: null }, tBrillo: { value: null }, uBrillo: { value: 1 }, uTexel: { value: new Vector2() }, uNitidez: { value: 0 }, uZona: { value: new Vector4(1, 1, 1, 1) }, uZonaBrillo: { value: new Vector4(1, 1, 1, 1) } },
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
       fragmentShader, depthTest: false, depthWrite: false
     });
@@ -94,10 +102,11 @@ export class SalidaPass extends Pass {
     const u = this.material.uniforms;
     u.tDiffuse.value = readBuffer.texture;
     u.tBrillo.value = this.brillo ? this.brillo.renderTargetsHorizontal[0].texture : null;
+    zonaDe(readBuffer, u.uZona.value); if (this.brillo) zonaDe(this.brillo.renderTargetsHorizontal[0], u.uZonaBrillo.value);
     u.uBrillo.value = this.brillo?.enabled ? 1 : 0;
     // Enfoque solo al presentar en pantalla y si la escena es más pequeña que el lienzo.
     u.uTexel.value.set(1 / readBuffer.width, 1 / readBuffer.height);
-    u.uNitidez.value = this.renderToScreen ? nitidezPara(renderer.getDrawingBufferSize(this.pantalla).x / readBuffer.width) : 0;
+    u.uNitidez.value = this.renderToScreen ? nitidezPara(renderer.getDrawingBufferSize(this.pantalla).x / readBuffer.viewport.z) : 0;   // ampliación real: pantalla / zona dibujada
     renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
     this.quad.render(renderer);
   }

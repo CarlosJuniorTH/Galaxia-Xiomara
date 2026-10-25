@@ -74,6 +74,8 @@ export function crearEfectos() {
 
   function cuadro(ahora) {
     pendiente = 0;
+    // Como mucho a 60 por segundo (en una pantalla de 120 Hz se dibujaba y componía el doble de veces que el 3D).
+    if (ahora - anterior < 14 && (parts.length || fugaces.length)) { pendiente = requestAnimationFrame(cuadro); return; }
     const paso = Math.min(2, Math.max(0, (ahora - anterior) / (1000 / 60))); anterior = ahora;
     if (!parts.length && !fugaces.length) { ctx.clearRect(0, 0, W, H); return; }
     ctx.clearRect(0, 0, W, H);

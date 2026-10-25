@@ -8,6 +8,7 @@ import { BrilloEficiente } from './brillo.js';
 import { SalidaPass, LIMITE_HDR } from './salida.js';
 import { crearPasadaLente } from './lente.js';
 import { crearPasadaSalto } from './salto.js';
+import { fijarZona } from './zona.js';
 import { crearContextoWebGL } from '../util/webgl.js';
 import { esMovil, Q, modoCompatible, calidadFija, nivelSeguro } from '../util/dispositivo.js';
 
@@ -33,6 +34,9 @@ export function crearNucleo(canvas) {
   //    La pasada de salida la reescala a la nativa con un enfoque adaptativo (salida.js).
   const prMaximo = Math.min(devicePixelRatio, Q.pr);
   let pr = esMovil ? Math.min(prMaximo, nivelSeguro >= 2 ? 1.25 : 2) : prMaximo;   // 2 en el móvil (a 1,75 se veía pixelado en una pantalla de DPR 3); la resolución dinámica sube hasta 2,5 si el aparato va sobrado y baja si se calienta
+  // Lo más alto que puede llegar la escena con la resolución dinámica (index.js, regulador): los búferes se reservan a
+  // este tamaño una sola vez y cambiar de resolución solo cambia la zona en la que se dibuja (zona.js).
+  const prTope = esMovil ? Math.min(prMaximo, Math.max(pr, 2.5 - (nivelSeguro >= 2 ? 1 : nivelSeguro ? 0.5 : 0))) : prMaximo;
   renderer.setPixelRatio(pr);
   canvas.dataset.resolucion3d = String(pr);
   renderer.setSize(innerWidth, innerHeight);
@@ -79,9 +83,7 @@ export function crearNucleo(canvas) {
       canvas.dataset.brilloMotor = Brillo === BrilloEficiente ? 'eficiente' : 'original';
       // El brillo solo se calcula; la pasada de salida lo combina con la escena,
       // limpia valores no válidos y comprime las altas luces en lugar de quemarlas.
-      bloom.materialHighPassFilter.fragmentShader = bloom.materialHighPassFilter.fragmentShader.replace(
-        'vec4 texel = texture2D( tDiffuse, vUv );',
-        `vec4 texel = min( max( texture2D( tDiffuse, vUv ), vec4( 0.0 ) ), vec4( ${LIMITE_HDR.toFixed(1)} ) );`);
+      // (BrilloEficiente ya limpia y limita lo que lee, y no hace la mezcla final: la pasada de salida suma el brillo.)
       bloom.blendMaterial.colorWrite = false;
       post.addPass(bloom);
       post.addPass(new SalidaPass(bloom));
@@ -134,11 +136,41 @@ export function crearNucleo(canvas) {
   // Compensación de tamaño de las estrellas de la galaxia según la distancia (index.js).
   const uTamGalaxia = { value: 1 };
 
+  // Reserva de los búferes del compositor (y del resplandor, que los sigue): al tamaño máximo de la escena (prTope) y con
+  // el alto máximo de la pantalla en esta orientación, para que ni la resolución dinámica ni las barras del navegador
+  // obliguen a rehacerlos. Solo se rehacen si la pantalla crece más allá (girar el móvil, agrandar la ventana del PC) o
+  // si se queda en menos de la mitad (para devolver la memoria).
+  let reserva = { w: 0, h: 0, pr: 0 };
+  function altoMaximo() {
+    if (!esMovil || !screen?.width) return innerHeight;
+    const largo = Math.max(screen.width, screen.height), corto = Math.min(screen.width, screen.height);
+    return Math.min(Math.round(innerHeight * 1.3), Math.max(innerHeight, innerHeight >= innerWidth ? largo : corto));
+  }
+  function reservar(prReserva = Math.max(prTope, pr)) {
+    reserva = { w: innerWidth, h: altoMaximo(), pr: prReserva };
+    post?.setPixelRatio(prReserva); post?.setSize(reserva.w, reserva.h);
+    canvas.dataset.reservas3d = String((Number(canvas.dataset.reservas3d) || 0) + 1);
+  }
+  // Zona activa: la escena de este cuadro (ventana actual × pr) dentro de lo reservado.
+  function aplicarZona() {
+    if (!post) return;
+    const w = Math.round(innerWidth * pr), h = Math.round(innerHeight * pr);
+    for (const rt of [post.renderTarget1, post.renderTarget2]) fijarZona(rt, w, h);
+  }
+  function ajustarReserva() {
+    if (!post) return;
+    // Se rehace si no cabe, o si la VENTANA se ha quedado en menos de la mitad de lo reservado (no por bajar la resolución).
+    const w = innerWidth * pr, h = innerHeight * pr, rw = reserva.w * reserva.pr, rh = reserva.h * reserva.pr;
+    if (w > rw + 0.5 || h > rh + 0.5 || innerWidth * innerHeight < reserva.w * reserva.h * 0.45) reservar();
+    aplicarZona();
+  }
+  if (post) { reservar(); aplicarZona(); }
+
   function redimensionar() {
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
-    composer.setSize(innerWidth, innerHeight);
+    ajustarReserva();
     uScale.value = alturaEscena();
   }
 
@@ -146,13 +178,16 @@ export function crearNucleo(canvas) {
   // se limitan en píxeles CSS (uPR) y su escala sigue la altura del búfer (uScale).
   let cambios = 0;
   function fijarResolucion(valor) {
-    const nuevo = Math.max(1, Math.min(prMaximo, Math.round(valor * 4) / 4));
+    const nuevo = Math.max(1, Math.min(prMaximo, Math.round(valor * 8) / 8));   // pasos de 1/8: ahora no cuestan nada
     if (nuevo === pr) return pr;
     pr = nuevo;
-    renderer.setPixelRatio(prLienzo()); composer.setPixelRatio(pr);
+    // Sin reasignar nada: solo cambia la zona de los búferes (salvo una postal a más resolución que la reservada).
+    // El lienzo no depende de pr con postprocesado (antes se volvía a fijar y el navegador lo rehacía).
+    if (!post) renderer.setPixelRatio(pr);
     uPR.value = pr; canvas.dataset.resolucion3d = String(pr);
     canvas.dataset.cambiosResolucion = String(++cambios);
-    redimensionar();
+    ajustarReserva();
+    uScale.value = alturaEscena();
     return pr;
   }
 
@@ -161,8 +196,10 @@ export function crearNucleo(canvas) {
     escenaActiva = otra; if (pasadaEscena) pasadaEscena.scene = otra;
     // Suavizado de bordes solo fuera de la escena principal (el sistema solar); el cambio ocurre en el destello del salto.
     const muestras = otra !== scene ? muestrasAA : 0;
-    if (post) for (const rt of [post.renderTarget1, post.renderTarget2]) if (rt.samples !== muestras) { rt.samples = muestras; rt.dispose(); }
+    // Solo en el búfer donde se dibuja la escena (el de lectura: en el sistema solar no hay pasadas que los intercambien);
+    // antes los dos, el doble de memoria (en un iPhone, del orden de 80 MB más de golpe al entrar).
+    if (post) for (const rt of [post.renderTarget1, post.renderTarget2]) { const m = rt === post.readBuffer ? muestras : 0; if (rt.samples !== m) { rt.samples = m; rt.dispose(); } }
   }
   return { renderer, scene, camera, controls, composer, bloom, fijarEscena, get escenaActiva() { return escenaActiva; }, get lente() { return lente; }, get post() { return post; }, get salto() { return salto; }, uScale, uPR, uTamGalaxia, redimensionar, fijarResolucion,
-    get resolucion() { return pr; }, prMaximo, get resolucionLienzo() { return prLienzo(); } };
+    get resolucion() { return pr; }, prMaximo, prTope, get resolucionLienzo() { return prLienzo(); } };
 }
