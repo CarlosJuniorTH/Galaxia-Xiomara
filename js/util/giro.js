@@ -11,7 +11,9 @@ import { vista } from './vista.js';   // tamaño guardado: leer clientHeight en 
 // adapta al ritmo real de los avisos del aparato (pantallas de 120 Hz: ~8 ms; ratones, paneles táctiles o un navegador
 // ocupado: 16–30 ms). Con uno fijo de 12 ms, si los avisos llegaban cada 30 ms la vista se paraba esperando el siguiente
 // y avanzaba a tirones (frenones).
-const RETRASO = 12, RETRASO_MAX = 45;
+// Mínimo 6 ms (antes 12): con un ratón (125–1000 avisos por segundo) bastan; el retraso real lo marca el ritmo medido de
+// los avisos (con el dedo a 60 Hz siguen siendo ~24 ms), así que no vuelve el avance a saltitos.
+const RETRASO = 6, RETRASO_MAX = 45;
 
 export function crearGiro({ canvas, camera, controls, sensibilidad = 1, alEmpezar = () => {}, alTerminar = () => {} }) {
   const esfera = new THREE.Spherical(), desp = new THREE.Vector3();
@@ -107,7 +109,9 @@ export function crearGiro({ canvas, camera, controls, sensibilidad = 1, alEmpeza
           if (a[0] <= t) { if (t < b[0]) { const f = (t - a[0]) / Math.max(1e-3, b[0] - a[0]); rT = a[1] + (b[1] - a[1]) * f; rP = a[2] + (b[2] - a[2]) * f; } break; }
           if (i === 1) { rT = a[1]; rP = a[2]; }
         }
-        const s = 1 - Math.exp(-dt * 60);   // un suavizado mínimo encima (casi directo: responde al instante)
+        // Un suavizado mínimo encima (casi directo: responde al instante). Con 11 ms en vez de 17 el dedo a 60 Hz avanzaba
+        // menos parejo (medido): se queda.
+        const s = 1 - Math.exp(-dt * 60);
         camT += (rT - camT) * s; camP += (rP - camP) * s;
       } else {
         // Deslizamiento (inercia): la vista sigue con la velocidad que llevaba el dedo y frena de forma pareja y continua
@@ -119,7 +123,8 @@ export function crearGiro({ canvas, camera, controls, sensibilidad = 1, alEmpeza
         // Y al final, ya despacio, un roce algo mayor que crece con suavidad: se para en ~0,7–1,4 s recorriendo casi el mismo
         // ángulo (antes 1,5–2,2 s, con una cola casi quieta en la que las estrellas avanzaban de píxel en píxel).
         const v = Math.hypot(velT, velP), lento = 1 - THREE.MathUtils.smoothstep(v, 0, 0.9);
-        const f = Math.exp(-dt * (3.4 + 0.45 * v + 4.6 * lento)); velT *= f; velP *= f;
+        // Inercia más corta (antes 3,4 + 4,6 al final: se paraba en ~0,7–1,4 s y flotaba): ~0,5–1 s, limpia.
+        const f = Math.exp(-dt * (4.6 + 0.45 * v + 6.0 * lento)); velT *= f; velP *= f;
         // Límites de arriba y abajo: la velocidad vertical nunca supera la distancia que queda hasta el límite × 5, así que se
         // acerca a él cada vez más despacio y nunca choca (antes podía llegar con velocidad y pararse en seco).
         const bajo = Math.max(0, camP - controls.minPolarAngle), alto = Math.max(0, controls.maxPolarAngle - camP);

@@ -53,8 +53,10 @@ export function crearNucleo(canvas) {
   // Evita atravesar el núcleo y llenar toda la pantalla con el disco de acreción.
   controls.minDistance = 300;
   controls.maxDistance = 14000;
-  controls.zoomSpeed = esMovil ? 1.2 : 1.0;
-  controls.rotateSpeed = esMovil ? 1.0 : 0.85;   // en el móvil responde al dedo como en un juego (antes 0,6: se notaba duro)
+  controls.zoomSpeed = esMovil ? 1.2 : 1.25;   // rueda del PC algo más viva (antes 1,0); el pellizco sigue igual
+  // Giro (util/giro.js): una altura de pantalla arrastrada = 1,2 vueltas en el móvil y 1,1 en el PC (antes 1 y 0,85: Carlos
+  // lo notaba lento al girar).
+  controls.rotateSpeed = esMovil ? 1.2 : 1.1;
   controls.enablePan = false;
   controls.minPolarAngle = Math.PI * 0.12;
   controls.maxPolarAngle = Math.PI * 0.82;

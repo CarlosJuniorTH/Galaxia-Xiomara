@@ -23,7 +23,8 @@ export function crearZoom({ canvas, camera, controls, alGesto = () => {} }) {
     actualizar(dt, puede) {
       if (!pendiente) return;
       if (!puede) { pendiente = 0; return; }
-      const paso = Math.abs(pendiente) < 1e-4 ? pendiente : pendiente * (1 - Math.exp(-dt * 16));
+      // 40 ms de constante (antes 60): cada paso de la rueda llega casi entero en ~0,12 s, sin saltos.
+      const paso = Math.abs(pendiente) < 1e-4 ? pendiente : pendiente * (1 - Math.exp(-dt * 25));
       pendiente -= paso;
       desp.copy(camera.position).sub(controls.target);
       const r = desp.length(), r2 = THREE.MathUtils.clamp(r * Math.exp(paso), controls.minDistance, controls.maxDistance);
