@@ -3,8 +3,8 @@
 // Cada costa es una lista plana de pares [longitud, latitud] en grados (oeste y sur, negativos). LAGOS son mares
 // interiores que se restan de la tierra (el Negro y el Caspio, dentro del contorno de Eurasia).
 
-// Las dos orillas: Carlos en España (Madrid) y Xiomara en Argentina (Buenos Aires).
-export const ORILLAS = Object.freeze({ carlos: [-3.7, 40.4], xiomara: [-58.4, -34.6] });
+// Las dos orillas: Carlos en España (Barcelona) y Xiomara en Argentina (Buenos Aires).
+export const ORILLAS = Object.freeze({ carlos: [2.17, 41.39], xiomara: [-58.4, -34.6] });
 
 // Islas del Atlántico demasiado pequeñas para un contorno: cada una es una mota suelta en el mapa de la intro (las que
 // pasan junto al camino de los dos: Canarias, Madeira, Azores, Cabo Verde, San Pedro y San Pablo en el ecuador,

@@ -1,7 +1,7 @@
 // Intro: un videoclip de 32 s con «Maps» (momento «inicio» de js/data/bandaSonora.js), rodado como una película con una
 // cámara que se mueve sobre un mapa del Atlántico hecho de motas. La canción es una súplica a alguien que está lejos: la
 // voz llama una y otra vez («say…»), pide que la esperen («wait…») y jura que nadie la quiere como ella. El clip lo cuenta
-// con los dos: Carlos llama desde Madrid y cada llamada, una onda sobre el mapa, va descubriendo su orilla; Xiomara
+// con los dos: Carlos llama desde Barcelona y cada llamada, una onda sobre el mapa, va descubriendo su orilla; Xiomara
 // responde desde Buenos Aires (plano y contraplano, cada vez más abiertos); al llamarse a la vez la cámara se aleja y
 // aparece el océano entero entre los dos. En el primer «wait» él sale a buscarla siguiendo el mapa (la cámara viaja con
 // él: travelling con su ruta, sus coordenadas y los kilómetros que faltan); en el segundo sale ella. Se encuentran en el
@@ -40,7 +40,7 @@ export const PULSOS = Object.freeze([0, 0.49, 1, 1.49, 1.97, 2.48, 3, 3.51, 3.99
 // Guion (segundos del clip = segundos del fragmento; con canción, cada hito cae en la marca del mismo nombre de su
 // momento «inicio», js/util/sincronia.js). La letra, con sus tiempos (Whisper large-v3 sobre la voz aislada, verificada
 // con los ataques de la voz), en js/data/bandaSonora.js; aquí, lo que se ve:
-//   luzCarlos   1,17  primera llamada de la voz: se enciende la luz de Carlos (primer plano de Madrid, cámara inclinada)
+//   luzCarlos   1,17  primera llamada de la voz: se enciende la luz de Carlos (primer plano de Barcelona, cámara inclinada)
 //   luzXiomara  3,25  la respuesta: corte al contraplano, Buenos Aires, se enciende la de Xiomara
 //   mapa        5,11  él vuelve a llamar (plano más abierto: las ondas descubren su orilla)
 //   ruta        7,13  ella responde (más abierto)
@@ -78,9 +78,10 @@ export const FRASES = Object.freeze([
   { desde: 24.6, texto: 'Y el mundo se nos quedó pequeño.' },
   { desde: 27.7, texto: '' }
 ]);
-// Puntos de paso del camino (longitud, latitud): de Madrid sale al Atlántico por Portugal, baja al oeste de Canarias y
-// Cabo Verde, cruza el ecuador junto a San Pedro y San Pablo y entra en el Río de la Plata.
-const CAMINO_PASOS = [ORILLAS.carlos, [-9.6, 38.6], [-19.5, 27.5], [-27, 9], [-30.5, -6], [-40, -24], [-52, -33.5], ORILLAS.xiomara];
+// Puntos de paso del camino (longitud, latitud): de Barcelona baja por el Mediterráneo frente a Valencia y Cartagena,
+// cruza el mar de Alborán, sale al Atlántico por el estrecho de Gibraltar, baja al oeste de Canarias y Cabo Verde, cruza
+// el ecuador junto a San Pedro y San Pablo y entra en el Río de la Plata.
+const CAMINO_PASOS = [ORILLAS.carlos, [1.4, 40.4], [0.6, 38.5], [-1.2, 37.15], [-4.4, 36.15], [-6.1, 35.92], [-9.5, 35], [-19.5, 27.5], [-27, 9], [-30.5, -6], [-40, -24], [-52, -33.5], ORILLAS.xiomara];
 
 // ── Geometría fija (no depende de la pantalla): el camino en coordenadas del mundo (x = longitud, y = −Mercator) ──
 const RUTA_N = 320, RX = new Float64Array(RUTA_N + 1), RY = new Float64Array(RUTA_N + 1);
@@ -132,7 +133,7 @@ function latido(t, desde) {
   const d = t - PULSOS[i];
   return Math.exp(-d * 8) + (d > 0.22 ? 0.55 * Math.exp(-(d - 0.22) * 9) : 0);
 }
-// Viaje de cada luz por su camino (fracción de la ruta: 0 = Madrid, 1 = Buenos Aires). Él sale en el primer «wait» y
+// Viaje de cada luz por su camino (fracción de la ruta: 0 = Barcelona, 1 = Buenos Aires). Él sale en el primer «wait» y
 // lleva algo más de la mitad de su parte cuando sale ella, más deprisa; se encuentran en el ecuador en «encuentro».
 function viajeCarlos(t, calma) { const m = calma ? 0 : 0.4; return t < H.respuesta ? 0.56 * S_ENC * aPulsos(t, H.espera, H.respuesta, m) : S_ENC * (0.56 + 0.44 * aPulsos(t, H.respuesta, H.encuentro, m)); }
 function viajeXiomara(t, calma) { return 1 - (1 - S_ENC) * aPulsos(t, H.respuesta, H.encuentro, calma ? 0 : 0.4); }
@@ -246,7 +247,7 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
   // más meridianos y paralelos en motas muy tenues.
   let globo = { n: 0 }, rejillaGlobo = { n: 0 };
   function construirGlobo(R) {
-    const N = Math.round(Math.max(6000, Math.min(26000, 4 * Math.PI * R * R / 30))), r = sembrado(77), gx = [], gy = [], gz = [], gt = [], gr = [];
+    const N = Math.round(Math.max(6000, Math.min(26000, 4 * Math.PI * R * R / 36))), r = sembrado(77), gx = [], gy = [], gz = [], gt = [], gr = [];
     const oro = Math.PI * (3 - Math.sqrt(5));
     for (let i = 0; i < N; i++) {
       const z = 1 - 2 * (i + 0.5) / N, rr = Math.sqrt(1 - z * z), a = i * oro, lat = Math.asin(z) / RAD, lon = ((a / RAD + 180) % 360 + 360) % 360 - 180;
@@ -267,8 +268,8 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     lienzo.width = Math.round(ancho * dpr); lienzo.height = Math.round(alto * dpr);
     // Escala base (zoom 1): las dos orillas ocupan ~60 % de la pantalla (en horizontal, la altura manda).
     k0 = Math.min(ancho * (vertical ? 0.62 : 0.42) / (CX - XX), alto * (vertical ? 0.54 : 0.62) / (XY - CY));
-    // Paso de las motas en el plano general: ~6 px (algo más en pantallas grandes, que no se llenen de motas).
-    pasoBase = Math.max(6, m / 115); const p0 = pasoBase / k0;
+    // Paso de las motas en el plano general: ~6,5 px (algo más en pantallas grandes, que no se llenen de motas).
+    pasoBase = Math.max(6.5, m / 108); const p0 = pasoBase / k0;
     niveles = [
       nivel(p0, 0, -180, 180, -150, 100, true),
       nivel(p0, 1, -125, 80, -125, 100),
@@ -890,7 +891,7 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     }
     // Primeros planos: el nombre de quien llama y dónde está, bajo su luz.
     const planos = [
-      [H.luzCarlos + 0.25, H.luzXiomara, CX, CY, 'Carlos', 'MADRID  ·  40°25′ N', tamN],
+      [H.luzCarlos + 0.25, H.luzXiomara, CX, CY, 'Carlos', 'BARCELONA  ·  41°23′ N', tamN],
       [H.luzXiomara + 0.25, H.mapa, XX, XY, 'Xiomara', 'BUENOS AIRES  ·  34°36′ S', tamN],
       [H.mapa + 0.2, H.ruta, CX, CY, 'Carlos', 'ESPAÑA', tamN * 0.78],
       [H.ruta + 0.2, H.juntos, XX, XY, 'Xiomara', 'ARGENTINA', tamN * 0.78]
