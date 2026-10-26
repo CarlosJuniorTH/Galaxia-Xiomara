@@ -1,15 +1,41 @@
 # Verificación objetiva de las estancias (scripts/preparar-estancias.py): duración, volumen, silencios y huecos, clics y
 # saltos de energía o de pulso en las uniones, que la instrumental sea la canción original donde no hay voz (SDR y
 # correlación) y continuidad con el final del clip.
-# (Los restos de voz se miden aparte con Whisper: solo cuenta palabras, nunca escribe la letra.)
-# Uso: .pruebas/audio/bin/python scripts/verificar-estancias.py --informe DIR [lugares…] [--destino assets/musica]
+# Además (docs/PROMPT-QUITAR-VOZ.md, fase 4): −20 LUFS ±0,5, pico verdadero ≤ −1,5 dBTP, 0 palabras de Whisper en la
+# estancia (solo cuenta palabras, nunca escribe la letra) y alineación con el clip y con el original
+# (scripts/verificar-alineacion.py: graves r ≥ 0,9 con desfase 0 ms). Sale con código 1 si algo no cumple.
+# Uso (GPU compartida, por Whisper): flock /tmp/claude-1000/gpu.lock .pruebas/audio/bin/python scripts/verificar-estancias.py
+#   --informe DIR [lugares…] [--destino assets/musica] [--sin-whisper]
 import argparse, json, subprocess, sys
 from pathlib import Path
 import numpy as np, librosa, scipy.signal as ss
 
 RAIZ = Path(__file__).resolve().parent.parent; SR = 44100
 ap = argparse.ArgumentParser(); ap.add_argument('lugares', nargs='*'); ap.add_argument('--informe', required=True)
-ap.add_argument('--destino', default=str(RAIZ / 'assets/musica')); A = ap.parse_args()
+ap.add_argument('--destino', default=str(RAIZ / 'assets/musica')); ap.add_argument('--sin-whisper', action='store_true')
+A = ap.parse_args()
+
+def palabras(x):
+    """Palabras fiables de Whisper (large-v3, sin VAD, temperatura 0, filtro de alucinaciones): las mismas reglas que
+    scripts/comparar-separaciones.py. Devuelve solo los segundos."""
+    import importlib.util
+    if 'c' not in _comparar:   # (una sola carga del módulo y del modelo para todas las estancias)
+        spec = importlib.util.spec_from_file_location('comparar', RAIZ / 'scripts' / 'comparar-separaciones.py')
+        c = importlib.util.module_from_spec(spec); sys.path.insert(0, str(RAIZ / 'scripts')); spec.loader.exec_module(c)
+        _comparar['c'] = c
+    c = _comparar['c']
+    return c.palabras_fiables(c.palabras_whisper(x))
+_comparar = {}
+
+def cantado(info, dur):
+    """Dónde cantaba la voz original en el tramo de la estancia (ventanas de 0,1 s): voz quitada por la separación
+    (vocals.wav = original − instrumental) a menos de 25 dB de su p95."""
+    import hashlib, soundfile as sf
+    ORIG = RAIZ.parent.parent.parent / 'audios-originales' if 'worktrees' in str(RAIZ) else RAIZ / 'audios-originales'
+    ro = ORIG / info['cancion']; base = ro.parent / '.separado' / hashlib.sha1(ro.read_bytes()).hexdigest()[:12] / info['separacion']
+    v = sf.read(base / 'vocals.wav', dtype='float64')[0]; v = v.mean(1) if v.ndim == 2 else v
+    a0 = int(info['tramo'][0] * SR); d = rms_db(v[a0:a0 + int(dur * SR)], 0.1)
+    return d > np.percentile(d, 95) - 25
 
 def leer(r):
     o = subprocess.run(['ffmpeg', '-v', 'error', '-i', str(r), '-f', 'f32le', '-ac', '2', '-ar', str(SR), '-'], capture_output=True, check=True).stdout
@@ -29,7 +55,17 @@ for lugar in lugares:
     fallos, datos = [], {}
     lufs, tp = ebu(ruta); datos['duración'] = round(dur, 1); datos['LUFS'] = lufs; datos['pico'] = tp
     if not 20 <= dur <= 120: fallos.append(f'duración {dur:.1f} s fuera de 20–120')
-    if abs(lufs + 20) > 0.7: fallos.append(f'volumen {lufs} LUFS')
+    if abs(lufs + 20) > 0.5: fallos.append(f'volumen {lufs} LUFS (−20 ±0,5)')
+    if tp > -1.5: fallos.append(f'pico verdadero {tp} dBTP (> −1,5)')
+    if not A.sin_whisper:
+        # cuentan las palabras donde la canción original tenía voz (±1 s): solo ahí puede quedar voz; las demás son
+        # alucinaciones de Whisper sobre la música (p. ej. en la cola que se apaga). Las mismas reglas que
+        # scripts/comparar-separaciones.py.
+        todas = palabras(x); canta = cantado(info, dur)
+        pal = [t for t in todas if canta[max(0, int(t / 0.1) - 10):int(t / 0.1) + 11].any()]
+        datos['whisper_palabras'] = len(pal); datos['whisper_segundos'] = [round(float(t), 1) for t in pal]
+        datos['whisper_fuera_de_la_voz'] = [round(float(t), 1) for t in todas if t not in pal]
+        if pal: fallos.append(f'Whisper oye {len(pal)} palabras donde se cantaba (s {datos["whisper_segundos"]})')
     # silencios (< −50 dBFS) y huecos de energía (12 dB bajo la mediana) de más de 0,4 s, salvo el final (4 s)
     d = rms_db(x, 0.05); med = np.median(d); cuerpo = d[:int((dur - 6) / 0.05)]  # (los 6 s finales: la cola natural)
     def tramos(mask):
@@ -125,4 +161,8 @@ for lugar in lugares:
     (Path(A.informe) / f'{lugar}-verificacion.json').write_text(json.dumps(datos, indent=1, ensure_ascii=False))
     print(f'== {lugar}: {"BIEN" if not fallos else "FALLA: " + "; ".join(fallos)}')
     print('  ', json.dumps(datos, ensure_ascii=False))
+# alineación muestra a muestra con el clip y con el original (graves, donde no hay voz)
+al = subprocess.run([sys.executable, str(RAIZ / 'scripts' / 'verificar-alineacion.py')], capture_output=True, text=True)
+print('== alineación:', 'BIEN' if al.returncode == 0 else 'FALLA'); print(al.stdout.rstrip() + al.stderr.rstrip())
+todo_ok &= al.returncode == 0
 sys.exit(0 if todo_ok else 1)

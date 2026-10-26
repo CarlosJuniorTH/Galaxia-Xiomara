@@ -1,8 +1,8 @@
 # Estancias: la instrumental que suena en cada lugar cuando acaba su canción (js/data/bandaSonora.js, `estancia`).
 #
-# Cada estancia es la MISMA canción sin la voz y nada más: la instrumental tal cual, sacada con un separador de calidad
-# profesional, sin nada añadido: la media de BS-RoFormer y MelBand Inst V2 (scripts/ensamblar-instrumental.py: es la
-# que mejor reproduce la instrumental verdadera en mezclas de prueba), o BS-RoFormer solo donde Inst V2 deja voz.
+# Cada estancia es la MISMA canción sin la voz y nada más: la instrumental tal cual, sacada con separadores RoFormer de
+# calidad profesional, sin nada añadido. La separación de cada lugar (`separacion` en PLANES) es la que ganó en
+# scripts/comparar-separaciones.py (docs/PROMPT-QUITAR-VOZ.md).
 #   · Un solo tramo continuo, sin empalmes: empieza 3 s antes de donde acaba el fragmento del clip (el mezclador,
 #     js/ui/bandaSonora.js, la funde en esos 3 s finales), así que la canción sigue en el mismo compás, y llega hasta su
 #     final natural (la canción se apaga sola) o, si es demasiado larga, hasta un primer tiempo de compás con un fundido
@@ -10,7 +10,7 @@
 #   · Normaliza a −20 LUFS (dos pasadas de loudnorm) y guarda AAC .m4a como scripts/preparar-audio.mjs; apunta en
 #     assets/musica/indice.json bytes, duración, el tramo y el modelo.
 #
-# Separar (una vez, GPU): .pruebas/audio/bin/python <scratch>/sep.py <modelo.ckpt> <carpeta>  →  audios-originales/
+# Separar (una vez, GPU): .pruebas/audio/bin/python scripts/separar-candidatos.py  →  audios-originales/
 #   .separado/<huella>/<carpeta>/instrumental.wav (la huella es la de scripts/analizar-audio.py).
 # Uso: .pruebas/audio/bin/python scripts/preparar-estancias.py [supernova pulsar …] [--separacion bsrof1297]
 import argparse, hashlib, json, subprocess
@@ -22,21 +22,28 @@ import soundfile as sf
 RAIZ = Path(__file__).resolve().parent.parent
 SR = 44100
 
+# Separación de cada lugar (carpeta de .separado/<huella>/; scripts/separar-candidatos.py), elegida con
+# scripts/comparar-separaciones.py (0 palabras de Whisper y mejor SDR en mezclas de prueba con verdad conocida) y escucha
+# a ciegas (oct. 2026): «ens-…» son medias (avg_wave) de modelos sueltos con la ganancia corregida.
 # Un tramo por lugar (segundos de la canción original): desde = final del clip − 3; hasta = None (final natural) o un
 # primer tiempo de compás en el que se cierra con un fundido de dos compases.
 PLANES = {
-    'supernova': dict(cancion='Supernova-Galaxia', clip=(114.962, 177.3), desde=174.3, hasta=None),      # «Sparks»
-    'pulsar': dict(cancion='Galaxia-Analizar1', clip=(95.643, 129.289), desde=126.289, hasta=None),       # «Neo Romeo»
+    'supernova': dict(cancion='Supernova-Galaxia', clip=(114.962, 177.3), desde=174.3, hasta=None,      # «Sparks»
+                      separacion='ens-res-gbx-bec-avg'),
+    'pulsar': dict(cancion='Galaxia-Analizar1', clip=(95.643, 129.289), desde=126.289, hasta=None,       # «Neo Romeo»
+                   separacion='resurrection-inst'),
     # «Middle»: hasta el final de su último estribillo (265,9); después el puente es casi solo voz (la instrumental queda
     # a −21 dB con silencios entre frases), así que se cierra ahí con un fundido de dos compases.
-    'deneb': dict(cancion='Deneb-Galaxia', clip=(155.806, 199.25), desde=196.25, hasta=265.915),
-    'ton618': dict(cancion='Galaxia-Analizar4', clip=(101.634, 138.971), desde=135.971, hasta=None),      # «I Wanna Be Yours»
-    'sagitario': dict(cancion='Galaxia-Analizar2', clip=(145.241, 183.345), desde=180.345, hasta=None),   # «Say Yes to Heaven»
-    # «I Saw Your Face Today»: solo BS-RoFormer. Con Inst V2 en la media, Whisper oye restos de la letra (11 palabras
-    # en el cuásar, 0 con BS-RoFormer solo): esta voz se cuela en Inst V2.
-    'hogar': dict(cancion='Galaxia-Analizar3', clip=(23.057, 54.195), desde=51.195, hasta=None, separacion='bsrof1297'),
+    'deneb': dict(cancion='Deneb-Galaxia', clip=(155.806, 199.25), desde=196.25, hasta=265.915, separacion='gabox-bs-voc'),
+    'ton618': dict(cancion='Galaxia-Analizar4', clip=(101.634, 138.971), desde=135.971, hasta=None,      # «I Wanna Be Yours»
+                   separacion='ens-res-bs-avg'),
+    'sagitario': dict(cancion='Galaxia-Analizar2', clip=(145.241, 183.345), desde=180.345, hasta=None,   # «Say Yes to Heaven»
+                      separacion='ens-res-bs-avg'),
+    # «I Saw Your Face Today»: ya NO BS-RoFormer solo (se comía instrumento de los medios: SDR 3,7 dB, −3,2 dB en medios);
+    # la media de Resurrection y FV7z da 15,4 dB y 0 palabras de Whisper.
+    'hogar': dict(cancion='Galaxia-Analizar3', clip=(23.057, 54.195), desde=51.195, hasta=None, separacion='ens-res-fv7z-avg'),
     # El cuásar (su clip es un mensaje hablado): la misma canción de casa desde su solo instrumental hasta el final.
-    'cuasar': dict(cancion='Galaxia-Analizar3', clip=None, desde=95.202, hasta=None, separacion='bsrof1297'),
+    'cuasar': dict(cancion='Galaxia-Analizar3', clip=None, desde=95.202, hasta=None, separacion='ens-res-fv7z-avg'),
 }
 
 ap = argparse.ArgumentParser()
