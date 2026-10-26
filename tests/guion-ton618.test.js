@@ -49,16 +49,16 @@ test('TON 618: la pista de cámara sigue la canción y devuelve el control en el
   const fin = muestrearPista(CAMARA_TON618, 50), ini = muestrearPista(CAMARA_TON618, 0);
   assert.ok(fin.pos[2] > 0.8 && fin.pos[2] < 1.2 && fin.fov === 60 && fin.mira.every(v => v === 0), 'acaba cerca del encuadre normal, mirando al centro');
   assert.ok(ini.pos[2] === 1 && ini.fov === 60);
-  // En cada «yours» del mantra la cámara está arriba o abajo (se ve la onda) y entre medias cruza el plano del disco;
-  // nunca se acerca más que el tope de zoom (0,3).
-  for (let i = 3; i < 8; i++) { assert.ok(Math.abs(muestrearPista(CAMARA_TON618, TUYOS[i]).pos[1]) > 12, `desde arriba o abajo en ${TUYOS[i]} s`); assert.ok(Math.abs(muestrearPista(CAMARA_TON618, (TUYOS[i] + TUYOS[i - 1]) / 2).pos[1]) < 2, 'de canto entre medias'); }
+  // En la cumbre, casi en el plano (la imagen curvada entera); nunca se acerca más que el tope de zoom (0,3).
+  assert.ok(Math.abs(muestrearPista(CAMARA_TON618, M.cumbre).pos[1]) < 8, 'la cumbre, casi de canto');
   let ant = muestrearPista(CAMARA_TON618, 0).pos.slice();
   for (let t = 0; t <= DURACION_TON618; t += 0.02) {
     const m = muestrearPista(CAMARA_TON618, t);
     assert.ok(m.pos[2] >= 0.29, `distancia ${m.pos[2].toFixed(3)} a ${t.toFixed(2)} s`);
     assert.ok(m.pos.every(Number.isFinite) && m.mira.every(Number.isFinite));
-    // (como mucho 70°/s alrededor del agujero: el giro rápido acompaña el paso de la estrella por el pericentro)
-    assert.ok(Math.abs(m.pos[0] - ant[0]) < 1.4 && Math.abs(m.pos[1] - ant[1]) < 1.2 && Math.abs(m.pos[2] - ant[2]) < 0.02, `sin saltos a ${t.toFixed(2)} s`);
+    // Lenta y sin vaivenes: como mucho 20°/s alrededor del agujero, 10°/s arriba o abajo, y siempre hacia el mismo lado.
+    assert.ok(m.pos[0] - ant[0] <= 1e-6, `sin volver atrás a ${t.toFixed(2)} s`);
+    assert.ok(Math.abs(m.pos[0] - ant[0]) < 0.4 && Math.abs(m.pos[1] - ant[1]) < 0.2 && Math.abs(m.pos[2] - ant[2]) < 0.01, `suave a ${t.toFixed(2)} s`);
     ant = m.pos.slice();
   }
 });

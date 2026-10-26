@@ -32,7 +32,7 @@ export const DURACION_TON618 = 37.3;
 // Órbita parabólica (ecuación de Barker) con el pericentro a Q radios de sombra justo en el primer «yours»; plano
 // inclinado INCL sobre el disco (llega desde arriba). Tras el pericentro la materia se enrosca: su radio va hacia el de
 // su anillo (rc) y su giro hacia el de Kepler del disco. Ángulos como los del disco: (cos φ, sin φ) en el plano XZ.
-export const CAIDA = Object.freeze({ Q: 2.4, S0: 2.0, PSI: 0.7069, INCL: -0.26, T1: 1.0, T2: 1.6 });
+export const CAIDA = Object.freeze({ Q: 2.4, S0: 2.0, PSI: 0.0873, INCL: -0.26, T1: 1.0, T2: 1.6 });
 const giroKepler = r => 1.0472 * Math.pow(r / 1.3, -1.5);
 // Posición (en radios de sombra) de la materia que va por su camino con «tau» segundos desde el pericentro y anillo rc.
 export function caminoCaida(tau, rc = 4, o = [0, 0, 0]) {
@@ -65,6 +65,7 @@ export const estrella = (t, o) => caminoCaida(t - MARCAS_TON618.tuyo, 4, o);
 //  bombo      el golpe del bombo en el disco de fuera
 //  caida      presencia de la estrella y su hilo (0 fuera de la escena; se funde en el disco al final)
 //  latidoEstrella   el destello de la estrella en «my heart»
+//  cumbre     el golpe de luz de todo el disco en el último «yours» completo (se apaga en ~1,5 s)
 //  avivar     el disco que come brilla más (1 en reposo; sube con el mantra hasta la cumbre y vuelve a 1)
 //  flujo      velocidad con la que el disco cae en espiral hacia el centro (1 = la de siempre)
 //  calma      0 → 1 en el fundido
@@ -89,50 +90,37 @@ export function guionTon618(t, M = MARCAS_TON618, { reducido = false } = {}, o =
   o.bombo *= (t < M.tuyo ? 0.12 : 0.3) * k * (1 - suave(t, M.fundido, M.fundido + 2));
   o.latidoEstrella = golpe(t - M.corazon, 0.45) * k;
   o.caida = 1 - muySuave(t, 30, 36.5);
+  o.cumbre = golpe(t - M.cumbre, 1.5) * k;
   o.avivar = 1 + 0.45 * suave(t, M.tuyo, M.mantra) + 0.35 * suave(t, 28.95, M.cumbre) - 0.8 * suave(t, M.cumbre + 0.5, M.fundido + 2);
   o.flujo = 1 + 4 * suave(t, M.tuyo, M.mantra) * (1 - suave(t, M.cumbre, M.fundido + 2));
   o.calma = muySuave(t, M.fundido, M.fundido + 2.3);
   return o;
 }
-export const REPOSO_TON618 = Object.freeze({ t: 0, encendido: 1, avivar: 1, revelar: 1, destello: 0, ola: -1, olaR0: 6.8, olaF: 0, bombo: 0, latidoEstrella: 0, caida: 0, flujo: 1, calma: 0 });
+export const REPOSO_TON618 = Object.freeze({ t: 0, encendido: 1, avivar: 1, cumbre: 0, revelar: 1, destello: 0, ola: -1, olaR0: 6.8, olaF: 0, bombo: 0, latidoEstrella: 0, caida: 0, flujo: 1, calma: 0 });
 
 // ── Pista de cámara (la lleva el director común, js/util/directorCamara.js): segundos del fragmento; pos = [azimut°,
 // elevación°, distancia] respecto al centro, en el marco del disco (azimut 0 = el lado de casa; elevación sobre el plano
 // del disco); distancia y mira en radios de encuadre (la distancia de llegada: 1 = donde deja el viaje; la sombra mide
 // 0,11 y el disco 0,7). El primer plano no es un corte: el director entra en la pista desde donde esté la cámara. ──
 export const CAMARA_TON618 = Object.freeze([
-  // Llegada: el agujero dormido y, por encima de él, lejos, la estrella que viene. Casi quieta (el compás de entrada).
+  // Lenta y suave, siempre hacia el mismo lado (una sola vuelta en toda la canción), sin vaivenes.
+  // Llegada: el agujero dormido; la estrella asoma a la izquierda, lejos.
   { t: 0, pos: [0, 9.2, 1.0], mira: [0, 0, 0], fov: 60, curva: 'suave' },
-  // «secrets…»: la cámara empieza a rodear el agujero por el lado contrario a la estrella, para tenerla siempre detrás de
-  // él: así se la ve caer desde arriba hacia la sombra (y, al acercarse, su luz se curva alrededor).
-  { t: 1.42, pos: [-2, 9.5, 0.98], mira: [0, 0.03, 0], fov: 60, curva: 'suave' },
-  // «…my heart» (la estrella late una vez) y «harder to hide»: la marea la estira; su imagen asoma curvada.
-  { t: 4.6, pos: [-5, 10, 0.92], mira: [0, 0.03, 0], fov: 58, curva: 'suave' },
-  { t: 6.0, pos: [-12, 10, 0.88], mira: [0, 0.03, 0], fov: 57, curva: 'suave' },
-  // «maybe…»: baja hacia el plano y acompaña el giro cada vez más rápido de la estrella…
-  { t: 8.02, pos: [-28, 8, 0.8], mira: [0, 0.02, 0], fov: 55, curva: 'lineal' },
-  { t: 9.0, pos: [-42, 6.5, 0.75], mira: [0, 0.01, 0], fov: 54, curva: 'lineal' },
-  { t: 10.2, pos: [-76, 4, 0.68], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
-  // …y en el primer «yours» la estrella pasa justo por detrás: su luz da la vuelta entera a la sombra.
-  { t: 11.18, pos: [-130, 2, 0.6], mira: [0, 0, 0], fov: 50, curva: 'lineal' },
-  // El gancho (dos «yours»): sigue rodeando mientras el hilo se enrosca y su cabeza cae dentro; cruza el disco hacia abajo.
-  { t: 12.98, pos: [-152, -9, 0.63], mira: [0, 0, 0], fov: 50, curva: 'lineal' },
-  { t: 14.74, pos: [-172, -3, 0.65], mira: [0, 0, 0], fov: 50, curva: 'lineal' },
-  // El mantra: entre un «yours» y otro la cámara atraviesa el plano del disco (de canto, la imagen curvada entera) y en
-  // cada «yours» está arriba o abajo del todo, para ver la onda que cae hasta el horizonte; cada vuelta, más cerca.
-  { t: 16.5, pos: [-188, 0, 0.66], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
-  { t: 18.3, pos: [-204, 14, 0.62], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
-  { t: 20.1, pos: [-220, 0, 0.6], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
-  { t: 21.82, pos: [-236, -14, 0.57], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
-  { t: 23.6, pos: [-252, 0, 0.55], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
-  { t: 25.39, pos: [-268, 14, 0.53], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
-  { t: 27.2, pos: [-284, 0, 0.51], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
-  { t: 28.95, pos: [-300, -14, 0.49], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
-  { t: 30.7, pos: [-316, 0, 0.47], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
-  // La cumbre: el último «yours» entero, lo más cerca y desde arriba: el disco ya completo, encendido hasta el borde.
-  { t: 32.51, pos: [-332, 16, 0.48], mira: [0, 0, 0], fov: 50, curva: 'suave' },
-  { t: 34.2, pos: [-344, 12, 0.6], mira: [0, 0, 0], fov: 54, curva: 'suave' },
-  // Fundido: se aleja despacio hasta el encuadre de llegada (una vuelta entera; algo más alta, para verlo entero) y
-  // devuelve el control.
-  { t: 37.3, pos: [-360, 14, 0.95], mira: [0, 0, 0], fov: 60, curva: 'suave' }
+  // «secrets… heart» / «harder to hide»: la cámara empieza a rodear el agujero, despacio, y se acerca un poco; la
+  // estrella va quedando detrás de él y se estira.
+  { t: 4.6, pos: [-14, 9, 0.93], mira: [-0.03, 0.01, 0], fov: 58, curva: 'lineal' },
+  { t: 8.02, pos: [-45, 6, 0.82], mira: [-0.01, 0.01, 0], fov: 55, curva: 'lineal' },
+  // Primer «yours»: la estrella pasa justo por detrás; su luz rodea la sombra. La cámara, casi en el plano.
+  { t: 11.18, pos: [-90, 4, 0.72], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
+  // El gancho y el mantra: sigue la vuelta, sube poco a poco para ver el disco encenderse anillo a anillo y las ondas
+  // que caen al horizonte en cada «yours».
+  { t: 18.3, pos: [-150, 14, 0.66], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
+  { t: 25.39, pos: [-215, 22, 0.62], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
+  { t: 29.4, pos: [-255, 26, 0.6], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
+  // La cumbre (el último «yours» entero): baja despacio hasta casi el plano: el disco entero ardiendo, su imagen curvada
+  // por encima y por debajo de la sombra, en el golpe de luz.
+  { t: 32.51, pos: [-290, 5, 0.54], mira: [0, 0.02, 0], fov: 50, curva: 'lineal' },
+  { t: 34.6, pos: [-312, 6, 0.6], mira: [0, 0.01, 0], fov: 52, curva: 'lineal' },
+  // Fundido: se aleja hasta el encuadre de llegada y devuelve el control.
+  { t: 37.3, pos: [-345, 12, 0.92], mira: [0, 0, 0], fov: 60, curva: 'suave' }
 ]);

@@ -449,12 +449,11 @@ export function* construirCosmos({ uScale, uPR }) {
       const V = new THREE.Vector3(), e = o => o.getWorldScale(V).x, d = o => Math.round(o.getWorldPosition(V).length());
       const anillo = m => m.geometry.parameters.outerRadius * e(m), esfera = m => m.geometry.parameters.radius * e(m), cono = m => m.geometry.parameters.height * e(m);
       const toroExt = m => (m.geometry.parameters.radius + m.geometry.parameters.tube) * e(m), spriteR = s => s.scale.x * 0.5 * e(s.parent);
-      const maxAtributo = (pts, k) => { const a = pts.geometry.attributes.position; let m = 0; for (let i = 0; i < a.count; i++) m = Math.max(m, a.array[i * 3 + k]); return m; };
       const r = x => Math.round(x);
       const tam = sn.cajaCorazon.getSize(new THREE.Vector3()).multiplyScalar(0.5 * e(sn.corazon));
       const progenitora = 110 * e(sn.superficie), eyecta = sn.radioEyecta * e(sn.grupo);
       const ton = { distancia: d(gigantesco), cuerpo: r(esfera(piezasTon.sombra)), disco: r(anillo(piezasTon.base)), lente: r(anillo(piezasTon.anillo)), materia: r(R * piezasTon.rFuera * e(piezasTon.planoDisco)),
-        estrellas: r(maxAtributo(piezasTon.discoEstrellas, 1) * e(piezasTon.discoEstrellas)), chorro: 0, halo: 0 };
+        estrellas: 0, chorro: 0, halo: 0 };
       ton.navegacion = Math.max(ton.disco, ton.lente);
       // materia: la zona luminosa de Sagitario A* (flujo, minispiral y el corazón de las órbitas de las estrellas S), 6,3 RS
       // como antes del rediseño: es su radio de navegación y su extensión visible (las elipses que se alejan más son trazas

@@ -265,7 +265,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   const proyectado = new THREE.Vector3();
   const camaraAntes = new THREE.Vector3();
   let distanciaAnterior = camera.position.distanceTo(controls.target), cuerposLente = null;
-  let nubesFoco = null, focoNubes = 1, focoAplicado = false, cieloEscena = 1; const tmpFoco = new THREE.Vector3();
+  let nubesFoco = null, focoNubes = 1, focoAplicado = false, cieloEscena = 1, focoTon = 0; const tmpFoco = new THREE.Vector3();
   let cometaAntes = null, escalaTiempo = 1;   // escalaTiempo: cámara lenta solo para pruebas (#debug)
   const VELO = { gigante: 0.2, deneb: 0, pulsar: 0, cuasar: 0, ton618: 0, sagitario: 0, supernova: 0, hogar: 0, constelacion: 0.62, calma: 0.45, capsulas: 0.4, suenos: 0.4, cartas: 0.35, rosa: 0.3, azul: 0.32, cometa: 0.2 };
 
@@ -1199,7 +1199,10 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // Del estallido a la revelación de la supernova, el fondo se atenúa: las chispas que forman el corazón no se pierden
     // contra la telaraña ni las nebulosas de esa zona (vuelve a su luz antes de devolver el control).
     const sSN = document.body.classList.contains('supernova-en-escena') ? cosmos.supernova.segundoCancion : null;
-    const focoSN = sSN === null ? 0 : (0.55 + 0.2 * THREE.MathUtils.smoothstep(sSN, 40.5, 42.2)) * THREE.MathUtils.smoothstep(sSN, -0.5, 2.5) * (1 - THREE.MathUtils.smoothstep(sSN, 52.2, 58));
+    // En el clip de TON 618, igual: las paredes de gas de detrás llenaban medio encuadre (y su lente las agrandaba) y
+    // tapaban la historia; se apagan en ~1,5 s al empezar y vuelven al terminar.
+    focoTon += ((clip?.id === 'ton618' && clip.fase === 'clip' ? 0.85 : 0) - focoTon) * Math.min(1, dtInterfaz * 1.5);
+    const focoSN = Math.max(focoTon, sSN === null ? 0 : (0.55 + 0.2 * THREE.MathUtils.smoothstep(sSN, 40.5, 42.2)) * THREE.MathUtils.smoothstep(sSN, -0.5, 2.5) * (1 - THREE.MathUtils.smoothstep(sSN, 52.2, 58)));
     maravillas.atenuacion = 1 - focoSN; capaVolumen.atenuacion = 1 - focoSN * 0.8;   // (el gas volumétrico de alrededor, también)
     const centroFoco = lejano && !vuelo ? lejano.centro : null, metaFoco = (centroFoco ? (cosmos.enEscenaAgujero ? 0.5 : 0.78) * (1 - (cosmos.escenas.focoNubes ?? 0)) : 1) * (1 - focoSN);   // en la escena de un gigante, aún más (y lo que pida la suya: Deneb, que nace de la nada)
     focoNubes += (metaFoco - focoNubes) * Math.min(1, dtInterfaz * 1.2);
@@ -1208,7 +1211,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       focoAplicado = Math.abs(focoNubes - 1) > 0.001;
     }
     // El cielo profundo (sus paredes de polvo) también se apaga en la escena que lo pide (Deneb nace de la nada).
-    const kCielo = (1 - (cosmos.escenas.focoNubes ?? 0)) * (1 - focoSN * 0.85); /* (y en la ceremonia de la supernova) */ if (!mirada && Math.abs(kCielo - cieloEscena) > 0.002) { cieloEscena = kCielo; cieloProfundo.ampliar(kCielo); }
+    const kCielo = (1 - (cosmos.escenas.focoNubes ?? 0)) * (1 - focoSN * 0.85); /* (y en la ceremonia de la supernova y el clip de TON 618) */ if (!mirada && Math.abs(kCielo - cieloEscena) > 0.002) { cieloEscena = kCielo; cieloProfundo.ampliar(kCielo); }
     const u = velo.material.uniforms.uVelo; u.value += (veloMeta - u.value) * Math.min(1, dt * 2.2);
     // Corriente: su fuerza sigue la velocidad de la cámara durante el vuelo.
     const rapidez = dt > 0 ? camera.position.distanceTo(camaraAntes) / dt : 0;
