@@ -140,7 +140,7 @@ export function* construirSupernova({ uScale, uPR, escala }) {
       }`, /* glsl */`
       varying vec3 vColor; varying float vA;
       void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; if(d > 1.0) discard;
-        float a = exp(-d * d * 5.0) * (1.0 - smoothstep(0.65, 1.0, d)) * vA;
+        float a = (1.0 - smoothstep(0.55, 1.0, d)) * vA * 0.75;   // motas nítidas, sin borde difuso
         gl_FragColor = vec4(vColor * a * ${exterior ? '1.6' : '0.8'}, a); }`);
     const puntos = new THREE.Points(geo, mat); puntos.frustumCulled = false; corazon.add(puntos);
   }
@@ -210,7 +210,7 @@ export function* construirSupernova({ uScale, uPR, escala }) {
   // corazón (la azul describe una órbita menor), sin acercarse ni alejarse de quien mira.
   const centroCorazon = cajaCorazon.getCenter(new THREE.Vector3()).setZ(0);
   const parejas = [['#9fc4ff', 300, 110, 0.95, 70], ['#ff8fc8', 300, 110, 0.95, 175]].map(([color, halo, nucleo, op, orbita]) => {
-    const p = new THREE.Group(); p.add(sprite(brillo, color, halo, 0.36), sprite(destello, color, nucleo, op)); p.userData.orbita = orbita; corazon.add(p); return p;
+    const p = new THREE.Group(); p.add(sprite(destello, color, nucleo * 0.7, op)); p.userData.orbita = orbita; corazon.add(p); return p;   // (sin el halo difuso de antes)
   });
   yield;
   // Antes de estallar, la estrella late y cada latido lanza una onda de gas que se aleja de su
@@ -219,17 +219,27 @@ export function* construirSupernova({ uScale, uPR, escala }) {
   // rota en grumos y jirones (inestabilidades), con huecos que se abren al expandirse. El ruido
   // está anclado a la cáscara (no a la vista) y cada pulso nace con otra orientación. Un medio
   // ópticamente delgado se ve más brillante en el limbo, pero aquí sin anillo continuo.
+  // (Antes eran esferas translúcidas: «humo». Ahora cada capa es una cáscara de motas nítidas de 1,5–3 px, rota en
+  // grumos y filamentos por el mismo ruido, que se expande y se enfría.)
   const pulsos = [0, 1, 2].map(k => {
-    const m = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 32), aditivo({ uA: { value: 0 }, uF: { value: 0 }, uS: { value: k * 7.3 } },
-      'varying vec3 vN,vV,vP;void main(){vP=position;vec4 p=modelViewMatrix*vec4(position,1.0);vN=normalize(normalMatrix*normal);vV=normalize(-p.xyz);gl_Position=projectionMatrix*p;}',
-      RUIDO + `uniform float uA,uF,uS;varying vec3 vN,vV,vP;void main(){
-        float n=fbm3(vP*2.6+uS), fino=rn3(vP*9.0-uS*1.3);
-        float grumo=smoothstep(0.42+uF*0.16,0.62+uF*0.12,n)*(0.55+0.45*fino);   // se fragmenta al expandirse
-        float limbo=pow(clamp(1.0-abs(dot(normalize(vN),normalize(vV))),0.0,1.0),1.5);
-        float a=grumo*(0.25+0.75*limbo)*uA; if(a<0.003)discard;
-        vec3 c=mix(vec3(1.0,0.58,0.34),vec3(0.72,0.2,0.16),uF);   // se enfría: de naranja a rojo oscuro
-        gl_FragColor=vec4(c*a,a);}`,
-      { side: THREE.DoubleSide }));
+    const nP = 1400, pos = new Float32Array(nP * 3), dat = new Float32Array(nP * 2);
+    for (let i = 0; i < nP; i++) {
+      const y = 1 - 2 * (i + 0.5) / nP, r = Math.sqrt(1 - y * y), a = i * 2.39996 + k * 1.7;
+      const j = 1 + (azar() - 0.5) * 0.06;   // un poco de espesor
+      pos.set([Math.cos(a) * r * j, y * j, Math.sin(a) * r * j], i * 3); dat.set([azar(), azar()], i * 2);
+    }
+    const gP = new THREE.BufferGeometry(); gP.setAttribute('position', new THREE.BufferAttribute(pos, 3)); gP.setAttribute('aDato', new THREE.BufferAttribute(dat, 2));
+    const m = new THREE.Points(gP, aditivo({ uA: { value: 0 }, uF: { value: 0 }, uS: { value: k * 7.3 }, uPR },
+      RUIDO + `attribute vec2 aDato; uniform float uA,uF,uS,uPR; varying vec3 vC; varying float vA;
+      void main(){
+        float n=fbm3(position*2.6+uS), fino=rn3(position*9.0-uS*1.3);
+        float grumo=smoothstep(0.42+uF*0.16,0.62+uF*0.12,n)*(0.45+0.55*fino);   // se fragmenta al expandirse
+        vA=grumo*uA*(0.55+0.9*aDato.x);
+        vC=mix(vec3(1.0,0.62,0.36),vec3(0.85,0.24,0.16),uF);   // se enfría: de naranja a rojo
+        gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);
+        gl_PointSize=vA<0.004 ? 0.0 : (1.5+1.5*aDato.y)*uPR;
+      }`,
+      `varying vec3 vC; varying float vA; void main(){ float d=length(gl_PointCoord-0.5)*2.0; if(d>1.0) discard; float a=vA*(1.0-smoothstep(0.6,1.0,d)); gl_FragColor=vec4(vC*a*1.8,a); }`));
     m.visible = false; m.userData.f = 1; progenitora.add(m); return m;
   });
   let fasePulso = 0, faseLatido = 0, faseGiro = 0;
@@ -287,7 +297,7 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
       float hervor=0.35+1.1*pow(materia,1.6)+0.35*fino;   // plasma que hierve: zonas más y menos calientes
       c=mix(vec3(1.0,0.3,0.08)*1.2,c,smoothstep(0.35,0.8,materia+0.25*(1.0-smoothstep(0.0,2.0,uE))));   // lo más frío, rojo anaranjado
       float a=luz*grumos*cuerpo*hervor*0.6*(1.0+0.9*cresta*smoothstep(1.0,4.0,uE)); if(a<0.002)discard;
-      gl_FragColor=vec4(c*a*1.4,a); }`, { side: THREE.FrontSide }));
+      gl_FragColor=vec4(c*a*0.75,a); }`, { side: THREE.FrontSide }));
   bola.visible = false; explosion.add(bola);
   yield;
   // Fragmentos: miles de grumos de materia incandescente que salen disparados (unos más rápidos que
@@ -449,7 +459,7 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
         d.estela.material.uniforms.uTam.value = tam * 0.9; d.estela.material.uniforms.uVis.value = kDos * 0.9;
       });
       const brilloLatido = (1 + superficie.material.uniforms.uLatido.value * 1.6) * 1.6;   // más resplandeciente
-      corona.material.opacity = 0.22 * (1 - colapso) * brilloLatido; halo.material.opacity = 0.07 * (1 - colapso) * brilloLatido; rayos.material.opacity = 0.12 * (1 - colapso) * brilloLatido;
+      corona.material.opacity = 0.07 * (1 - colapso) * brilloLatido; halo.material.opacity = 0; rayos.material.opacity = 0.05 * (1 - colapso) * brilloLatido;   // casi sin halo: la estrella y sus motas
       const k = Math.min(1, Math.max(0.15, camara.distanceTo(grupo.position) / (8400 * grupo.scale.x * P)));
       // La luz de la estrella y sus prominencias crecen con ella (acompañan cada latido).
       const tamEstrella = superficie.scale.x;
@@ -479,10 +489,10 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
       if (!explosion.visible) return;
       const e = desdeAnimacion(Math.max(0, t - inicio)); uE.value = e;   // (en el reloj de la animación)
       const flash = Math.exp(-e / 0.6) * THREE.MathUtils.smoothstep(e, 0, 0.08);   // ruptura del choque: breve
-      destelloGrande.scale.setScalar(60 * (4 + 12 * flash)); destelloGrande.material.opacity = Math.min(1, flash * 0.6);   // un destello seco, no una mancha blanca
-      raya.scale.set(60 * 60 * flash + 1, 60 * 1.5 * flash + 1, 1); raya.material.opacity = flash * 0.55;
+      destelloGrande.scale.setScalar(60 * (2 + 5 * flash)); destelloGrande.material.opacity = Math.min(1, flash * 0.5);   // un punto seco   // un destello seco, no una mancha blanca
+      raya.scale.set(60 * 40 * flash + 1, 60 * 0.8 * flash + 1, 1); raya.material.opacity = flash * 0.45;
       fragmentos.visible = e < 15;
-      luzGrande.scale.setScalar(60 * (18 + 55 * flash)); luzGrande.material.opacity = flash * 0.04;
+      luzGrande.scale.setScalar(60 * (18 + 55 * flash)); luzGrande.material.opacity = 0; luzGrande.visible = false;   // sin halo
       bola.visible = e < 10; bola.scale.setScalar(R * P * 0.9 + 720 * (1 - Math.exp(-e / 2.2)));   // nace del tamaño de la estrella
       eco.visible = false;   // sin aros: se veían como círculos quietos
       // El frente de choque solo se dibuja si la cámara está bien fuera de él: visto desde cerca,
@@ -490,7 +500,7 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
       const rOnda = radioOnda(e), lejosCam = camara.distanceTo(grupo.position) / grupo.scale.x;
       onda.material.uniforms.uVer.value = 1 - THREE.MathUtils.smoothstep(rOnda / lejosCam, 0.45, 0.75); onda.visible = false; onda.scale.setScalar(rOnda);
       anillosChoque.forEach(m => { m.visible = false; });   // sin anillos fijos: se veían como aros quietos
-      gas.material.uniforms.uBrillo.value = 1.4 + 0.9 * THREE.MathUtils.smoothstep(lejosCam, 5500, 9500); /* de lejos brilla como las demás nebulosas */ gas.material.uniforms.uOpacidad.value = 0.35 * THREE.MathUtils.smoothstep(e, 6, 17);   // apenas un velo: el corazón lo dibujan las chispas y los hilos
+      gas.material.uniforms.uBrillo.value = 1.4 + 0.9 * THREE.MathUtils.smoothstep(lejosCam, 5500, 9500); /* de lejos brilla como las demás nebulosas */ gas.material.uniforms.uOpacidad.value = 0.05 * THREE.MathUtils.smoothstep(e, 6, 17);   // casi nada: el corazón lo dibujan las chispas y los hilos
       parejas.forEach((p, i) => { const a = t * 0.12 + i * Math.PI, r = p.userData.orbita; p.position.set(centroCorazon.x + Math.cos(a) * r, centroCorazon.y + Math.sin(a) * r * 0.55, 30); p.scale.setScalar(THREE.MathUtils.smoothstep(e, 5, 14) * (1 + Math.sin(t * 1.5 + i) * 0.03)); });
     }
   };
