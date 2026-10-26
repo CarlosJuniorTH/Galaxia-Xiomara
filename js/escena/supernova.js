@@ -133,7 +133,7 @@ export function* construirSupernova({ uScale, uPR, escala }) {
         vec3 caliente = mix(vec3(0.78, 0.86, 1.0), vec3(1.0, 0.9, 0.68), smoothstep(0.2, 1.4, uE));
         caliente = mix(caliente, vec3(1.0, 0.5, 0.2), smoothstep(1.4, 3.5, uE));
         vColor = mix(caliente * (1.0 + grumo * 0.6), vColor, smoothstep(3.0, 9.0, uE));
-        vA = smoothstep(0.0, 1.0, uE) * (0.48 + 0.09 * sin(uT * 0.22 + aDato.z * 6.283)) * (1.0 + 4.5 * (1.0 - forma) * smoothstep(1.0, 3.5, uE));   // en vuelo, chispas vivas que se ven contra el fondo
+        vA = smoothstep(0.35, 1.8, uE) * (0.48 + 0.09 * sin(uT * 0.22 + aDato.z * 6.283)) * (1.0 + 4.5 * (1.0 - forma) * smoothstep(1.0, 3.5, uE));   // en vuelo, chispas vivas que se ven contra el fondo
         float px = (12.0 + aDato.z * 14.0) * ${escala.toFixed(3)} * uScale / max(1.0, -mv.z);
         gl_PointSize = clamp(px, 1.5 * uPR * (1.0 - forma) + 1.0 * forma, 3.2 * uPR);
         vA *= min(1.0, px * px) * (1.0 + 0.45 * uCanto);   // con la voz sostenida, más luz
@@ -297,7 +297,7 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
       float hervor=0.35+1.1*pow(materia,1.6)+0.35*fino;   // plasma que hierve: zonas más y menos calientes
       c=mix(vec3(1.0,0.3,0.08)*1.2,c,smoothstep(0.35,0.8,materia+0.25*(1.0-smoothstep(0.0,2.0,uE))));   // lo más frío, rojo anaranjado
       float a=luz*grumos*cuerpo*hervor*0.6*(1.0+0.9*cresta*smoothstep(1.0,4.0,uE)); if(a<0.002)discard;
-      gl_FragColor=vec4(c*a*0.75,a); }`, { side: THREE.FrontSide }));
+      gl_FragColor=vec4(c*a*0.25,a); }`, { side: THREE.FrontSide }));
   bola.visible = false; explosion.add(bola);
   yield;
   // Fragmentos: miles de grumos de materia incandescente que salen disparados (unos más rápidos que
@@ -494,7 +494,7 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
       raya.scale.set(60 * 40 * flash + 1, 60 * 0.8 * flash + 1, 1); raya.material.opacity = flash * 0.45;
       fragmentos.visible = e < 15;
       luzGrande.scale.setScalar(60 * (18 + 55 * flash)); luzGrande.material.opacity = 0; luzGrande.visible = false;   // sin halo
-      bola.visible = e < 10; bola.scale.setScalar(R * P * 0.9 + 720 * (1 - Math.exp(-e / 2.2)));   // nace del tamaño de la estrella
+      bola.visible = false; bola.scale.setScalar(R * P * 0.9 + 720 * (1 - Math.exp(-e / 2.2)));   // sin bola de fuego: desde fuera era un disco lechoso; el estallido lo cuentan el destello y las chispas
       eco.visible = false;   // sin aros: se veían como círculos quietos
       // El frente de choque solo se dibuja si la cámara está bien fuera de él: visto desde cerca,
       // su borde cruzaba la pantalla como una franja borrosa.
