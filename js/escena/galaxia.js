@@ -316,6 +316,9 @@ export function* construirGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia })
     partesLejos: { puntos: lejos.children.find(o => o.isPoints), disco: discoLejos, bulbo: bulboLejos, grupo: lejos },   // diagnóstico (pruebas de identidad y luz)
     // Punto de un brazo (en el mundo, girando con la galaxia): ahí está nuestro sistema solar.
     puntoBrazo(brazo = 1, t = 0.62) { const { x, z } = enBrazo(brazo, t, 0); grupo.updateMatrixWorld(); return grupo.localToWorld(new THREE.Vector3(x, 0, z)); },
+    // Gira la galaxia a su ángulo del instante t (también sirve para ponerla al día al volver del sistema solar, donde no se
+    // actualiza: sin esto, la marca del sistema solar saltaba de sitio al salir).
+    girar(t) { grupo.rotation.y = t * 0.022; grupo.updateMatrixWorld(); },
     actualizar(t, dt, { camera }) {
       grupo.rotation.y = t * 0.022;
       // Una galaxia no resuelta integra la luz de sus estrellas: no titila entera.

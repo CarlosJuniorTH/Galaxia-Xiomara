@@ -106,6 +106,32 @@ export default async function ({ base, informe }) {
         informe.comprobar(finAntes.length > 0 && Math.max(...finAntes.map(s => s.sol)) < 10, 'entrada: hacia el punto del brazo, mirando al Sol', { maxGrados: finAntes.length ? +Math.max(...finAntes.map(s => s.sol)).toFixed(1) : null });
         informe.comprobar(inicioDespues.length > 0 && Math.max(...inicioDespues.map(s => s.sol)) < 3, 'entrada: tras el corte, la cámara mira al Sol', { grados: inicioDespues.map(s => +s.sol.toFixed(1)) });
         informe.comprobar(ultimo.enSolar && ultimo.destino < 8, 'entrada: termina mirando al destino (Azul)', { grados: +ultimo.destino?.toFixed(1) });
+
+        // Salida (de Azul a casa), el espejo de la entrada: en el sistema solar la cámara se aleja mirando al Sol; tras el corte
+        // aparece junto a la marca del brazo, mirándola, en la misma posición relativa (escalada ×60/8400 y girada con el brazo):
+        // ni salto de lado ni la miniatura «mirando a otro sitio».
+        await pagina.waitForTimeout(800);
+        await pagina.evaluate(() => { window.__galaxia.interfaz.visitar('hogar'); });
+        const salida = [];
+        for (let k = 0; k < 500; k++) {
+          const s = await pagina.evaluate(() => {
+            const i = window.__galaxia.escena.interno, { THREE, camera, galaxia } = i, enSolar = i.escenaActiva === 'solar';
+            const mira = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion), centro = enSolar ? new THREE.Vector3() : galaxia.puntoBrazo();
+            const a = THREE.MathUtils.radToDeg(mira.angleTo(centro.clone().sub(camera.position).normalize()));
+            // Posición relativa en el marco del sistema solar: en la escena principal se deshace el giro del brazo y la escala.
+            const ang = 2 * Math.PI / 5 + 0.62 * 4.5, rad = 60 + 0.62 * 980, giro = Math.atan2(centro.x, centro.z) - Math.atan2(Math.cos(ang) * rad, Math.sin(ang) * rad);
+            const rel = camera.position.clone().sub(centro); if (!enSolar) rel.applyAxisAngle(new THREE.Vector3(0, 1, 0), -giro).multiplyScalar(8400 / 60);
+            return { enSolar, a, rel: rel.toArray(), viajando: window.__galaxia.escena.viajando };
+          });
+          salida.push(s); if (!s.viajando && k > 4) break; await pagina.waitForTimeout(30);   // muestreo fino alrededor del corte
+        }
+        const dentro = salida.filter(s => s.enSolar), fueraS = salida.filter(s => !s.enSolar);
+        const ultDentro = dentro.at(-1), primFuera = fueraS[0];
+        const V = a => ({ l: Math.hypot(...a), n: a.map(x => x / Math.hypot(...a)) }), d1 = V(ultDentro.rel), d2 = V(primFuera.rel);
+        const angRel = Math.acos(Math.min(1, d1.n.reduce((t, x, j) => t + x * d2.n[j], 0))) * 180 / Math.PI;
+        informe.comprobar(dentro.slice(-3).every(s => s.a < 5) && V(dentro.at(-1).rel).l > V(dentro[Math.floor(dentro.length / 2)].rel).l, 'salida: en el sistema solar se aleja mirando al Sol', { grados: dentro.slice(-3).map(s => +s.a.toFixed(1)) });
+        informe.comprobar(primFuera.a < 3, 'salida: tras el corte, la cámara mira a la marca del sistema solar', { grados: +primFuera.a.toFixed(1) });
+        informe.comprobar(angRel < 8 && d2.l / d1.l > 0.5 && d2.l / d1.l < 2, 'salida: aparece junto a la marca en la misma posición relativa (sin salto de lado)', { angulo: +angRel.toFixed(1), razon: +(d2.l / d1.l).toFixed(2) });
       }
       informe.comprobar(errores.length === 0, `${perfil}: sin errores de consola`, errores.slice(0, 3));
     } finally { await navegador.close(); }

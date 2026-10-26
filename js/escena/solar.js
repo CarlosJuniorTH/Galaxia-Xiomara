@@ -205,8 +205,9 @@ export function* construirSolar({ haciaCentroGalactico, uPR = { value: 1 } }) {
     fragmentShader: RUIDO + /* glsl */`uniform float uT; varying vec2 vP;
       void main(){ float r = length(vP) / ${RADIO_SOL.toFixed(1)}, a = atan(vP.y, vP.x);
         // Cada filamento es una franja angular estrecha (borde nítido) que se curva un poco con la altura y se corta a su largo.
-        float u = a * 34.0 + sin(a * 5.0 + r * 3.0 + uT * 0.1) * 1.2, id = floor(u), f = fract(u);
-        float largo = 1.03 + 0.22 * h3(vec3(id, 3.0, 1.0)), ancho = 0.04 + 0.04 * h3(vec3(id, 5.0, 2.0));
+        float u = a * 34.0 + sin(a * 5.0 + r * 3.0 + uT * 0.45) * 1.2 + sin(r * 9.0 - uT * 1.3 + a * 3.0) * 0.25, id = floor(u), f = fract(u);
+        // Cada filamento se estira y se recoge a su ritmo: la corona se mueve.
+        float largo = 1.03 + (0.12 + 0.14 * (0.5 + 0.5 * sin(uT * (0.6 + h3(vec3(id, 1.0, 7.0))) + id * 2.3))) * (0.4 + 0.6 * h3(vec3(id, 3.0, 1.0))), ancho = 0.04 + 0.04 * h3(vec3(id, 5.0, 2.0));
         float hilo = step(abs(f - 0.5), ancho) * step(r, largo) * step(1.0, r) * step(0.7, h3(vec3(id, 9.0, 4.0)));
         float k = hilo * (0.4 - 0.3 * (r - 1.0) / (largo - 1.0 + 1e-3));
         gl_FragColor = vec4(vec3(1.0, 0.35, 0.04) * k, k); }`,
@@ -226,9 +227,19 @@ export function* construirSolar({ haciaCentroGalactico, uPR = { value: 1 } }) {
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
     m.frustumCulled = false; sol.add(m); return m;
   })();
-  // Rayos cortos y finos (1 px), de cara a la cámara: ocho, del borde a ~1,6 radios. Una pista de lucero, no una cruz.
-  const rayos = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(Array.from({ length: 6 }, (_, i) => { const a = i / 6 * Math.PI * 2 + 0.3, l = i % 2 ? 1.3 : 1.42; return [new THREE.Vector3(Math.cos(a) * 1.1, Math.sin(a) * 1.1, 0), new THREE.Vector3(Math.cos(a) * l, Math.sin(a) * l, 0)]; }).flat().map(v => v.multiplyScalar(RADIO_SOL))),
-    new THREE.LineBasicMaterial({ color: '#ffd28a', transparent: true, opacity: 0.4, depthWrite: false, blending: THREE.AdditiveBlending }));
+  // Rayos cortos y finos (1 px), de cara a la cámara: seis, del borde a ~1,4 radios, que titilan (cada uno crece, encoge y
+  // brilla a su ritmo). Una pista de lucero, no una cruz.
+  const rayos = (() => {
+    const pos = [], dat = [];
+    for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + 0.3; for (const ext of [0, 1]) { pos.push(Math.cos(a), Math.sin(a), 0); dat.push(i, ext); } }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('aDat', new THREE.Float32BufferAttribute(dat, 2));
+    return new THREE.LineSegments(g, new THREE.ShaderMaterial({ uniforms: { uT: superficie.material.uniforms.uT },
+      vertexShader: /* glsl */`attribute vec2 aDat; uniform float uT; varying float vA;
+        void main(){ float ritmo = 0.5 + 0.5 * sin(uT * (2.1 + aDat.x * 0.37) + aDat.x * 1.9), largo = 1.24 + 0.22 * ritmo;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position * ${RADIO_SOL.toFixed(1)} * mix(1.1, largo, aDat.y), 1.0); vA = (0.18 + 0.4 * ritmo) * (1.0 - aDat.y * 0.6); }`,
+      fragmentShader: 'varying float vA; void main(){ gl_FragColor = vec4(vec3(1.0, 0.62, 0.22) * vA, 1.0); }',
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+  })();
   rayos.frustumCulled = false; sol.add(rayos);
   yield;
   // Protuberancias: arcos de plasma que salen de la superficie siguiendo el campo magnético.
@@ -239,7 +250,7 @@ export function* construirSolar({ haciaCentroGalactico, uPR = { value: 1 } }) {
     vertexShader: 'varying vec2 vUv; varying vec3 vM; void main(){ vUv = uv; vec4 m = modelMatrix * vec4(position, 1.0); vM = m.xyz; gl_Position = projectionMatrix * viewMatrix * m; }',
     fragmentShader: RUIDO + `uniform float uT; varying vec2 vUv; varying vec3 vM;
       void main(){ vec3 v = normalize(cameraPosition - vM); if (length(vM - v * dot(vM, v)) < ${(RADIO_SOL * 1.01).toFixed(1)}) discard;
-        float n = fbm3(vec3(vUv.x * 12.0, vUv.y * 3.0, uT * 0.3));
+        float n = fbm3(vec3(vUv.x * 12.0 - uT * 1.4, vUv.y * 3.0, uT * 0.5));   // el plasma corre a lo largo del arco
         float k = (0.55 + 0.6 * n) * (0.5 + 0.5 * sin(vUv.x * 3.14159)); vec3 c = mix(vec3(1.0, 0.12, 0.01), vec3(1.0, 0.3, 0.03), n);
         gl_FragColor = vec4(c * k * 0.9, k); }`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide
@@ -252,12 +263,38 @@ export function* construirSolar({ haciaCentroGalactico, uPR = { value: 1 } }) {
     arco.position.y = RADIO_SOL * 0.96; arco.rotation.y = lon * 2.3; base.add(arco); sol.add(base); arcos.push(arco);
   }
 
+  // Eyecciones: chorros de plasma hechos de motas nítidas (1,5–2,5 px) que salen disparadas de cuatro zonas activas, suben,
+  // frenan y vuelven a caer (balística en la GPU), cada chorro a su ritmo. Las que se proyectan sobre el disco no se dibujan
+  // (solo se ven saltando por el borde, sin sumar luz al Sol).
+  {
+    const n = 520, pos = new Float32Array(n * 3), dat = new Float32Array(n * 4); let k = 7781; const az = () => (k = (k * 16807) % 2147483647) / 2147483647;
+    const zonas = Array.from({ length: 4 }, () => new THREE.Vector3(az() - 0.5, (az() - 0.5) * 0.7, az() - 0.5).normalize());
+    for (let i = 0; i < n; i++) {
+      const z = zonas[i % 4], d = z.clone().add(new THREE.Vector3(az() - 0.5, az() - 0.5, az() - 0.5).multiplyScalar(0.07)).normalize();
+      pos.set([d.x, d.y, d.z], i * 3); dat.set([az(), 0.35 + az() * 0.65, i % 4, 1.5 + az()], i * 4);
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aDat', new THREE.BufferAttribute(dat, 4));
+    const chorros = new THREE.Points(g, new THREE.ShaderMaterial({ uniforms: { uT: superficie.material.uniforms.uT, uPR },
+      vertexShader: /* glsl */`attribute vec4 aDat; uniform float uT, uPR; varying float vA; varying vec3 vM;
+        void main(){
+          float ciclo = 5.0 + aDat.z * 1.3, f = fract(uT / ciclo + aDat.z * 0.27 + aDat.x * 0.3);   // cada chorro, su erupción
+          float alto = (0.3 + 0.4 * aDat.y) * 4.0 * f * (1.0 - f);                                            // sube, frena y cae
+          vec3 p = position * ${RADIO_SOL.toFixed(1)} * (1.0 + alto);
+          vec4 m = modelMatrix * vec4(p, 1.0); vM = m.xyz; gl_Position = projectionMatrix * viewMatrix * m;
+          gl_PointSize = aDat.w * uPR; vA = 0.7 * smoothstep(0.0, 0.05, f) * (1.0 - smoothstep(0.85, 1.0, f)) * (1.0 - smoothstep(1200.0, 2600.0, length(cameraPosition - m.xyz))); }`,
+      fragmentShader: /* glsl */`varying float vA; varying vec3 vM;
+        void main(){ vec3 v = normalize(cameraPosition - vM); if (length(vM - v * dot(vM, v)) < ${(RADIO_SOL * 1.01).toFixed(1)}) discard;
+          vec2 q = gl_PointCoord - 0.5; if (dot(q, q) > 0.25) discard; gl_FragColor = vec4(vec3(1.0, 0.42, 0.06) * vA, 1.0); }`,
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    chorros.frustumCulled = false; sol.add(chorros);
+  }
   return {
     escena, sol, radioSol: RADIO_SOL,
     actualizar(t, camera) {
       superficie.material.uniforms.uT.value = t; corona.material.uniforms.uT.value = t; materialArco.uniforms.uT.value = t; uT.value = t;
       rotulo.position.copy(camera.position).addScaledVector(dirRotulo, 4000);
-      for (const [i, a] of arcos.entries()) a.scale.setScalar(1 + Math.sin(t * 0.3 + i * 1.7) * 0.12);
+      // Las protuberancias se elevan y caen: cada una crece desde la superficie hasta ~1,3 veces y vuelve a hundirse a su ritmo.
+      for (const [i, a] of arcos.entries()) { const c = 0.5 + 0.5 * Math.sin(t * (0.22 + i * 0.05) + i * 1.7); a.scale.setScalar(0.25 + 1.05 * c); a.position.y = RADIO_SOL * (0.96 - 0.06 * (1 - c)); }
       superficie.rotation.y = t * 0.01; corona.lookAt(camera.position); rayos.quaternion.copy(camera.quaternion);
       // De lejos el Sol no puede quedarse en un punto de 1 px: la corona y los rayos crecen lo justo para que se reconozca.
       const k = Math.max(1, camera.position.length() / 5200); rayos.scale.setScalar(Math.min(1.8, k));

@@ -724,7 +724,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // El sistema solar vive en el marco propio de la galaxia (sin su giro lento): entre las dos escenas, las direcciones se giran
   // alrededor de Y lo que ha girado el punto del brazo desde el inicio (brazoInicial, con el que solar.js orienta el centro galáctico).
   const giroBrazo = () => { const p = galaxia.puntoBrazo(); return Math.atan2(p.x, p.z) - Math.atan2(brazoInicial.x, brazoInicial.z); };
-  let entradaSolar = false;   // el próximo viaje sale del fundido al sistema solar: pasa primero hacia el Sol (viajar)
+  let entradaSolar = false, salidaSolar = null;   // entradaSolar: el próximo viaje sale del fundido al sistema solar (pasa primero hacia el Sol); salidaSolar: la marca de la que se acaba de salir (se sigue mirando un rato)
   // Dónde aparece la cámara en el sistema solar (relativo al Sol) si llega al punto del brazo en la dirección dirPrincipal.
   function posicionEntradaSolar(dirPrincipal) {
     const dir = dirPrincipal.clone().applyAxisAngle(EJE_Y, -giroBrazo());
@@ -743,6 +743,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   async function entrarOSalir(id, opciones) {
     const haciaSolar = SOLARES.has(id);
     destinoActual = id; mundos.enfocar(id); alViajar(id); soltarCielo();
+    // En el sistema solar la galaxia no se actualiza: se pone al día para que el brazo, su giro y la marca sean los de ahora.
+    galaxia.girar(tiempo);
     const desdeUniverso = escenaActiva === 'solar' ? galaxia.puntoBrazo() : camera.position.clone();
     const total = duracionViaje(desdeUniverso.distanceTo(posicionUniverso(id))) * (viajeBreve ? 0.7 : 1);
     const mio = compuesto = { fin: performance.now() + total * 1000 };
@@ -763,8 +765,13 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
         primero = desplazar(llegada, p, total * 0.42, undefined, { paso: recta(camera.position, llegada), corriente: 1, mirarAntes: 1.5, avance: 'acercarse', seguir: () => galaxia.puntoBrazo() });
       }
     } else {
-      fuera = camera.position.clone().setY(0).normalize().multiplyScalar(9500).add(new THREE.Vector3(0, 1800, 0));
-      primero = desplazar(fuera, fuera.clone().multiplyScalar(2), THREE.MathUtils.clamp(total * 0.3, 3, 4.5), undefined, { corriente: 1, avance: 'acercarse' });
+      // Salida, el espejo de la entrada: la cámara se aleja del Sol hacia el lado del destino, mirándolo (se ven el Sol y
+      // las órbitas encogerse), hasta el punto equivalente al borde del sistema solar en miniatura del brazo. Tras el corte
+      // aparece allí, junto a la marca, viendo lo mismo (la miniatura tiene la orientación de esta escena) y sigue
+      // alejándose mientras se gira hacia el destino. Antes salía de lado, mirando hacia fuera, y aparecía a 30 u de la marca.
+      const p = galaxia.puntoBrazo(), haciaDestino = posicionUniverso(id).sub(p).normalize();
+      fuera = posicionEntradaSolar(haciaDestino.negate());   // del lado del destino (posicionEntradaSolar se pone en el lado opuesto al que se le da)
+      primero = desplazar(fuera, ORIGEN, THREE.MathUtils.clamp(total * 0.3, 3, 4.5), undefined, { paso: recta(camera.position, fuera), corriente: 1, avance: 'acercarse' });
     }
     // El fundido a oscuro empieza medio segundo antes del final del primer tramo (la cámara sigue avanzando debajo).
     clearTimeout(esperaFundido); esperaFundido = setTimeout(() => fundido.classList.add('activo'), Math.max(0, (vuelo.duracion - 0.5) * 1000));
@@ -777,16 +784,17 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       cambiarEscena('solar');
       colocarEntradaSolar(dir); entradaSolar = true;
     } else {
-      cambiarEscena('principal');
-      // Se sale en la dirección en que se iba (pasada al marco de la escena principal).
-      const p = galaxia.puntoBrazo(), sale = fuera.clone().normalize().applyAxisAngle(EJE_Y, giroBrazo());
-      camera.position.copy(p).addScaledVector(sale, 30).add(new THREE.Vector3(0, 14, 0)); controls.target.copy(p).addScaledVector(sale, 600); camera.lookAt(controls.target);
+      cambiarEscena('principal'); galaxia.girar(tiempo);
+      // En la marca, en el punto equivalente a donde estaba la cámara en el sistema solar (misma posición relativa, escalada
+      // y girada con el brazo), mirando al Sol en miniatura: la misma imagen que antes del corte.
+      const p = galaxia.puntoBrazo(), relativa = camera.position.clone().applyAxisAngle(EJE_Y, giroBrazo()).multiplyScalar(ESCALA_MARCA);
+      camera.position.copy(p).add(relativa); controls.target.copy(p); camera.lookAt(p); salidaSolar = p.clone();
     }
     camaraAntes.copy(camera.position);
     // (Los dos los usa el desplazamiento o el vuelo que viajar crea en el acto.)
     trasFundido = true; tramoRestante = Math.max(3, (mio.fin - performance.now()) / 1000);
     const viaje = viajar(id, { ...opciones, continuacion: true });
-    trasFundido = false; tramoRestante = null; entradaSolar = false;
+    trasFundido = false; tramoRestante = null; entradaSolar = false; salidaSolar = null;
     // La imagen vuelve en el cuadro siguiente (ya con la escena nueva dibujada).
     requestAnimationFrame(() => requestAnimationFrame(() => { if (compuesto === mio) fundido.classList.remove('activo'); }));
     viaje.then(() => { if (compuesto === mio) compuesto = null; });
@@ -854,6 +862,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     if (recorrido > 60000) opciones.corriente = 1;
     // Recién entrados en el sistema solar: primero hacia el Sol, mirándolo, y luego el giro hacia el destino.
     if (entradaSolar) Object.assign(opciones, entradaPorElSol(camera.position, ORIGEN, hasta, objetivo));
+    // Recién salidos del sistema solar: se aleja de la marca mirándola (se ve el sistema solar encogerse) y luego se gira al destino.
+    if (salidaSolar) Object.assign(opciones, { giroMirada: [0.18, 0.55], centroDesde: salidaSolar });
     return desplazar(hasta, objetivo, duracion, undefined, { ...opciones, viaje: esViaje });
   }
   // Reencuadre al cambiar la ventana (girar el móvil, redimensionar, mostrar u ocultar la
