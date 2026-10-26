@@ -126,9 +126,9 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
     return estimado;
   }
 
-  function rampa(param, valor, duracion) {
+  function rampa(param, valor, duracion, desde = param.value) {
     const t = ctx.currentTime;
-    param.cancelScheduledValues(t); param.setValueAtTime(param.value, t); param.linearRampToValueAtTime(valor, t + duracion);
+    param.cancelScheduledValues(t); param.setValueAtTime(desde, t); param.linearRampToValueAtTime(valor, t + duracion);
   }
   // Lleva cada canal a su nivel: el audible a su volumen, los demás a cero; el que se queda en silencio se pausa al
   // terminar su fundido (ni un <audio> ni el ambiente siguen trabajando sin oírse).
@@ -138,13 +138,27 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
     for (const canal of [ambiente, ...pistas.values()]) {
       if (!canal.ganancia) continue;
       if (canal.nombre === oir && canal.saltarA !== undefined && canal.estado === 'lista') {
-        canal.el.currentTime = canal.saltarA; canal.previo = canal.saltarA - 1e-3; canal.ancla = null; canal.fin = null; delete canal.saltarA;
+        const s = canal.saltarA; delete canal.saltarA;
+        // Sonando (y oyéndose): un salto en seco se oye como un tropiezo. Se baja en un instante, se salta y se vuelve a
+        // subir (la música de los viajes al encadenar un viaje con otro, o al volver a viajar en su fundido de salida).
+        if (!canal.el.paused && canal.ganancia.gain.value > 0.06 && Math.abs(canal.el.currentTime - s) > 0.15) { saltarConFundido(canal, s); continue; }
+        situar(canal, s);
       }
+      if (canal.saltando) { if (canal.nombre === oir) continue; clearTimeout(canal.saltando); canal.saltando = 0; canal.nivel = -1; }   // (−1: que se programe su parada)
       const nivel = canal.nombre === oir ? volumenDe(canal) : 0;
       if (nivel === canal.nivel && (nivel === 0 || sonando(canal))) continue;
-      canal.nivel = nivel; rampa(canal.ganancia.gain, nivel, duracion); clearTimeout(canal.parada);
+      // Una pista parada que vuelve a sonar entra desde el silencio (si se acababa de parar en mitad de su fundido de
+      // salida —volver a viajar justo al llegar—, su ganancia aún estaba alta y arrancaba de golpe, a media voz).
+      const desdeCero = nivel > 0 && canal !== ambiente && !!canal.el?.paused;
+      canal.nivel = nivel; rampa(canal.ganancia.gain, nivel, duracion, desdeCero ? 0 : undefined); clearTimeout(canal.parada);
       if (nivel > 0) arrancar(canal); else canal.parada = setTimeout(() => detener(canal), (duracion + 0.25) * 1000);
     }
+  }
+  function situar(p, s) { p.el.currentTime = s; p.previo = s - 1e-3; p.ancla = null; p.fin = null; }
+  function saltarConFundido(p, s) {
+    clearTimeout(p.parada); clearTimeout(p.saltando);
+    rampa(p.ganancia.gain, 0, 0.16); p.nivel = 0;
+    p.saltando = setTimeout(() => { p.saltando = 0; if (p.estado === 'lista' && p.el) situar(p, s); aplicar(0.5); }, 190);
   }
   const sonando = canal => canal === ambiente ? canal.encendido : !!canal.el && !canal.el.paused;
   function arrancar(canal) {
@@ -161,7 +175,7 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
   function detener(canal) {
     if (canal.nivel > 0) return;
     if (canal === ambiente) { if (ambiente.encendido) { ambiente.encendido = false; ambiente.registro?.apagar(); } return; }
-    const p = canal; p.sonando = false;
+    const p = canal; p.sonando = false; ritmo(p, 1);
     if (p.el && !p.el.paused) {
       // Parada en el fundido final (o casi al final): su reloj sigue contando, como si el fragmento acabara solo.
       if (!p.conf.bucle && duracionDe(p) && p.el.currentTime >= duracionDe(p) - FUNDIDO - 0.4) p.fin = { t: p.el.currentTime, en: performance.now() };
@@ -183,6 +197,22 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
       if (!p.conf.bucle && !p.conf.hastaLlegar && dur && objetivo === p.nombre && t >= dur - fundidoTras(p)) despues(p, t);
     }
     if (!alguna) { clearInterval(vigia); vigia = 0; }
+  }
+  // La música de los viajes acaba en la llegada aunque el viaje no vaya al ritmo del reloj (el vuelo avanza por cuadros
+  // y un cuadro largo de más de 65 ms no cuenta entero: en un móvil a tirones el viaje puede llegar tarde y la canción
+  // se acabaría antes). Cada 120 ms se compara el segundo de la
+  // canción con el que debería llevar (duración − lo que le queda al viaje): una diferencia pequeña se corrige sin que se
+  // note cambiando un poco la velocidad (±6 %, sin cambiar el tono); una grande, con un salto bajo un fundido corto.
+  function acompasar(m, restante) {
+    if (!m.el || m.el.paused || m.estado !== 'lista' || m.conSilencio || m.saltando) return;
+    const dur = duracionDe(m) || 15, deberia = dur - restante, error = m.el.currentTime - deberia;
+    if (restante <= 0.3 || deberia < 0) { ritmo(m, 1); return; }
+    if (Math.abs(error) > 1.2) { ritmo(m, 1); saltarConFundido(m, Math.max(0, deberia)); return; }
+    ritmo(m, Math.abs(error) < 0.06 ? 1 : Math.max(0.94, Math.min(1.06, 1 - error * 0.2)));
+  }
+  function ritmo(p, r) {
+    if (!p.el || Math.abs(p.el.playbackRate - r) < 0.004) return;
+    p.ancla = null; p.el.preservesPitch = true; p.el.playbackRate = r;
   }
   // Al acabar un fragmento: su estancia, si la tiene (fundido de 3 s), y si no (o al acabar la estancia), el reposo.
   // La estancia es la continuación de la canción: su segundo 0 es el segundo «duración − 3» del fragmento (los dos suenan
@@ -319,11 +349,11 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
       viajeEnCurso = { id, fin };
       vigiaViaje = setInterval(() => {
         const v = viajando();
+        const m = pistas.get('viajes');
         if (v && !visto) {
           visto = true;
-          const m = pistas.get('viajes');
           if (m && m.estado !== 'fallo' && !(protegerInicio && objetivo === 'inicio')) ir('viajes', m.conf.hastaLlegar ? { desde: Math.max(0, (duracionDe(m) || 15) - restante()) } : {});
-        }
+        } else if (v && m?.conf.hastaLlegar && objetivo === 'viajes') acompasar(m, restante());
         // (La llegada la avisa la escena en el cuadro exacto, llegada(); esto es por si no lo hiciera.)
         if ((visto && !v) || (!visto && performance.now() - t0 > 1500)) fin();
       }, 120);
