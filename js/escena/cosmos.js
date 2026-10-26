@@ -19,7 +19,6 @@ import { SITIOS_DESTINO } from '../data/sitios.js';
 import { materialSombra } from './materiales.js';
 import { crearEscenaCuasar } from './escenasGigantes.js';
 import { construirPulsar } from './pulsar.js';
-import { atenuarFondo } from '../util/fondoEscena.js';
 import { crearDeneb, RADIO_DENEB } from './deneb.js';
 import { ESCENA_PULSAR, ESCENA_CUASAR, ESCENA_DENEB, estadoPulsar, estadoCuasar, estadoDeneb, crearDirector } from '../util/escenasGigantes.js';
 const reducido = !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
