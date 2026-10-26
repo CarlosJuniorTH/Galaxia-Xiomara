@@ -54,10 +54,13 @@ export function crearMarcaSolar({ uScale, uPR, etiqueta }) {
   mini.add(sol, planetas);
   // Órbitas: los mismos círculos que en la escena del sistema solar (planetas.js), igual de tenues.
   const materialOrbita = new THREE.LineBasicMaterial({ color: '#d9c6ff', transparent: true, opacity: 0.13, depthWrite: false, blending: THREE.AdditiveBlending });
-  for (const r of RADIOS_ORBITA) {
-    const pts = Array.from({ length: 160 }, (_, i) => { const t = i / 160 * Math.PI * 2; return new THREE.Vector3(Math.cos(t) * r, 0, Math.sin(t) * r); });
-    mini.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), materialOrbita));
+  // Todas en una sola orden de dibujo (los mismos 160 tramos por círculo, como pares de puntos): eran 10 por cuadro.
+  const tramos = [];
+  for (const r of RADIOS_ORBITA) for (let i = 0; i < 160; i++) {
+    const a = i / 160 * Math.PI * 2, b = (i + 1) / 160 * Math.PI * 2;
+    tramos.push(new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r), new THREE.Vector3(Math.cos(b) * r, 0, Math.sin(b) * r));
   }
+  const orbitas = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(tramos), materialOrbita); mini.add(orbitas);
   // El nombre, encima: se lee de lejos y se aparta al acercarse (antes crecía hasta cubrir la pantalla).
   const nombre = new THREE.Sprite(new THREE.SpriteMaterial({ map: etiqueta, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending }));
   nombre.scale.set(190, 30, 1); nombre.position.y = 44; grupo.add(nombre);
@@ -70,7 +73,7 @@ export function crearMarcaSolar({ uScale, uPR, etiqueta }) {
       rayos.quaternion.copy(camera.quaternion); rayos.scale.setScalar(d * 0.032 * (1 + (uLatido.value - 1) * 0.6));
       uLatido.value = 1 + Math.sin(tiempo * 2.2) * 0.18 * THREE.MathUtils.smoothstep(d, 300, 900);   // late de lejos; de cerca, quieto
       const cerca = 1 - THREE.MathUtils.smoothstep(d, 260, 1100);
-      materialOrbita.opacity = 0.13 * cerca; uOpPlanetas.value = 0.35 + 0.65 * cerca;
+      materialOrbita.opacity = 0.13 * cerca; orbitas.visible = cerca > 0.002; uOpPlanetas.value = 0.35 + 0.65 * cerca;
       nombre.material.opacity = 0.7 * THREE.MathUtils.smoothstep(d, 170, 520);
     }
   };
