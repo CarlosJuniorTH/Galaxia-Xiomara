@@ -66,7 +66,7 @@ test('la pista de cámara del púlsar: ordenada, dentro de la canción y sin atr
   for (let i = 1; i < pista.length; i++) assert.ok(pista[i].t > pista[i - 1].t, `orden en ${pista[i].t}`);
   for (const p of pista) { assert.ok(['suave', 'rapida', 'corte', 'lineal'].includes(p.curva)); assert.ok(p.pos[2] >= 0.3 && p.pos[2] <= 1.2, `distancia en ${p.t}`); assert.ok(p.fov >= 30 && p.fov <= 60); }
   // El último plano: un encuadre normal del gigante (no lejísimos ni pegado).
-  assert.ok(pista.at(-1).pos[2] > 0.7 && pista.at(-1).pos[2] < 1.1);
+  assert.ok(pista.at(-1).pos[2] > 0.5 && pista.at(-1).pos[2] < 1.1);
 });
 
 test('el cuásar se enciende con la historia: los chorros se recogen, nacen y crecen en las frases clave y acaba en su diseño de siempre', () => {

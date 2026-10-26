@@ -125,7 +125,7 @@ export function* construirPulsar({ uScale, uPR, config = ESCENA_PULSAR }) {
   // ── Magnetosfera: el toro de plasma del ecuador (como en las imágenes de Chandra del Cangrejo y de Vela): un anillo interior
   // fino y brillante y un toro de HEBRAS finas (circunferencias onduladas, con nudos) que giran. El detalle
   // se HORNEA una vez en la carga en una imagen (hornear, desde cosmos.js → index.js, como el remolino del cuásar) y en cada
-  // cuadro solo se muestrea: siete láminas a distintas alturas dan el grosor del toro (las de fuera, solo su núcleo) con
+  // cuadro solo se muestrea: tres láminas (la central y dos tenues, solo con el núcleo del toro) dan el grosor del toro (las de fuera, solo su núcleo) con
   // paralaje. En los golpes de la canción una onda de luz recorre el toro de dentro afuera y salen ondas finas del ecuador
   // (los «wisps» del Cangrejo, que de verdad se alejan del púlsar). Nada de humo: hebras de un píxel con huecos oscuros. ──
   const RT = PULSAR.toro, LADO = nivelSeguro ? 1024 : esMovil ? 1536 : 2048;
@@ -141,21 +141,27 @@ export function* construirPulsar({ uScale, uPR, config = ESCENA_PULSAR }) {
   const FRAG_TORO = /* glsl */`varying vec2 vP; ${RUIDO}
     void main(){ float r = length(vP), a = atan(vP.y, vP.x); vec2 c = vec2(cos(a), sin(a));
       // Las hebras: muchas circunferencias finas, onduladas por un ruido suave (sin costura: el ángulo entra como cos/sin).
-      float w = fbm3(vec3(c * 2.0, r * 2.5));
-      // Hebras de dos grosores (34 y 61 por radio), sin relleno entre ellas: huecos oscuros de verdad.
-      float h1 = pow(0.5 + 0.5 * cos((r * 34.0 + w * 3.0) * 6.2832), 8.0);
-      float h2 = pow(0.5 + 0.5 * cos((r * 61.0 + w * 5.0) * 6.2832), 14.0) * 0.5;
-      // Tramos brillantes y oscuros a lo largo del anillo (el toro del Cangrejo está roto en arcos) y nudos blancos.
-      float arcos = smoothstep(0.28, 0.78, fbm3(vec3(c * 3.0, r * 4.0 + 1.0)));
+      // Forma ORGÁNICA, como el toro de rayos X del Cangrejo: su radio y su grosor cambian con el ángulo (bultos, un lado más
+      // gordo), y sus hebras no son aros: dos familias de espirales suaves que se cruzan (una sube y otra baja en ángulo),
+      // onduladas, rotas en arcos irregulares, con nudos blancos donde se cruzan.
+      float bulto = fbm3(vec3(c * 1.6, 0.5)), grueso = fbm3(vec3(c * 2.3 + 4.0, 1.5));
+      float r0 = 0.47 + 0.09 * (bulto - 0.5) * 2.0, anchoT = 0.11 + 0.1 * grueso;
+      float w = fbm3(vec3(c * 2.0, r * 2.5)), w2 = fbm3(vec3(c * 5.0 + 9.0, r * 6.0));
+      float fA = r * 26.0 + a * 0.477 + w * 2.4 + w2 * 0.35, fB = r * 21.0 - a * 0.318 + w * 1.9 - w2 * 0.3;   // 3 y −2 vueltas por giro
+      float hA = pow(0.5 + 0.5 * cos(fA * 6.2832), 9.0), hB = pow(0.5 + 0.5 * cos(fB * 6.2832), 11.0);
+      float arcosA = smoothstep(0.42, 0.7, fbm3(vec3(c * 3.4, r * 5.0 + 1.0))), arcosB = smoothstep(0.42, 0.7, fbm3(vec3(c * 2.7 + 2.0, r * 4.0 + 7.0)));
+      float hebras = hA * arcosA + hB * arcosB * 0.85, cruce = hA * hB * arcosA * arcosB;
+      float toro = exp(-pow((r - r0) / anchoT, 2.0));
+      // Anillo interior: fino pero roto en arcos, algo excéntrico y con nudos (no un aro limpio).
+      float rI = 0.2 + 0.012 * sin(a * 2.0 + 1.3) + 0.008 * (w - 0.5);
+      float arcI = smoothstep(0.3, 0.62, fbm3(vec3(c * 4.0, 3.0)));
+      float interior = exp(-pow((r - rI) / 0.01, 2.0)) * (0.25 + 1.3 * arcI) + exp(-pow((r - rI - 0.03) / 0.008, 2.0)) * 0.5 * arcI * hA;
       float nudos = pow(smoothstep(0.55, 0.95, fbm3(vec3(c * 9.0, r * 14.0 + 5.0))), 2.0);
-      // Perfil: anillo interior nítido (0,2), toro (0,35–0,7) y un borde exterior de hebras sueltas (0,85).
-      float interior = exp(-pow((r - 0.2) / 0.011, 2.0)) * (1.1 + 0.6 * arcos);
-      float toro = exp(-pow((r - 0.5) / 0.15, 2.0)), borde = 0.35 * exp(-pow((r - 0.85) / 0.05, 2.0));
-      float luz = interior + (toro + borde) * ((h1 * (0.3 + 1.2 * arcos) + h2 * arcos) + nudos * 1.4 * arcos * toro);
-      luz *= (1.0 - smoothstep(0.9, 0.98, r)) * smoothstep(0.17, 0.19, r);
-      vec3 col = mix(vec3(0.85, 0.95, 1.0), mix(vec3(0.3, 0.62, 1.0), vec3(0.66, 0.42, 1.0), smoothstep(0.4, 0.85, r)), smoothstep(0.22, 0.3, r));
-      col = mix(col, vec3(1.0), nudos * 0.7);
-      gl_FragColor = vec4(col * luz, clamp(toro + interior * 0.5, 0.0, 1.0)); }`;
+      float luz = interior + toro * (hebras * 1.25 + cruce * 1.6 + nudos * 0.9 * (arcosA + arcosB) * 0.5);
+      luz *= (1.0 - smoothstep(0.86, 0.96, r)) * smoothstep(0.17, 0.19, r);
+      vec3 col = mix(vec3(0.85, 0.95, 1.0), mix(vec3(0.32, 0.64, 1.0), vec3(0.62, 0.46, 1.0), smoothstep(r0 - 0.05, r0 + 0.2, r)), smoothstep(0.22, 0.3, r));
+      col = mix(col, vec3(1.0), clamp(nudos * 0.6 + cruce, 0.0, 1.0));
+      gl_FragColor = vec4(col * luz, clamp(toro + interior * 0.3, 0.0, 1.0)); }`;
   function hornear(renderer) {
     const m = new THREE.ShaderMaterial({ vertexShader: 'varying vec2 vP; void main(){ vP = position.xy; gl_Position = vec4(position.xy, 0.0, 1.0); }', fragmentShader: FRAG_TORO, depthTest: false, depthWrite: false });
     const sc = new THREE.Scene(), malla = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m); sc.add(malla);
@@ -167,8 +173,8 @@ export function* construirPulsar({ uScale, uPR, config = ESCENA_PULSAR }) {
   const uT = { uTex: { value: texToro }, uT: { value: 0 }, uEnc: { value: 0 }, uLuz: { value: 0.3 }, uGolpe: { value: 9 }, uGolpeF: { value: 0 }, uTibio: { value: 0 }, uExpo: EXPOSICION,
     uOndaR: { value: new THREE.Vector3(9, 9, 9) }, uOndaA: { value: new THREE.Vector3() } };
   const laminas = [];
-  for (let k = 0; k < 7; k++) {
-    const h = (k - 3) / 3, lam = new THREE.Mesh(new THREE.RingGeometry(RT * 0.16, RT, 192, 6), new THREE.ShaderMaterial({
+  for (let k = 0; k < 3; k++) {
+    const h = k - 1, lam = new THREE.Mesh(new THREE.RingGeometry(RT * 0.16, RT, 192, 6), new THREE.ShaderMaterial({
       uniforms: { ...uT, uH: { value: h } },
       vertexShader: 'varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
       fragmentShader: /* glsl */`uniform sampler2D uTex; uniform float uT, uEnc, uLuz, uGolpe, uGolpeF, uTibio, uExpo, uH; uniform vec3 uOndaR, uOndaA; varying vec2 vP;
@@ -178,20 +184,25 @@ export function* construirPulsar({ uScale, uPR, config = ESCENA_PULSAR }) {
           float a = atan(vP.y, vP.x) - uT * (0.35 + 0.08 * uH) - uH * 0.9;
           vec4 t = texture2D(uTex, vec2(cos(a), sin(a)) * r * 0.5 + 0.5);
           // Grosor del toro: las láminas de arriba y abajo solo tienen el núcleo del toro (sección redonda).
-          float grosor = uH == 0.0 ? 1.0 : smoothstep(0.35 + 0.55 * abs(uH), 1.0, t.a) * (1.0 - abs(uH) * 0.4);
+          float grosor = uH == 0.0 ? 1.0 : smoothstep(0.7, 1.0, t.a) * 0.45;
           // Se enciende de dentro afuera; dormido, solo un susurro del anillo interior.
           float enc = mix(0.12, 1.0, smoothstep(r - 0.12, r, uEnc));
           // Cada golpe de la canción: una onda de luz que sale del anillo interior y recorre el toro.
           float onda = exp(-pow((r - 0.2 - uGolpe * 1.1) / 0.07, 2.0)) * uGolpeF;
           vec3 c = t.rgb * grosor * enc * uLuz * (1.0 + 1.6 * onda);
           // Ondas finas del ecuador («wisps»): hebras que se alejan, moduladas por los nudos de la imagen.
-          if (uH == 0.0) { vec3 d = abs(vec3(r) - uOndaR); vec3 w = exp(-d * d / 0.00004) * uOndaA; c += vec3(0.75, 0.88, 1.0) * (w.x + w.y + w.z) * (0.45 + 0.8 * t.a); }
+          if (uH == 0.0) {
+            // Ondas del ecuador: arcos irregulares y breves (su radio ondula con el ángulo y solo brillan donde hay plasma).
+            float ond = 0.02 * sin(a * 3.0 + uOndaR.x * 9.0) + 0.012 * sin(a * 7.0 - 2.0);
+            vec3 d = abs(vec3(r + ond) - uOndaR); vec3 w = exp(-d * d / 0.00006) * uOndaA;
+            c += vec3(0.75, 0.88, 1.0) * (w.x + w.y + w.z) * smoothstep(0.15, 0.6, t.a) * (0.4 + 0.8 * fract(sin(floor(a * 3.0) * 12.9898) * 437.585));
+          }
           c = mix(c, c * vec3(1.25, 0.86, 0.95), uTibio * 0.6);
           gl_FragColor = vec4(c * uExpo, 1.0); }`,
       transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
-    lam.rotation.x = -Math.PI / 2; lam.position.y = h * RT * 0.15; lam.renderOrder = 1; giro.add(lam); laminas.push(lam);
+    lam.rotation.x = -Math.PI / 2; lam.position.y = h * RT * 0.07; lam.rotation.y = h * 0.6; lam.renderOrder = 1; giro.add(lam); laminas.push(lam);
   }
-  const anilloToro = laminas[3];
+  const anilloToro = laminas[1];
   yield;
 
   // ── Polvo que el faro enciende al barrerlo: motas finas, invisibles salvo cuando un haz las atraviesa; quedan un instante
@@ -258,7 +269,7 @@ export function* construirPulsar({ uScale, uPR, config = ESCENA_PULSAR }) {
       uT.uT.value = tToro; uT.uEnc.value = v('toro'); uT.uLuz.value = v('luzToro'); uT.uGolpe.value = golpe; uT.uGolpeF.value = fG; uT.uTibio.value = v('tibio');
       // Ondas del ecuador: en cada golpe fuerte (≥ 0,5) sale una nueva (hasta tres a la vez) que se aleja en 1,8 s.
       if (e.golpeN !== ondaN) { if (ondaN >= 0 && e.golpeN === ondaN + 1 && e.golpeFuerza >= 0.5 && v('ondas') > 0.05) { ondaT[ondaK] = 0; ondaF[ondaK] = e.golpeFuerza * v('ondas'); ondaK = (ondaK + 1) % 3; } ondaN = e.golpeN; }
-      for (let i = 0; i < 3; i++) { ondaT[i] += dt; const q = Math.min(1, ondaT[i] / 1.8); uT.uOndaR.value.setComponent(i, 0.22 + 0.75 * Math.sqrt(q)); uT.uOndaA.value.setComponent(i, ondaT[i] < 1.8 ? ondaF[i] * (1 - q) * (1 - q) * 1.6 : 0); }
+      for (let i = 0; i < 3; i++) { ondaT[i] += dt; const q = Math.min(1, ondaT[i] / 1.1); uT.uOndaR.value.setComponent(i, 0.25 + 0.45 * Math.sqrt(q)); uT.uOndaA.value.setComponent(i, ondaT[i] < 1.1 ? ondaF[i] * (1 - q) * (1 - q) * 1.2 : 0); }
       // El barrido del faro en el polvo.
       uB.uPsi.value = psi; uB.uLuz.value = v('barrido') * 2.2; uB.uTibio.value = v('tibio'); uB.uGolpeF.value = fG;
       return alineado;

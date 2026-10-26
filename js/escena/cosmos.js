@@ -315,7 +315,7 @@ export function* construirCosmos({ uScale, uPR }) {
     // Deneb: también fuera de su escena, cerca de ella, el resto del cielo queda en penumbra (la escena acaba limpia).
     get foco() { return Math.max(estadoP.foco * directores.pulsar.peso, estadoC.foco * directores.cuasar.peso, estadoD.foco * directores.deneb.peso, 0.85 * cercaDeneb); },
     // Las nebulosas lejanas se apagan en la escena de Deneb (nace de la nada: delante de un cielo casi negro).
-    get focoNubes() { return Math.max(estadoD.nubes * directores.deneb.peso, cercaDeneb); },   // junto a Deneb, su propia nube es el cielo
+    get focoNubes() { return Math.max(estadoD.nubes * directores.deneb.peso, cercaDeneb, 0.95 * directores.pulsar.peso); },   // (el púlsar: ninguna nube del catálogo en su clip)   // junto a Deneb, su propia nube es el cielo
     get animando() { for (const k in directores) { const d = directores[k]; if (d.activa || (d.visible && !d.terminada)) return true; } return false; },
     // Para las pruebas y el diagnóstico: segundo, peso y estado de cada una.
     estado(id) { const d = directores[id]; return d ? { activa: d.activa, terminada: d.terminada, segundo: d.segundo, peso: d.peso, ...(id === 'pulsar' ? estadoP : id === 'cuasar' ? estadoC : estadoD) } : null; }
@@ -479,6 +479,8 @@ export function* construirCosmos({ uScale, uPR }) {
       if (dC.activa && (estadoC.acento >= 0 || acentoEscena)) { piezasCuasar.acento(estadoC.acento); acentoEscena = estadoC.acento >= 0; }
       else if (!dC.activa && acentoEscena) { piezasCuasar.acento(-1); acentoEscena = false; }
       // El cuásar no cambia de orientación (antes precesaba y al volver se veía distinto).
+      // Mientras se mira el púlsar (su clip y después), el cuásar vecino no entra en plano: sus chorros rosa y azul le robaban el cielo.
+      cuasar.visible = directores.pulsar.peso < 0.001;
       cuasar.quaternion.copy(rotacionCuasar);   // orientación fija: se ve igual siempre (lo que gira es su gas, en los shaders)
       for (const { superficie, late, fase } of superficies) { superficie.material.uniforms.uT.value = t; if (late) superficie.scale.setScalar(1 + 0.03 * Math.sin(t * 0.25 + fase)); }   // las rojas laten despacio
       for (const e of envolturas) e.material.uniforms.uT.value = t;

@@ -45,18 +45,18 @@ export const ESCENA_PULSAR = {
   // del estribillo (el primero, justo en el grave del 16,71).
   // Cámara LENTA y suave (Carlos): sin cortes ni giros bruscos; un solo arco que rodea al púlsar hacia la izquierda (~9°/s)
   // mientras se acerca, y que pasa por el camino del haz justo en los golpes (270° en el pre-estribillo, 180° en el grave).
-  // Planos abiertos (≥ 0,55 radios): en el móvil vertical se ven enteros la estrella, el viento y el barrido del faro.
+  // Planos a ~0,39 radios: en el móvil vertical el toro ocupa ~90 % del ancho, entero y centrado.
   camara: [
     { t: 0, pos: [0, 8, 1.0], mira: [0, 0, 0], fov: 50, curva: 'suave' },             // llegada: dormido, sin haces
-    { t: 4.86, pos: [-35, 18, 0.78], mira: [0, 0, 0], fov: 50, curva: 'suave' },      // «quererte»: nacen los haces; se acerca
-    { t: 8.6, pos: [-75, 27, 0.6], mira: [0, 0, 0], fov: 48, curva: 'suave' },       // «caliente»: late y acelera
-    { t: 12.4, pos: [-95, 30, 0.56], mira: [0, 0, 0], fov: 48, curva: 'lineal' },     // en el camino del haz (11,14): «nunca falla»
-    { t: 14.5, pos: [-137, 30, 0.56], mira: [0, 0, 0], fov: 48, curva: 'lineal' },    // «de tu amor»: sigue el arco, sin prisa
-    { t: 16.7, pos: [-180, 30, 0.56], mira: [0, 0, 0], fov: 48, curva: 'lineal' },    // el haz la atraviesa en el grave
-    { t: 22.3, pos: [-212, 28, 0.55], mira: [0, 0, 0], fov: 48, curva: 'lineal' },    // estribillo: el faro barre una y otra vez
-    { t: 27.9, pos: [-245, 18, 0.88], mira: [0, 0, 0], fov: 52, curva: 'suave' },     // instrumental: se abre despacio
-    { t: 31.2, pos: [-268, 24, 0.64], mira: [0, 0, 0], fov: 50, curva: 'suave' },     // segunda vuelta: vuelve a acercarse
-    { t: 33.6, pos: [-285, 14, 0.92], mira: [0, 0, 0], fov: 52, curva: 'suave' }      // queda despierto: encuadre final
+    { t: 4.86, pos: [-35, 18, 0.62], mira: [0, 0, 0], fov: 50, curva: 'suave' },      // «quererte»: nacen los haces; se acerca
+    { t: 8.6, pos: [-75, 27, 0.44], mira: [0, 0, 0], fov: 48, curva: 'suave' },       // «caliente»: late y acelera
+    { t: 12.4, pos: [-95, 30, 0.39], mira: [0, 0, 0], fov: 48, curva: 'lineal' },     // en el camino del haz (11,14): «nunca falla»
+    { t: 14.5, pos: [-137, 30, 0.39], mira: [0, 0, 0], fov: 48, curva: 'lineal' },    // «de tu amor»: sigue el arco, sin prisa
+    { t: 16.7, pos: [-180, 30, 0.39], mira: [0, 0, 0], fov: 48, curva: 'lineal' },    // el haz la atraviesa en el grave
+    { t: 22.3, pos: [-212, 28, 0.38], mira: [0, 0, 0], fov: 48, curva: 'lineal' },    // estribillo: el faro barre una y otra vez
+    { t: 27.9, pos: [-245, 18, 0.6], mira: [0, 0, 0], fov: 52, curva: 'suave' },     // instrumental: se abre despacio
+    { t: 31.2, pos: [-268, 24, 0.42], mira: [0, 0, 0], fov: 50, curva: 'suave' },     // segunda vuelta: vuelve a acercarse
+    { t: 33.6, pos: [-285, 14, 0.62], mira: [0, 0, 0], fov: 52, curva: 'suave' }      // queda despierto: encuadre final
   ]
 };
 
@@ -152,6 +152,6 @@ export function estadoPulsar(s, config, e = {}, reducido = false) {
   // El faro empieza a encender lo que barre con «de tu amor» y del todo con el grave.
   e.barrido = 0.4 * suave(f, m.amor - 0.3, m.amor + 1.2) + 0.6 * suave(f, m.grave - 0.15, m.grave + 0.4) - 0.3 * suave(f, m.fundido, m.fin);
   e.tibio = suave(f, m.segunda - 0.4, m.segunda + 1.2) * (1 - 0.5 * suave(f, m.fundido, m.fin));
-  e.foco = 0.85 * suave(f, 0, m.quererte) - 0.4 * suave(f, m.fundido, m.fin);
+  e.foco = 0.85;   // la telaraña, apagada desde el primer cuadro del clip y mientras se le mira
   return e;
 }
