@@ -55,13 +55,14 @@ test('Deneb: la pista de cámara, en orden, dentro de la canción y fuera de la 
   assert.equal(CAMARA_DENEB[0].t, 0); assert.equal(CAMARA_DENEB.at(-1).t, ESCENA_DENEB.duracion);
   CAMARA_DENEB.forEach((p, i) => {
     assert.ok(i === 0 || p.t > CAMARA_DENEB[i - 1].t, `orden en ${p.t}`);
-    assert.ok(formas.has(p.curva) && p.pos.length === 3 && p.mira.length === 3 && p.fov > 30 && p.fov < 80, `plano ${p.t}`);
+    assert.ok(formas.has(p.curva) && p.pos.length === 3 && (!p.mira || p.mira.length === 3) && (p.fov === undefined || (p.fov > 30 && p.fov < 80)), `plano ${p.t}`);
     assert.ok(p.pos[2] > 0.3, `la cámara no entra en la estrella (0,22) en ${p.t}`);
   });
   // En el drop, planos que cambian a compás (cortes o golpes); en los versos, suaves.
   const drop = CAMARA_DENEB.filter(p => p.t >= m.drop && p.t < m.segunda);
   assert.ok(drop.length >= 5 && drop.every(p => p.curva === 'corte' || p.curva === 'rapida'));
-  assert.ok(CAMARA_DENEB.some(p => cerca(p.t, m.medio) && Math.abs(p.pos[1]) < 20 && p.curva === 'suave'), '«in the middle»: de frente');
+  assert.ok(CAMARA_DENEB.some(p => cerca(p.t, m.medio) && p.pos[1] > 55 && p.curva === 'suave'), '«in the middle»: sus anillos de lleno, ella en el centro');
+  assert.equal(ESCENA_DENEB.camara, CAMARA_DENEB, 'el director la encuentra en la escena');
 });
 
 test('Deneb: escalada a otra duración, las mismas fases en proporción', () => {

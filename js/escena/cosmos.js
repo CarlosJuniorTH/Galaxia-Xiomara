@@ -122,7 +122,7 @@ export function* construirCosmos({ uScale, uPR }) {
   // deslumbrante, brillo ceñido, destellos de difracción como en un telescopio, estrellas más
   // cercanas que pasan por delante y, las hipergigantes, la nebulosa que expulsan ──
   const estrellas = [], superficies = [], envolturas = [], cercanas = [], gruposEstrella = {};
-  let denebCerca = null, suavesDeneb = null;   // Deneb de cerca: la estrella, su mundo y su videoclip (deneb.js)
+  let denebCerca = null, suavesDeneb = null, cercaDeneb = 0;   // Deneb de cerca: la estrella, su mundo y su videoclip (deneb.js)
   for (const [nombre, color, tam, acimut, elevacion] of ESTRELLAS_REALES) {
     yield;
     const g = new THREE.Group(); g.position.copy(direccionCielo(acimut, elevacion, DIST_ESTRELLAS)); g.lookAt(0, 0, 0); (nombre === 'Deneb' ? raiz : decor).add(g); gruposEstrella[nombre] = g;
@@ -205,7 +205,13 @@ export function* construirCosmos({ uScale, uPR }) {
       rayos.material.opacity = 0.12; rayos.scale.setScalar(tam * 0.5);
       // De cerca, la supergigante (radio RADIO_DENEB) y su mundo, con su videoclip (deneb.js): sustituye al disco genérico;
       // su brillo de lejos (los destellos y halos) se apaga al acercarse (actualizar), y lo que se ve es la estrella.
-      yield; denebCerca = crearDeneb({ uScale, uPR }); g.add(denebCerca.marco); superficie.visible = false; yield;
+      yield; denebCerca = crearDeneb({ uScale, uPR }); g.add(denebCerca.marco); superficie.visible = false;
+      // Su marco, en los ejes del director de cámara (index.js, marcoClip): y = el eje Y del universo del lado de casa (Deneb
+      // está por encima: hacia abajo), z = hacia casa en el plano perpendicular, x = y × z (el grupo mira a casa con su
+      // elevación: se compensa).
+      { const casa = g.position.clone().negate().normalize(), y = new THREE.Vector3(0, casa.y < 0 ? -1 : 1, 0), z = casa.clone().projectOnPlane(y).normalize(), x = new THREE.Vector3().crossVectors(y, z);
+        denebCerca.marco.quaternion.copy(g.quaternion).invert().multiply(new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z))); }
+      yield;
     }
     // El brillo y los destellos son un efecto óptico: al acercarse conservan su tamaño en el
     // cielo (encogen en el espacio) mientras el disco de la estrella sí se ve más grande.
@@ -367,7 +373,7 @@ export function* construirCosmos({ uScale, uPR }) {
   // empezar se elige cuánto girar hasta «quieto» y la fase se calcula por el segundo de la escena (también con
   // el reloj del audio). Tablas de ∫giro y ∫giro·u (u: fracción hasta «quieto»), una vez por escena.
   const PASOS = 64, integral = new Float32Array(PASOS + 1), integralU = new Float32Array(PASOS + 1), aux = {};
-  const ejeLocal = new THREE.Vector3(), qInversa = new THREE.Quaternion(), camaraDeneb = new THREE.Vector3(), arribaDeneb = new THREE.Vector3(), qDeneb = new THREE.Quaternion();
+  const ejeLocal = new THREE.Vector3(), qInversa = new THREE.Quaternion();
   let paradaPulsar = null, camaraMundo = null, tActual = 0;
   const OMEGA = 2.2, INCLINACION = 0.75;   // giro del púlsar (rad/s) y ángulo del eje magnético (magnetico.rotation.z)
   function planearParada() {
@@ -394,7 +400,6 @@ export function* construirCosmos({ uScale, uPR }) {
       return new Promise(resolve => {
         d.iniciar(tActual, { reloj, config, alFin: resolve });
         if (id === 'pulsar') planearParada();
-        if (id === 'deneb' && camaraMundo) { const gD = gruposEstrella.Deneb; gD.updateMatrixWorld(); denebCerca.orientar(gD.worldToLocal(camaraDeneb.copy(camaraMundo)), arribaDeneb.set(0, 1, 0).applyQuaternion(gD.getWorldQuaternion(qDeneb).invert())); }
       });
     },
     cancelar(id = null) { for (const k in directores) if (!id || k === id) directores[k].cancelar(); },
@@ -402,9 +407,10 @@ export function* construirCosmos({ uScale, uPR }) {
     segundo: id => directores[id]?.segundo ?? 0,
     get enCurso() { for (const k in directores) if (directores[k].activa) return k; return null; },
     // Penumbra del resto del cielo mientras dura una escena (index.js la aplica a la telaraña).
-    get foco() { return Math.max(estadoP.foco * directores.pulsar.peso, estadoC.foco * directores.cuasar.peso, estadoD.foco * directores.deneb.peso); },
+    // Deneb: también fuera de su escena, cerca de ella, el resto del cielo queda en penumbra (la escena acaba limpia).
+    get foco() { return Math.max(estadoP.foco * directores.pulsar.peso, estadoC.foco * directores.cuasar.peso, estadoD.foco * directores.deneb.peso, 0.85 * cercaDeneb); },
     // Las nebulosas lejanas se apagan en la escena de Deneb (nace de la nada: delante de un cielo casi negro).
-    get focoNubes() { return estadoD.nubes * directores.deneb.peso; },
+    get focoNubes() { return Math.max(estadoD.nubes * directores.deneb.peso, 0.85 * cercaDeneb); },
     get animando() { for (const k in directores) { const d = directores[k]; if (d.activa || (d.visible && !d.terminada)) return true; } return false; },
     // Para las pruebas y el diagnóstico: segundo, peso y estado de cada una.
     estado(id) { const d = directores[id]; return d ? { activa: d.activa, terminada: d.terminada, segundo: d.segundo, peso: d.peso, ...(id === 'pulsar' ? estadoP : id === 'cuasar' ? estadoC : estadoD) } : null; }
@@ -562,6 +568,7 @@ export function* construirCosmos({ uScale, uPR }) {
       // De lejos (desde casa está a unas 8 veces su distancia de llegada) se ve como antes: un punto deslumbrante con su
       // disco pequeño (radio 30), no una luna; al acercarse (de 6 a 2,5 veces la llegada) crece hasta su tamaño de verdad.
       const lejosLlegada = camara.distanceTo(gruposEstrella.Deneb.position) / (450 * ESCALA_DENEB);
+      cercaDeneb = 1 - THREE.MathUtils.smoothstep(lejosLlegada, 3, 6);
       denebCerca.marco.scale.setScalar(Math.max(wD > 0 ? 1 : 0, 0.3 + 0.7 * (1 - THREE.MathUtils.smoothstep(lejosLlegada, 2.5, 6))));
       denebCerca.actualizar(estadoD, normalD, wD, dt, t, reducido, camera.position);
       // Cuásar: en su escena su gas se calma (tiempo propio, acumulado) y se va encendiendo con la historia.

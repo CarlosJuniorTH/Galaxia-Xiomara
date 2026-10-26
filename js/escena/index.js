@@ -149,7 +149,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // La telaraña cósmica: filamentos y cúmulos de galaxias por todo el universo (se ve desde cualquier destino).
   await ceder();
   const telarana = await capaPorPasos('telarana', async () => crearTelaranaCosmica(nucleo, await datosTelarana));
-  telarana.fijarGigantes(cosmos.cuerpos().filter(c => c.id !== 'xiomara').map(c => ({ centro: c.centro, radio: c.visible })));
+  // También Deneb (no está entre los cuerpos de navegación): la telaraña que queda detrás de su estrella no se ve encima.
+  telarana.fijarGigantes([...cosmos.cuerpos().filter(c => c.id !== 'xiomara').map(c => ({ centro: c.centro, radio: c.visible })), { centro: cosmos.objetivo('deneb').centro, radio: cosmos.medidas().deneb.estrella * 1.15 }]);
   // Maravillas: rincones impresionantes (el Ojo, la enana de las burbujas, la espiral de hebras, la nube de fuego).
   await ceder();
   const maravillas = await capaPorPasos('maravillas', () => porTramos(construirMaravillas({ ...nucleo, texBrillo: texBrillo(), centros: Object.fromEntries(['supernova', 'cuasar', 'ton618'].map(id => [id, cosmos.cuerpos().find(c => c.id === id).centro])) })));
