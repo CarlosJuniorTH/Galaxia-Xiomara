@@ -258,27 +258,39 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
     const zx = (ci + 0.5) * C, zy = (cj + 0.5) * C, zz = (ck + 0.5) * C;
     let alguna = false; for (const m of muestras) { const dx = m.p.x - zx, dy = m.p.y - zy, dz = m.p.z - zz, lim = C * 2.2 + m.g * 2; if (dx * dx + dy * dy + dz * dz < lim * lim) { alguna = true; break; } }
     if (!alguna && !cercano.geometry.attributes.position?.count) return;
-    const lista = [], centroZona = new V(zx, zy, zz);
-    const cerca = muestras.filter(m => m.p.distanceTo(centroZona) < C * 2.2 + m.g * 2);
+    // Rehacerlo eran decenas de miles de galaxias (con memoria nueva por cada una) en un solo cuadro: en pleno viaje, al
+    // cruzar la telaraña, un tirón cada vez que se cambiaba de celda. Ahora se calcula a trozos en los cuadros siguientes
+    // (≈1,5 ms por cuadro, sin memoria nueva por galaxia) y la geometría se cambia cuando está entera. Las mismas galaxias.
+    trabajoCercano = generarCercano(ci, cj, ck, zx, zy, zz);
+  }
+  let trabajoCercano = null;
+  function* generarCercano(ci, cj, ck, zx, zy, zz) {
+    const cerca = muestras.filter(m => { const dx = m.p.x - zx, dy = m.p.y - zy, dz = m.p.z - zz, lim = C * 2.2 + m.g * 2; return dx * dx + dy * dy + dz * dz < lim * lim; });
+    const pos = [], col = [], tam = []; let paso = 0;
     for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let c = -1; c <= 1; c++) {
       const x0 = (ci + a) * C, y0 = (cj + b) * C, z0 = (ck + c) * C, rnd = generador(semillaDe(`celda-${ci + a},${cj + b},${ck + c}`));
       for (const m of cerca) {
         // Cuántas caen en esta celda alrededor de esta muestra (más en los cúmulos).
+        const s = m.g * 0.55;
         for (let i = 0, n = Math.round(240 * m.n * K); i < n; i++) {
-          // En números sueltos (antes dos vectores nuevos por galaxia: miles de objetos en cada rehecho, en pleno clip).
-          const s = m.g * 0.55, gx = gauss(rnd), gy = gauss(rnd), gz = gauss(rnd), px = m.p.x + gx * s, py = m.p.y + gy * s, pz = m.p.z + gz * s;
-          if (px < x0 || px >= x0 + C || py < y0 || py >= y0 + C || pz < z0 || pz >= z0 + C) continue;
-          const k = galaxiaColor(rnd); lista.push(px - O.x, py - O.y, pz - O.z, k.r, k.g, k.b, 0.35 + rnd() * 0.75);
+          if ((++paso & 255) === 0) yield;
+          const x = m.p.x + gauss(rnd) * s, y = m.p.y + gauss(rnd) * s, z = m.p.z + gauss(rnd) * s;
+          if (x < x0 || x >= x0 + C || y < y0 || y >= y0 + C || z < z0 || z >= z0 + C) continue;
+          const k = galaxiaColor(rnd);
+          pos.push(x - O.x, y - O.y, z - O.z); col.push(k.r, k.g, k.b); tam.push(0.35 + rnd() * 0.75);
         }
       }
     }
     // Lejos de la telaraña (en los gigantes, al girar la cámara cambia de celda en cada cuadro) la lista sale vacía: no se
     // rehace la geometría vacía una y otra vez (creaba y borraba búferes de la GPU en cada cuadro).
-    if (!lista.length && !cercano.geometry.attributes.position?.count) return;
-    const n = lista.length / 7, pos = new Float32Array(n * 3), c = new Float32Array(n * 3), br = new Float32Array(n);
-    for (let i = 0; i < n; i++) { const j = i * 7; pos[i * 3] = lista[j]; pos[i * 3 + 1] = lista[j + 1]; pos[i * 3 + 2] = lista[j + 2]; c[i * 3] = lista[j + 3]; c[i * 3 + 1] = lista[j + 4]; c[i * 3 + 2] = lista[j + 5]; br[i] = lista[j + 6]; }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aCol', new THREE.BufferAttribute(c, 3)); g.setAttribute('aBrillo', new THREE.BufferAttribute(br, 1));
+    if (!pos.length && !cercano.geometry.attributes.position?.count) return;
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3)); g.setAttribute('aCol', new THREE.BufferAttribute(new Float32Array(col), 3)); g.setAttribute('aBrillo', new THREE.BufferAttribute(new Float32Array(tam), 1));
     cercano.geometry.dispose(); cercano.geometry = g;
+  }
+  function avanzarCercano() {
+    if (!trabajoCercano) return;
+    const t0 = performance.now();
+    while (performance.now() - t0 < 1.5) if (trabajoCercano.next().done) { trabajoCercano = null; return; }
   }
   // Toda la telaraña es fija: sus matrices se calculan una vez y no se recorren en cada cuadro (menos CPU en el móvil).
   raiz.updateMatrixWorld(true); raiz.matrixWorldAutoUpdate = false;
@@ -336,7 +348,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
       uniformes.uCasa.value = luzCasa * expoAuto * penumbra;
       const pr = uPR.value; uniformes.uRes.value.set(vista.ancho * pr * 0.5, vista.alto * pr * 0.5);
       uniformes.uF.value = vista.alto / (2 * Math.tan(camera.fov * Math.PI / 360));
-      rehacerCercano(camera.position);
+      rehacerCercano(camera.position); avanzarCercano();
       // Ocultación por los gigantes: lo que solo depende de la cámara, una vez por cuadro (ver OCULTO).
       bloquesGalaxias.updateWorldMatrix(true, false); const cam = bloquesGalaxias.worldToLocal(uniformes.uCamL.value.copy(camera.position));
       for (let i = 0; i < 6; i++) {
