@@ -141,6 +141,23 @@ def candidato_listo(cancion: Path, nombre: str) -> bool:
     return (d / 'instrumental.wav').exists() and (d / 'vocals.wav').exists()
 
 
+_ganancias = {}
+def leer_candidato(cancion: Path, nombre: str, pista='instrumental', a=0, b=None) -> np.ndarray:
+    """Lee una pista de un candidato de la caché. Los de separar-candidatos.py (con info.json) ya tienen la ganancia
+    corregida; los antiguos (bsrof1297, melinst2… de separar-instrumental.py) salen del separador normalizados a pico 0,9
+    (−2,6 dB en «Sparks»): se corrigen aquí con la misma ganancia de mínimos cuadrados, para medirlos en igualdad."""
+    d = ruta_candidato(cancion, nombre)
+    x = leer(d / f'{pista}.wav')
+    if not (d / 'info.json').exists():
+        clave = (str(cancion), nombre)
+        if clave not in _ganancias:
+            m = leer(decodificar(cancion)); i = x if pista == 'instrumental' else leer(d / 'instrumental.wav')
+            v = x if pista == 'vocals' else leer(d / 'vocals.wav')
+            _ganancias[clave] = ganancia(m, i, v)
+        x = x * _ganancias[clave]
+    return x[a:b]
+
+
 def candidatos_de(cancion: Path):
     base = carpeta(cancion)
     if not base.exists(): return []

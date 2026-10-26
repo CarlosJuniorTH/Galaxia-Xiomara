@@ -13,10 +13,11 @@ ap = argparse.ArgumentParser()
 ap.add_argument('--top', type=int, default=3)
 ap.add_argument('--segundos', type=float, default=40)
 ap.add_argument('--semilla', type=int, default=7)
+ap.add_argument('--destino', default=None, help='carpeta de salida (por defecto .pruebas/escucha); p. ej. una que sirva el servidor LAN')
 A = ap.parse_args()
 
 res = json.loads((RAIZ / '.pruebas' / 'separaciones' / 'comparacion.json').read_text(encoding='utf-8'))
-DEST = RAIZ / '.pruebas' / 'escucha'; (DEST / 'audio').mkdir(parents=True, exist_ok=True)
+DEST = Path(A.destino).resolve() if A.destino else RAIZ / '.pruebas' / 'escucha'; (DEST / 'audio').mkdir(parents=True, exist_ok=True)
 rnd = random.Random(A.semilla)
 secciones, solucion = [], {}
 
@@ -25,7 +26,10 @@ for lugar, r in res.items():
     elegidos = list(dict.fromkeys(r['ranking'][:A.top] + ([r['actual']] if r['actual'] in r['candidatos'] else [])))
     rnd.shuffle(elegidos)
     # el fragmento empieza un poco antes del primer momento difícil y dura A.segundos
-    ini = max(r['tramo'][0], (r['momentos'] or [r['tramo'][0]])[0] - 3)
+    # (en tramos largos los momentos pueden estar a más de A.segundos: se elige la ventana que abarca más)
+    opciones = [max(r['tramo'][0], t - 3) for t in (r['momentos'] or [r['tramo'][0]])]
+    ini = max(opciones, key=lambda o: (sum(0 <= t - o < A.segundos for t in r['momentos']), -o))
+    ini = max(r['tramo'][0], min(ini, r['tramo'][1] - A.segundos))
     marcas = [round(t - ini, 1) for t in r['momentos'] if 0 <= t - ini < A.segundos]
     # el original con voz, como referencia de cómo debe sonar el instrumental
     filas = []
@@ -38,10 +42,10 @@ for lugar, r in res.items():
         subprocess.run(['ffmpeg', '-v', 'error', '-y', '-ss', str(ini), '-t', str(A.segundos), '-i', str(ruta_candidato(c, cand) / 'instrumental.wav'),
                         '-af', 'loudnorm=I=-20:TP=-1.5', '-ar', str(SR), '-c:a', 'aac', '-b:a', '192k', str(out)], check=True)
         botones = ''.join(f'<button data-t="{t}">▶ {t:.0f}s</button>' for t in marcas)
-        filas.append(f'<div class="fila"><b>{letra}</b><audio controls preload="none" src="audio/{out.name}"></audio>{botones}'
+        filas.append(f'<div class="fila"><b>{letra}</b><audio controls preload="none" data-src="audio/{out.name}"></audio>{botones}'
                      f'<span class="rev" data-k="{lugar}-{letra}"></span></div>')
     secciones.append(f'<section><h2>{html.escape(lugar)}</h2><p class="nota">{html.escape(r["cancion"])} · desde {ini:.1f}s · '
-                     f'original con voz: <audio controls preload="none" src="audio/{ref.name}"></audio></p>{"".join(filas)}</section>')
+                     f'original con voz: <audio controls preload="none" data-src="audio/{ref.name}"></audio></p>{"".join(filas)}</section>')
 
 (DEST / 'index.html').write_text(f'''<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Escucha a ciegas</title>
@@ -60,6 +64,9 @@ audio{{height:34px;max-width:100%}} button{{background:none;border:1px solid var
 <p><button id="revelar">Revelar nombres</button></p>
 <script>
 const S={json.dumps(solucion)};
+// Los audios se cargan enteros como blob: así se puede saltar a cualquier segundo aunque el servidor no admita Range
+// (el servidor LAN es SimpleHTTPRequestHandler; Safari en iPhone no reproduce m4a sin Range si no es blob).
+(async()=>{{for(const a of document.querySelectorAll('audio[data-src]')){{try{{const r=await fetch(a.dataset.src);if(!r.ok)throw 0;a.src=URL.createObjectURL(await r.blob());}}catch(e){{a.src=a.dataset.src;}}}}}})();
 document.querySelectorAll('.fila button').forEach(b=>b.onclick=()=>{{const a=b.parentElement.querySelector('audio');document.querySelectorAll('audio').forEach(x=>x!==a&&x.pause());a.currentTime=+b.dataset.t;a.play();}});
 document.getElementById('revelar').onclick=()=>document.querySelectorAll('.rev').forEach(s=>s.textContent=S[s.dataset.k]);
 </script></html>''', encoding='utf-8')

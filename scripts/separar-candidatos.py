@@ -24,7 +24,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from separacion_comun import (RAIZ, SR, planes, ruta_cancion, carpeta, decodificar, leer, escribir, ganancia,
-                              ensemble, ruta_candidato, candidato_listo, candidatos_de, guardar_json, igualar)
+                              ensemble, ruta_candidato, candidato_listo, candidatos_de, guardar_json, igualar, leer_candidato)
 
 # Modelos sueltos (nombre corto → archivo de audio-separator). Puntuaciones de referencia (SDR instrumental, dB):
 # viperx 1297 16,45 · Inst V2 16,06 (tabla de audio-separator) · Resurrection 17,25 · becruily 17,55 (Multisong).
@@ -51,6 +51,7 @@ ENSEMBLES = {
     'ens-res-bec-min': (['resurrection-inst', 'becruily-inst'], 'min_spec'),
     'ens-res-gbx-bec-avg': (['resurrection-inst', 'gabox-bs-voc', 'becruily-inst'], 'avg_wave'),
 }
+REINTENTOS_MEMORIA = 20
 MDXC = {'segment_size': 256, 'override_model_segment_size': False, 'batch_size': 1, 'overlap': 8, 'pitch_shift': 0}
 
 
@@ -58,7 +59,7 @@ def presets():
     try:
         from importlib import resources
         datos = json.loads(resources.files('audio_separator').joinpath('ensemble_presets.json').read_text(encoding='utf-8'))
-        return {k: (v['models'], v['algorithm']) for k, v in datos['presets'].items() if k.startswith('instrumental')}
+        return {k: (v['models'], v['algorithm']) for k, v in datos['presets'].items() if k in PRESETS_RESPALDO}   # clean, full, balanced (no low_resource: lleva un MDX .onnx)
     except Exception:
         return PRESETS_RESPALDO
 
@@ -79,6 +80,18 @@ def cargar_corregido(cancion: Path, inst_ruta, voz_ruta):
     return i * g, g
 
 
+def esperar_memoria_gpu(minimo_mb=2000, maximo_s=1800):
+    """Espera (hasta maximo_s) a que la GPU compartida tenga minimo_mb libres antes de cargar un modelo."""
+    try:
+        import torch
+        if not torch.cuda.is_available(): return
+        t0 = time.time()
+        while torch.cuda.mem_get_info()[0] / 2 ** 20 < minimo_mb and time.time() - t0 < maximo_s:
+            print(f'   (GPU con {torch.cuda.mem_get_info()[0] / 2 ** 20:.0f} MB libres; espero)', flush=True); time.sleep(30)
+    except Exception:
+        pass
+
+
 _separador = {}
 def separador(dir_modelos: Path, salida: Path):
     from audio_separator.separator import Separator
@@ -97,12 +110,25 @@ def separar_suelto(cancion: Path, nombre: str, archivo: str, dir_modelos: Path):
     entrada = decodificar(cancion)
     with tempfile.TemporaryDirectory(dir=carpeta(cancion)) as tmp:
         tmp = Path(tmp)
-        try:
-            s = separador(dir_modelos, tmp); t = time.time()
-            s.load_model(model_filename=archivo)
-            salida = [Path(f) if Path(f).is_absolute() else tmp / Path(f).name for f in s.separate(str(entrada))]
-        except Exception as e:
-            print(f'   {nombre}: NO se pudo ({type(e).__name__}: {e})'); return False
+        # La GPU se comparte (navegadores de pruebas, otros procesos): si no hay memoria, se espera y se reintenta
+        # en lugar de dar el modelo por «no disponible».
+        for intento in range(1, REINTENTOS_MEMORIA + 1):
+            esperar_memoria_gpu()
+            try:
+                s = separador(dir_modelos, tmp); t = time.time()
+                s.load_model(model_filename=archivo)
+                salida = [Path(f) if Path(f).is_absolute() else tmp / Path(f).name for f in s.separate(str(entrada))]
+                break
+            except (Exception, SystemExit) as e:
+                # audio-separator hace sys.exit(1) si no puede cargar el modelo (p. ej. sin memoria en la GPU)
+                sin_memoria = 'out of memory' in str(e).lower() or isinstance(e, SystemExit)
+                _separador.clear()
+                try:
+                    import torch; torch.cuda.empty_cache()
+                except Exception: pass
+                if sin_memoria and intento < REINTENTOS_MEMORIA:
+                    print(f'   {nombre}: GPU sin memoria, reintento {intento} en 30 s', flush=True); time.sleep(30); continue
+                print(f'   {nombre}: NO se pudo ({type(e).__name__}: {str(e)[:300]})'); return False
         inst = [f for f in salida if any(k in f.name.lower() for k in ('(instrumental)', '(no_vocals)', '(other)'))]
         voz = [f for f in salida if '(vocals)' in f.name.lower()]
         if not inst or not voz: print(f'   {nombre}: salida inesperada {[f.name for f in salida]}'); return False
@@ -116,7 +142,7 @@ def hacer_ensemble(cancion: Path, nombre: str, partes, metodo):
     if candidato_listo(cancion, nombre): print(f'   {nombre}: ya está'); return
     falta = [p for p in partes if not candidato_listo(cancion, p)]
     if falta: print(f'   {nombre}: faltan {falta}, se salta'); return
-    insts = [leer(ruta_candidato(cancion, p) / 'instrumental.wav') for p in partes]
+    insts = [leer_candidato(cancion, p) for p in partes]   # (los antiguos, con su ganancia corregida)
     guardar_candidato(cancion, nombre, ensemble(insts, metodo), dict(tipo='ensemble', partes=partes, metodo=metodo))
     print(f'   {nombre}: {metodo} de {"+".join(partes)}', flush=True)
 

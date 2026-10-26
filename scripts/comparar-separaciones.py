@@ -21,7 +21,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from separacion_comun import (RAIZ, SR, ORIGINALES, planes, ruta_cancion, carpeta, decodificar, leer, escribir, igualar,
-                              sdr, db, rms_frames, ensemble, ruta_candidato, candidatos_de, guardar_json)
+                              sdr, db, rms_frames, ensemble, ruta_candidato, candidatos_de, guardar_json, leer_candidato)
 
 PRUEBAS = ORIGINALES / '.pruebas-sdr'
 SALIDA = RAIZ / '.pruebas' / 'separaciones'
@@ -35,7 +35,7 @@ def voz_referencia(cancion: Path, a=0, b=None):
     disp = [c for c in REFERENCIAS if (ruta_candidato(cancion, c) / 'vocals.wav').exists()]
     if not disp: disp = candidatos_de(cancion)[:3]
     if not disp: raise RuntimeError(f'{cancion.name}: no hay separaciones; ejecuta antes separar-candidatos.py')
-    voces = [leer(ruta_candidato(cancion, c) / 'vocals.wav')[a:b] for c in disp[:4]]
+    voces = [leer_candidato(cancion, c, 'vocals', a, b) for c in disp[:4]]
     return ensemble(voces, 'min_spec') if len(voces) > 1 else voces[0], disp[:4]
 
 
@@ -67,10 +67,13 @@ def preparar(A):
         # sin voz: la voz de referencia 30 dB por debajo de la mezcla o de lo que suena la voz cuando canta
         sin_voz = (rv < rm - 30) | (rv < np.percentile(rv, 95) - 30)
         sin_voz &= rm > np.median(rm) - 20                # que el instrumental suene (no silencios ni fundidos)
-        tramos = zonas(sin_voz, A.duracion)
-        if not tramos: print(f'{nombre}: no tiene {A.duracion:.0f} s seguidos sin voz; se salta'); continue
-        # voz: la ventana de A.duracion con más voz
-        n = int(A.duracion * SR); e = np.convolve(10 ** (rv / 10), np.ones(int(A.duracion / HOP)), 'valid')
+        dur = A.duracion; tramos = zonas(sin_voz, dur)
+        if not tramos and A.duracion_minima < dur:   # canciones sin 10 s seguidos sin voz: tramos más cortos
+            dur = A.duracion_minima; tramos = zonas(sin_voz, dur)
+            if tramos: print(f'{nombre}: no tiene {A.duracion:.0f} s seguidos sin voz; uso tramos de {dur:.0f} s')
+        if not tramos: print(f'{nombre}: no tiene {dur:.0f} s seguidos sin voz; se salta'); continue
+        # voz: la ventana de dur con más voz
+        n = int(dur * SR); e = np.convolve(10 ** (rv / 10), np.ones(int(dur / HOP)), 'valid')
         k0 = int(np.argmax(e) * HOP * SR); voz = v[k0:k0 + n]
         for j, (i0, i1) in enumerate(tramos[:A.max_tramos]):
             verdad = m[i0:i0 + n]
@@ -80,7 +83,7 @@ def preparar(A):
             if pico > 0.99: mezcla *= 0.99 / pico; verdad = verdad * 0.99 / pico
             base = f'{nombre}-{j}'
             escribir(PRUEBAS / f'{base}.wav', mezcla); escribir(PRUEBAS / 'verdad' / f'{base}.wav', verdad)
-            indice[base] = dict(cancion=nombre, instrumental_desde=round(i0 / SR, 2), voz_desde=round(k0 / SR, 2), referencias=refs)
+            indice[base] = dict(cancion=nombre, duracion=dur, instrumental_desde=round(i0 / SR, 2), voz_desde=round(k0 / SR, 2), referencias=refs)
             print(f'{base}: instrumental {i0 / SR:.1f}s + voz {k0 / SR:.1f}s')
     guardar_json(PRUEBAS / 'indice.json', indice)
     print(f'\nAhora: python scripts/separar-candidatos.py --archivos "{PRUEBAS / "*.wav"}"')
@@ -125,7 +128,8 @@ def palabras_whisper(wav_tramo: np.ndarray, idioma=None):
     sf.write(ruta, wav_tramo.mean(1).astype(np.float32), SR)
     segs, _ = _whisper['m'].transcribe(ruta, language=idioma, vad_filter=True, word_timestamps=True,
                                        condition_on_previous_text=False, no_speech_threshold=0.6)
-    pal = [(round(w.start, 1), w.word.strip()) for s in segs for w in (s.words or []) if w.probability > 0.5]
+    # solo los segundos (del tramo) de cada palabra reconocida, nunca el texto: las letras tienen derechos de autor
+    pal = [round(w.start, 1) for s in segs for w in (s.words or []) if w.probability > 0.5]
     Path(ruta).unlink(missing_ok=True)
     return pal
 
@@ -135,6 +139,8 @@ def momentos_dificiles(rv, a, n=3, separacion=8):
     orden = np.argsort(rv)[::-1]; elegidos = []
     for k in orden:
         t = k * HOP
+        # todos a menos de ±17 s del más fuerte: caben en el fragmento de 40 s de la escucha a ciegas
+        if elegidos and abs(t - elegidos[0]) > 17: continue
         if all(abs(t - e) >= separacion for e in elegidos): elegidos.append(t)
         if len(elegidos) == n: break
     return [round(float(a / SR + max(0, t - 2)), 1) for t in sorted(elegidos)]
@@ -144,6 +150,8 @@ def medir(A):
     pl = planes(); lugares = A.lugares or list(pl)
     indice_sdr = json.loads((PRUEBAS / 'indice.json').read_text(encoding='utf-8')) if (PRUEBAS / 'indice.json').exists() else {}
     res = {}
+    ruta_cache = SALIDA / 'whisper-cache.json'
+    cache_whisper = json.loads(ruta_cache.read_text(encoding='utf-8')) if ruta_cache.exists() else {}
     for lugar in lugares:
         p = pl[lugar]; c = ruta_cancion(p['cancion']); m = leer(decodificar(c))
         a = int(p['desde'] * SR); b = int(p['hasta'] * SR) if p.get('hasta') else len(m)
@@ -155,7 +163,7 @@ def medir(A):
         bm = bandas_db(mt[:len(quietas_muestras)][quietas_muestras]) if quietos.sum() > 20 else None
         filas = {}
         for cand in candidatos_de(c):
-            inst = leer(ruta_candidato(c, cand) / 'instrumental.wav')[a:b]
+            inst = leer_candidato(c, cand, 'instrumental', a, b)
             fila = dict(fuga_db=fuga(inst, vr, activos, ventana))
             if bm is not None:
                 bi = bandas_db(inst[:len(quietas_muestras)][quietas_muestras[:len(inst)]])
@@ -165,12 +173,18 @@ def medir(A):
             for base, info in indice_sdr.items():
                 if info['cancion'] != p['cancion']: continue
                 mezcla = PRUEBAS / f'{base}.wav'; est = ruta_candidato(mezcla, cand) / 'instrumental.wav'
+                if cand == 'ensamble' and not est.exists():   # el actual: en las mezclas es ens-actual (la misma media)
+                    est = ruta_candidato(mezcla, 'ens-actual') / 'instrumental.wav'
                 if not est.exists(): continue
                 ver = leer(PRUEBAS / 'verdad' / f'{base}.wav'); e = leer(est)
                 s.append(sdr(ver, e)); x, y = perdida_sobrante(*igualar(ver, e)); per.append(x); sob.append(y)
             if s: fila.update(sdr=round(float(np.mean(s)), 2), perdida_db=round(float(np.mean(per)), 1), sobrante_db=round(float(np.mean(sob)), 1))
             if A.whisper:
-                pal = palabras_whisper(inst, A.idioma); fila['whisper'] = len(pal); fila['whisper_palabras'] = pal[:20]
+                # caché por candidato y tramo (la separación no cambia: se puede volver a medir tras añadir candidatos)
+                wav = ruta_candidato(c, cand) / 'instrumental.wav'
+                clave = f'{wav}|{wav.stat().st_mtime_ns}|{a}|{b}|{A.idioma}'
+                if clave not in cache_whisper: cache_whisper[clave] = palabras_whisper(inst, A.idioma)
+                pal = cache_whisper[clave]; fila['whisper'] = len(pal); fila['whisper_segundos'] = pal[:20]
             if fila['fuga_db'] is not None: fila['fuga_db'] = round(fila['fuga_db'], 1)
             filas[cand] = fila
         # ranking: 0 palabras (si se midió) → SDR → menos fuga
@@ -182,6 +196,7 @@ def medir(A):
                           momentos=momentos_dificiles(rv, a), candidatos=filas, ranking=ranking,
                           actual=p.get('separacion', 'ensamble'))
         print(f'● {lugar}: mejor → {ranking[:3]}', flush=True)
+        if A.whisper: guardar_json(ruta_cache, cache_whisper)
     guardar_json(SALIDA / 'comparacion.json', res)
     (SALIDA / 'comparacion.md').write_text(tabla_md(res), encoding='utf-8')
     print(f'→ {SALIDA / "comparacion.md"}')
@@ -203,7 +218,7 @@ def tabla_md(res):
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(); sub = ap.add_subparsers(dest='orden', required=True)
-    pp = sub.add_parser('preparar'); pp.add_argument('--duracion', type=float, default=10); pp.add_argument('--max-tramos', type=int, default=2)
+    pp = sub.add_parser('preparar'); pp.add_argument('--duracion', type=float, default=10); pp.add_argument('--duracion-minima', type=float, default=6); pp.add_argument('--max-tramos', type=int, default=2)
     pm = sub.add_parser('medir'); pm.add_argument('--lugares', nargs='*'); pm.add_argument('--whisper', action='store_true'); pm.add_argument('--idioma', default=None)
     A = ap.parse_args()
     preparar(A) if A.orden == 'preparar' else medir(A)
