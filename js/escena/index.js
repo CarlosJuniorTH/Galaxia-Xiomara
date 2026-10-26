@@ -10,7 +10,7 @@ import { construirViaLactea } from './viaLactea.js';
 import { construirGalaxia, enBrazo } from './galaxia.js';
 import { construirSolar } from './solar.js';
 import { crearMarcaSolar, ESCALA_MARCA } from './marcaSolar.js';
-import { texBrillo, texDestello, texTexto, texEstrellaGigante } from './texturas.js';
+import { texBrillo, texDestello, texTexto, texEstrellaGigante, texEstrellaNitida } from './texturas.js';
 import { crearAgujeroNegro } from './agujeroNegro.js';
 import { crearCorazon } from './corazon.js';
 import { crearNombre } from './nombre.js';
@@ -197,7 +197,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // un gran lucero rosado con sus destellos (unos 3,5° de cielo); al acercarse, su brillo se recoge y
   // queda la estrella de verdad.
   const faroEstrella = new THREE.Group(); faroEstrella.userData.capa = 'faroEstrella'; scene.add(faroEstrella);
-  const faroRayos = new THREE.Sprite(new THREE.SpriteMaterial({ map: texEstrellaGigante(), color: '#ffc2b0', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+  const faroRayos = new THREE.Sprite(new THREE.SpriteMaterial({ map: texEstrellaNitida(), color: '#ffc8b8', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));   // núcleo y cruz nítidos, sin halo
   const faroHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: texBrillo(), color: '#ff7a8f', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
   faroRayos.renderOrder = faroHalo.renderOrder = -2; faroEstrella.add(faroHalo, faroRayos);
   let escenaActiva = 'principal', solarPreparado = false;
@@ -1291,7 +1291,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       const d = Math.max(1, c.distanceTo(camera.position)), pxEstrella = RADIO_ESTRELLA / d * f, estable = sn.estado === 'estable' || sn.estado === 'inestable';
       const kFaro = estable ? 1 - THREE.MathUtils.smoothstep(pxEstrella, 6, 40) : 0;
       faroEstrella.visible = kFaro > 0.003;
-      if (faroEstrella.visible) { faroEstrella.position.copy(c); const lat = 1 + Math.sin(tiempo * 1.3) * 0.05; faroRayos.scale.setScalar(d * 0.16 * lat); faroHalo.scale.setScalar(d * 0.09); faroRayos.material.opacity = kFaro; faroHalo.material.opacity = 0.55 * kFaro; }
+      if (faroEstrella.visible) { faroEstrella.position.copy(c); const lat = 1 + Math.sin(tiempo * 1.3) * 0.05; faroRayos.scale.setScalar(d * 0.16 * lat); faroHalo.scale.setScalar(d * 0.09); faroRayos.material.opacity = kFaro; faroHalo.material.opacity = 0; faroHalo.visible = false; }   // (sin el halo difuso de antes)
     }
     // Las marcas de casa (el sistema solar) son interfaz de casa: lejos de Xiomara no se dibujan.
     marcaSolar.visible = camera.position.length() < 20000;

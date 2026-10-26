@@ -219,6 +219,23 @@ export function texFlorRedonda() {
 
 // Estrella brillante con destellos de difracción: cuatro largos y cuatro cortos, y halo.
 let gigantaCompartida;
+// Estrella lejana nítida (el faro de la supernova antes de estallar): un núcleo de borde duro y una cruz de rayos finos,
+// sin resplandor alrededor (nada de halo difuso).
+let farolCompartido = null;
+export function texEstrellaNitida() {
+  if (farolCompartido) return farolCompartido;
+  const S = 256, [c, x] = lienzoLuz(S), m = S / 2;
+  x.globalCompositeOperation = 'lighter';
+  x.fillStyle = 'rgba(255,255,255,1)'; x.beginPath(); x.arc(m, m, S * 0.022, 0, Math.PI * 2); x.fill();   // núcleo
+  const rayo = (largo, ancho, ang, a) => {
+    x.save(); x.translate(m, m); x.rotate(ang);
+    const l = x.createLinearGradient(-largo, 0, largo, 0);
+    l.addColorStop(0, 'rgba(255,255,255,0)'); l.addColorStop(0.5, `rgba(255,255,255,${a})`); l.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = l; x.beginPath(); x.moveTo(-largo, 0); x.lineTo(0, -ancho); x.lineTo(largo, 0); x.lineTo(0, ancho); x.fill(); x.restore();
+  };
+  rayo(m * 0.9, 1.4, 0, 0.9); rayo(m * 0.9, 1.4, Math.PI / 2, 0.9);
+  return (farolCompartido = aTextura(c));
+}
 export function texEstrellaGigante() {
   if (gigantaCompartida) return gigantaCompartida;
   const S = 256, [c, x] = lienzoLuz(S), m = S / 2;
