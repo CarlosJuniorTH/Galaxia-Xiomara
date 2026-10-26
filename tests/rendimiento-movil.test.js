@@ -18,13 +18,24 @@ test('a 25 FPS (la tarjeta gráfica no llega) la resolución baja enseguida y a 
   assert.equal(agotado, 1, 'en el mínimo y aún lento: avisa para aligerar');
 });
 
-test('si bajar la resolución no acelera (el procesador no llega), vuelve a la de antes y no insiste ni aligera', () => {
-  let agotado = 0;
-  const registrar = crearReguladorResolucion({ minimo: 1, maximo: 3, inicial: 2, alAgotar: () => agotado++ });
+test('si lo que pesa no son los píxeles (vértices), deshace la bajada y prueba a aligerar, que sí acelera', () => {
+  let escalon = 0, res = 2;
+  const registrar = crearReguladorResolucion({ minimo: 1, maximo: 3, inicial: 2, alAgotar: () => { if (escalon >= 4) return false; escalon++; return true; }, alRecuperar: () => { if (!escalon) return false; escalon--; return true; } });
+  const paso = () => { const r = ventana(ms => registrar(ms), 40 - escalon * 8); if (r !== null) res = r; return r; };
+  assert.equal(paso(), 1.5); assert.equal(paso(), 2, 'la resolución no ayudó: vuelve');
+  assert.equal(paso(), null); assert.equal(escalon, 1, 'prueba un escalón de aligerar');
+  paso(); assert.equal(escalon, 2, 'ayudó (40 → 32 ms): se queda y sigue');
+  assert.equal(res, 2, 'la nitidez se conserva');
+});
+
+test('si nada acelera (el procesador no llega), vuelve a la nitidez y a los efectos de antes y no insiste', () => {
+  let escalon = 0, intentos = 0;
+  const registrar = crearReguladorResolucion({ minimo: 1, maximo: 3, inicial: 2, alAgotar: () => { intentos++; escalon++; return true; }, alRecuperar: () => { if (!escalon) return false; escalon--; return true; } });
   assert.equal(ventana(registrar, 39), 1.5, 'lo intenta una vez');
   assert.equal(ventana(registrar, 39), 2, 'no sirvió: vuelve a la nitidez de antes');
-  for (let i = 0; i < 10; i++) assert.equal(ventana(registrar, 39), null, 'no lo reintenta enseguida');
-  assert.equal(agotado, 0, 'tampoco aligera (no aliviaría al procesador)');
+  for (let i = 0; i < 10; i++) assert.equal(ventana(registrar, 39), null, 'la resolución no se reintenta enseguida');
+  assert.equal(intentos, 1, 'prueba aligerar una sola vez');
+  assert.equal(escalon, 0, 'y como tampoco sirvió, lo devuelve');
 });
 
 test('a 45 FPS baja un cuarto en una sola ventana (la mediana ignora un tirón aislado)', () => {

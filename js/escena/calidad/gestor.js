@@ -19,10 +19,13 @@ export function crearGestorCalidad({ canvas, nucleo, telarana, muestrasNube }) {
     [() => telarana.fijarMuestra(telarana.muestraInicial * 0.65), () => telarana.fijarMuestra(telarana.muestraInicial)]
   ];
   let aligerado = 0;
-  const aligerar = () => { if (aligerado >= ESCALONES.length) return; ESCALONES[aligerado][0](); aligerado++; canvas.dataset.aligerado = String(aligerado); };
+  const aligerar = () => { if (aligerado >= ESCALONES.length) return false; ESCALONES[aligerado][0](); aligerado++; canvas.dataset.aligerado = String(aligerado); return true; };
   const recuperar = () => { if (!aligerado) return false; aligerado--; ESCALONES[aligerado][1](); canvas.dataset.aligerado = String(aligerado); return true; };
   const regular = crearReguladorResolucion({ minimo: esMovil ? Math.min(1.5, nucleo.resolucion) : 1, maximo: nucleo.prTope,   // lo reservado (nucleo.js): subir hasta ahí no rehace nada
-    inicial: nucleo.resolucion, alAgotar: aligerar, alRecuperar: recuperar });
+    inicial: nucleo.resolucion, alAgotar: aligerar, alRecuperar: recuperar,
+    // Reacción en ~1 s (antes 1,5 s por ventana y 9 s para subir): con el equipo cargado por otros programas la imagen se
+    // ajusta enseguida, y cuando se libera recupera la nitidez en ~4 s (la mediana sigue ignorando un tirón suelto).
+    ventanaMs: 1000, ventanasParaSubir: 4 });
   // (El cambio de resolución ya no rehace búferes, zona.js: se aplica en el acto.)
   let resolucionPendiente = null;
   function regularResolucion(ms) { const nueva = regular(ms); if (nueva !== null) resolucionPendiente = nueva; aplicarResolucionPendiente(); }

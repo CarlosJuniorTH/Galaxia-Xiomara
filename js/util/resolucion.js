@@ -11,15 +11,18 @@
 //    alRecuperar los devuelve uno a uno antes de volver a subir la resolución (el teléfono se ha enfriado).
 //  · reiniciar() descarta la ventana en curso (pausas, cambios de estado o de tamaño).
 //  · Una bajada que no acelera se deshace: si en la ventana siguiente la mediana no ha mejorado al menos un 10 %, lo que no
-//    llega es el procesador (bajar píxeles solo descarga la tarjeta gráfica): vuelve a la resolución de antes y no la baja
-//    de ahí (ni aligera) durante ~1 minuto. Antes, con la CPU ×4 o en un móvil de procesador modesto, la imagen perdía
-//    nitidez al llegar a casa sin ganar ni un cuadro.
+//    llega no son los píxeles (el procesador, o una tarjeta gráfica que se atasca en los vértices): vuelve a la resolución
+//    de antes y no la baja de ahí durante ~1 minuto. Antes, con la CPU ×4 o en un móvil de procesador modesto, la imagen
+//    perdía nitidez al llegar a casa sin ganar ni un cuadro.
+//  · Lo mismo con cada escalón de aligerar (alAgotar devuelve true si aplicó uno): a prueba una ventana; si no acelera se
+//    devuelve (alRecuperar) y no se reintenta en ~1 minuto. Si la resolución no ayudaba, se prueba aligerar (en un PC con
+//    gráfica integrada, lo que pesa son los puntos de la telaraña: bajar su muestra sí acelera).
 export function crearReguladorResolucion({ minimo, maximo, inicial, paso = 0.25, ventanaMs = 1500, ventanasParaSubir = 6, alAgotar = () => {}, alRecuperar = () => false }) {
   let actual = inicial, techo = maximo, tiempos = [], suma = 0, estables = 0, subio = false;
-  let prueba = null, suelo = minimo, esperaSuelo = 0;   // bajada en observación; mínimo provisional tras una que no sirvió
+  let prueba = null, suelo = minimo, esperaSuelo = 0, esperaAligerar = 0;   // bajada en observación; mínimos provisionales
   function bajar(pasos, mediana) {
     estables = 0;
-    if (actual - paso < suelo - 1e-9) { if (suelo <= minimo + 1e-9) alAgotar(); return null; }
+    if (actual - paso < suelo - 1e-9) { if (!esperaAligerar && alAgotar() === true) prueba = { aligerar: true, mediana }; return null; }
     if (subio) techo = actual - paso;
     else prueba = { desde: actual, mediana };   // (deshacer una subida que no se sostuvo no se pone a prueba)
     subio = false; actual = Math.max(suelo, actual - paso * pasos); return actual;
@@ -31,9 +34,14 @@ export function crearReguladorResolucion({ minimo, maximo, inicial, paso = 0.25,
     const mediana = tiempos[tiempos.length >> 1], p90 = tiempos[Math.floor(tiempos.length * 0.9)];
     tiempos = []; suma = 0;
     if (esperaSuelo > 0 && --esperaSuelo === 0) suelo = minimo;
+    if (esperaAligerar > 0) esperaAligerar--;
     if (prueba) {
-      const { desde, mediana: antes } = prueba; prueba = null;
-      if (mediana > antes * 0.9) { suelo = desde; esperaSuelo = 40; estables = 0; actual = desde; return actual; }
+      const { desde, mediana: antes, aligerar } = prueba; prueba = null;
+      if (mediana > antes * 0.9) {
+        estables = 0;
+        if (aligerar) { alRecuperar(); esperaAligerar = 40; return null; }
+        suelo = desde; esperaSuelo = 40; actual = desde; return actual;
+      }
     }
     if (mediana > 26) return bajar(2, mediana);
     if (mediana > 19.5) return bajar(1, mediana);
