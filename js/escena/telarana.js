@@ -25,6 +25,10 @@ float ocultoGig(vec3 p){ vec3 v = p - uCamL; float dp = length(v), k = 1.0; vec3
     float c = dot(u, uGigA[i].xyz); if (c <= uGigA[i].w) continue;   // fuera del fundido: no tapa (el factor sería 1)
     float r = uGigB[i].y; k *= smoothstep(r * 0.85, r * 1.5, acos(min(c, 1.0))); }
   return k; }`;
+// Motas (1–3 px) fuera de la vista o detrás de la cámara: la tarjeta gráfica las descarta igual después, pero antes hacía
+// todo su cálculo (titileo, ondas, ocultación por los gigantes). Desde casa son ~2/3 de los puntos de los bloques a la
+// vista: se salen aquí (con un 2 % de margen para que la mota del borde siga igual). Misma imagen, menos trabajo.
+const FUERA = /* glsl */`if (gl_Position.w <= 0.0 || any(greaterThan(abs(gl_Position.xy), vec2(gl_Position.w * 1.02)))) { gl_PointSize = 0.0; vA = 0.0; vC = vec3(0.0); return; }`;
 const gauss = a => { let u = 0; while (!u) u = a(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * a()); };
 const col = c => new THREE.Color(c);
 // Galaxias: sobre todo doradas y blancas (luz de estrellas viejas), algunas azuladas y alguna rosada.
@@ -169,7 +173,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   // Polvo luminoso de los cúmulos (1–2 px).
   const matNubes = new THREE.ShaderMaterial({ uniforms: { ...uniformes, uComp },
     vertexShader: /* glsl */`uniform float uPR, uCasa, uComp, uT; attribute vec3 aCol; attribute float aBrillo; varying vec3 vC; varying float vA;
-      void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv; float d = length(mv.xyz);
+      void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv; ${FUERA} float d = length(mv.xyz);
         float h = fract(sin(dot(position.xy, vec2(12.9898, 78.233)) * 0.0001) * 43758.5);
         vA = aBrillo * clamp(pow(3000000.0 / d, 0.5), 0.4, 1.5) * uCasa * uComp * step(0.0, -mv.z); vC = aCol; gl_PointSize = (1.0 + aBrillo) * uPR;
         // Vida: cada mota titila despacio a su ritmo y unas ondas de luz lentas recorren la red (como pulsos que viajan por
@@ -183,7 +187,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   // Polvo de los filamentos: motas finas (1–2,5 px), con un leve titileo.
   const matPolvo = new THREE.ShaderMaterial({ uniforms: { ...uniformes, uComp },
     vertexShader: /* glsl */`uniform float uPR, uCasa, uComp, uT; ${OCULTO} attribute vec3 aCol; attribute float aBrillo; varying vec3 vC; varying float vA;
-      void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv; float d = length(mv.xyz);
+      void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv; ${FUERA} float d = length(mv.xyz);
         float h = fract(sin(dot(position.xy, vec2(12.9898, 78.233)) * 0.0001) * 43758.5);
         vA = aBrillo * 3.2 * clamp(pow(4500000.0 / d, 0.5), 0.6, 2.0) * uCasa * step(0.0, -mv.z) * smoothstep(60000.0, 250000.0, d) * ocultoGig(position) * uComp; vC = aCol;
         // Vida: cada mota titila despacio a su ritmo y unas ondas de luz lentas recorren la red (como pulsos que viajan por
