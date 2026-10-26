@@ -347,6 +347,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // En pantallas estrechas la interfaz ocupa arriba y abajo: el centro de la
   // proyección se desplaza a la franja libre (solo en la vista de inicio).
   let desplazamiento = 0, desplazamientoMeta = 0, fraccionZona = 1;
+  // Videoclip de un gigante en curso (director de cámara, más abajo): sin tarjeta ni panel, la proyección no se desplaza.
+  let enClip = false;
   const cajas = selectores => selectores.flatMap(s => [...document.querySelectorAll(s)])
     // offsetParent es null en elementos fijos: getClientRects() vacío indica display:none.
     .filter(el => !el.hidden && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden')
@@ -356,7 +358,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     if (!estrecha) { desplazamientoMeta = 0; fraccionZona = 1; return; }
     const arriba = Math.max(0, ...cajas(['#titulo', '#btn-tour', '.marca-universo', '.horarios']).map(r => r.bottom));
     const abajo = Math.min(vista.alto, ...cajas(['#ruta', '#lugar', '#cometa-aviso']).map(r => r.top));
-    desplazamientoMeta = -desplazamientoZonaLibre(arriba, abajo, vista.alto);
+    // Durante un videoclip la tarjeta no está: el gigante, centrado (o donde diga su pista con `mira`).
+    desplazamientoMeta = enClip ? 0 : -desplazamientoZonaLibre(arriba, abajo, vista.alto);
     // En casa, la galaxia algo más abajo: encima asoma la franja de cielo con los destinos.
     if (destinoActual === 'hogar') desplazamientoMeta -= vista.alto * 0.13;
     fraccionZona = Math.max(0, abajo - arriba) / vista.alto;
@@ -922,6 +925,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     if (!lejano || lejano.id !== id || destinoActual !== id) return;
     const marco = marcoClip(id), conPista = pista && !movimientoReducido ? pista : null;
     clip = { id, segundo, vivo, pista: conPista, marco, fase: 'clip', entrada: null, salida: null, arriba: conPista ? marco.y : EJE_Y };
+    enClip = true; desplazamientoMeta = 0;   // (el centro de la proyección vuelve al centro con su suavizado)
     if (conPista) {
       muestrearCamara(conPista, 0, muestraClip);
       if (conPista[0].curva !== 'corte') clip.entrada = { t: 0, dur: Math.min(ENTRADA, conPista[1] ? Math.max(0.4, conPista[1].t - conPista[0].t) : ENTRADA), desde: poseActual(marco) };
@@ -963,6 +967,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // completo: el clip terminó (encuadre normal y límites del zoom); si no, solo se devuelve lo bloqueado.
   function soltarClip(completo) {
     const c = clip; clip = null; if (!c) return;
+    enClip = false; medirZonaLibre();   // la tarjeta vuelve: la franja libre manda otra vez
     delete canvas.dataset.clip; delete canvas.dataset.clipFase;
     camera.up.copy(EJE_Y);
     if (camera.fov !== FOV_BASE) { camera.fov = FOV_BASE; camera.updateProjectionMatrix(); }
@@ -1196,9 +1201,12 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     distanciaAnterior=distanciaCamara;
     ctx.velocidadPolvo.copy(movimiento).divideScalar(Math.max(dt, 1e-3));
     if (!vuelo) ctx.velocidadPolvo.copy(adelanteCamara).multiplyScalar(radial);   // solo cuenta acercarse o alejarse
+    // En un videoclip la cámara la mueve el director: un corte (un salto en un cuadro) o un travelling no son velocidad
+    // (ni estelas del salto a la luz, ni polvo estirado).
+    if (enClip && !vuelo) ctx.velocidadPolvo.set(0, 0, 0);
     camaraAntes.copy(camera.position);
     camera.updateMatrixWorld();
-    campoVelocidad.actualizar(dt,{vuelo,radial,ceremonia:document.body.classList.contains('supernova-en-escena') && cosmos.supernova.estado!=='remanente' && !(cosmos.supernova.desdeEstallido>=TIEMPOS_AMOR.revelar),entrada:tEntrada!==null});
+    campoVelocidad.actualizar(dt,{vuelo,radial,ceremonia:(enClip && !vuelo) || (document.body.classList.contains('supernova-en-escena') && cosmos.supernova.estado!=='remanente' && !(cosmos.supernova.desdeEstallido>=TIEMPOS_AMOR.revelar)),entrada:tEntrada!==null});
     velo.visible = u.value > 0.004;
     // El fondo (nebulosas, galaxias, estrellas lejanas) acompaña siempre a la cámara: está
     // infinitamente lejos y se ve igual desde cualquier punto. Solo lo que se visita (cosmos:
