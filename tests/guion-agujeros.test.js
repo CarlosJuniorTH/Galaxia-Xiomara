@@ -18,7 +18,7 @@ test('las escenas usan las marcas de la banda sonora y terminan con su canción'
 test('Sagitario A*: el agujero hambriento traga un grumo en cada «sí» y S2 lo roza en el primero', () => {
   const M = marcasDe('sagitario'), g = t => JSON.parse(JSON.stringify(guionSagitario(t, M)));
   assert.equal(M.si1, MARCAS_SAGITARIO.si1);
-  assert.ok(g(1).alimento < 0.35 && g(M.si1 - 0.2).alimento < 0.35, 'empieza hambriento (versión de inicio)');
+  assert.ok(g(1).alimento < 0.45 && g(M.si1 - 0.2).alimento < 0.45, 'empieza hambriento (versión de inicio)');
   assert.ok(g(M.si4 + 2).alimento > 0.99 && g(60).alimento > 0.99, 'acaba con el diseño final');
   // Cada «sí» es un escalón: el flujo solo crece y lo hace justo en sus «sí».
   let a = 0; for (let t = 0; t < 40; t += 0.05) { const b = g(t).alimento; assert.ok(b >= a - 1e-9, `alimento a ${t}`); a = b; }
@@ -49,7 +49,7 @@ test('Sagitario A*: la pista de cámara sigue el contrato del director', () => {
   }
   // En el primer «sí» la cámara está pegada al agujero (S2 lo roza).
   const cerca = C.filter(p => Math.abs(p.t - MARCAS_SAGITARIO.si1) < 1.2);
-  assert.ok(cerca.length && cerca.every(p => p.pos[2] < 0.6));
+  assert.ok(cerca.length && cerca.every(p => p.pos[2] < 0.65));
   const [x, y, z] = posicionPista([90, 0, 2]); assert.ok(Math.abs(x - 2) < 1e-9 && Math.abs(y) < 1e-9 && Math.abs(z) < 1e-9);
 });
 

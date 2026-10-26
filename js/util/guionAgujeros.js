@@ -5,9 +5,9 @@
 import { MOMENTOS } from '../data/bandaSonora.js';
 import { MARCAS_TON618, REPOSO_TON618, DURACION_TON618, CAMARA_TON618 } from './guionTon618.js';
 // El guion de TON 618 vive en su propio archivo (js/util/guionTon618.js): la estrella que cae, el disco que se enciende y
-// su pista de cámara.
+// su pista de cámara. El de Sagitario A*, en js/util/guionSagitario.js.
 export { guionTon618 } from './guionTon618.js';
-import { reposoSagitario, MARCAS_SAGITARIO } from './guionSagitario.js';
+import { reposoSagitario, MARCAS_SAGITARIO, CAMARA_SAGITARIO } from './guionSagitario.js';
 
 const suave = (x, a, b) => { const k = Math.min(1, Math.max(0, (x - a) / (b - a))); return k * k * (3 - 2 * k); };
 const muySuave = (x, a, b) => { const k = Math.min(1, Math.max(0, (x - a) / (b - a))); return k * k * k * (k * (k * 6 - 15) + 10); };
@@ -24,8 +24,9 @@ function aCompases(t, a, b, compas) {
 export const PULSO = Object.freeze({ ton618: { periodo: 0.4445, inicio: 0 }, sagitario: { periodo: 0.5862, inicio: 0 } });
 export const DURACION = Object.freeze({ ton618: DURACION_TON618, sagitario: 38.1 });
 // Pistas de cámara de sus videoclips (formato: js/util/directorCamara.js; segundos del fragmento, radios de encuadre).
-// null: sin pista (la cámara se queda en la llegada con los controles bloqueados). La de TON 618: js/util/guionTon618.js.
-export const CAMARA_AGUJEROS = { ton618: CAMARA_TON618, sagitario: null };
+// null: sin pista (la cámara se queda en la llegada con los controles bloqueados). La de TON 618: js/util/guionTon618.js;
+// la de Sagitario A*: js/util/guionSagitario.js.
+export const CAMARA_AGUJEROS = { ton618: CAMARA_TON618, sagitario: CAMARA_SAGITARIO };
 // Marcas por defecto (las mismas que js/data/bandaSonora.js; si allí faltan, la escena conserva su guion).
 const POR_DEFECTO = {
   ton618: { ...MARCAS_TON618 },

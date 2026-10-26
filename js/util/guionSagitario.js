@@ -40,7 +40,7 @@ export const COMPAS_SAGITARIO = 4 * PULSO_SAGITARIO.periodo;
 // Marcas (segundos del fragmento). Las mismas que js/data/bandaSonora.js (allí mandan si cambian).
 //  primera  1.ª frase · tengo  la certeza · si1…si4  cada «sí» · cielo / mi  las palabras que cierran cada frase · fundido
 export const MARCAS_SAGITARIO = Object.freeze({ primera: 3.16, tengo: 12.68, si1: 18.96, cielo: 20.06, si2: 23.58, mi: 24.86, si3: 28.64, si4: 33.22, fundido: 35.6 });
-const SIES = ['si1', 'si2', 'si3', 'si4'], FUERZA_SI = [1, 1.25, 1, 1.45], ALIMENTO_SI = [0.3, 0.18, 0.11, 0.11];
+const SIES = ['si1', 'si2', 'si3', 'si4'], FUERZA_SI = [1, 1.25, 1, 1.45], ALIMENTO_SI = [0.26, 0.16, 0.09, 0.09];
 
 // Estrellas S (Gillessen et al. 2017, GRAVITY 2020): semieje (″), excentricidad, inclinación, nodo y argumento del
 // pericentro (°), periodo (años). S2 la primera. Las distancias se comprimen en la escena (sagitario.js) para que todas
@@ -74,7 +74,7 @@ export const segundosPorAno = M => periodoS2(M) / ESTRELLAS_S[0].anos;
 //  ecos[4] / ecosF[4]   segundos desde cada «sí» (−1: aún no) y su fuerza: el eco de luz que sale y enciende el gas
 //  encendido  el gas que queda iluminado tras los ecos (se queda en la calma)
 //  calma      0 → 1 en el fundido
-//  alimento   cuánto se ha encendido el flujo (0,3 hambriento → 1 el diseño final), un escalón con cada grumo tragado
+//  alimento   cuánto se ha encendido el flujo (0,4 hambriento → 1 el diseño final), un escalón con cada grumo tragado
 //  grumosIni[4] / grumosFin[4]   cuándo se suelta cada grumo de la minispiral y cuándo lo traga el agujero (su «sí»)
 export function guionSagitario(t, Mm, { reducido = false } = {}, o = {}) {
   const M = Mm && Mm.si1 !== undefined && Mm.fundido !== undefined && Mm.primera !== undefined ? Mm : marcasSagitario(Mm), k = reducido ? 0.35 : 1;
@@ -85,7 +85,7 @@ export function guionSagitario(t, Mm, { reducido = false } = {}, o = {}) {
   o.calma = muySuave(t, M.fundido, M.fundido + 2.5);
   o.inspira = 0; o.destello = 0; o.mancha = 0; o.manchaAng = 0; o.encendido = 0;
   if (!o.ecos) { o.ecos = [-1, -1, -1, -1]; o.ecosF = [0, 0, 0, 0]; o.grumosIni = [0, 0, 0, 0]; o.grumosFin = [0, 0, 0, 0]; }
-  o.alimento = 0.3;
+  o.alimento = 0.4;
   for (let i = 0; i < 4; i++) {
     const s = M[SIES[i]], f = FUERZA_SI[i], dt = t - s;
     o.inspira += 0.35 * suave(t, s - 1.0, s - 0.05) * (dt < 0 ? 1 : Math.exp(-dt / 0.2)) * k;
@@ -108,14 +108,12 @@ export function reposoSagitario(o = {}) {
   return o;
 }
 
-// ── Pista de cámara (contrato del director, js/util/directorCamara.js) ──
-// Coordenadas del grupo de Sagitario (sin giro: los mismos ejes que el cosmos), en unidades del radio de encuadre
-// (cosmos.objetivo('sagitario').distancia = 12,6 radios de la sombra). pos: [azimut°, elevación°, distancia] con
-// azimut 0 = eje +Z (desde donde las órbitas se ven como en el cielo de la Tierra), azimut 90 = +X, elevación 90 = +Y
-// (convención de posicionPista, abajo). Las distancias son para una pantalla apaisada: en vertical se multiplican por
-// el mismo factor que la llegada (index.js: max(1, min(1,6, 0,95 / aspecto))), o en el móvil la sombra llena el ancho. Medidas de lo que se ve, en esas unidades: sombra 0,08 · flujo hasta 0,23 (más cerca de 0,45 todo se ve
-// disperso: la cámara no baja de 0,5) ·
-// pericentro de S2 0,14 · su apocentro 0,42 · la minispiral hasta 0,7.
+// ── Pista de cámara (contrato del director, js/util/directorCamara.js; va en CAMARA_AGUJEROS.sagitario) ──
+// Ejes del director: unidad R = distancia de encuadre al llegar (lejano.dist = 12,6 radios de la sombra; en vertical ya
+// incluye el factor del móvil); azimut 0 / elevación 0 = desde Sagitario hacia casa (desde ahí las órbitas se ven como en
+// el cielo de la Tierra), el azimut crece hacia la derecha, +90 de elevación = eje Y del universo. sagitario.js orienta
+// sus piezas en esos mismos ejes. Medidas de lo que se ve, en R: sombra 0,08 · flujo hasta 0,23 (más cerca de 0,45 todo
+// se ve disperso: la cámara no baja de 0,5) · pericentro de S2 0,14 · su apocentro 0,42 · la minispiral hasta 0,7.
 export const RS_POR_RADIO = 1500 / 119;   // 12,6 (objetivo 1500·ESCALA_SGR; sombra 170·0,7·ESCALA_SGR)
 export function posicionPista([az, el, d]) {
   const a = az * Math.PI / 180, e = el * Math.PI / 180;
@@ -132,14 +130,14 @@ export const CAMARA_SAGITARIO = Object.freeze([
   { t: 11.2, pos: [-55, 16, 0.82], mira: [0, 0, 0], fov: 47, curva: 'lineal' },
   // «Lo tengo»: el grumo, ya un hilo, y S2 caen hacia el agujero; la cámara baja y se acerca con ellos.
   { t: 14.07, pos: [-45, 8, 0.68], mira: [0, 0, 0], fov: 44, curva: 'suave' },
-  { t: 16.41, pos: [-28, 4, 0.58], mira: [0, 0, 0], fov: 41, curva: 'suave' },
+  { t: 16.41, pos: [-28, 4, 0.64], mira: [0, 0, 0], fov: 41, curva: 'suave' },
   // «Say…»: contiene el aliento, casi quieta, pegada al agujero (el hilo se enrosca en la sombra).
-  { t: M0.si1 - 1.0, pos: [-18, 2, 0.54], mira: [0, 0, 0], fov: 40, curva: 'suave' },
+  { t: M0.si1 - 1.0, pos: [-18, 2, 0.6], mira: [0, 0, 0], fov: 40, curva: 'suave' },
   // «…yes»: el agujero se lo traga y estalla la llamarada; S2 lo roza. Un barrido rápido, con un leve alabeo.
-  { t: M0.si1 + 0.35, pos: [4, 6, 0.5], mira: [0, 0, 0], fov: 38, curva: 'rapida', giro: 5 },
+  { t: M0.si1 + 0.35, pos: [4, 6, 0.56], mira: [0, 0, 0], fov: 38, curva: 'rapida', giro: 5 },
   // «…to heaven»: se calma; la mancha caliente gira junto a la sombra.
-  { t: M0.cielo + 1.0, pos: [20, 12, 0.56], mira: [0, 0, 0], fov: 40, curva: 'suave', giro: 0 },
-  { t: M0.si2 - 1.0, pos: [28, 15, 0.6], mira: [0, 0, 0], fov: 42, curva: 'suave' },
+  { t: M0.cielo + 1.0, pos: [20, 12, 0.6], mira: [0, 0, 0], fov: 40, curva: 'suave', giro: 0 },
+  { t: M0.si2 - 1.0, pos: [28, 15, 0.64], mira: [0, 0, 0], fov: 42, curva: 'suave' },
   // «…yes to me»: el segundo grumo, la llamarada mayor: la cámara se aparta deprisa para ver salir el eco por el gas.
   { t: M0.si2 + 0.5, pos: [38, 22, 0.78], mira: [0, 0, 0], fov: 46, curva: 'rapida' },
   { t: 26.5, pos: [56, 28, 0.9], mira: [0, 0, 0], fov: 48, curva: 'suave' },

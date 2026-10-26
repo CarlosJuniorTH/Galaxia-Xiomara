@@ -53,7 +53,12 @@ export function* construirSagitario({ uScale, uPR, RS, grupo }) {
   // ── Flujo de acreción: gas caliente y tenue, grueso, muy cerca de la sombra. Gira deprisa y el Doppler concentra su luz
   // en una media luna; la lente dobla su parte de detrás en un anillo (como en la imagen del Telescopio del Horizonte).
   // En cada «sí», la llamarada: todo el flujo se aviva y una mancha caliente gira con él pegada a la sombra. ──
-  const planoFlujo = new THREE.Group(); planoFlujo.rotation.set(1.05, 0.4, 0.2); grupo.add(planoFlujo);
+  // Todo lo que tiene orientación cuelga de «cielo», el marco del videoclip (el del director de cámara, index.js
+  // marcoClip): z hacia casa en horizontal, y el eje Y del universo, x a la derecha. Así las órbitas se ven desde casa como
+  // en las medidas reales (el cielo de la Tierra) y la pista de cámara está escrita en los mismos ejes. Se orienta en el
+  // primer cuadro (hace falta la posición del grupo en el mundo).
+  const cielo = new THREE.Group(); grupo.add(cielo);
+  const planoFlujo = new THREE.Group(); planoFlujo.rotation.set(1.05, 0.4, 0.2); cielo.add(planoFlujo);
   let flujo;
   {
     const d = new Float32Array(N_FLUJO * 3), tam = new Float32Array(N_FLUJO);
@@ -167,7 +172,7 @@ export function* construirSagitario({ uScale, uPR, RS, grupo }) {
         vC = mix(aColor, vec3(1.0, 0.86, 0.74), clamp(e * 0.6, 0.0, 0.7));
         vA = luz * 0.45 * cerca * (0.8 + 0.2 * sin(uT * (0.5 + aFase * 0.5) + aFase * 30.0)) * (1.0 + luzEco);
       }`));
-    grupo.add(gas);
+    cielo.add(gas);
   }
 
   yield;
@@ -236,7 +241,7 @@ export function* construirSagitario({ uScale, uPR, RS, grupo }) {
         if (i == 0 && cabeza > 0.5) gl_PointSize = min(gl_PointSize * 1.35, 4.0 * uPR);
         vC = c; vA = brillo * luz * im.w * (1.0 + roce * cabeza * 0.5);
       }`));
-    grupo.add(trazas);
+    cielo.add(trazas);
   }
 
   for (const [o, orden] of [[gas, 0], [sombra, 1], [flujo, 2], [grumos, 2], [trazas, 3], [anillo, 4]]) o.renderOrder = orden;
@@ -246,7 +251,8 @@ export function* construirSagitario({ uScale, uPR, RS, grupo }) {
   const tmp = new THREE.Vector3(), centro = new THREE.Vector3(), qa = new THREE.Quaternion(), qb = new THREE.Quaternion();
   // Anomalía media de cada estrella. S2 sin envolver (las vueltas cuentan para la roseta).
   const marcas = marcasSagitario(), spa = segundosPorAno(marcas), ritmo = estrellas.map(s => DOS_PI / (s.anos * spa));
-  let giro = 0, escenaVista = null, baseS2 = 0, atenuando = false;
+  let giro = 0, escenaVista = null, baseS2 = 0, atenuando = false, orientado = false;
+  const ejeX = new THREE.Vector3(), ejeY = new THREE.Vector3(0, 1, 0), ejeZ = new THREE.Vector3(), base = new THREE.Matrix4();
   const kepler = (M, e) => { let E = M; for (let n = 0; n < 6; n++) E -= (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E)); return E; };
   return {
     sombra, anillo, flujo, gas, trazas, grumos, RS,
@@ -254,6 +260,13 @@ export function* construirSagitario({ uScale, uPR, RS, grupo }) {
     actualizar(t, dt, camera, escena) {
       const w = escena ? escena.presencia : 0, s = escena ? escena.guion : g, viva = !!escena?.viva;
       grupo.updateMatrixWorld();
+      if (!orientado) {
+        orientado = true;
+        grupo.getWorldPosition(ejeZ).negate().projectOnPlane(ejeY).normalize();   // hacia casa (el origen), en horizontal
+        ejeX.crossVectors(ejeY, ejeZ).normalize();
+        cielo.quaternion.setFromRotationMatrix(base.makeBasis(ejeX, ejeY, ejeZ)).premultiply(grupo.getWorldQuaternion(qa).invert());
+        cielo.updateMatrixWorld(true);
+      }
       const unidad = RS * grupo.matrixWorld.getMaxScaleOnAxis(); comunes.uUnidad.value = unidad; comunes.uSombra.value = unidad;
       const d = camera.position.distanceTo(grupo.getWorldPosition(centro)), px = unidad / Math.max(1, d) * 900;
       for (const m of [flujo, trazas, grumos]) m.geometry.instanceCount = px > 5 ? 3 : 1;
