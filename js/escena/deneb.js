@@ -20,8 +20,11 @@ import { EXPOSICION } from './exposicion.js';
 import { RUIDO_TABLA, texturaRuido } from './nube.js';
 import { crearNebulosaDeneb } from './nebulosaDeneb.js';
 
-export const RADIO_DENEB = 100;   // radio de la supergigante en el espacio de Deneb (la cámara llega a 450: 0,22 del encuadre)
-const R = RADIO_DENEB;
+// R: la unidad del marco de Deneb (su nube y sus motas se miden en ella; la cámara llega a 450). La estrella es más
+// pequeña: el corazón de su mundo, no algo que lo tape (0,12 del encuadre al llegar).
+const R = 100;
+export const RADIO_DENEB = 55;
+const RE = RADIO_DENEB;
 
 function azarCon(semilla) { let s = semilla >>> 0; return () => { s = (Math.imul(1664525, s) + 1013904223) >>> 0; return s / 4294967296; }; }
 
@@ -48,7 +51,7 @@ export function crearDeneb({ uScale, uPR }) {
 
   // ── Superficie ──
   const uS = { uRuido: { value: texturaRuido() }, uT: { value: 0 }, uLuz: { value: 1 }, uTemp: { value: 1 }, uGloria: { value: 0.55 }, uPum: { value: 0 } };
-  const superficie = new THREE.Mesh(new THREE.SphereGeometry(R, 128, 96), new THREE.ShaderMaterial({
+  const superficie = new THREE.Mesh(new THREE.SphereGeometry(RE, 128, 96), new THREE.ShaderMaterial({
     // Transparente (con alfa 1 y profundidad): se dibuja después del cielo profundo, que es «opaco» pero de un grupo
     // con un orden mayor y se sumaba ENCIMA de la estrella (la teñía con sus paredes de polvo).
     uniforms: uS, transparent: true, depthWrite: true, extensions: { derivatives: true },
@@ -70,10 +73,10 @@ export function crearDeneb({ uScale, uPR }) {
         float giro = uT * 0.012 * (1.0 - 0.35 * n0.y * n0.y), cg = cos(giro), sg = sin(giro);
         vec3 n = vec3(cg * n0.x + sg * n0.z, n0.y, -sg * n0.x + cg * n0.z);
         float mu = clamp(dot(normalize(vN), -normalize(vV)), 0.0, 1.0);
-        // Granulación FINA: unas 150 celdas a lo ancho del disco (como en las fotos de la fotosfera del Sol), con contraste
+        // Granulación fina: unas 90 celdas a lo ancho del disco (como en las fotos de la fotosfera del Sol), con contraste
         // suave. Cuando una celda mide menos de ~2 píxeles se funde en su media (sin parpadeo ni moiré).
         vec3 p5 = n * 9.0 + vec3(0.0, 0.0, uT * 0.02);
-        vec3 q = n * 75.0 + (vec3(rn3(p5), rn3(p5 + 7.3), rn3(p5 + 13.1)) - 0.5) * 3.0;
+        vec3 q = n * 46.0 + (vec3(rn3(p5), rn3(p5 + 7.3), rn3(p5 + 13.1)) - 0.5) * 3.0;
         vec2 g = granulo(q, uT * 0.4);
         float px = length(fwidth(q));                                    // celdas por píxel
         float nitido = 1.0 - smoothstep(0.35, 0.7, px);
@@ -82,25 +85,42 @@ export function crearDeneb({ uScale, uPR }) {
         // Encima, la supergranulación y la red de fáculas (manchas mayores, muy suaves) y, cerca del borde, fáculas claras.
         float w = rn3(n * 3.2 + vec3(0.0, uT * 0.015, 0.0)), red = rn3(n * 14.0 - vec3(uT * 0.01)), medio = rn3(n * 32.0 + vec3(uT * 0.04, 0.0, 0.0));
         float hierve = 0.75 + 0.45 * uGloria;
-        float textura = 1.0 + ((gran - 0.62) * 0.4 + (w - 0.5) * 0.14 + (red - 0.5) * 0.1 + (medio - 0.5) * 0.14) * hierve;
+        float textura = 1.0 + ((gran - 0.62) * 0.6 + (w - 0.5) * 0.14 + (red - 0.5) * 0.1 + (medio - 0.5) * 0.14) * hierve;
         // Oscurecimiento al limbo continuo y su color: el centro, blanco cegador apenas azulado; hacia el borde, cada vez más
         // azul y más tenue (una estrella de 8 500 K), sin lila ni gris.
         // (Valores lineales: la salida los pasa a sRGB, que aclara mucho los medios: el borde ha de ir muy abajo.)
         // El oscurecimiento se hace sobre todo con el color (del blanco al azul saturado) y menos con la luz: oscurecer un
         // blanco azulado lo vuelve gris; un azul intenso sigue pareciendo luz.
-        float limbo = 0.26 + 0.74 * pow(mu, 0.8);
-        vec3 tono = mix(vec3(0.07, 0.34, 1.0), vec3(0.45, 0.74, 1.0), smoothstep(0.0, 0.45, mu));
-        tono = mix(tono, vec3(0.97, 0.99, 1.0), smoothstep(0.4, 0.95, mu));
-        vec3 col = tono * limbo * textura * 0.86;
+        // Un núcleo pequeño blanco y saturado; casi todo el disco, de un azul cada vez más intenso hacia el limbo.
+        float limbo = 0.2 + 0.8 * pow(mu, 0.85);
+        vec3 tono = mix(vec3(0.04, 0.24, 1.0), vec3(0.36, 0.66, 1.0), smoothstep(0.0, 0.5, mu));
+        tono = mix(tono, vec3(0.9, 0.96, 1.0), smoothstep(0.62, 0.97, mu));
+        vec3 col = tono * limbo * textura * 0.95 + vec3(0.32, 0.34, 0.36) * pow(mu, 10.0);
         col += vec3(0.35, 0.55, 1.0) * smoothstep(0.6, 0.8, red) * pow(1.0 - mu, 2.0) * 0.12;   // fáculas
-        // Núcleo muy brillante sin quemar la textura: por encima de ~0,7 la luz se comprime en vez de recortarse.
-        col = mix(col, 0.72 + 0.3 * (1.0 - exp(-(col - 0.72) * 4.0)), step(0.72, col));
+        // Núcleo saturado sin quemar la textura alrededor: por encima de ~0,8 la luz se comprime en vez de recortarse.
+        col = mix(col, 0.8 + 0.25 * (1.0 - exp(-(col - 0.8) * 4.0)), step(0.8, col));
         // Ribete cromosférico: una franja finísima rosada y nítida justo en el borde (el anillo de las espículas).
         col += vec3(1.0, 0.45, 0.62) * (1.0 - smoothstep(0.0, 0.07, mu)) * 0.5;
         vec3 brasa = vec3(0.86, 0.93, 1.0) * (0.55 + 0.45 * limbo);   // la chispa de la que nace (y a la que vuelve): un punto blanco azulado
         gl_FragColor = vec4(mix(brasa, col, uTemp) * uLuz * (1.0 + 0.06 * uPum), 1.0); }`
   }));
   superficie.renderOrder = -2; marco.add(superficie);
+
+  // ── Rayos de difracción: cuatro líneas de 1 px CSS que salen del centro hacia la pantalla (como en una foto con
+  // telescopio), nítidas (sin halo); largo en radios de la estrella, y se apagan hacia la punta. ──
+  const pr = [], ang = [];
+  for (let k = 0; k < 4; k++) for (const [x, y] of [[-0.5, 0], [0.5, 0], [0.5, 1], [-0.5, 0], [0.5, 1], [-0.5, 1]]) { pr.push(x, y, 0); ang.push(k * Math.PI / 2 + Math.PI / 4); }
+  const gR = new THREE.BufferGeometry(); gR.setAttribute('position', new THREE.Float32BufferAttribute(pr, 3)); gR.setAttribute('aAng', new THREE.Float32BufferAttribute(ang, 1));
+  const uR = { uScale, uPR, uLargo: { value: RE * 3.2 }, uLuz: { value: 1 } };
+  const rayos = new THREE.Mesh(gR, new THREE.ShaderMaterial({ uniforms: uR, transparent: true, depthWrite: false, depthTest: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+    vertexShader: /* glsl */`attribute float aAng; uniform float uScale, uPR, uLargo; varying float vU;
+      void main(){ vec4 c = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0); float esc = length(modelViewMatrix[0].xyz);
+        vec2 d = vec2(cos(aAng), sin(aAng)), n = vec2(-d.y, d.x);
+        float ancho = 1.1 * uPR * max(1.0, -c.z) / uScale;   // 1,1 px CSS a la distancia de la estrella
+        c.xy += d * position.y * uLargo * esc + n * position.x * ancho; vU = position.y;
+        gl_Position = projectionMatrix * c; }`,
+    fragmentShader: 'uniform float uLuz; varying float vU; void main(){ float a = pow(1.0 - vU, 2.2) * uLuz; gl_FragColor = vec4(vec3(0.82, 0.9, 1.0) * a, 1.0); }' }));
+  rayos.frustumCulled = false; rayos.renderOrder = 4; marco.add(rayos);
 
   // ── La nube que esculpe: de nube oscura a cavidad iluminada (como Deneb con la nebulosa Norteamérica/Pelícano) ──
   // Una estrella tan luminosa barre con su luz el gas que la rodea: abre una cavidad, comprime su borde en un frente
@@ -211,9 +231,9 @@ export function crearDeneb({ uScale, uPR }) {
       float estela = aFantasma < 0.5 ? 1.0 : (1.0 - aFantasma * 0.32) * smoothstep(0.003, 0.012, abs(uRastro));
       float titila = 1.0 - uTitileo * 0.25 * (0.5 + 0.5 * sin(uT * (0.8 + aDato.y * 1.7) + aDato.w * 60.0));
       float tam = (2.0 + aDato.w * 1.6) * (1.0 + 0.3 * borde + 0.4 * punta);
-      vA = a * estela * titila * tamMota(tam, mv, 2.8) * fueraSilueta(mv, R * max(uEstrella, 0.09)) * sqrt(uExpo); }`));
+      vA = a * estela * titila * tamMota(tam, mv, 2.8) * fueraSilueta(mv, ${RE.toFixed(1)} * max(uEstrella, 0.09)) * sqrt(uExpo); }`));
   materia.frustumCulled = false; materia.renderOrder = 2; marco.add(materia);
-  const nebulosa = crearNebulosaDeneb({ radio: R }); marco.add(nebulosa.grupo);
+  const nebulosa = crearNebulosaDeneb({ radio: R, radioEstrella: RE }); marco.add(nebulosa.grupo);
 
   // ── Viento, corona y espículas ──
   const NV = 3000, NE = 2400, NB = NV + NE, dirV = new Float32Array(NB * 3), datoV = new Float32Array(NB * 4);
@@ -230,7 +250,7 @@ export function crearDeneb({ uScale, uPR }) {
   const viento = new THREE.Points(gV, motas(uV, /* glsl */`attribute vec4 aDato;
     uniform float uScale, uPR, uExpo, uViento, uEstrella, uGloria, uPum, uEncendido, uT, uTitileo; uniform vec3 uCam; varying vec3 vC; varying float vA;
     ${COMUN}
-    const float R = ${R.toFixed(1)};
+    const float R = ${RE.toFixed(1)};
     void main(){
       float espicula = aDato.z, edad = fract(aDato.x + uViento * aDato.y * (espicula > 0.5 ? 6.0 : 1.0)), r, a;
       // Las espículas se ven en el borde (el limbo visto desde la cámara): se colocan siempre en ese anillo, con un poco
@@ -256,7 +276,7 @@ export function crearDeneb({ uScale, uPR }) {
   const eyecciones = new THREE.Points(gE, motas(uE, /* glsl */`attribute vec3 aDato;
     uniform float uScale, uPR, uExpo, uEstrella; uniform vec3 uEje[${NS}]; uniform float uEdadE[${NS}]; varying vec3 vC; varying float vA;
     ${COMUN}
-    const float R = ${R.toFixed(1)};
+    const float R = ${RE.toFixed(1)};
     void main(){
       vec3 eje = uEje[0]; float edad = uEdadE[0];
       for (int k = 1; k < ${NS}; k++) if (abs(float(k) - aDato.x) < 0.5) { eje = uEje[k]; edad = uEdadE[k]; }
@@ -270,7 +290,7 @@ export function crearDeneb({ uScale, uPR }) {
       float a = step(0.0, edad) * smoothstep(0.0, 0.06, edad) * (1.0 - smoothstep(0.6, 1.75, edad)) * 2.8;
       vA = uEstrella * a * tamMota(1.6 + aDato.z * 1.4, mv, 2.8) * fueraSilueta(mv, R * uEstrella) * uExpo; }`));
   eyecciones.frustumCulled = false; eyecciones.renderOrder = 2; marco.add(eyecciones);
-  let siguiente = 0, cuentaEy = 0, ultimaEy = 0, edadAntes = 9, pulsos = 0, encendidaEy = false;
+  let siguiente = 0, cuentaEy = 0, ultimaEy = 0, edadAntes = 9, pulsos = 0;
   const azarEy = x => { const s = Math.sin(x * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
   const lanzar = () => { const k = cuentaEy++, z = azarEy(k) * 1.6 - 0.8, f = azarEy(k + 0.37) * Math.PI * 2, q = Math.sqrt(1 - z * z);
     ejes[siguiente].set(Math.cos(f) * q, z, Math.sin(f) * q); edades[siguiente] = 0; siguiente = (siguiente + 1) % NS; };
@@ -291,6 +311,7 @@ export function crearDeneb({ uScale, uPR }) {
       // Tamaño: nada → chispa (0,09 R) → estrella (con un pequeño rebote al encenderse); late con el bombo.
       const tam = Math.max(0.001, brasa * 0.09 * (1 + 0.3 * e.pum) + estrella * (1 + 0.05 * Math.sin(Math.min(1, Math.max(0, e.encendido) / 1.2) * Math.PI) * w));
       superficie.visible = tam > 0.01; superficie.scale.setScalar(tam * (1 + (reducido ? 0 : 0.012) * e.pum * w));
+      rayos.visible = estrella > 0.02; uR.uLuz.value = estrella * (0.75 + 0.25 * gloria) * (1 + 0.4 * e.pum * w); uR.uLargo.value = RE * tam * (3.0 + 0.6 * gloria);
       const destello = w > 0.5 && e.encendido >= 0 ? Math.exp(-e.encendido / 0.35) * Math.min(1, e.encendido / 0.08) : 0;
       // «in the middle»: cuando la luz que corre por la nube llega al centro, la estrella responde.
       const respuesta = w > 0.5 && e.medioT >= 0 ? 0.12 * Math.exp(-Math.pow((e.medioT - 0.95) / 0.3, 2)) : 0;
@@ -303,15 +324,14 @@ export function crearDeneb({ uScale, uPR }) {
       uM.uT.value = t; uM.uTitileo.value = reducido ? 0 : 1; uM.uRebobina.value = Math.min(1, Math.max(0, -reloj) / 2); uM.uEstrella.value = Math.max(estrella, 0.001);
       viento.visible = estrella > 0.002; uV.uViento.value += dt * reloj * (reducido ? 0.03 : 0.06 + 0.06 * gloria); uV.uEstrella.value = estrella; uV.uGloria.value = gloria; uV.uPum.value = e.pum * w;
       uV.uEncendido.value = w > 0.5 ? e.encendido : -1; uV.uT.value = t; uV.uTitileo.value = reducido ? 0 : 1;
-      // Eyecciones: en la escena, una cada dos golpes del bombo donde suena fuerte (el drop) y tres a la vez al encenderse;
+      // Eyecciones: en la escena, una cada dos golpes del bombo donde suena fuerte (el drop) (al encenderse ya sale el frente
+      // de motas: tres eyecciones a la vez pegadas a la superficie se veían como formas blancas sueltas);
       // fuera de ella, una cada ~2,6 s. Con movimiento reducido, ninguna.
       for (let k = 0; k < NS; k++) if (edades[k] >= 0) { edades[k] += dt * Math.max(0, reloj); if (edades[k] > 1.8) edades[k] = -1; }
       if (!reducido && estrella > 0.9) {
         if (w > 0.5) {
           const edad = e.edad ?? 9, nuevo = edad < edadAntes; edadAntes = edad;
           if (nuevo && (e.fuerza ?? 0) > 0.6 && pulsos++ % 2 === 0) lanzar();
-          if (e.encendido >= 0.3 && !encendidaEy) { encendidaEy = true; lanzar(); lanzar(); lanzar(); }
-          if (e.encendido < 0) encendidaEy = false;
         } else if (t - ultimaEy > 2.6) { ultimaEy = t; lanzar(); }
       }
       eyecciones.visible = estrella > 0.002 && edades.some(x => x >= 0); uE.uEstrella.value = estrella;

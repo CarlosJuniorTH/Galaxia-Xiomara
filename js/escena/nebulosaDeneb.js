@@ -85,7 +85,7 @@ const FRAG_NEBULOSA = /* glsl */`varying vec2 vP;
 // Láminas: [profundidad (en radios de la estrella, + hacia casa), escala, giro, tipo: 0 fondo entero · 1 media · 2 delante].
 const LAMINAS = [[-2.2, 1.0, 0.0, 0], [-0.6, 0.86, 0.35, 1], [1.4, 0.74, -0.5, 2]];
 
-export function crearNebulosaDeneb({ radio, semiLado = 5.4 }) {
+export function crearNebulosaDeneb({ radio, radioEstrella = radio, semiLado = 5.4 }) {
   const S = radio * semiLado, LADO = nivelSeguro ? 1024 : esMovil ? 2048 : 3072;
   const rt = new THREE.WebGLRenderTarget(LADO, LADO, { generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter });
   rt.texture.colorSpace = THREE.NoColorSpace; rt.texture.anisotropy = 8;
@@ -111,8 +111,12 @@ export function crearNebulosaDeneb({ radio, semiLado = 5.4 }) {
           vec4 t = texture2D(uTex, q * 0.5 + 0.5);
           t *= step(abs(q.x), 1.0) * step(abs(q.y), 1.0);
           // Oscura: solo la densidad, en azul violáceo muy tenue; iluminada: su color, con el frente que brilla al pasar.
-          vec3 oscura = vec3(0.07, 0.06, 0.16) * t.a * 0.5 + vec3(0.1, 0.08, 0.22) * dot(t.rgb, vec3(0.3, 0.4, 0.3)) * 0.8;
-          float pasa = exp(-pow((r - uFrente + 0.02) / 0.018, 2.0)) * step(uFrente, 1.15) * smoothstep(0.3, 0.7, t.a);
+          // Oscura pero con su estructura: la luz que tendrá (hebras, frentes, pilares) se ve en azul violáceo apagado, y el
+          // polvo, más negro: se lee la forma de la nube antes de encenderse.
+          float l = dot(t.rgb, vec3(0.3, 0.45, 0.25));
+          vec3 oscura = vec3(0.09, 0.08, 0.22) * pow(clamp(l, 0.0, 2.0), 0.75) * 1.5 + vec3(0.015, 0.015, 0.035) * t.a;
+          // (Solo en el gas luminoso: sobre el cuerpo oscuro de un pilar se veía como una aleta blanca.)
+          float pasa = exp(-pow((r - uFrente + 0.02) / 0.018, 2.0)) * step(uFrente, 1.15) * smoothstep(0.08, 0.4, dot(t.rgb, vec3(0.3, 0.45, 0.25)));
           float ondas = 1.0;
           if (uOnda >= 0.0) ondas += 1.1 * uOndaF * exp(-pow((r - uOnda) / 0.04, 2.0));      // el drop: una onda hacia fuera
           if (uMedio >= 0.0) ondas += 1.5 * exp(-pow((r - uMedio) / 0.05, 2.0));             // «en el medio»: hacia ella
@@ -121,7 +125,9 @@ export function crearNebulosaDeneb({ radio, semiLado = 5.4 }) {
           vec3 col = mix(oscura, lit, k) + vec3(0.85, 0.95, 1.0) * pasa * t.a * 1.4;
           col = mix(col, col * vec3(0.6, 0.85, 1.3), uRebobina * 0.6);
           float a = t.a;
-          if (uTipo > 0.5) { float denso = smoothstep(0.75, 0.95, t.a) * 0.8; col *= denso; a *= denso; }      // láminas de delante: solo lo denso
+          // Láminas de delante: solo el gas luminoso más denso (no el polvo ni los pilares: sueltos por delante se veían como
+          // esquirlas grises flotando).
+          if (uTipo > 0.5) { float denso = smoothstep(0.35, 0.8, dot(t.rgb, vec3(0.3, 0.45, 0.25))) * smoothstep(0.5, 0.8, t.a) * 0.8; col *= denso; a *= denso; }      // láminas de delante: solo lo denso
           if (uTipo > 1.5) { float m = smoothstep(rEstrella * 1.15, rEstrella * 1.8, length(vP)); col *= m * 0.7; a *= m * 0.6; }   // nunca tapa la estrella
           gl_FragColor = vec4(col, a); }`,
       transparent: true, depthWrite: false, premultipliedAlpha: true,
@@ -142,7 +148,7 @@ export function crearNebulosaDeneb({ radio, semiLado = 5.4 }) {
     // onda del drop (y su fuerza) y de la luz que va hacia ella (−1: no hay); estrella: tamaño de la estrella (0–1).
     actualizar({ frente, onda, ondaF, medio, luz, rebobina, calido, estrella, t }) {
       uFrente.value = frente; uOnda.value = onda; uOndaF.value = ondaF; uMedio.value = medio; uLuz.value = luz; uRebobina.value = rebobina; uCalido.value = calido; uT.value = t;
-      rEstrella.value = Math.max(0.02, estrella) / semiLado;
+      rEstrella.value = Math.max(0.02, estrella) * radioEstrella / radio / semiLado;
     }
   };
 }
