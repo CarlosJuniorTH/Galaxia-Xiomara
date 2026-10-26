@@ -73,6 +73,9 @@ function estrellaEn(m, d, rnd, o) {
   o[0] = u; o[1] = v; o[2] = gauss(rnd) * espesor; o[3] = comp;
 }
 
+// Tamaño aparente (px) de una galaxia según su DISTANCIA a la cámara (sin cierres por cuadro: nada de memoria nueva).
+const pxDe = (g, cx, cy, cz, f) => { const p = g.pos, dx = p.x - cx, dy = p.y - cy, dz = p.z - cz; return g.radio * f / Math.max(1, Math.sqrt(dx * dx + dy * dy + dz * dz)); };
+
 export function crearCampoGalaxias({ lista, texturas, descriptores, uPR }) {
   // Carga completa: el mapa de estrellas de cada tipo de galaxia se calcula ya (no la primera vez que una crece en pantalla).
   for (const d of Object.values(descriptores)) if (d) mapaGalaxia(d);
@@ -134,8 +137,13 @@ export function crearCampoGalaxias({ lista, texturas, descriptores, uPR }) {
   const mediaLuz = t => { if (luzTextura.has(t)) return luzTextura.get(t); const datos = t.image?.data; if (!datos) return null; let suma = 0; for (let j = 0; j < datos.length; j += 4) suma += 0.2126 * datos[j] + 0.7152 * datos[j + 1] + 0.0722 * datos[j + 2]; const media = suma / (datos.length / 4) / 255; if (media < 1e-4) return null; luzTextura.set(t, media); return media; };
   // Las estrellas ya creadas se guardan (las ~60 últimas galaxias): si se vuelve a acercar, reaparecen sin recalcular ni
   // crear memoria nueva (antes, girando cerca de un gigante se creaban y borraban miles de estrellas en cada cuadro).
-  const guardadas = new Map(), GUARDAR = 60;
-  function crearEstrellas(g) {
+  const guardadas = new Map(), GUARDAR = 60, pendientes = new Map();
+  // Generar las 1950 estrellas de una galaxia cuesta varios ms con la CPU de un móvil (decenas la primera vez, con el
+  // código aún sin optimizar): en pleno viaje era un tirón cada vez que una galaxia cruzaba los 24 px. Ahora se generan a
+  // trozos (un generador que cede cada 128 estrellas) repartidos en varios cuadros con un presupuesto fijo (actualizar);
+  // crearEstrellas las genera de una vez (diagnóstico). Mismas estrellas: misma semilla, mismo orden.
+  function crearEstrellas(g) { return deUnTiron(generarEstrellas(g)); }
+  function* generarEstrellas(g) {
     const vieja = guardadas.get(g.id);
     if (vieja) { guardadas.delete(g.id); grupo.add(vieja); g.estrellas = vieja; activas.add(g); g.flujoEstrellas = vieja.userData.flujo; const ab = g.instancia.im.geometry.attributes.aBeta; ab.array[g.instancia.i] = vieja.userData.beta; ab.needsUpdate = true; return vieja; }
     const rnd = generador(semillaDe(`estrellas-${g.id}`)), n = g.puntos;
@@ -144,6 +152,7 @@ export function crearCampoGalaxias({ lista, texturas, descriptores, uPR }) {
     let flujo = 0;
     const m = mapaGalaxia(d);
     for (let i = 0; i < n; i++) {
+      if ((i & 127) === 127) yield;
       estrellaEn(m, d, rnd, p); v.set(p[0], -p[1], p[2]).multiplyScalar(g.radio).applyQuaternion(g.quaternion);
       pos[i * 3] = v.x; pos[i * 3 + 1] = v.y; pos[i * 3 + 2] = v.z;
       c.copy(cols[p[3]]).lerp(cols[1], p[3] === 0 ? rnd() * 0.15 : 0).multiplyScalar(g.op); col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
@@ -263,12 +272,19 @@ export function crearCampoGalaxias({ lista, texturas, descriptores, uPR }) {
       // en un viaje, que alimentaba al recolector): la distancia y la profundidad se calculan en línea.
       let nuevas = 0;
       const n = lista.length, tramo = Math.ceil(n / 4), fin = Math.min(n, turno + tramo);
-      for (let i = turno; i < fin && nuevas < 2; i++) {
-        const g = lista[i]; if (g.estrellas) continue;
-        const p = g.pos, dx = p.x - cx, dy = p.y - cy, dz = p.z - cz;
-        if (g.radio * f / Math.max(1, Math.sqrt(dx * dx + dy * dy + dz * dz)) > 24) { crearEstrellas(g); nuevas++; }   // crear/soltar según la DISTANCIA (girar no las crea ni las borra); la profundidad solo decide si se ven
-      }
+      for (let i = turno; i < fin && nuevas < 2; i++) { const g = lista[i]; if (!g.estrellas && !pendientes.has(g) && pxDe(g, cx, cy, cz, f) > 24) { pendientes.set(g, generarEstrellas(g)); nuevas++; } }   // crear/soltar según la DISTANCIA (girar no las crea ni las borra); la profundidad solo decide si se ven
       turno = fin >= n ? 0 : fin;
+      // Las pendientes avanzan con ~1,5 ms por cuadro entre todas; la que ya va a verse (34 px: el fundido empieza a 35) se
+      // termina en el acto, y la que se ha alejado otra vez se abandona.
+      const t0 = performance.now();
+      for (const [g, it] of pendientes) {
+        const px = pxDe(g, cx, cy, cz, f);
+        if (px < 12) { pendientes.delete(g); continue; }
+        const urge = px > 34;
+        if (!urge && performance.now() - t0 > 1.5) continue;
+        let r; while (!(r = it.next()).done) if (!urge && performance.now() - t0 > 1.5) break;
+        if (r.done) pendientes.delete(g);
+      }
       for (const g of activas) {   // borrar de un Set mientras se recorre es seguro
         const p = g.pos, dx = p.x - cx, dy = p.y - cy, dz = p.z - cz, z = -(e[2] * p.x + e[6] * p.y + e[10] * p.z + e[14]);
         if (g.radio * f / Math.max(1, Math.sqrt(dx * dx + dy * dy + dz * dz)) < 12) { liberarEstrellas(g); continue; }
