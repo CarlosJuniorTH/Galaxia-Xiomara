@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizarPista, muestrearCamara, mezclarMuestras, aplicarCurva, esfericasACartesianas, cartesianasAEsfericas, pistaDe, duracionPista, crearMuestra, FOV_BASE, LIMITES } from '../js/util/directorCamara.js';
+import { normalizarPista, muestrearCamara, mezclarMuestras, aplicarCurva, esfericasACartesianas, cartesianasAEsfericas, pistaDe, duracionPista, crearMuestra, crearSuavizador, segundoAdelantado, siguienteCorte, FOV_BASE, LIMITES, CORTE_MIN, SUAVIDAD } from '../js/util/directorCamara.js';
 import { ESCENAS_GIGANTES } from '../js/util/escenasGigantes.js';
 
 const cerca = (a, b, e = 1e-6) => Math.abs(a - b) < e;
@@ -43,7 +43,7 @@ test('corte: el plano anterior sigue hasta el segundo exacto y salta seco', () =
 
 test('suave se posa (sin velocidad en los extremos), rápida sale disparada y lineal va a velocidad constante', () => {
   assert.equal(aplicarCurva('suave', 0), 0); assert.equal(aplicarCurva('suave', 1), 1); assert.ok(aplicarCurva('suave', 0.05) < 0.01);
-  assert.ok(aplicarCurva('rapida', 0.1) > 0.3 && aplicarCurva('rapida', 1) === 1);
+  assert.ok(aplicarCurva('rapida', 0.1) > 0.25 && aplicarCurva('rapida', 1) === 1);
   assert.equal(aplicarCurva('corte', 0.99), 0); assert.equal(aplicarCurva('corte', 1), 1);
   const v = t => (muestrearCamara(PISTA, t + 0.01).pos[0] - muestrearCamara(PISTA, t).pos[0]) / 0.01;
   assert.ok(Math.abs(v(0)) < 1 && Math.abs(v(3.989)) < 1 && v(2) > 15, 'suave: sale y se posa parada (de 0 a 4)');

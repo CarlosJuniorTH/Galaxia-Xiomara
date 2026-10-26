@@ -45,7 +45,7 @@ import { nivelSeguro } from '../util/dispositivo.js';
 import { esquivar, sinRepetidos } from '../util/ruta.js';
 import { planificarVuelo } from '../util/vuelo.js';
 import { TIEMPOS_AMOR, faltaReal, desdeAnimacion } from '../util/supernovaAmor.js';
-import { pistaDe, muestrearCamara, mezclarMuestras, crearMuestra, esfericasACartesianas, cartesianasAEsfericas, ENTRADA, SALIDA, LIMITES } from '../util/directorCamara.js';
+import { pistaDe, muestrearCamara, mezclarMuestras, crearMuestra, crearSuavizador, segundoAdelantado, siguienteCorte, esfericasACartesianas, cartesianasAEsfericas, ENTRADA, SALIDA, LIMITES } from '../util/directorCamara.js';
 import { finEscena } from '../util/guionAgujeros.js';
 import { aMal, SEMIEJES_CORAZON, ESCALA_SUPERNOVA, PROGENITORA_RELATIVA, LLEGADA_GIGANTE } from '../data/escalaCosmica.js';
 const RADIO_ESTRELLA = 110 * ESCALA_SUPERNOVA * PROGENITORA_RELATIVA;
@@ -924,7 +924,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // se suelta en el acto. Marco de cada gigante: centro, radio R (su distancia de encuadre) y ejes x (derecha), y (arriba),
   // z (hacia casa).
   let clip = null;
-  const muestraClip = crearMuestra(), cartClip = [0, 0, 0], matrizClip = new THREE.Matrix4(), arribaClip = new THREE.Vector3(), relClip = new THREE.Vector3();
+  // muestraClip: lo que se coloca (ya filtrado); crudaClip: la pista adelantada; suaveClip: la capa global de suavidad.
+  const muestraClip = crearMuestra(), crudaClip = crearMuestra(), suaveClip = crearSuavizador(), cartClip = [0, 0, 0], matrizClip = new THREE.Matrix4(), arribaClip = new THREE.Vector3(), relClip = new THREE.Vector3();
   function marcoClip(id) {
     const centro = lejano.centro.clone(), casa = centro.clone().negate().normalize();
     const arriba = id === 'cuasar' ? cosmos.ejeCuasar() : id === 'ton618' ? new THREE.Vector3(0, 1, 0).applyQuaternion(cosmos.agujeros.ton618.planoDisco.getWorldQuaternion(new THREE.Quaternion())) : EJE_Y.clone();
@@ -952,8 +953,11 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     clip = { id, segundo, vivo, pista: conPista, marco, fase: 'clip', entrada: null, salida: null, arriba: conPista ? marco.y : EJE_Y };
     enClip = true; desplazamientoMeta = 0;   // (el centro de la proyección vuelve al centro con su suavizado)
     if (conPista) {
-      muestrearCamara(conPista, 0, muestraClip);
-      if (conPista[0].curva !== 'corte') clip.entrada = { t: 0, dur: Math.min(ENTRADA, conPista[1] ? Math.max(0.4, conPista[1].t - conPista[0].t) : ENTRADA), desde: poseActual(marco) };
+      // El filtro sale de donde está la cámara (si la pista empieza con un corte, del primer plano). El alabeo del primer
+      // plano entra con un fundido propio (el filtro lo cambiaría demasiado despacio para llegar a él).
+      muestrearCamara(conPista, 0, muestraClip); muestrearCamara(conPista, segundoAdelantado(conPista, 0), crudaClip); clip.t = 0;
+      if (conPista[0].curva !== 'corte') { const desde = poseActual(marco); desde.giro = muestraClip.giro; suaveClip.fijar(desde); clip.entrada = { t: 0, dur: ENTRADA }; }
+      else suaveClip.fijar(muestraClip);
     }
     ajuste = null; controls.enabled = false; controls.autoRotate = false;
     canvas.dataset.clip = id; canvas.dataset.clipFase = 'clip'; delete canvas.dataset.clipFin;
@@ -976,9 +980,14 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     if (c.fase === 'clip') {
       if (!c.pista) return;
       const s = c.segundo();
-      if (Number.isFinite(s)) muestrearCamara(c.pista, s, muestraClip);
+      if (Number.isFinite(s)) {
+        // Un corte entre el cuadro anterior y este: el filtro salta con la pista. Si no, sigue la pista adelantada.
+        if (siguienteCorte(c.pista, c.t) <= s) suaveClip.fijar(muestrearCamara(c.pista, s, crudaClip));
+        muestrearCamara(c.pista, segundoAdelantado(c.pista, s), crudaClip); c.t = s;
+      }
+      suaveClip.paso(crudaClip, dt, muestraClip);
       if (c.entrada) {
-        c.entrada.t += dt; mezclarMuestras(c.entrada.desde, muestraClip, THREE.MathUtils.smootherstep(c.entrada.t, 0, c.entrada.dur), muestraClip);
+        c.entrada.t += dt; muestraClip.giro *= THREE.MathUtils.smootherstep(c.entrada.t, 0, c.entrada.dur);
         if (c.entrada.t >= c.entrada.dur) c.entrada = null;
       }
       colocarClip(muestraClip, c.marco, c.arriba, 0);

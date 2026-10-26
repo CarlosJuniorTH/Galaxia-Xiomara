@@ -4,14 +4,12 @@
 // interfaz; al terminar, la franja libre vuelve a mandar. Usa una pista propia con cortes en el púlsar.
 import { abrir, visitar } from './arnes.mjs';
 
+// Cortes separados por más de CORTE_MIN (8 s): los más seguidos el director los convierte en pasos suaves.
 const PISTA = [
   { t: 0, pos: [0, 10, 1], mira: [0, 0, 0], curva: 'corte' },
-  { t: 1.5, pos: [90, 25, 0.55], curva: 'corte' },
-  { t: 3, pos: [-60, -15, 2.2], curva: 'corte' },
-  { t: 4.5, pos: [170, 35, 0.7], curva: 'corte' },
-  { t: 6, pos: [20, 5, 1.8], curva: 'rapida' },
-  { t: 7.5, pos: [-120, 20, 0.6], curva: 'corte' },
-  { t: 9, pos: [0, 10, 1], curva: 'corte' }
+  { t: 4, pos: [40, 15, 0.8], curva: 'suave' },
+  { t: 8.5, pos: [-120, 25, 1.8], curva: 'corte' },
+  { t: 10, pos: [-110, 20, 1.6], curva: 'suave' }
 ];
 
 async function probar(base, informe, perfil) {
@@ -45,7 +43,7 @@ async function probar(base, informe, perfil) {
       seguir = false;
       return { maxEstelas, saltos, centroY: centro.length ? centro.reduce((a, b) => a + b, 0) / centro.length : null };
     }, PISTA);
-    informe.comprobar(r.saltos >= 4, `${perfil}: la pista de prueba corta de verdad (saltos de cámara en un cuadro)`, r.saltos);
+    informe.comprobar(r.saltos >= 1, `${perfil}: la pista de prueba corta de verdad (saltos de cámara en un cuadro)`, r.saltos);
     informe.comprobar(r.maxEstelas < 0.015, `${perfil}: los cortes del clip no encienden las estelas del salto a la luz`, +r.maxEstelas.toFixed(4));
     if (perfil !== 'pc') {
       informe.comprobar(r.centroY !== null && Math.abs(r.centroY) < 0.06, `${perfil}: en vertical, durante el clip el gigante queda centrado (no en el tercio de arriba)`, r.centroY);
