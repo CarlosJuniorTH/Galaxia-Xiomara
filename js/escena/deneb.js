@@ -5,11 +5,11 @@
 //    diferencial, oscurecimiento al limbo continuo del blanco cegador del centro al azul del borde (la luz se comprime:
 //    el núcleo no quema la textura) y un ribete cromosférico rosado y fino en el borde; con la formación pasa de nada a
 //    una chispa blanca azulada y, al encenderse, a la estrella entera.
-//  · materia: las motas que cuentan la historia. Cada una tiene su sitio en la nube oscura del principio, en el disco que
-//    nace al caer y en su mundo: siete anillos (órbitas) en los que el disco se ordena alrededor de ella, dos mundos
-//    pequeños que se forman juntos en uno de ellos y las protuberancias, arcos rosas pegados a la superficie. Su posición
-//    es función de la formación `tau`: al rebobinar recorren el mismo camino hacia atrás, con dos copias «fantasma»
-//    detrás que dibujan su estela mientras se mueven.
+//  · nube: lo que su luz esculpe (como Deneb con la nebulosa Norteamérica/Pelícano): una cavidad abierta hacia casa con
+//    paredes de filamentos, pilares con la punta hacia ella y el gas de delante que la luz se lleva; antes de nacer, una
+//    nube oscura y llena cuyo núcleo cae para formarla. Cada mota tiene su sitio en la nube oscura y en la tallada; su
+//    posición es función de la formación `tau` (al rebobinar recorre el mismo camino hacia atrás, con dos copias
+//    «fantasma» detrás que dibujan su estela mientras se mueve). Unas 11 400 motas en un solo dibujo.
 //  · viento y corona: motas que salen de la superficie (más en unos chorros, las serpentinas de la corona), un borde de
 //    espículas finísimas y, al encenderse, el frente de motas que sale de ella.
 //  · eyecciones: chorros de motas que la estrella lanza (en el drop, con el bombo; fuera de la escena, de vez en cuando).
@@ -39,15 +39,11 @@ const COMUN = /* glsl */`
   float fueraSilueta(vec4 mv, float radio){ vec3 c = (modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz; float dc = max(length(c), 1.0); vec3 eje = c / dc;
     float t = dot(mv.xyz, eje), r = radio * length(modelViewMatrix[0].xyz) * t / dc;
     return 1.0 - step(t, dc) * step(0.0, t) * (1.0 - smoothstep(r * 0.97, r * 1.03, length(mv.xyz - eje * t))); }`;
-// Anillos: 7 órbitas de 1,6 a 4,5 radios en el plano del sistema (inclinado hacia casa, para que desde allí se lean).
-export const ANILLOS_DENEB = Array.from({ length: 7 }, (_, k) => 1.6 + 0.48 * k);
-const INCLINACION_SISTEMA = 0.42;   // rad: el plano de los anillos, inclinado ~24° hacia casa
 
 export function crearDeneb({ uScale, uPR }) {
   const azar = azarCon(1907);
   // marco: los ejes del director de cámara (x derecha, y arriba = el eje Y del universo, z hacia casa); cosmos.js lo orienta.
   const marco = new THREE.Group(); marco.name = 'Deneb de cerca';
-  const sistema = new THREE.Group(); sistema.rotation.x = INCLINACION_SISTEMA; marco.add(sistema);
 
   // ── Superficie ──
   const uS = { uRuido: { value: texturaRuido() }, uT: { value: 0 }, uLuz: { value: 1 }, uTemp: { value: 1 }, uGloria: { value: 0.55 }, uPum: { value: 0 } };
@@ -105,113 +101,126 @@ export function crearDeneb({ uScale, uPR }) {
   }));
   superficie.renderOrder = -2; marco.add(superficie);
 
-  // ── Materia: nube → disco → anillos, dos mundos y protuberancias (y lo que cae a la estrella) ──
-  // tipo (aLinea.w): 0 anillo (aLinea.x = su radio, en R), 1 protuberancia (aLinea.x = L del arco), 2 lo que cae a la
-  // estrella al encenderse, 3 uno de los dos mundos pequeños (aLinea.y = 0 o 1; aLinea.xz y aDato.x: su sitio en el grumo).
-  const NL = 11000, NP = 1800, NW = 2 * 110, NA = 1100, N = NL + NP + NW + NA, F = 3;
-  const nube = new Float32Array(N * 3), linea = new Float32Array(N * 4), dato = new Float32Array(N * 4);
-  // La nube del principio está en el mismo plano que sus anillos (es su mundo antes de ordenarse): un disco ancho y
-  // tenue, de 1,5 a 5 radios, de arcos de polvo que giran en espiral, con poco grosor.
-  const caminantes = [];
-  for (let c = 0; c < 80; c++) {
-    let r = 1.5 + azar() * 3.5, f = azar() * Math.PI * 2;
-    const deriva = (azar() - 0.5) * 0.012, pts = [];
-    for (let k = 0; k < 90; k++) {
-      f += 0.022 + (azar() - 0.5) * 0.01; r = Math.min(5, Math.max(1.5, r + deriva + (azar() - 0.5) * 0.02));
-      pts.push([Math.cos(f) * r, (azar() + azar() - 1) * 0.06 * r * 0.4, Math.sin(f) * r]);
-    }
-    caminantes.push(pts);
-  }
+  // ── La nube que esculpe: de nube oscura a cavidad iluminada (como Deneb con la nebulosa Norteamérica/Pelícano) ──
+  // Una estrella tan luminosa barre con su luz el gas que la rodea: abre una cavidad, comprime su borde en un frente
+  // brillante y deja pilares (grumos densos que resisten) con la punta hacia ella. La cavidad está abierta hacia casa (+z
+  // del marco, de donde llega la cámara): se mira dentro, con la estrella en el centro y las paredes alrededor y detrás.
+  // tipo (aLinea.w): 0 pared y filamentos (aLinea.x = radio final en R; nube.xyz = su sitio en la nube oscura, más
+  // adentro: el gas que la luz empuja), 1 pilar (aLinea.x = radio; aLinea.y = 1 en la punta), 2 el gas de la abertura que
+  // la luz se lleva hacia fuera, 3 el núcleo de la nube que cae y forma la estrella.
+  const NF = 11000, NPi = 3600, NAb = 1200, NC = 1200, N = NF + NPi + NAb + NC, F = 3;
+  const nube = new Float32Array(N * 3), destino = new Float32Array(N * 3), linea = new Float32Array(N * 4), dato = new Float32Array(N * 4);
+  // Radio interior de la cavidad según la dirección: irregular (no un círculo) y algo más profunda por un lado.
+  const ruido3 = (x, y, z) => Math.sin(x * 2.1 + 1.3) * Math.sin(y * 2.7 + 0.4) * Math.sin(z * 1.9 + 2.2) + 0.5 * Math.sin(x * 4.3 - y * 3.1 + z * 2.3);
+  const radioCavidad = (x, y, z) => 2.1 * (1 + 0.28 * ruido3(x, y, z) + 0.18 * x - 0.12 * y);
+  // La abertura: hacia casa y, de lado, hacia la derecha y arriba: la pared es un acantilado curvo que la abraza por la
+  // izquierda, abajo y detrás (como el Pelícano), no un anillo cerrado.
+  const abierta = (x, y, z) => z > 0.42 || (x + 0.35 * y > 0.3 && z > -0.35);
+  const dirAzar = (fuera = true) => { for (;;) { const z = azar() * 2 - 1, f = azar() * Math.PI * 2, q = Math.sqrt(1 - z * z), v = [Math.cos(f) * q, z, Math.sin(f) * q], j = (azar() - 0.5) * 0.15; if (!fuera || !abierta(v[0] + j, v[1], v[2] + j)) return v; } };
   let i = 0;
-  // Anillos: motas en proporción a su longitud; cada una nace en el disco cerca de su anillo (se ordena sin cruzar todo).
-  const sumaR = ANILLOS_DENEB.reduce((a, b) => a + b, 0);
-  ANILLOS_DENEB.forEach((rk, k) => {
-    const n = k === ANILLOS_DENEB.length - 1 ? NL - i : Math.round(NL * rk / sumaR);
-    for (let j = 0; j < n; j++, i++) {
-      linea.set([rk * (1 + (azar() + azar() - 1) * 0.008), azar() * Math.PI * 2, azar(), 0], i * 4);
-      dato.set([k / (ANILLOS_DENEB.length - 1), azar(), azar(), Math.max(1.25, rk + (azar() + azar() - 1) * 0.55)], i * 4);
+  const poner = (fin, ini, tipo, a, b, d0, d1, d2) => { destino.set(fin.map(c => c * R), i * 3); nube.set(ini.map(c => c * R), i * 3); linea.set([Math.hypot(...fin), a, b, tipo], i * 4); dato.set([d0, d1, d2, azar()], i * 4); i++; };
+  // Filamentos de la pared: caminos que serpentean por la superficie de la cavidad (motas en hilos nítidos), unos en el
+  // mismo borde (el frente iluminado) y otros algo más hondos en la pared.
+  while (i < NF) {
+    let u = dirAzar(), hondo = azar() < 0.65 ? azar() * 0.06 : 0.25 + Math.pow(azar(), 1.4) * 1.4;
+    const d = [azar() - 0.5, azar() - 0.5, azar() - 0.5], largo = 90 + Math.floor(azar() * 110), grosor = 0.005 + azar() * 0.01, encoge = 0.25 + azar() * 0.45;
+    for (let k = 0; k < largo && i < NF; k++) {
+      for (let e = 0; e < 3; e++) d[e] += (azar() - 0.5) * 0.22;
+      const dd = Math.hypot(...d) || 1; u = u.map((c, e) => c + d[e] / dd * 0.009); const L = Math.hypot(...u); u = u.map(c => c / L);
+      if (abierta(...u)) break;
+      const rc = radioCavidad(...u), r = rc + hondo + (azar() - 0.5) * grosor * 4, j = () => (azar() - 0.5) * grosor;
+      // En la nube oscura el mismo hilo está más adentro (encogido hacia el centro): la luz lo empuja entero hasta la pared.
+      const fin = [u[0] * r + j(), u[1] * r + j(), u[2] * r + j()];
+      poner(fin, fin.map(c => c * encoge), 0, 0, 0, (r - 1) / 4.5, azar(), hondo < 0.1 ? 1 : 0);
     }
-  });
-  // Protuberancias: 11 arcos (r = L·sen²θ entre dos pies en la superficie), en meridianos al azar; las motas fluyen por ellos.
-  for (let k = 0, h = null; k < NP; k++, i++) {
-    if (k % Math.ceil(NP / 11) === 0) h = { L: 1.15 + azar() * 0.42, fi: azar() * Math.PI * 2 };
-    linea.set([h.L, h.fi + (azar() - 0.5) * 0.04, azar(), 1], i * 4);
-    dato.set([azar() * 0.4, azar(), azar(), 1.3 + azar() * 1.5], i * 4);
   }
-  // Los dos mundos: dos grumos de motas en el anillo 4, juntos.
-  for (let k = 0; k < NW; k++, i++) {
-    const cual = k < NW / 2 ? 0 : 1, z = azar() * 2 - 1, f = azar() * Math.PI * 2, q = Math.sqrt(1 - z * z), r = 0.075 * Math.cbrt(azar());
-    linea.set([Math.cos(f) * q * r, cual, Math.sin(f) * q * r, 3], i * 4); dato.set([z * r, azar(), azar(), ANILLOS_DENEB[4] + (azar() - 0.5) * 0.6], i * 4);
+  // Pilares: 12 columnas de gas denso en el contorno de la abertura (vistas desde casa, alrededor de ella), con la punta
+  // hacia la estrella: las talla la luz y se quedan; todas señalan al centro.
+  for (let p = 0; p < 12; p++) {
+    // En el borde del acantilado (de la izquierda, por abajo, hasta abajo a la derecha): visto desde casa, señalan a ella.
+    const z = 0.05 + azar() * 0.32, f = Math.PI * (0.55 + 1.15 * (p + azar() * 0.7) / 12), q = Math.sqrt(1 - z * z), u = [Math.cos(f) * q, Math.sin(f) * q, z];
+    const rc = radioCavidad(...u), base = rc + 1.0 + azar() * 0.6, punta = rc * (0.55 + azar() * 0.2), ancho = 0.1 + azar() * 0.1;
+    const t1 = [u[1], -u[0], 0], L1 = Math.hypot(...t1) || 1, a = t1.map(c => c / L1), b = [u[1] * a[2] - u[2] * a[1], u[2] * a[0] - u[0] * a[2], u[0] * a[1] - u[1] * a[0]];
+    for (let k = 0; k < NPi / 12; k++) {
+      const s = Math.pow(azar(), 0.7), r = punta + (base - punta) * s, w = ancho * (0.25 + 0.75 * s) * Math.sqrt(azar()), f = azar() * Math.PI * 2;
+      const fin = [0, 1, 2].map(e => u[e] * r + (a[e] * Math.cos(f) + b[e] * Math.sin(f)) * w);
+      poner(fin, fin.map(c => c * 0.5), 1, s < 0.08 ? 1 : 0, s, (r - 1) / 4.5, azar(), 0);   // en la nube oscura, más adentro y sin forma
+    }
   }
-  for (; i < N; i++) { linea.set([2, 0, azar(), 2], i * 4); dato.set([azar() * 0.6, azar(), azar(), 0.15 + azar() * 0.8], i * 4); }
-  for (let k = 0; k < N; k++) { const c = caminantes[Math.floor(azar() * caminantes.length)], p = c[Math.floor(azar() * c.length)], j = 0.06; nube.set([(p[0] + (azar() - 0.5) * j) * R, (p[1] + (azar() - 0.5) * j) * R, (p[2] + (azar() - 0.5) * j) * R], k * 3); }
+  // El gas de la abertura (delante de la estrella, hacia casa): en la nube oscura está ahí; la luz se lo lleva.
+  while (i < NF + NPi + NAb) { const z = 0.45 + azar() * 0.55, f = azar() * Math.PI * 2, q = Math.sqrt(1 - z * z), r = 0.9 + azar() * 2.6, u = [Math.cos(f) * q, z, Math.sin(f) * q];
+    poner(u.map(c => c * r * 2.8), u.map(c => c * r), 2, 0, 0, (r - 1) / 4.5, azar(), 0); }
+  // El núcleo de la nube: cae girando hacia el centro y forma la estrella (se lo traga al encenderse).
+  while (i < N) { const u = dirAzar(false), r = 0.4 + azar() * 1.6; poner([0, 0, 0], u.map(c => c * r), 3, 0, 0, r / 2, azar(), 0); }
   // Tres copias de cada mota (la de verdad y dos fantasmas de su estela), en bloques para un solo dibujo.
   const rep = (a, w) => { const b = new Float32Array(a.length * F); for (let f = 0; f < F; f++) b.set(a, f * a.length); return new THREE.BufferAttribute(b, w); };
   const fantasma = new Float32Array(N * F); for (let f = 0; f < F; f++) fantasma.fill(f, f * N, (f + 1) * N);
   const gM = new THREE.BufferGeometry();
-  gM.setAttribute('position', rep(nube, 3)); gM.setAttribute('aLinea', rep(linea, 4)); gM.setAttribute('aDato', rep(dato, 4)); gM.setAttribute('aFantasma', new THREE.BufferAttribute(fantasma, 1));
+  gM.setAttribute('position', rep(nube, 3)); gM.setAttribute('aDestino', rep(destino, 3)); gM.setAttribute('aLinea', rep(linea, 4)); gM.setAttribute('aDato', rep(dato, 4)); gM.setAttribute('aFantasma', new THREE.BufferAttribute(fantasma, 1));
   const uM = { uScale, uPR, uExpo: EXPOSICION, uTau: { value: 1 }, uRastro: { value: 0 }, uFlujo: { value: 0 }, uOrbita: { value: 0 }, uGloria: { value: 0.55 }, uEdad: { value: 1 }, uFuerza: { value: 0 }, uMedio: { value: 0 }, uMedioT: { value: -1 }, uCalido: { value: 0.25 }, uT: { value: 0 }, uTitileo: { value: 1 }, uEstrella: { value: 1 }, uRebobina: { value: 0 } };
-  const materia = new THREE.Points(gM, motas(uM, /* glsl */`attribute vec4 aLinea, aDato; attribute float aFantasma;
+  const materia = new THREE.Points(gM, motas(uM, /* glsl */`attribute vec3 aDestino; attribute vec4 aLinea, aDato; attribute float aFantasma;
     uniform float uScale, uPR, uExpo, uTau, uRastro, uFlujo, uOrbita, uGloria, uEdad, uFuerza, uMedio, uMedioT, uCalido, uT, uTitileo, uEstrella, uRebobina; varying vec3 vC; varying float vA;
     ${COMUN}
-    const float R = ${R.toFixed(1)}, PI = 3.14159265;
+    const float R = ${R.toFixed(1)};
     float tipo;
-    // Ángulo de órbita (Kepler: más deprisa cerca de la estrella); uOrbita lleva el tiempo propio (al rebobinar, hacia atrás).
-    float orbita(float r){ return uOrbita * pow(1.6 * R / max(r, 1.0), 1.5); }
-    float llegada(){ return tipo < 0.5 ? 0.63 + aDato.x * 0.25 + aDato.y * 0.03 : tipo < 1.5 ? 0.62 + aDato.x * 0.15 : 0.78 + aDato.y * 0.02; }
+    // Cuándo la talla la luz: el frente sale de la estrella al encenderse (τ 0,52) y llega a lo más hondo hacia τ 0,97.
+    float tallado(float tau){ float dl = 0.52 + 0.36 * clamp(aDato.x, 0.0, 1.0); return smoothstep(dl, dl + 0.09, tau); }
     vec3 sitio(float tau){
-      // Caída: de su sitio en la nube a su órbita en el disco, girando cada vez más deprisa al acercarse.
-      float rC = length(position.xz), fC = atan(position.z, position.x);
-      float u = clamp((tau - aDato.y * 0.08) / 0.42, 0.0, 1.0), e = u * u * (3.0 - 2.0 * u);
-      float rd = aDato.w * R, r = mix(rC, rd, e), f0 = fC + 2.4 * e * e, fd = f0 + smoothstep(0.42, 0.64, tau) * orbita(rd);
-      vec3 D = vec3(cos(fd) * r, position.y * (1.0 - smoothstep(0.0, 0.85, e)), sin(fd) * r);
-      if (tipo > 1.5 && tipo < 2.5) return D;
-      float dl = llegada(), v = smoothstep(dl, dl + (tipo < 0.5 ? 0.1 : 0.06), tau);
-      vec3 W;
-      if (tipo < 0.5) {
-        // Su anillo: el disco se ordena (cada mota va a su radio sin dejar de orbitar).
-        float rk = aLinea.x * R, rr = mix(rd, rk, v), f = mix(fd, f0 + aLinea.y + orbita(rr), v);
-        return vec3(cos(f) * rr, D.y * (1.0 - v) + (aDato.z - 0.5) * 0.012 * rk * v, sin(f) * rr);
-      } else if (tipo < 1.5) {
-        // Protuberancia: arco r = L·sen²θ entre sus dos pies; las motas fluyen de un pie al otro.
-        float s = fract(aLinea.z + uFlujo * 1.6), L = aLinea.x, t0 = asin(sqrt(1.0 / L)), th = mix(t0, PI - t0, s), ra = L * R * sin(th) * sin(th);
-        W = vec3(ra * sin(th) * cos(aLinea.y), ra * cos(th), ra * sin(th) * sin(aLinea.y));
-      } else {
-        // Uno de los dos mundos: un grumo que orbita en el anillo 4, junto al otro.
-        float rk = ${ANILLOS_DENEB[4].toFixed(3)} * R, f = orbita(rk) + 0.6 + aLinea.y * 0.16;
-        W = vec3(cos(f) * rk, 0.0, sin(f) * rk) + vec3(aLinea.x, aDato.x, aLinea.z) * R;
+      if (tipo > 2.5) {
+        // Cae girando (cada vez más deprisa) hacia el centro entre τ 0,05 y 0,48.
+        float c = smoothstep(0.05 + aDato.y * 0.1, 0.48, tau), a = c * c * (4.0 + 6.0 * aDato.y);
+        vec3 p = position * (1.0 - c * 0.97); float ca = cos(a), sa = sin(a);
+        return vec3(p.x * ca - p.z * sa, p.y * (1.0 - c * 0.6), p.x * sa + p.z * ca);
       }
-      return mix(D, W, v);
+      // La nube oscura respira muy despacio; al tallarse, cada mota va a su sitio (la pared, el pilar o fuera).
+      float k = tallado(tau);
+      vec3 q = mix(position, aDestino, k * k * (3.0 - 2.0 * k));
+      // Los filamentos fluyen un poco a lo largo de la pared (vivos, sin dejar de ser los mismos).
+      q += vec3(sin(uFlujo * 3.0 + aDato.y * 40.0), cos(uFlujo * 2.3 + aDato.w * 40.0), sin(uFlujo * 2.7 + aDato.z * 9.0)) * 1.4;
+      return q;
     }
     void main(){
       tipo = floor(aLinea.w + 0.5);
       float tau = clamp(uTau - aFantasma * uRastro, 0.0, 1.0);
       vec3 q = sitio(tau);
       vec4 mv = modelViewMatrix * vec4(q, 1.0); gl_Position = projectionMatrix * mv;
-      float dl = llegada(), hecho = tipo > 1.5 && tipo < 2.5 ? 0.0 : smoothstep(dl, dl + 0.1, tau), disco = smoothstep(0.25, 0.5, tau);
-      float k = aDato.x * 6.0;   // índice del anillo
-      // En el drop, con cada golpe una onda de luz sale de la estrella y cruza los anillos de dentro afuera; «in the middle»:
-      // los anillos se encienden uno tras otro de fuera adentro, hacia ella, en el centro.
-      float onda = exp(-pow(uEdad / 0.5 * 7.5 - k, 2.0) * 0.7) * exp(-uEdad / 0.5) * uFuerza;
-      float haciaElla = tipo < 0.5 ? exp(-pow((uMedioT - (6.0 - k) * 0.13) / 0.16, 2.0)) * step(0.0, uMedioT) : 0.0;
-      float luz = tipo < 0.5 ? 0.5 + 0.75 * uGloria + 2.2 * onda + 2.6 * haciaElla + 0.5 * uMedio : tipo < 1.5 ? 1.4 + 0.6 * uGloria : 2.4;
-      float a = mix(mix(1.5, 1.1, disco), luz, hecho);
-      if (tipo > 1.5 && tipo < 2.5) a *= 1.0 - smoothstep(0.47, 0.53, tau);   // lo que cae, se lo traga la estrella al encenderse
-            // Colores de los anillos: blanco azulado, rosa y oro pálido alternos; las protuberancias, rosas; los mundos, uno rosa y otro dorado.
-      float m = mod(k + 0.5, 3.0);
-      vec3 cAnillo = m < 1.0 ? mix(vec3(0.78, 0.87, 1.0), vec3(1.0), aDato.z * 0.5) : m < 2.0 ? mix(vec3(1.0, 0.72, 0.85), vec3(1.0, 0.9, 0.95), aDato.z * 0.5) : mix(vec3(1.0, 0.86, 0.62), vec3(1.0, 0.95, 0.85), aDato.z * 0.5);
-      vec3 cHecho = tipo < 0.5 ? cAnillo : tipo < 1.5 ? mix(vec3(1.0, 0.48, 0.64), vec3(1.0, 0.78, 0.86), aDato.z) : (aLinea.y < 0.5 ? vec3(1.0, 0.7, 0.86) : vec3(1.0, 0.86, 0.6));
-      cHecho = mix(cHecho, mix(vec3(1.0, 0.7, 0.82), vec3(1.0, 0.86, 0.62), aDato.z), uCalido * 0.4 * step(tipo, 0.5));
-      // La nube y el disco, con los mismos colores que su mundo (más tenues): todo el clip con la misma paleta.
-      vC = mix(mix(cAnillo * 0.85, mix(vec3(0.88, 0.93, 1.0), cAnillo, 0.6), disco), cHecho, hecho);
+      float rn = clamp(aDato.x, 0.0, 1.0), luzT = tipo > 2.5 ? 0.0 : tallado(tau);
+      if (tipo > 0.5 && tipo < 1.5) luzT = luzT * luzT * luzT;   // los pilares se encienden al llegar a su sitio (no a medio camino)
+      // La luz llega: el frente que pasa brilla un momento; lo tallado queda iluminado desde dentro (más cerca, más luz).
+      float dl = 0.52 + 0.36 * rn, frente = exp(-pow((tau - dl - 0.05) / 0.035, 2.0)) * step(tipo, 2.5);
+      float borde = aDato.z;   // 1: el mismo borde de la cavidad (el frente de ionización)
+      float punta = tipo > 0.5 && tipo < 1.5 ? aLinea.y : 0.0;
+      // En el drop, con cada golpe una onda de luz recorre la nube desde la estrella hacia fuera; «in the middle»: la luz
+      // corre por la nube de fuera adentro hasta ella, en el centro.
+      float onda = exp(-pow(uEdad / 0.55 * 1.1 - rn, 2.0) / 0.012) * exp(-uEdad / 0.6) * uFuerza;
+      float haciaElla = step(0.0, uMedioT) * exp(-pow((1.0 - rn) - uMedioT / 1.1, 2.0) / 0.01);
+      // Como en una región HII de verdad: lo que da a la estrella (el borde de la cavidad, las caras y puntas de los pilares)
+      // brilla; detrás, el polvo de la pared queda oscuro y tenue: frentes de luz nítidos contra la nube.
+      float cara = tipo > 0.5 && tipo < 1.5 ? 1.0 - smoothstep(0.0, 0.45, aLinea.z) : 0.0;
+      float iluminada = (0.16 + 0.12 * (1.0 - rn)) + (2.1 * borde + 1.5 * cara + 1.0 * punta) * (0.75 + 0.35 * uGloria);
+      float oscuro = tipo > 0.5 && tipo < 1.5 ? 0.2 : 0.6;
+      float a = mix(oscuro, iluminada, luzT) * uEstrella + oscuro * (1.0 - uEstrella) + 1.4 * frente + luzT * (1.4 * onda + 1.6 * haciaElla + 0.3 * uMedio);
+      if (tipo > 1.5 && tipo < 2.5) a *= 1.0 - smoothstep(0.55, 0.9, luzT);          // lo que se lleva la luz, se apaga lejos
+      if (tipo > 2.5) a *= 1.0 - smoothstep(0.44, 0.5, tau);                         // el núcleo, tragado por la estrella
+      // Colores: la nube oscura, azul violáceo tenue; iluminada, el rojo-rosa del hidrógeno, el azul verdoso del oxígeno
+      // cerca de la estrella, y el borde y las puntas casi blancos.
+      vec3 oscura = mix(vec3(0.22, 0.26, 0.62), vec3(0.36, 0.3, 0.7), aDato.y);
+      vec3 hidrogeno = mix(vec3(1.0, 0.24, 0.42), vec3(1.0, 0.44, 0.58), aDato.w);
+      vec3 oxigeno = mix(vec3(0.3, 0.72, 1.0), vec3(0.55, 0.85, 1.0), aDato.w);
+      vec3 polvo = mix(vec3(0.42, 0.18, 0.4), vec3(0.3, 0.22, 0.55), aDato.y);
+      vec3 frenteLuz = aDato.y < 0.35 ? oxigeno : hidrogeno;   // los frentes, rosas del hidrógeno con hebras azules del oxígeno
+      vec3 luz = mix(polvo, frenteLuz, clamp(borde + cara, 0.0, 1.0));
+      luz = mix(luz, vec3(1.0, 0.88, 0.92), punta * 0.6);
+      luz = mix(luz, vec3(1.0, 0.82, 0.62), uCalido * 0.35 * aDato.y);
+      vC = mix(oscura, luz, luzT);
+      vC = mix(vC, vec3(1.0, 0.97, 0.95), clamp(frente, 0.0, 1.0) * 0.6);
       // Mientras el tiempo va hacia atrás, todo se tiñe de un azul helado (se nota que es un rebobinado, no otra cosa).
       vC = mix(vC, vec3(0.62, 0.86, 1.0), uRebobina * 0.55); a *= 1.0 + 0.35 * uRebobina;
-      // Estela: los fantasmas solo se ven mientras la mota se mueve deprisa (rebobinado, caída), más tenues cuanto más atrás.
       float estela = aFantasma < 0.5 ? 1.0 : (1.0 - aFantasma * 0.32) * smoothstep(0.003, 0.012, abs(uRastro));
-      float titila = 1.0 - uTitileo * 0.25 * (0.5 + 0.5 * sin(uT * (0.8 + aDato.z * 1.7) + aDato.y * 60.0));
-      float tam = tipo > 2.5 ? 2.4 : (1.6 + aDato.y * 1.3) * (1.0 + 0.6 * (1.0 - disco));
-      vA = a * estela * titila * tamMota(tam, mv, 2.8) * fueraSilueta(mv, R * uEstrella) * sqrt(uExpo); }`));
-  materia.frustumCulled = false; materia.renderOrder = 2; sistema.add(materia);
+      float titila = 1.0 - uTitileo * 0.25 * (0.5 + 0.5 * sin(uT * (0.8 + aDato.y * 1.7) + aDato.w * 60.0));
+      float tam = (2.0 + aDato.w * 1.6) * (1.0 + 0.3 * borde + 0.4 * punta);
+      vA = a * estela * titila * tamMota(tam, mv, 2.8) * fueraSilueta(mv, R * max(uEstrella, 0.09)) * sqrt(uExpo); }`));
+  materia.frustumCulled = false; materia.renderOrder = 2; marco.add(materia);
 
   // ── Viento, corona y espículas ──
   const NV = 3000, NE = 2400, NB = NV + NE, dirV = new Float32Array(NB * 3), datoV = new Float32Array(NB * 4);
@@ -289,13 +298,13 @@ export function crearDeneb({ uScale, uPR }) {
       const tam = Math.max(0.001, brasa * 0.09 * (1 + 0.3 * e.pum) + estrella * (1 + 0.05 * Math.sin(Math.min(1, Math.max(0, e.encendido) / 1.2) * Math.PI) * w));
       superficie.visible = tam > 0.01; superficie.scale.setScalar(tam * (1 + (reducido ? 0 : 0.012) * e.pum * w));
       const destello = w > 0.5 && e.encendido >= 0 ? Math.exp(-e.encendido / 0.35) * Math.min(1, e.encendido / 0.08) : 0;
-      // «in the middle»: cuando la luz de los anillos llega al centro, la estrella responde.
+      // «in the middle»: cuando la luz que corre por la nube llega al centro, la estrella responde.
       const respuesta = w > 0.5 && e.medioT >= 0 ? 0.12 * Math.exp(-Math.pow((e.medioT - 0.95) / 0.3, 2)) : 0;
       uS.uT.value = tEstrella; uS.uTemp.value = estrella; uS.uLuz.value = estrella + brasa * 0.9 + 0.4 * destello + respuesta; uS.uGloria.value = gloria; uS.uPum.value = e.pum * w;
       uM.uTau.value = tau; uM.uRastro.value = reducido ? 0 : Math.max(-0.08, Math.min(0.08, dtau * 0.08));
       // Las copias de la estela solo se dibujan mientras las motas se mueven deprisa (casi siempre, solo las de verdad).
       gM.setDrawRange(0, Math.abs(uM.uRastro.value) > 0.003 ? N * F : N);
-      uM.uFlujo.value += dt * reloj * (reducido ? 0.01 : 0.025); uM.uOrbita.value += dt * reloj * (reducido ? 0.04 : 0.12 + 0.06 * gloria);
+      uM.uFlujo.value += dt * reloj * (reducido ? 0.03 : 0.08); uM.uOrbita.value += dt * reloj * 0.05;
       uM.uGloria.value = gloria; uM.uEdad.value = e.edad ?? 1; uM.uFuerza.value = (e.fuerza ?? 0) * w; uM.uMedio.value = e.medio * w; uM.uMedioT.value = w > 0.5 ? e.medioT : -1; uM.uCalido.value = mezcla(n.calido, e.calido, w);
       uM.uT.value = t; uM.uTitileo.value = reducido ? 0 : 1; uM.uRebobina.value = Math.min(1, Math.max(0, -reloj) / 2); uM.uEstrella.value = Math.max(estrella, 0.001);
       viento.visible = estrella > 0.002; uV.uViento.value += dt * reloj * (reducido ? 0.03 : 0.06 + 0.06 * gloria); uV.uEstrella.value = estrella; uV.uGloria.value = gloria; uV.uPum.value = e.pum * w;

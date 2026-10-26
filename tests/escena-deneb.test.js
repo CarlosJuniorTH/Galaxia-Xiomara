@@ -64,7 +64,7 @@ test('Deneb: la pista de cámara, en orden, dentro de la canción y fuera de la 
     assert.ok(p.curva !== 'corte' && !p.giro, `sin cortes ni giros en ${p.t}`);
     assert.ok(p.pos[0] >= a.pos[0], `el azimut no cambia de sentido en ${p.t}`);
     assert.ok((p.pos[0] - a.pos[0]) / (p.t - a.t) < 6, `despacio en ${p.t}`); });
-  assert.ok(CAMARA_DENEB.some(p => cerca(p.t, m.medio) && p.pos[1] > 55), '«in the middle»: sus anillos de lleno, ella en el centro');
+  assert.ok(CAMARA_DENEB.some(p => cerca(p.t, m.medio) && Math.abs(p.pos[1]) < 12 && Math.abs(p.pos[0]) < 35), '«en el medio»: de frente a la cavidad, ella en el centro');
   assert.equal(ESCENA_DENEB.camara, CAMARA_DENEB, 'el director la encuentra en la escena');
 });
 

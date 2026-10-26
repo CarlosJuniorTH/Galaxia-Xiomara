@@ -2,56 +2,52 @@
 // compás cada 2,286 s desde el 0 (medido en sus pulsos y compases) (compases en 0; 2,30; 4,57; …; 20,57; …; 32,00; …; 41,15). Aquí solo hay números y curvas
 // (sin three.js): las pruebas los comprueban sin navegador. Lo que se dibuja: js/escena/deneb.js.
 //
-// La historia la cuenta lo que hace una estrella: NACER. Al llegar se ve Deneb tal como es (supergigante blanca azulada,
-// con sus protuberancias y su «mundo»: los anillos de motas que la rodean). Con la letra:
-//   0–2,5    se acaba el compás de la parte anterior (aún hay bombo): Deneb tal cual.
+// La historia la cuenta lo que hace una estrella así de luminosa: NACER y ESCULPIR con su luz la nube de la que nace (como
+// Deneb con la nebulosa Norteamérica/Pelícano, en el Cisne). Al llegar se ve como es: la supergigante blanca azulada en
+// el centro de una cavidad que su luz ha abierto en la nube, con paredes de filamentos y pilares iluminados desde dentro.
+// Tiempos medidos sobre la voz aislada (arranques de sílaba) y el bombo de la instrumental. Con la letra:
+//   0–2,5    se acaba el compás de la parte anterior (aún hay bombo): Deneb y su nube tal cual.
 //   2,5      el ritmo se apaga (pre-estribillo solo con voz): silencio, calma.
-//   4,33     «turn back the time» (giro 4,33 · vuelta 4,67 · tiempo 5,21): el tiempo se REBOBINA de verdad, a la vista:
-//            todo lo que pasó para que naciera la estrella ocurre al revés. Los anillos se deshacen en el disco, la estrella se apaga y encoge hasta una brasa (5,8–6,7), y el disco se desenrosca hasta ser otra vez
-//            una nube oscura y fría; la superficie, el viento y las órbitas corren hacia atrás.
-//   7,03 / 8,56  los dos «alright»: la brasa da sus dos últimos latidos mientras todo se dispersa.
-//   9,57     «for us»: ya no hay nada. Una nube oscura y quieta: «como si no fuese nada».
-//   11,03    «I promise»: la nube cae hacia el centro (girando, como cae el gas de verdad) y se aplana en un disco.
-//   12,01    «build»: ENCENDIDO. Nace la estrella: un frente de motas sale de ella y crece hasta su tamaño.
-//   13,23    «new world»: lo que sobra del disco se ordena en siete anillos (órbitas) alrededor de ella, de dentro
-//            afuera; las protuberancias, arcos rosas, nacen primero, pegadas a ella. 14,9 «for us two»: en uno de los
-//            anillos se forman dos mundos pequeños, juntos (uno rosa y otro dorado).
-//   16,01 / 17,49  «with you»: el mundo se cierra; la cámara la rodea.
-//   19,16    «in the middle»: su mundo terminado y visto de lleno, ella en el centro exacto: los anillos se encienden
-//            uno tras otro de fuera adentro, hacia ella, y la estrella responde.
-//   20,57    el DROP: el estribillo instrumental con su bombo. Deneb en toda su gloria: la superficie hierve, el viento y las
-//            protuberancias se avivan, cada golpe manda una onda de luz por los anillos y lanza eyecciones de motas.
-//   32,00    segunda mitad: todo igual de vivo, más cálido (rosa y oro en los anillos).
+//   4,27     el deseo de volver atrás en el tiempo (4,27 · 4,62 · 5,11): el tiempo se REBOBINA de verdad, a la vista:
+//            la luz se retira de la nube, el gas vuelve a llenar la cavidad, la estrella se apaga y encoge hasta una
+//            chispa (5,8–6,7) y la nube se queda oscura; la superficie y el viento corren hacia atrás.
+//   7,03 / 8,56  los dos «que todo esté bien»: la chispa da sus dos últimos latidos y se apaga.
+//   9,57     ya no hay nada: una nube oscura y quieta, «como si no fuese nada».
+//   10,87    la promesa: el núcleo de la nube cae girando hacia el centro.
+//   12,01    construir: ENCENDIDO. Nace la estrella: un frente de motas sale de ella.
+//   12,86    un mundo nuevo para los dos: su luz enciende y talla la nube de dentro afuera: abre la cavidad, empuja el gas
+//            hasta un borde brillante, deja los pilares con la punta hacia ella y se lleva hacia fuera el gas de delante.
+//   16,01 / 17,35  contigo: la cavidad se completa.
+//   19,16    en el medio: la estrella en el centro exacto de su cavidad iluminada; la luz corre por toda la nube de fuera
+//            adentro, hacia ella, y la estrella responde.
+//   20,57    el DROP (el bombo, en la rejilla de 0,5716 s): Deneb en toda su gloria; con cada golpe una onda de luz
+//            recorre la nube desde ella hacia fuera y lanza eyecciones de motas.
+//   32,00    segunda mitad: todo igual de vivo, más cálido.
 //   41,15    se serena hasta su estado de siempre (el mismo que al llegar: sin saltos).
 // El estado es el mismo en s = 0 y en s ≥ fin (el «normal», lo que se ve fuera de la escena).
 export const ESCENA_DENEB = {
   id: 'deneb', duracion: 43.4, pulso: 43.44 / 76, compas: 4, desfase: 0,
-  marcas: { inicio: 0, silencio: 2.5, atras: 4.33, tiempo: 5.21, bien: 7.03, bien2: 8.56, nada: 9.57, promesa: 11.03, construir: 12.01, mundo: 13.23, dos: 14.93, contigo: 16.01, tu: 17.49, medio: 19.16, drop: 20.57, segunda: 32, fundido: 41.15, fin: 43.4 }
+  marcas: { inicio: 0, silencio: 2.5, atras: 4.27, tiempo: 5.11, bien: 7.03, bien2: 8.56, nada: 9.57, promesa: 10.87, construir: 12.01, mundo: 12.86, dos: 14.93, contigo: 16.01, tu: 17.35, medio: 19.16, drop: 20.57, segunda: 32, fundido: 41.15, fin: 43.4 }
 };
 
 // La pista de cámara del videoclip (formato y ejes del director de cámara, js/util/directorCamara.js): t en segundos del
 // fragmento; pos = [azimut°, elevación°, distancia] alrededor de Deneb en radios de encuadre (1 = la distancia de llegada;
-// la estrella mide 0,22 y sus anillos llegan a 1,0); azimut 0 / elevación 0 = desde Deneb hacia casa. Los anillos están en
-// un plano inclinado 24° hacia casa.
-// Un solo travelling lento y continuo (Carlos: movimientos suaves, con mucha sensibilidad): el azimut siempre avanza en el
-// mismo sentido (de 0 a 100° en toda la canción), la cámara sube despacio hasta ver los anillos de lleno en «in the
-// middle», se acerca un poco en el drop y vuelve a bajar hasta el mismo encuadre de la llegada: acaba como empezó. Sin cortes, sin giros
-// de cámara y sin cambios de sentido: todos los tramos encadenados (lineales, con tangentes continuas).
+// la estrella mide 0,22, su cavidad ~0,46 y la nube llega a ~1); azimut 0 / elevación 0 = desde Deneb hacia casa: por
+// ahí está abierta la cavidad. Un solo travelling lento y continuo: el azimut siempre hacia el mismo lado (de −10° a 38°
+// en toda la canción, ~1°/s), mirando dentro de la cavidad; se aleja para ver la nube entera cuando no hay nada y
+// mientras se construye su mundo, queda de frente en «en el medio», se acerca despacio en el drop y acaba como empezó.
 const PISTA = [
-  { t: 0, pos: [0, 10, 1.0], mira: [0, 0, 0], fov: 55, curva: 'corte' },     // llegada: Deneb tal cual
-  { t: 4.33, pos: [6, 12, 0.93], curva: 'lineal' },                           // «turn back the time»
-  { t: 9.6, pos: [18, 24, 1.15], curva: 'lineal' },                           // se aparta para ver cómo todo se deshace
-  { t: 12.0, pos: [24, 26, 1.05], curva: 'lineal' },                          // «promise… build»: se enciende
-  { t: 14.93, pos: [32, 36, 0.98], curva: 'lineal' },                         // «new world… us two»: los anillos se ordenan
-  { t: 17.49, pos: [40, 52, 1.0], curva: 'lineal' },                          // «with you»: sube despacio…
-  { t: 19.16, pos: [45, 64, 1.02], curva: 'lineal' },                         // «in the middle»: sus anillos de lleno, ella en el centro
-  { t: 20.57, pos: [50, 58, 0.9], curva: 'lineal' },                          // el drop: se acerca
-  { t: 24.0, pos: [60, 44, 0.8], curva: 'lineal' },
-  { t: 28.0, pos: [70, 34, 0.78], curva: 'lineal' },
-  { t: 32.0, pos: [80, 26, 0.84], curva: 'lineal' },                          // segunda mitad
-  { t: 36.57, pos: [88, 18, 0.92], curva: 'lineal' },
-  { t: 41.15, pos: [96, 12, 1.0], curva: 'lineal' },
-  { t: 43.4, pos: [100, 10, 1.0], curva: 'suave' }                            // se posa como al llegar (misma altura y distancia)
+  { t: 0, pos: [-10, 8, 1.15], mira: [0, 0, 0], fov: 55, curva: 'corte' },   // llegada: Deneb y su cavidad
+  { t: 4.27, pos: [-7, 9, 1.2], curva: 'lineal' },                           // el tiempo se rebobina…
+  { t: 9.6, pos: [3, 14, 1.75], curva: 'lineal' },                           // …hasta la nube oscura: se ve entera
+  { t: 12.01, pos: [9, 12, 1.4], curva: 'lineal' },                          // se enciende
+  { t: 16.01, pos: [15, 9, 1.6], curva: 'lineal' },                          // su luz talla la nube: abierto para verlo crecer
+  { t: 19.16, pos: [19, 4, 1.42], curva: 'lineal' },                         // en el medio: de frente, ella en el centro
+  { t: 20.57, pos: [21, 4, 1.3], curva: 'lineal' },                          // el drop
+  { t: 28.0, pos: [27, 8, 1.05], curva: 'lineal' },                          // se acerca despacio con el bombo
+  { t: 32.0, pos: [31, 10, 1.12], curva: 'lineal' },                         // segunda mitad
+  { t: 41.15, pos: [36, 9, 1.18], curva: 'lineal' },
+  { t: 43.4, pos: [38, 8, 1.15], curva: 'suave' }                            // se posa como al llegar
 ];
 export const CAMARA_DENEB = PISTA;
 ESCENA_DENEB.camara = PISTA;
@@ -75,9 +71,9 @@ function curva(claves) {
 function curvasDe(m) {
   const k = m.fin / 43.4, a = v => v * k;   // las claves intermedias, en proporción si cambia la duración
   return {
-    // Formación (0 nube oscura · 0,5 disco con la estrella encendiéndose · 0,62 estrella hecha · 1 su mundo completo).
+    // Formación (0 nube oscura · 0,46 núcleo caído · 0,5–0,6 encendido · 0,62 estrella hecha · 1 la nube tallada del todo).
     tau: curva([[0, 1], [m.atras, 1], [m.tiempo, 0.8], [a(5.9), 0.6], [a(6.7), 0.45], [m.bien2 - a(0.6), 0.2], [m.nada + a(0.1), 0.02], [m.promesa, 0], [m.promesa + a(0.55), 0.24], [m.construir, 0.46], [m.construir + a(0.5), 0.6], [m.mundo, 0.64], [m.contigo, 0.88], [m.medio, 1], [m.fin, 1]]),
-    // Sentido y velocidad del tiempo de la estrella (superficie, viento, órbitas): negativo = rebobinado.
+    // Sentido y velocidad del tiempo de la estrella (superficie, viento, flujo de la nube): negativo = rebobinado.
     reloj: curva([[0, 1], [m.atras - a(0.1), 1], [m.atras + a(0.5), -3.2], [m.bien2, -2.2], [m.nada + a(0.2), 0.08], [m.promesa, 0.08], [m.promesa + a(0.6), 1.6], [m.construir + a(0.6), 1], [m.fin, 1]]),
     // Actividad: su estado normal 0,55; joven y tranquila en los versos; del todo en el drop.
     gloria: curva([[0, 0.55], [m.silencio, 0.55], [m.silencio + a(0.5), 0.42], [m.construir + a(0.3), 0.42], [m.medio, 0.48], [m.drop - a(0.2), 0.4], [m.drop, 0.42], [m.drop + a(0.18), 1], [m.segunda, 1], [m.segunda + a(0.4), 0.86], [m.fundido, 0.86], [m.fin, 0.55]]),
@@ -85,8 +81,8 @@ function curvasDe(m) {
     fuerza: curva([[0, 0.25], [m.silencio - a(0.1), 0.25], [m.silencio + a(0.1), 0], [m.drop - a(0.05), 0], [m.drop, 1], [m.fundido, 0.85], [m.fin, 0.25]]),
     calido: curva([[0, 0.25], [m.atras, 0.25], [m.tiempo, 0], [m.segunda, 0], [m.segunda + a(1.5), 0.75], [m.fundido, 0.75], [m.fin, 0.25]]),
     foco: curva([[0, 0], [m.silencio, 0.7], [m.tiempo, 0.9], [m.construir + a(0.5), 0.9], [m.medio, 0.75], [m.fundido, 0.75], [m.fin, 0]]),
-    // Las nebulosas lejanas: casi apagadas mientras no hay nada (que la nube y la estrella se lean), tenues después.
-    nubes: curva([[0, 0], [m.silencio, 0.7], [m.tiempo, 0.93], [m.construir + a(0.5), 0.93], [m.medio, 0.85], [m.fundido, 0.85], [m.fin, 0]])
+    // Las nebulosas lejanas y el cielo profundo: casi apagados (su propia nube es su cielo).
+    nubes: curva([[0, 1], [m.fin, 1]])
   };
 }
 const cache = new WeakMap();
@@ -104,15 +100,15 @@ export function latidoDeneb(s, { pulso, compas = 4, desfase = 0 }, e, reducido =
 const sat = x => x < 0 ? 0 : x > 1 ? 1 : x;
 
 // Estado de Deneb en el segundo `s` (escribe en `e`). Fuera de la escena (s ≤ 0 o s ≥ fin), el normal.
-//  tau      formación (0 nube · 0,45 brasa · 0,5–0,6 encendido · 0,62 estrella · 1 su mundo completo);
-//  estrella cuánto existe la estrella (0–1: tamaño y luz) y brasa  la protoestrella roja (0–1);
+//  tau      formación (0 nube oscura · 0,45 chispa · 0,5–0,6 encendido · 0,62 estrella · 1 su cavidad tallada);
+//  estrella cuánto existe la estrella (0–1: tamaño y luz) y brasa  la chispa de la que nace (0–1);
 //  reloj    velocidad (con signo) del tiempo propio de la estrella: negativa al rebobinar;
-//  gloria   actividad (superficie, viento, anillos: 0,4 joven · 0,55 normal · 1 drop);
+//  gloria   actividad (superficie, viento, nube: 0,4 joven · 0,55 normal · 1 drop);
 //  pum      el latido en este instante (ya con su fuerza), `edad` (s desde el último pulso) y `fuerza` (la del bombo);
 //  encendido segundos desde que nace (−1 si no toca: el frente de motas del encendido);
-//  medio    el destello del «in the middle» (0–1) y `medioT` los segundos desde entonces (−1 antes): los anillos se
-//           encienden de fuera adentro, hacia ella;
-//  calido   rosa y oro en los anillos (0–1);  foco  penumbra del resto del cielo (0–0,9);  nubes  cuánto se apagan las
+//  medio    el destello del «in the middle» (0–1) y `medioT` los segundos desde entonces (−1 antes): la luz corre
+//           por la nube de fuera adentro, hacia ella;
+//  calido   rosa y oro en la nube (0–1);  foco  penumbra del resto del cielo (0–0,9);  nubes  cuánto se apagan las
 //           nebulosas lejanas (0–0,93: casi del todo mientras la estrella no existe).
 export function estadoDeneb(s, config, e = {}, reducido = false) {
   const m = config.marcas, c = curvas(config), t = Math.min(Math.max(s, 0), m.fin);

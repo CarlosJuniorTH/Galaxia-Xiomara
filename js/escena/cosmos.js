@@ -315,7 +315,7 @@ export function* construirCosmos({ uScale, uPR }) {
     // Deneb: también fuera de su escena, cerca de ella, el resto del cielo queda en penumbra (la escena acaba limpia).
     get foco() { return Math.max(estadoP.foco * directores.pulsar.peso, estadoC.foco * directores.cuasar.peso, estadoD.foco * directores.deneb.peso, 0.85 * cercaDeneb); },
     // Las nebulosas lejanas se apagan en la escena de Deneb (nace de la nada: delante de un cielo casi negro).
-    get focoNubes() { return Math.max(estadoD.nubes * directores.deneb.peso, 0.85 * cercaDeneb); },
+    get focoNubes() { return Math.max(estadoD.nubes * directores.deneb.peso, cercaDeneb); },   // junto a Deneb, su propia nube es el cielo
     get animando() { for (const k in directores) { const d = directores[k]; if (d.activa || (d.visible && !d.terminada)) return true; } return false; },
     // Para las pruebas y el diagnóstico: segundo, peso y estado de cada una.
     estado(id) { const d = directores[id]; return d ? { activa: d.activa, terminada: d.terminada, segundo: d.segundo, peso: d.peso, ...(id === 'pulsar' ? estadoP : id === 'cuasar' ? estadoC : estadoD) } : null; }
