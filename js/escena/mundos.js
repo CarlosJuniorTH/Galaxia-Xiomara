@@ -677,6 +677,7 @@ export function* construirMundos({ scene, uScale, uPR }, { alConstelar = () => {
       const trazoMeta = completada ? total + 1 : unidos > 0 ? posicionNodos[Math.min(unidos, posicionNodos.length) - 1] + 1 : 0;
       trazado = Math.min(trazoMeta, trazado + dt * 70); geo.setDrawRange(0, Math.floor(trazado));
       hiloLuz.geometry.setDrawRange(0, Math.floor(trazado));
+      hilo.visible = trazado >= 2; hiloLuz.visible = trazado >= 1;   // sin trazo aún: nada que dibujar (sin órdenes de dibujo vacías)
       llenado += ((completada && trazado >= total ? 1 : 0) - llenado) * Math.min(1, dt * 0.8);
       relleno.material.uniforms.uOpacidad.value = llenado * (nebulosa ? 0.45 : 1); relleno.visible = llenado > 0.01;
       if (nebulosa) { nebulosa.material.uniforms.uT.value = t; nebulosa.material.uniforms.uLlenado.value = llenado; nebulosa.visible = llenado > 0.01; }
@@ -693,10 +694,10 @@ export function* construirMundos({ scene, uScale, uPR }, { alConstelar = () => {
       if (decoracion) {
         const { marco, interior, nombres, subida, base } = decoracion.userData;
         marco.material.uniforms.uTime.value = t; interior.material.uniforms.uTime.value = t;
-        interior.material.uniforms.uOpacidad.value = llenado * (0.6 + pulsoCorazon * 0.6);
+        interior.material.uniforms.uOpacidad.value = llenado * (0.6 + pulsoCorazon * 0.6); interior.visible = llenado > 0.002;
         for (const n of nombres) n.material.opacity = 0.32 + llenado * 0.6;
         // Corazoncitos: suben desde el contorno, se mecen y se desvanecen (solo con el corazón completo).
-        subida.material.uniforms.uTime.value = t; subida.material.uniforms.uOp.value = llenado * 0.9;
+        subida.material.uniforms.uTime.value = t; subida.material.uniforms.uOp.value = llenado * 0.9; subida.visible = llenado > 0.002;
         const pos = subida.geometry.getAttribute('position');
         for (let i = 0; i < pos.count; i++) { const f = (t * 0.12 + i / pos.count) % 1; pos.setXYZ(i, base[i * 3] + Math.sin(t + i) * 6, base[i * 3 + 1] + f * 120, base[i * 3 + 2] + 10); }
         pos.needsUpdate = true;

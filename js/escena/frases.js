@@ -86,6 +86,8 @@ export function crearFrases({ scene, renderer }, frases) {
         const meta = i === actual ? visible * 0.95 : 0;
         m.opacity += (meta - m.opacity) * Math.min(1, dt * 4);
         m.color.setScalar(m.opacity);
+        // Las que no se leen ahora (todas menos una) no se dibujan: eran 17 órdenes de dibujo por cuadro con opacidad ~0.
+        grupo.children[i].visible = m.opacity > 0.002 || meta > 0;
       });
     }
   };
