@@ -559,6 +559,10 @@ export function* construirCosmos({ uScale, uPR }) {
       suavesDeneb ??= gruposEstrella.Deneb.children.filter(o => o.isSprite).map(o => [o, o.material.opacity]);
       const lejosDeneb = THREE.MathUtils.smoothstep(camara.distanceTo(gruposEstrella.Deneb.position) / (450 * ESCALA_DENEB), 4, 14);
       for (const [o, base] of suavesDeneb) { o.material.opacity = base * lejosDeneb; o.visible = lejosDeneb > 0.001; }
+      // De lejos (desde casa está a unas 8 veces su distancia de llegada) se ve como antes: un punto deslumbrante con su
+      // disco pequeño (radio 30), no una luna; al acercarse (de 6 a 2,5 veces la llegada) crece hasta su tamaño de verdad.
+      const lejosLlegada = camara.distanceTo(gruposEstrella.Deneb.position) / (450 * ESCALA_DENEB);
+      denebCerca.marco.scale.setScalar(Math.max(wD > 0 ? 1 : 0, 0.3 + 0.7 * (1 - THREE.MathUtils.smoothstep(lejosLlegada, 2.5, 6))));
       denebCerca.actualizar(estadoD, normalD, wD, dt, t, reducido, camera.position);
       // Cuásar: en su escena su gas se calma (tiempo propio, acumulado) y se va encendiendo con la historia.
       const dC = directores.cuasar, sC = dC.avanzar(t, dt), wC = dC.peso; estadoCuasar(sC, dC.config, estadoC, reducido);

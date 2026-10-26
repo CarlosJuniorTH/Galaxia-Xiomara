@@ -1,8 +1,9 @@
 // Deneb de cerca: una supergigante blanca azulada (tipo A2 Ia) y su mundo, y su videoclip: el nacimiento de la estrella
 // (tiempos y curvas: js/util/escenaDeneb.js). En el espacio del grupo de Deneb (cosmos.js; la cámara llega a ~450).
-//  · superficie: esfera opaca con granulación que hierve (células claras con calles oscuras, deformadas y en dos
-//    escalas), supergranulación, fáculas junto al borde y oscurecimiento al limbo; con la formación pasa de nada a una
-//    brasa roja y, al encenderse, a blanca azulada. Un solo programa barato: tres lecturas de la tabla de ruido.
+//  · superficie: esfera opaca de plasma que hierve (hilos finos de gas más caliente en dos escalas, sobre un fondo que
+//    va del blanco del centro al azul del borde: oscurecimiento al limbo), manchas grandes y fáculas junto al borde; con
+//    la formación pasa de nada a una brasa roja y, al encenderse, a blanca azulada. Un solo programa barato: tres
+//    lecturas de la tabla de ruido.
 //  · materia: las motas que cuentan la historia. Cada una tiene su sitio en la nube oscura del principio, en el disco y
 //    en un hilo del mundo (líneas del campo magnético de la estrella, r = L·sen²θ: las grandes, su «mundo»; las bajas,
 //    pegadas a la superficie, sus protuberancias). Su posición es función de la formación `tau`: al rebobinar recorren el
@@ -52,9 +53,8 @@ export function crearDeneb({ uScale, uPR }) {
       void main(){
         vec3 n = normalize(vP);
         float mu = clamp(dot(normalize(vN), -normalize(vV)), 0.0, 1.0);
-        // Granulación fina (gránulos claros entre calles algo más oscuras y azules, en dos escalas) torcida por un campo
-        // lento, y encima la supergranulación; hierve con el tiempo propio de la estrella (al rebobinar, hacia atrás). De lejos
-        // se lee como el moteado de una superficie de gas; de cerca, como gránulos que cambian de forma.
+        // Dos escalas de ruido torcidas por un campo lento (w, que además da las manchas grandes): hierven con el tiempo
+        // propio de la estrella (al rebobinar, hacia atrás).
         float w = rn3(n * 2.4 + vec3(0.0, uT * 0.02, 0.0));
         float g1 = rn3(n * 21.0 + w * 2.2 + vec3(uT * 0.2, 0.0, -uT * 0.13));
         float g2 = rn3(n * 47.0 - w * 1.4 + vec3(0.0, -uT * 0.32, uT * 0.24));
@@ -74,7 +74,7 @@ export function crearDeneb({ uScale, uPR }) {
   superficie.renderOrder = -2; marco.add(superficie);
 
   // ── Materia: nube → disco → mundo (y lo que cae a la estrella) ──
-  // Hilos: dos capas de 14 líneas del campo (L 1,85 y 2,6 radios) y 9 protuberancias bajas (L 1,12–1,4).
+  // Hilos: dos capas de 14 líneas del campo (L 1,85 y 2,6 radios) y 11 protuberancias bajas (L 1,15–1,55).
   const hilos = [];
   for (let capa = 0; capa < 2; capa++) for (let k = 0; k < 14; k++) hilos.push({ L: capa ? 2.6 : 1.85, fi: (k + capa * 0.5) / 14 * Math.PI * 2 + 0.2, retraso: (k / 14) * 0.8 + capa * 0.12, tipo: 0, rosa: (k + capa * 3) % 4 === 0 });
   for (let k = 0; k < 11; k++) hilos.push({ L: 1.15 + azar() * 0.4, fi: azar() * Math.PI * 2, retraso: azar() * 0.25, tipo: 1, rosa: true });
@@ -113,9 +113,9 @@ export function crearDeneb({ uScale, uPR }) {
   const fantasma = new Float32Array(N * F); for (let f = 0; f < F; f++) fantasma.fill(f, f * N, (f + 1) * N);
   const gM = new THREE.BufferGeometry();
   gM.setAttribute('position', rep(nube, 3)); gM.setAttribute('aLinea', rep(linea, 4)); gM.setAttribute('aDato', rep(dato, 4)); gM.setAttribute('aFantasma', new THREE.BufferAttribute(fantasma, 1));
-  const uM = { uScale, uPR, uExpo: EXPOSICION, uTau: { value: 1 }, uRastro: { value: 0 }, uFlujo: { value: 0 }, uGloria: { value: 0.55 }, uPum: { value: 0 }, uEdad: { value: 1 }, uMedio: { value: 0 }, uCalido: { value: 0.25 }, uLuz: { value: 1 }, uT: { value: 0 }, uTitileo: { value: 1 }, uEstrella: { value: 1 } };
+  const uM = { uScale, uPR, uExpo: EXPOSICION, uTau: { value: 1 }, uRastro: { value: 0 }, uFlujo: { value: 0 }, uGloria: { value: 0.55 }, uPum: { value: 0 }, uEdad: { value: 1 }, uMedio: { value: 0 }, uCalido: { value: 0.25 }, uLuz: { value: 1 }, uT: { value: 0 }, uTitileo: { value: 1 }, uEstrella: { value: 1 }, uRebobina: { value: 0 }, uFuerza: { value: 0 } };
   const materia = new THREE.Points(gM, motas(uM, /* glsl */`attribute vec4 aLinea, aDato; attribute float aFantasma;
-    uniform float uScale, uPR, uExpo, uTau, uRastro, uFlujo, uGloria, uPum, uEdad, uMedio, uCalido, uLuz, uT, uTitileo, uEstrella; varying vec3 vC; varying float vA;
+    uniform float uScale, uPR, uExpo, uTau, uRastro, uFlujo, uGloria, uPum, uEdad, uMedio, uCalido, uLuz, uT, uTitileo, uEstrella, uRebobina, uFuerza; varying vec3 vC; varying float vA;
     ${COMUN}
     const float R = ${R.toFixed(1)}, PI = 3.14159265;
     float tipo; float s;
@@ -146,20 +146,22 @@ export function crearDeneb({ uScale, uPR }) {
       float hilo = tipo > 1.5 ? 0.0 : smoothstep(0.62 + aDato.x * (tipo > 0.5 ? 0.12 : 0.26) + aLinea.z * 0.07, 0.72 + aDato.x * (tipo > 0.5 ? 0.12 : 0.26) + aLinea.z * 0.07, tau);
       float disco = smoothstep(0.25, 0.5, tau);
       // En los hilos: un pulso de luz con cada golpe, de un pie al otro; el «in the middle» enciende su punto medio.
-      float frente = uEdad / 0.55, pulso = exp(-pow((s - frente) * 7.0, 2.0)) * uPum;
+      float frente = uEdad / 0.55, pulso = exp(-pow((s - frente) * 6.0, 2.0)) * exp(-uEdad / 0.4) * uFuerza;
       float medio = exp(-pow((s - 0.5) * 12.0, 2.0)) * uMedio;
       float luzHilo = (tipo > 0.5 ? 1.5 : 0.55) + 0.9 * uGloria + 2.0 * pulso + 2.4 * medio + 0.6 * uMedio;
-      float a = mix(mix(1.5, 1.0, disco), luzHilo, hilo);
+      float a = mix(mix(2.2, 1.1, disco), luzHilo, hilo);
       if (tipo > 1.5) a *= 1.0 - smoothstep(0.47, 0.53, tau);   // lo que cae, se lo traga la estrella al encenderse
       vec3 frio = vec3(0.55, 0.6, 1.0), caliente = mix(vec3(1.0, 0.86, 0.78), vec3(0.85, 0.9, 1.0), uEstrella);
       vec3 cHilo = tipo > 0.5 ? mix(vec3(1.0, 0.5, 0.66), vec3(1.0, 0.78, 0.86), aDato.z) : mix(vec3(0.74, 0.84, 1.0), vec3(1.0, 0.98, 0.98), aDato.z * 0.6);
       cHilo = mix(cHilo, vec3(1.0, 0.7, 0.84), rosa * 0.55 * (1.0 - tipo));
       cHilo = mix(cHilo, mix(vec3(1.0, 0.68, 0.8), vec3(1.0, 0.85, 0.6), aDato.z), uCalido * 0.45);
       vC = mix(mix(frio, caliente, disco), cHilo, hilo);
+      // Mientras el tiempo va hacia atrás, todo se tiñe de un azul helado (se nota que es un rebobinado, no otra cosa).
+      vC = mix(vC, vec3(0.62, 0.86, 1.0), uRebobina * 0.55); a *= 1.0 + 0.35 * uRebobina;
       // Estela: los fantasmas solo se ven mientras la mota se mueve deprisa (rebobinado, caída), más tenues cuanto más atrás.
       float estela = aFantasma < 0.5 ? 1.0 : (1.0 - aFantasma * 0.32) * smoothstep(0.003, 0.012, abs(uRastro));
       float titila = 1.0 - uTitileo * 0.25 * (0.5 + 0.5 * sin(uT * (0.8 + aDato.z * 1.7) + aDato.y * 60.0));
-      vA = uLuz * a * estela * titila * tamMota(1.6 + aDato.y * 1.3, mv, 2.6) * fueraSilueta(mv, R * uEstrella) * sqrt(uExpo); }`));
+      vA = uLuz * a * estela * titila * tamMota((1.6 + aDato.y * 1.3) * (1.0 + 0.6 * (1.0 - disco)), mv, 2.8) * fueraSilueta(mv, R * uEstrella) * sqrt(uExpo); }`));
   materia.frustumCulled = false; materia.renderOrder = 2; marco.add(materia);
 
   // ── Viento, corona y espículas ──
@@ -187,7 +189,7 @@ export function crearDeneb({ uScale, uPR }) {
       if (espicula > 0.5) { r = R * (1.0 + 0.07 * edad * (0.6 + 0.8 * aDato.w)); a = (1.0 - edad) * 2.0; }
       else { r = R * (1.02 + 2.7 * pow(edad, 1.7)); a = pow(1.0 - edad, 1.2) * smoothstep(0.0, 0.04, edad) * 1.3; }
       // Al encenderse, un frente de motas sale de la estrella y se deshace en el viento.
-      if (uEncendido >= 0.0) { float k = smoothstep(0.8, 1.7, uEncendido), rf = R * (1.0 + uEncendido * 2.6 * (0.8 + 0.4 * aDato.w)); r = mix(rf, r, k); a = mix(1.4 * (1.0 - smoothstep(1.0, 1.7, uEncendido)), a, k); }
+      if (uEncendido >= 0.0) { float k = smoothstep(0.9, 1.9, uEncendido), rf = R * (1.0 + uEncendido * 2.4 * (0.75 + 0.5 * aDato.w)); dir = position; r = mix(rf, r, k); a = mix(2.2 * (1.0 - smoothstep(1.1, 1.9, uEncendido)), a, k); }
       vec4 mv = modelViewMatrix * vec4(dir * r * mix(0.25, 1.0, uEstrella), 1.0); gl_Position = projectionMatrix * mv;
       vC = espicula > 0.5 ? mix(vec3(1.0, 0.96, 0.98), vec3(1.0, 0.62, 0.76), step(0.7, aDato.w)) : mix(vec3(0.76, 0.85, 1.0), vec3(1.0, 1.0, 1.0), aDato.w * 0.5);
       float titila = 1.0 - uTitileo * 0.3 * (0.5 + 0.5 * sin(uT * (1.0 + aDato.w * 2.0) + aDato.x * 50.0));
@@ -217,11 +219,14 @@ export function crearDeneb({ uScale, uPR }) {
       // Tamaño: nada → brasa (0,24 R) → estrella (con un pequeño rebote al encenderse); late con el bombo.
       const tam = Math.max(0.001, brasa * 0.24 * (1 + 0.25 * e.pum) + estrella * (1 + 0.05 * Math.sin(Math.min(1, Math.max(0, e.encendido) / 1.2) * Math.PI) * w));
       superficie.visible = tam > 0.01; superficie.scale.setScalar(tam * (1 + (reducido ? 0 : 0.012) * e.pum * w));
-      uS.uT.value = tEstrella; uS.uTemp.value = estrella; uS.uLuz.value = estrella + brasa * 0.9; uS.uGloria.value = gloria; uS.uPum.value = e.pum * w;
-      uM.uTau.value = tau; uM.uRastro.value = reducido ? 0 : Math.max(-0.08, Math.min(0.08, dtau * 0.08)); uM.uFlujo.value += dt * reloj * (reducido ? 0.01 : 0.025);
+      const destello = w > 0.5 && e.encendido >= 0 ? Math.exp(-e.encendido / 0.35) * Math.min(1, e.encendido / 0.08) : 0;
+      uS.uT.value = tEstrella; uS.uTemp.value = estrella; uS.uLuz.value = estrella + brasa * 0.9 + 0.45 * destello; uS.uGloria.value = gloria; uS.uPum.value = e.pum * w;
+      uM.uTau.value = tau; uM.uRastro.value = reducido ? 0 : Math.max(-0.08, Math.min(0.08, dtau * 0.08));
+      // Las copias de la estela solo se dibujan mientras las motas se mueven deprisa (casi siempre, solo las de verdad).
+      gM.setDrawRange(0, Math.abs(uM.uRastro.value) > 0.003 ? N * F : N); uM.uFlujo.value += dt * reloj * (reducido ? 0.01 : 0.025);
       uM.uGloria.value = gloria; uM.uPum.value = e.pum * w; uM.uEdad.value = e.edad ?? 1; uM.uMedio.value = e.medio * w; uM.uCalido.value = mezcla(n.calido, e.calido, w);
-      uM.uT.value = t; uM.uTitileo.value = reducido ? 0 : 1; uM.uEstrella.value = Math.max(estrella, 0.001);
-      uV.uViento.value += dt * reloj * (reducido ? 0.03 : 0.06 + 0.06 * gloria); uV.uEstrella.value = estrella; uV.uGloria.value = gloria; uV.uPum.value = e.pum * w;
+      uM.uT.value = t; uM.uTitileo.value = reducido ? 0 : 1; uM.uRebobina.value = Math.min(1, Math.max(0, -reloj) / 2); uM.uFuerza.value = (e.fuerza ?? 0) * w; uM.uEstrella.value = Math.max(estrella, 0.001);
+      viento.visible = estrella > 0.002; uV.uViento.value += dt * reloj * (reducido ? 0.03 : 0.06 + 0.06 * gloria); uV.uEstrella.value = estrella; uV.uGloria.value = gloria; uV.uPum.value = e.pum * w;
       uV.uEncendido.value = w > 0.5 ? e.encendido : -1; uV.uT.value = t; uV.uTitileo.value = reducido ? 0 : 1;
     }
   };

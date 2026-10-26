@@ -41,18 +41,18 @@ export const CAMARA_DENEB = [
   { t: 9.6, pos: [-28, 20, 1.55], mira: [0, 0, 0], fov: 58, curva: 'suave' },       // ya no hay nada: la nube entera
   { t: 11.03, pos: [-36, 18, 1.5], mira: [0, 0, 0], fov: 58, curva: 'suave' },      // «I promise»
   { t: 12.0, pos: [-20, 12, 0.95], mira: [0, 0, 0], fov: 55, curva: 'rapida' },     // la nube cae: la cámara va con ella
-  { t: 12.1, pos: [32, 16, 0.6], mira: [0, 0, 0], fov: 52, curva: 'corte' },        // «build»: corte al encendido
-  { t: 13.23, pos: [44, 18, 0.72], mira: [0, 0, 0], fov: 54, curva: 'suave' },      // «new world»: se aparta para verlo crecer
+  { t: 12.1, pos: [30, 14, 1.15], mira: [0, 0, 0], fov: 55, curva: 'corte' },       // «build»: corte al encendido (el frente de motas sale del cuadro)
+  { t: 13.23, pos: [44, 18, 0.8], mira: [0, 0, 0], fov: 54, curva: 'suave' },       // «new world»: se acerca mientras crece
   { t: 16.0, pos: [62, 22, 1.08], mira: [0, 0, 0], fov: 56, curva: 'suave' },
   { t: 17.49, pos: [78, 10, 0.98], mira: [0, 0, 0], fov: 54, curva: 'suave' },     // «with you»
   { t: 19.16, pos: [90, 12, 0.98], mira: [0, 0, 0], fov: 52, curva: 'suave' },     // «in the middle»: de frente, ella en el centro de su mundo
   { t: 20.4, pos: [90, 10, 0.84], mira: [0, 0, 0], fov: 52, curva: 'lineal' },      // la tensión antes del drop
-  { t: 20.57, pos: [128, -16, 0.46], mira: [0, 0.05, 0], fov: 62, curva: 'corte', giro: 8 },   // DROP
-  { t: 21.72, pos: [158, 8, 0.6], mira: [0, 0, 0], fov: 58, curva: 'rapida' },
-  { t: 22.87, pos: [208, 30, 0.76], mira: [0, 0, 0], fov: 56, curva: 'corte', giro: -6 },
-  { t: 25.15, pos: [250, -10, 0.5], mira: [0, 0, 0], fov: 60, curva: 'rapida' },
-  { t: 27.45, pos: [300, 52, 1.12], mira: [0, 0, 0], fov: 55, curva: 'corte' },    // desde arriba: el mundo entero
-  { t: 29.72, pos: [340, 4, 0.42], mira: [0, 0.1, 0], fov: 64, curva: 'rapida', giro: 5 },   // rozando la superficie
+  { t: 20.57, pos: [128, -16, 0.56], mira: [0, 0.05, 0], fov: 62, curva: 'corte', giro: 8 },   // DROP: desde abajo, entre los hilos
+  { t: 21.72, pos: [158, 8, 0.72], mira: [0, 0, 0], fov: 58, curva: 'rapida' },
+  { t: 22.87, pos: [208, 30, 0.9], mira: [0, 0, 0], fov: 56, curva: 'corte', giro: -6 },
+  { t: 25.15, pos: [250, -10, 0.62], mira: [0, 0, 0], fov: 60, curva: 'rapida' },
+  { t: 27.45, pos: [300, 52, 1.15], mira: [0, 0, 0], fov: 55, curva: 'corte' },    // desde arriba: el mundo entero
+  { t: 29.72, pos: [340, 4, 0.45], mira: [0, 0.12, 0], fov: 64, curva: 'rapida', giro: 5 },   // rozando la superficie
   { t: 32.0, pos: [20, 16, 0.9], mira: [0, 0, 0], fov: 55, curva: 'corte' },       // segunda mitad: un giro amplio
   { t: 36.57, pos: [78, 24, 0.95], mira: [0, 0, 0], fov: 55, curva: 'lineal' },
   { t: 41.15, pos: [112, 12, 1.0], mira: [0, 0, 0], fov: 55, curva: 'suave' },
@@ -111,7 +111,7 @@ const sat = x => x < 0 ? 0 : x > 1 ? 1 : x;
 //  estrella cuánto existe la estrella (0–1: tamaño y luz) y brasa  la protoestrella roja (0–1);
 //  reloj    velocidad (con signo) del tiempo propio de la estrella: negativa al rebobinar;
 //  gloria   actividad (superficie, viento, hilos: 0,4 joven · 0,55 normal · 1 drop);
-//  pum      el latido en este instante (ya con su fuerza) y `edad` (s desde el último pulso);
+//  pum      el latido en este instante (ya con su fuerza), `edad` (s desde el último pulso) y `fuerza` (la del bombo);
 //  encendido segundos desde que nace (−1 si no toca: el frente de motas del encendido);
 //  medio    el destello del «in the middle» (0–1): el punto medio de cada hilo se enciende;
 //  calido   rosa y oro en los hilos (0–1);  foco  penumbra del resto del cielo (0–0,9);  nubes  cuánto se apagan las
@@ -123,7 +123,8 @@ export function estadoDeneb(s, config, e = {}, reducido = false) {
   e.brasa = sat((e.tau - 0.22) / 0.2) * (1 - e.estrella);
   e.reloj = reducido ? Math.max(-1, c.reloj(t)) : c.reloj(t);
   e.gloria = c.gloria(t);
-  e.pum = latidoDeneb(t, config, e, reducido) * c.fuerza(t) * (reducido ? 0.4 : 1);
+  e.fuerza = c.fuerza(t) * (reducido ? 0.4 : 1);
+  e.pum = latidoDeneb(t, config, e, reducido) * e.fuerza;
   // Los dos «alright»: la brasa late dos veces mientras se apaga.
   for (const b of [m.bien, m.bien2]) { const x = t - b; if (x >= 0 && x < 1.2) e.pum = Math.max(e.pum, 0.8 * Math.exp(-x / 0.35)); }
   const x = t - m.construir; e.encendido = x >= 0 && x < 2.5 && s < m.fin ? x : -1;
