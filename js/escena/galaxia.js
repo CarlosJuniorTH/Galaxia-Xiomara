@@ -308,13 +308,16 @@ export function* construirGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia })
     transparent: true, premultipliedAlpha: true, depthWrite: false, blending: THREE.AdditiveBlending }));
   haloLuz.frustumCulled = false; haloLuz.visible = false; grupo.add(haloLuz);
   const mediaTextura = (t, porDefecto) => { try { const d = t.image?.data || t.image?.getContext?.('2d')?.getImageData(0, 0, t.image.width, t.image.height).data; if (!d) return porDefecto; let s = 0; for (let j = 0; j < d.length; j += 4) s += (0.2126 * d[j] + 0.7152 * d[j + 1] + 0.0722 * d[j + 2]) * d[j + 3] / 255; const m = s / (d.length / 4) / 255; return m > 1e-4 ? m : porDefecto; } catch { return porDefecto; } };
-  let mDisco = null, mBulbo = null; const ejeGalaxia = new THREE.Vector3(), haciaCam = new THREE.Vector3();
+  let mDisco = null, mBulbo = null; const ejeGalaxia = new THREE.Vector3(), haciaCam = new THREE.Vector3(), qGalaxia = new THREE.Quaternion();
+  // La luz media de sus imágenes de lejos se mide en la carga (prepararLuz): medirla la primera vez que casa queda lejos
+  // recorría 512×512 píxeles en pleno viaje (~25 ms con la CPU de un móvil: un tirón al salir de casa).
 
   const titileos = mats.map(m => m.uniforms.uTw.value);
   return {
     grupo,
     partesLejos: { puntos: lejos.children.find(o => o.isPoints), disco: discoLejos, bulbo: bulboLejos, grupo: lejos },   // diagnóstico (pruebas de identidad y luz)
     // Punto de un brazo (en el mundo, girando con la galaxia): ahí está nuestro sistema solar.
+    prepararLuz() { mDisco ??= mediaTextura(texLejos, null); mBulbo ??= mediaTextura(bulboLejos.material.map, null); },
     puntoBrazo(brazo = 1, t = 0.62) { const { x, z } = enBrazo(brazo, t, 0); grupo.updateMatrixWorld(); return grupo.localToWorld(new THREE.Vector3(x, 0, z)); },
     // Gira la galaxia a su ángulo del instante t (también sirve para ponerla al día al volver del sistema solar, donde no se
     // actualiza: sin esto, la marca del sistema solar saltaba de sitio al salir).
@@ -352,7 +355,7 @@ export function* construirGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia })
       uLejos.uOp.value = paso * LUZ_LEJOS * area * (1 - noResuelta);
       // El disco compensa su inclinación (la luz total de un disco transparente no depende de ella):
       // de canto se ve estrecho pero no se apaga.
-      ejeGalaxia.set(0, 1, 0).applyQuaternion(grupo.getWorldQuaternion(new THREE.Quaternion()));
+      ejeGalaxia.set(0, 1, 0).applyQuaternion(grupo.getWorldQuaternion(qGalaxia));
       const coseno = Math.max(0.12, Math.abs(ejeGalaxia.dot(haciaCam.copy(camera.position).normalize())));
       // Bulbo más suave y disco algo más luminoso (misma luz total): de lejos se leía como un punto muy
       // brillante con un disco tenue (pico 3× el de las demás galaxias), no como una espiral.

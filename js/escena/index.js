@@ -298,6 +298,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   const listo = (async () => {
     window.__pasoCarga = 'nebulosas'; await lejanas.prepararTodas((h, t) => avance(0.5 + 0.06 * h / t, 0.56));
     window.__pasoCarga = 'texturas'; await texturasTodas((h, t) => avance(0.56 + 0.28 * h / t, 0.84));
+    galaxia.prepararLuz();   // (la luz media de casa vista de lejos: antes se medía al salir de casa en el primer viaje)
     window.__pasoCarga = 'cielo'; avance(0.84, 0.86); await cieloProfundo.listo;
     window.__pasoCarga = 'cuasar'; avance(0.86, 0.88); cosmos.hornear(renderer); await new Promise(r => setTimeout(r, 0));
     avance(0.88, 0.96);
@@ -481,14 +482,14 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // Durante el viaje: región, encuentro a la vista y distancia a casa (interfaz y pruebas).
   const nombreEncuentro = new Map(lejanas.universo.encuentros.map(e => [e.id, e.nombre]));
   const REGIONES_NOMBRE = { salida: 'Grupo de Xiomara', extragalactica: 'Primeras regiones extragalácticas', intermedia: 'Regiones intermedias', profunda: 'Universo profundo', llegada: 'Región de la supernova' };
-  const dirTmp = new THREE.Vector3();
+  const dirTmp = new THREE.Vector3(), vEncuentro = new THREE.Vector3();   // (sin memoria nueva por galaxia: menos pausas del recolector en pleno viaje)
   function informarViaje(e) {
     const p = camera.position, mal = aMal(p.length()), aSupernova = aMal(p.distanceTo(cosmos.objetivo('supernova').centro));
     const region = mal < 3 ? 'salida' : (universoLocal.presencia.supernova ?? 0) > 0.5 ? 'llegada' : mal < 20 ? 'extragalactica' : mal < 80 ? 'intermedia' : 'profunda';
     canvas.dataset.region = REGIONES_NOMBRE[region]; canvas.dataset.distanciaMal = mal < 10 ? mal.toFixed(1) : String(Math.round(mal));
     // El encuentro que se ve ahora (el más reconocible delante).
     camera.getWorldDirection(dirTmp); let mejor = null, mw = 0.25;
-    for (const g of lejanas.universo.galaxias) { if (!g.encuentro) continue; const v = g.pos.clone().sub(p), d = v.length(), px = g.radio / d * 780, c = v.dot(dirTmp) / d; const w = THREE.MathUtils.smoothstep(px, 6, 30) * THREE.MathUtils.smoothstep(c, 0.5, 0.85); if (w > mw) { mw = w; mejor = g; } }
+    for (const g of lejanas.universo.galaxias) { if (!g.encuentro) continue; const v = vEncuentro.subVectors(g.pos, p), d = v.length(), px = g.radio / d * 780, c = v.dot(dirTmp) / d; const w = THREE.MathUtils.smoothstep(px, 6, 30) * THREE.MathUtils.smoothstep(c, 0.5, 0.85); if (w > mw) { mw = w; mejor = g; } }
     const nombre = mejor ? nombreEncuentro.get(mejor.encuentro) || '' : '';
     if (canvas.dataset.encuentro !== nombre) { if (nombre) canvas.dataset.encuentro = nombre; else delete canvas.dataset.encuentro; }
   }
