@@ -843,6 +843,15 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
         if (eje.lengthSq() > 0.5) haciaLuz.applyAxisAngle(eje, giroTotal - 0.45);
       }
       offset = haciaLuz.multiplyScalar(dist).setY(dist * (d?.altura ?? 0.2));
+      // Al cometa se llega de perfil (desde un lado del plano de sus colas, el más cercano, y algo por delante, del lado
+      // de la luz), mirando un poco detrás de la cabeza: se ven el núcleo, la coma y las dos colas abriéndose y curvándose.
+      // De frente (desde la luz) las colas se veían de punta, como una mancha.
+      if (id === 'cometa') {
+        const lado = mundos.ladoCometa(), cola = mundos.colaCometa();
+        if (lado.dot(camera.position.clone().sub(objetivo)) < 0) lado.negate();
+        objetivo.addScaledVector(cola, dist * 0.28);
+        offset = lado.multiplyScalar(0.92).addScaledVector(cola, -0.3).addScaledVector(EJE_Y, 0.12).normalize().multiplyScalar(dist * 1.25);
+      }
       // Horizontal bajo (móvil girado): la figura se aparta de la tarjeta de la izquierda.
       if (vista.alto < 620 && vista.ancho > vista.alto && vista.ancho <= 900) {
         const derecha = new THREE.Vector3().crossVectors(offset.clone().negate(), EJE_Y).normalize();

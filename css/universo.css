@@ -284,13 +284,14 @@ body.en-ruta .btn-mapa,body.en-calma .btn-mapa{display:none;}
 body.reuniendo .muelle,body.reuniendo .lugar,body.reuniendo .cometa-aviso,body.reuniendo #pastilla-estrellas,body.reuniendo .boton-tour,body.reuniendo #mensaje,body.reuniendo .btn-mapa,body.reuniendo #titulo{opacity:0;pointer-events:none;transition:opacity 1s ease;}
 
 /* Frase del cometa: aparece suave en la parte alta mientras cruza el cielo. */
-.cometa-frase{position:fixed;left:50%;top:calc(var(--arriba) + 140px);transform:translate(-50%,-8px);z-index:27;width:min(480px,88vw);display:flex;gap:12px;align-items:flex-start;
+/* La frase del cometa sale abajo (donde el brindis; nunca a la vez): arriba tapaba al propio cometa, que cruza esa parte del cielo. */
+.cometa-frase{position:fixed;left:50%;bottom:calc(var(--abajo) + 120px);transform:translate(-50%,-8px);z-index:27;width:min(480px,88vw);display:flex;gap:12px;align-items:flex-start;
   padding:12px 18px;border-radius:18px;background:#160e22eb;border:1px solid #cfe0ff33;color:#eef2ff;pointer-events:none;opacity:0;transition:opacity 1.2s ease,transform 1.2s ease;}
 .cometa-frase[hidden]{display:none;}
 .cometa-frase.visible{opacity:1;transform:translate(-50%,0);}
 .cometa-frase span{font-size:1.2rem;line-height:1.2;color:#cfe0ff;}
 .cometa-frase p{margin:0;font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1.12rem;line-height:1.4;}
-@media(max-width:600px){.cometa-frase{top:calc(var(--arriba) + 146px);}.cometa-frase p{font-size:1.02rem;}}
+@media(max-width:600px){.cometa-frase{bottom:auto;top:calc(var(--arriba) + 146px);}.cometa-frase p{font-size:1.02rem;}}
 
 /* Abrir un sobre (acción del correo de la luna). */
 .sobre-animado{position:fixed;inset:0;z-index:60;display:grid;place-items:center;pointer-events:none;background:radial-gradient(circle at 50% 50%,#1a0f2a99,transparent 60%);opacity:0;transition:opacity .35s ease;}

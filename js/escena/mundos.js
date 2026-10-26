@@ -564,6 +564,8 @@ export function* construirMundos({ scene, uScale, uPR }, { alConstelar = () => {
     posicionCometa() { return cometa.posicion(); },
     // Dirección de la cola de polvo (para llegar al cometa siguiéndola).
     colaCometa() { return cometa.cola(); },
+    // Perpendicular al plano de sus colas (para verlo de perfil al llegar).
+    ladoCometa() { return cometa.lado(); },
     // Un punto de la ruta postal en coordenadas del mundo (ángulo en su plano).
     puntoRuta(angulo) { correo.updateMatrixWorld(true); return ruta.localToWorld(new THREE.Vector3(Math.cos(angulo) * RADIO_RUTA, 12, Math.sin(angulo) * RADIO_RUTA)); },
     probarToque(x, y, camera) {

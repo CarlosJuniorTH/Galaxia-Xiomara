@@ -1,25 +1,45 @@
-// El cometa: todo de motas nítidas (nada de velos ni halos difusos), como en las fotografías reales:
-//  · núcleo blanco y nítido, con una cruz fina, y una coma de motas verde pálido (el carbono de los cometas reales
-//    brilla en verde) que nace en el núcleo, se aleja despacio y la luz empuja hacia la cola;
-//  · cola de polvo ancha y curvada, de blanco cálido a dorado pálido, hecha de hebras (las «sincronas»: el polvo que el
-//    núcleo soltó a la vez) que se abren en abanico y se quedan atrás, en la estela del movimiento;
-//  · cola de iones recta, fina y azulada, con unas pocas hebras que ondulan; apunta justo en contra de la luz.
-// La «luz» es el centro de la galaxia (el origen): las dos colas salen siempre en sentido contrario, de forma continua.
-// La orientación es una base fija en el espacio (contraluz y estela), sin depender de la cámara: antes las colas eran
-// bandas giradas hacia la cámara y su curva cambiaba de lado de golpe cuando la cámara cruzaba su plano.
+// El cometa: todo de motas nítidas (nada de velos ni halos difusos), como en las fotografías de los grandes cometas
+// (Hale-Bopp, NEOWISE): cada mota es un grano con edad, nace en el núcleo y se aleja según la física de verdad.
+//  · Núcleo: un punto blanco pequeño y nítido, con una cruz fina.
+//  · Coma: motas finas que salen del núcleo en tres chorros que giran con él (el núcleo rota) y otras en todas las
+//    direcciones; la luz las frena y las dobla hacia atrás, como fuentes: dibujan arcos y espirales que se van a la cola.
+//  · Cola de polvo: ancha, curvada, de blanco a dorado. Cada grano conserva el recorrido del cometa en el instante en que
+//    salió, la luz lo empuja hacia fuera (más a los granos finos) y se va quedando atrás en la órbita: la cola es la
+//    historia de por dónde ha pasado, se abre en abanico y se curva sola. Los «golpes» de actividad del núcleo dejan
+//    estrías (bandas de granos que salieron a la vez) y la cola se riza despacio.
+//  · Cola de iones: recta, fina, azulada, en contra de la luz en todo momento; hecha de filamentos que ondulan como una
+//    bandera al viento y se aceleran al alejarse.
+//  · Chispas: unos pocos granos que destellan un instante.
+// La «luz» es el centro de la galaxia (el origen): la cola de iones apunta siempre justo en contra; la de polvo se curva
+// hacia atrás de la órbita. Nada depende de la cámara (antes las colas eran bandas giradas hacia ella y cambiaban de lado).
 // Una sola nube de puntos (un dibujo) animada en la GPU: en cada cuadro solo cambian unos pocos uniformes.
-// Cruza el cielo durante 42 s de cada ciclo de 130 s. Si se le visita, sigue avanzando (la cámara viaja con él) y al
-// dejarlo está donde le corresponde. Lejos de casa (en las seis grandes) no se ve ni cuenta como visible.
+// Cruza el cielo durante 42 s de cada ciclo de 130 s, por detrás de la galaxia y por encima de su borde lejano: desde
+// casa (en PC y en el móvil en vertical) se ve como un trazo largo en el cielo. Si se le visita, sigue avanzando (la
+// cámara viaja con él) y al dejarlo está donde le corresponde. Lejos de casa (en las seis grandes) no se ve.
 import * as THREE from 'three';
 
 const CICLO = 130, VISIBLE = 42;
-// Pasa por la parte alta del encuadre de la vista inicial, por delante de la galaxia.
-const RECORRIDO = new THREE.QuadraticBezierCurve3(new THREE.Vector3(-2900, 820, 1000), new THREE.Vector3(200, 1300, 1700), new THREE.Vector3(2900, 620, 400));
-const LARGO = RECORRIDO.getLength();
+// El recorrido (curva de Bézier cuadrática; más allá del final sigue en línea recta con la misma velocidad).
+const P0 = new THREE.Vector3(-1800, 80, -600), P1 = new THREE.Vector3(-100, 500, -1600), P2 = new THREE.Vector3(1600, 60, -600);
+// Avance por segundo en el parámetro de la curva (0,06 → 0,94 en los 42 s visibles).
+const DU = 0.88 / VISIBLE;
 // Más allá de esta distancia de casa se está en el universo a gran escala (como escena.lejosDeCasa): ahí no hay cometa.
 const LEJOS = 15000;
-// Medidas de las colas (unidades de la escena) y número de motas de cada parte.
-const POLVO = { largo: 950, abre: 0.14, curva: 480, ancho: 260, motas: 11000 }, IONES = { largo: 1500, ancho: 24, motas: 4000, hebras: 7 }, COMA = { radio: 70, motas: 1500 };
+// Medidas (unidades de la escena), vidas (s) y número de motas de cada parte.
+const COMA = { motas: 1400, vida: 2.6, chorro: 38, empuje: 12 };
+const POLVO = { motas: 11000, vida: 15, largo: 1900, atras: 1000 };
+const IONES = { motas: 6000, vida: 3.6, largo: 2700, hebras: 9 };
+
+const D01 = new THREE.Vector3().subVectors(P1, P0), D12 = new THREE.Vector3().subVectors(P2, P1), FINAL = new THREE.Vector3().copy(D12).multiplyScalar(2);
+function punto(u, salida) {
+  if (u > 1) return punto(1, salida).addScaledVector(FINAL, u - 1);
+  const a = (1 - u) * (1 - u), b = 2 * (1 - u) * u, c = u * u;
+  return salida.set(0, 0, 0).addScaledVector(P0, a).addScaledVector(P1, b).addScaledVector(P2, c);
+}
+function derivada(u, salida) {
+  u = Math.min(u, 1);
+  return salida.copy(D01).multiplyScalar(2 * (1 - u)).addScaledVector(D12, 2 * u);
+}
 
 // Velo de una cola: una banda orientada a lo largo de la cola y girada hacia la cámara (lo usan los cometas lejanos del cosmos).
 export function crearVelo({ largo, ancho, colorA, colorB, curva = 0, intensidad = 1 }) {
@@ -50,72 +70,110 @@ export function crearVelo({ largo, ancho, colorA, colorB, curva = 0, intensidad 
   return malla;
 }
 
-// Las motas del cometa. aTipo: 0 núcleo, 1 coma, 2 polvo, 3 iones. aSemilla: x fase, y/z desvíos, w hebra o brillo.
-// position solo la usa la coma (dirección y radio de salida de cada mota).
+const f1 = v => v.toFixed(1), f4 = v => v.toFixed(4);
+
+// Las motas del cometa. aTipo: 0 núcleo, 1 coma, 2 polvo, 3 iones.
+// aSemilla: x fase de la vida, y/z rasgos propios (chorro, finura del grano, hebra…), w brillo propio.
+// position: una dirección al azar (dispersión de cada grano), no una posición.
 function crearMotas({ uScale, uPR }) {
   const total = 1 + COMA.motas + POLVO.motas + IONES.motas;
-  const pos = new Float32Array(total * 3), semilla = new Float32Array(total * 4), tipo = new Float32Array(total);
+  const dir = new Float32Array(total * 3), semilla = new Float32Array(total * 4), tipo = new Float32Array(total);
   const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;   // de −1 a 1, más denso en el centro
-  let i = 1;   // la 0 es el núcleo (todo a cero)
-  for (let k = 0; k < COMA.motas; k++, i++) {
-    const z = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, s = Math.sqrt(1 - z * z), r = COMA.radio * (0.15 + 0.85 * Math.pow(Math.random(), 1.2));
-    pos.set([Math.cos(a) * s * r, z * r, Math.sin(a) * s * r], i * 3);
-    semilla.set([Math.random(), 0, 0, 0.45 + Math.random() * 0.55], i * 4); tipo[i] = 1;
-  }
+  const esfera = i => { const z = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, s = Math.sqrt(1 - z * z), r = Math.cbrt(Math.random()); dir.set([Math.cos(a) * s * r, z * r, Math.sin(a) * s * r], i * 3); };
+  let i = 1;   // la 0 es el núcleo
+  for (let k = 0; k < COMA.motas; k++, i++) { esfera(i); semilla.set([Math.random(), Math.random(), Math.random(), 0.4 + Math.random() * 0.6], i * 4); tipo[i] = 1; }
   for (let k = 0; k < POLVO.motas; k++, i++) {
-    // Dos de cada tres motas forman hebras (9 sincronas en abanico); el resto rellena la cola entre ellas.
-    const hebra = Math.random() < 0.66 ? (Math.floor(Math.random() * 9) - 4) / 4 + gauss() * 0.05 : Math.random() * 2 - 1;
-    semilla.set([Math.random(), gauss(), gauss(), hebra], i * 4); tipo[i] = 2;
+    // Finura del grano (cuánto lo empuja la luz): más granos medianos que extremos.
+    const fino = 0.42 + 0.58 * Math.pow(Math.random(), 0.7);
+    esfera(i); semilla.set([Math.random(), fino, gauss(), 0.35 + Math.random() * 0.65], i * 4); tipo[i] = 2;
   }
   for (let k = 0; k < IONES.motas; k++, i++) {
-    const hebra = (Math.floor(Math.random() * IONES.hebras) + Math.random() * 0.12) / IONES.hebras;
-    semilla.set([Math.random(), gauss(), gauss(), hebra], i * 4); tipo[i] = 3;
+    // Las hebras centrales llevan más motas: un eje brillante y filamentos más tenues a los lados.
+    const h = Math.floor(Math.pow(Math.random(), 1.4) * IONES.hebras);
+    esfera(i); semilla.set([Math.random(), h, Math.random(), 0.4 + Math.random() * 0.6], i * 4); tipo[i] = 3;
   }
   const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aSemilla', new THREE.BufferAttribute(semilla, 4)); g.setAttribute('aTipo', new THREE.BufferAttribute(tipo, 1));
+  g.setAttribute('position', new THREE.BufferAttribute(dir, 3)); g.setAttribute('aSemilla', new THREE.BufferAttribute(semilla, 4)); g.setAttribute('aTipo', new THREE.BufferAttribute(tipo, 1));
   const m = new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uScale, uPR, uI: { value: 0 }, uAnti: { value: new THREE.Vector3(1, 0, 0) }, uAtras: { value: new THREE.Vector3(0, 1, 0) } },
+    uniforms: {
+      uTime: { value: 0 }, uScale, uPR, uI: { value: 0 }, uU: { value: 0.06 },
+      uAnti: { value: new THREE.Vector3(1, 0, 0) }, uAtras: { value: new THREE.Vector3(0, 1, 0) }, uCabeza: { value: new THREE.Vector3() },
+      uP0: { value: P0 }, uP1: { value: P1 }, uP2: { value: P2 }
+    },
     vertexShader: /* glsl */`
-      attribute vec4 aSemilla; attribute float aTipo; uniform float uTime, uScale, uPR, uI; uniform vec3 uAnti, uAtras;
+      attribute vec4 aSemilla; attribute float aTipo;
+      uniform float uTime, uScale, uPR, uI, uU; uniform vec3 uAnti, uAtras, uCabeza, uP0, uP1, uP2;
       varying vec3 vC; varying float vA, vTipo, vTam;
+      vec3 derivada(float u){ u = min(u, 1.0); return 2.0 * (1.0 - u) * (uP1 - uP0) + 2.0 * u * (uP2 - uP1); }
+      vec3 punto(float u){
+        float v = min(u, 1.0);
+        vec3 p = (1.0 - v) * (1.0 - v) * uP0 + 2.0 * (1.0 - v) * v * uP1 + v * v * uP2;
+        return p + derivada(1.0) * max(0.0, u - 1.0);
+      }
+      // Giro de v alrededor del eje unitario k (Rodrigues).
+      vec3 girar(vec3 v, vec3 k, float a){ float c = cos(a), s = sin(a); return v * c + cross(k, v) * s + k * dot(k, v) * (1.0 - c); }
       void main(){
         vec3 e1 = uAnti, e2 = uAtras, e3 = cross(e1, e2);   // contraluz, estela, y el tercer eje
-        vec3 p = vec3(0.0); float tam = 2.4, maximo = 2.6, a = 1.0;
+        vec3 p = vec3(0.0); float tam = 2.4, maximo = 2.4, a = 1.0;
         if (aTipo < 0.5) {
-          vC = vec3(1.0, 0.99, 0.96); tam = 0.0;
+          vC = vec3(1.0, 0.98, 0.94); tam = 0.0;
         } else if (aTipo < 1.5) {
-          // Coma: cada mota sale del núcleo, se aleja y se apaga; la luz la empuja hacia la cola.
-          float e = fract(aSemilla.x + uTime * 0.035), r = length(position) * (0.45 + e * 0.8);
-          p = position * (0.45 + e * 0.8) + e1 * r * 0.5;
-          a = (1.0 - e) * smoothstep(0.0, 0.12, e) * aSemilla.w * 0.5;
-          vC = mix(vec3(0.95, 1.0, 0.95), vec3(0.5, 1.0, 0.8), smoothstep(6.0, 40.0, r));
-          tam = 2.4;
+          // Coma: chorros que giran con el núcleo (una vuelta cada ~8 s) y granos sueltos; la luz los dobla hacia la cola.
+          float edad = fract(aSemilla.x + uTime / ${f1(COMA.vida)}) * ${f1(COMA.vida)}, tau = edad / ${f1(COMA.vida)};
+          float sale = uTime - edad;   // instante en que salió
+          vec3 d; float v;
+          if (aSemilla.y < 0.72) {
+            float j = floor(aSemilla.y / 0.24);
+            vec3 base = j < 0.5 ? vec3(0.9, 0.3, 0.3) : (j < 1.5 ? vec3(-0.5, 0.6, -0.6) : vec3(-0.2, -0.8, 0.55));
+            d = normalize(girar(normalize(base), normalize(vec3(0.25, 1.0, 0.15)), sale * 0.78 + j * 2.1) + position * 0.1);
+            v = ${f1(COMA.chorro)} * (0.75 + 0.5 * aSemilla.z);
+          } else { d = normalize(position + vec3(1e-4)); v = ${f1(COMA.chorro * 0.55)} * (0.5 + aSemilla.z); }
+          p = d * v * edad + e1 * (0.5 * ${f1(COMA.empuje)} * edad * edad);
+          a = pow(1.0 - tau, 1.5) * smoothstep(0.0, 0.06, tau) * aSemilla.w * 0.32;
+          vC = mix(vec3(1.0, 1.0, 0.97), vec3(0.72, 0.95, 0.9), smoothstep(0.1, 0.8, tau));
+          tam = 1.8;
         } else if (aTipo < 2.5) {
-          // Polvo: se aleja despacio, se curva hacia la estela (ya sale algo abierto respecto a los iones) y se abre en
-          // hebras; el borde de delante, más nítido.
-          float s = fract(aSemilla.x + uTime * ${(0.018).toFixed(3)});
-          float abanico = 10.0 + s * ${POLVO.ancho.toFixed(1)};
-          float lateral = aSemilla.w * abanico * 0.5 + aSemilla.y * (3.0 + s * 26.0);
-          p = e1 * (s * ${POLVO.largo.toFixed(1)}) + e2 * (s * ${(POLVO.largo * POLVO.abre).toFixed(1)} + s * s * ${POLVO.curva.toFixed(1)} + lateral) + e3 * aSemilla.z * (4.0 + s * 46.0);
-          a = pow(1.0 - s, 1.25) * smoothstep(0.0, 0.025, s) * (0.75 - 0.25 * aSemilla.w) * 0.85;
-          vC = mix(vec3(1.0, 0.96, 0.88), vec3(1.0, 0.74, 0.42), smoothstep(0.05, 0.75, s));
-          tam = 3.2 + s * 2.0;
+          // Polvo: el grano sigue el movimiento que tenía el cometa al soltarlo, la luz lo aleja (más cuanto más fino) y
+          // se queda atrás en la órbita. Todo en el mundo, relativo a la cabeza: la cola guarda la forma del recorrido.
+          float edad = fract(aSemilla.x + uTime / ${f1(POLVO.vida)}) * ${f1(POLVO.vida)}, tau = edad / ${f1(POLVO.vida)};
+          float ue = uU - edad * ${f4(DU)}, fino = aSemilla.y;
+          vec3 pe = punto(ue), ve = derivada(ue) * ${f4(DU)};
+          vec3 an = normalize(pe), ta = normalize(ve), lado = normalize(cross(an, ta));
+          p = pe + ve * edad - uCabeza
+            + an * (${f1(POLVO.largo)} * fino * tau * tau)
+            - ta * (${f1(POLVO.atras)} * fino * tau * tau * tau);
+          // Dispersión de la salida (la cola gana grosor al alejarse) y un rizo lento que recorre la cola.
+          p += position * (3.0 + 38.0 * tau) + lado * sin(tau * 9.0 - uTime * 0.55 + fino * 4.0) * tau * 38.0;
+          // Estrías: los golpes de actividad del núcleo sueltan más polvo a la vez (bandas nítidas a lo ancho).
+          float sale = uTime - edad;
+          float golpe = 0.5 + 0.5 * sin(sale * 0.83) * sin(sale * 0.37 + 1.3);
+          a = pow(1.0 - tau, 1.9) * smoothstep(0.0, 0.02, tau) * aSemilla.w * (0.35 + 0.9 * golpe * golpe) * mix(0.1, 1.0, smoothstep(0.0, 0.2, tau)) * 1.1;
+          // Chispas: unos pocos granos destellan un instante.
+          float chispa = step(0.985, aSemilla.w) * pow(max(0.0, sin(uTime * 2.3 + aSemilla.x * 61.0)), 24.0);
+          a += chispa * 0.9 * (1.0 - tau);
+          vC = mix(vec3(1.0, 0.97, 0.9), vec3(1.0, 0.78, 0.46), smoothstep(0.03, 0.6, tau) * (1.1 - fino * 0.6));
+          tam = 2.0 + (1.0 - fino) * 0.7; maximo = 1.9 + chispa;
         } else {
-          // Iones: rectos, rápidos y finos; unas pocas hebras que ondulan con el viento de la luz.
-          float s = fract(aSemilla.x + uTime * 0.055), ang = aSemilla.w * 6.2832;
-          float radio = 1.5 + s * ${IONES.ancho.toFixed(1)};
-          vec2 o = vec2(cos(ang), sin(ang)) * radio + aSemilla.yz * (0.8 + s * 5.0);
-          o.x += sin(s * 11.0 - uTime * 1.3 + aSemilla.w * 23.0) * s * 16.0;
-          p = e1 * (s * ${IONES.largo.toFixed(1)}) + e2 * o.x + e3 * o.y;
-          a = pow(1.0 - s, 0.9) * smoothstep(0.0, 0.04, s);
-          vC = mix(vec3(0.7, 0.84, 1.0), vec3(0.28, 0.5, 1.0), smoothstep(0.0, 0.3, s));
-          tam = 2.6;
+          // Iones: recto en contra de la luz, cada vez más rápido; filamentos que ondulan como una bandera.
+          float edad = fract(aSemilla.x + uTime / ${f1(IONES.vida)}) * ${f1(IONES.vida)}, tau = edad / ${f1(IONES.vida)};
+          float h = aSemilla.y, lejos = ${f1(IONES.largo)} * (0.22 * tau + 0.78 * tau * tau);
+          float ang = h * 2.39996 + 0.4, abre = h < 0.5 ? 0.0 : (0.35 + 0.65 * fract(h * 0.618));
+          vec2 o = vec2(cos(ang), sin(ang)) * (lejos * 0.034 * abre);
+          // Ondas que viajan hacia fuera a lo largo de la cola (más amplias lejos del núcleo) y un pliegue lento.
+          o.x += sin(lejos * 0.0065 - uTime * 1.9 + h * 0.9) * lejos * 0.028;
+          o.y += sin(lejos * 0.0041 - uTime * 1.1 + h * 2.3) * lejos * 0.016;
+          o += position.xy * (0.4 + tau * 4.0);
+          p = e1 * lejos + e2 * o.x + e3 * o.y;
+          a = pow(1.0 - tau, 1.1) * smoothstep(0.0, 0.12, tau) * aSemilla.w * (h < 0.5 ? 1.0 : 0.62);
+          vC = mix(vec3(0.78, 0.9, 1.0), vec3(0.34, 0.56, 1.0), smoothstep(0.0, 0.35, tau));
+          tam = 1.8; maximo = 1.6;
         }
         vec4 mv = modelViewMatrix * vec4(p, 1.0); gl_Position = projectionMatrix * mv;
         float px = tam * uScale / max(0.1, -mv.z);
-        if (aTipo < 0.5) { vTam = clamp(34.0 * uScale / max(0.1, -mv.z), 9.0, 19.0) * uPR; gl_PointSize = vTam; vA = uI; }
-        // Motas de 1 a 2,6 px: de cerca no se vuelven manchas; las de menos de un píxel se atenúan en vez de parpadear.
-        else { gl_PointSize = clamp(px, 1.0, maximo) * uPR; vTam = gl_PointSize; vA = a * uI * min(1.0, px * px); }
+        if (aTipo < 0.5) { vTam = clamp(30.0 * uScale / max(0.1, -mv.z), 7.0, 15.0) * uPR; gl_PointSize = vTam; vA = uI; }
+        // Motas de 1 a ~2,4 px: de cerca no se vuelven manchas; las de menos de un píxel se atenúan en vez de parpadear
+        // (sin bajar del 35 %: de lejos, las colas siguen leyéndose como un trazo).
+        else { gl_PointSize = clamp(px, 1.0, maximo) * uPR; vTam = gl_PointSize; vA = a * uI * clamp(px * px, 0.35, 1.0); }
         vTipo = aTipo;
       }`,
     fragmentShader: /* glsl */`
@@ -125,9 +183,9 @@ function crearMotas({ uScale, uPR }) {
         float d = length(q), a;
         if (vTipo < 0.5) {
           // Núcleo: un disco nítido y una cruz de un píxel que se adelgaza hasta la punta.
-          float disco = 1.0 - smoothstep(1.9, 2.7, d);
-          float cruz = (1.0 - smoothstep(0.35, 0.9, min(abs(q.x), abs(q.y)))) * max(0.0, 1.0 - d / (vTam * 0.5));
-          a = max(disco, cruz * 0.85);
+          float disco = 1.0 - smoothstep(1.4, 2.1, d);
+          float cruz = (1.0 - smoothstep(0.3, 0.8, min(abs(q.x), abs(q.y)))) * max(0.0, 1.0 - d / (vTam * 0.5));
+          a = max(disco, cruz * 0.7);
         } else {
           float r = d / max(0.5, vTam * 0.5); if (r > 1.0) discard;
           a = 1.0 - smoothstep(0.55, 1.0, r);   // mota redonda de borde nítido
@@ -150,12 +208,12 @@ export function crearCometa({ uScale, uPR }) {
   let visible = false, pasoSeguido = null;
   const tangente = new THREE.Vector3(), atras = new THREE.Vector3(), cola = new THREE.Vector3();
   function situar(avance) {
-    if (avance <= 1) { RECORRIDO.getPoint(avance, grupo.position); RECORRIDO.getTangent(avance, tangente); }
-    else { RECORRIDO.getPoint(1, grupo.position); RECORRIDO.getTangent(1, tangente); grupo.position.addScaledVector(tangente, (avance - 1) * LARGO); }
+    punto(avance, grupo.position); derivada(avance, tangente).normalize();
+    u.uU.value = avance; u.uCabeza.value.copy(grupo.position);
   }
-  // Base de las colas: contraluz (lejos del centro de la galaxia) y estela (lo que queda atrás del movimiento, sin la
-  // parte que va en la dirección de la luz). Las dos cambian poco a poco con el recorrido: nunca hay saltos. Si la estela
-  // llegara a ir justo en la dirección de la luz, se conserva la del cuadro anterior en vez de dar un vector sin sentido.
+  // Base de la cola de iones y de la coma: contraluz (lejos del centro de la galaxia) y estela (lo que queda atrás del
+  // movimiento, sin la parte que va en la dirección de la luz). Cambian poco a poco con el recorrido: nunca hay saltos.
+  // Si la estela llegara a ir justo en la dirección de la luz, se conserva la del cuadro anterior.
   function orientar() {
     const anti = u.uAnti.value.copy(grupo.position).normalize();
     atras.copy(tangente).negate().addScaledVector(anti, tangente.dot(anti));
@@ -168,7 +226,9 @@ export function crearCometa({ uScale, uPR }) {
     get visible() { return visible; },
     posicion: () => grupo.position.clone(),
     // Hacia el centro de la cola de polvo (para llegar al cometa siguiéndola).
-    cola: () => cola.copy(u.uAnti.value).multiplyScalar(POLVO.largo * 0.5).addScaledVector(u.uAtras.value, POLVO.largo * POLVO.abre * 0.5 + POLVO.curva * 0.25).normalize().clone(),
+    cola: () => cola.copy(u.uAnti.value).multiplyScalar(POLVO.largo * 0.3).addScaledVector(u.uAtras.value, POLVO.atras * 0.12).normalize().clone(),
+    // Perpendicular al plano de las colas (contraluz y estela): desde ahí se ven de perfil, enteras y curvadas.
+    lado: () => new THREE.Vector3().crossVectors(u.uAnti.value, u.uAtras.value).normalize(),
     actualizar(t, dt, { tiempoDentro, foco, camera }) {
       if (tiempoDentro === null || camera.position.lengthSq() > LEJOS * LEJOS) { visible = false; grupo.visible = false; return; }
       const inicioCiclo = tiempoDentro - (tiempoDentro % CICLO);
@@ -181,7 +241,7 @@ export function crearCometa({ uScale, uPR }) {
       visible = transcurrido < (foco === 'cometa' ? FIN : VISIBLE);
       grupo.visible = visible;
       if (!visible) return;
-      situar(0.06 + transcurrido / VISIBLE * 0.88);
+      situar(0.06 + transcurrido * DU);
       orientar();
       // Al aparecer y al irse, se funde (sin saltos).
       u.uI.value = Math.min(1, transcurrido / 2.5, ((foco === 'cometa' ? FIN : VISIBLE) - transcurrido) / 2.5);
