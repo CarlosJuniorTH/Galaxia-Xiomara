@@ -4,7 +4,7 @@
 //    despacio y se funden en su media cuando miden menos de dos píxeles), supergranulación, fáculas, rotación
 //    diferencial, oscurecimiento al limbo continuo del blanco cegador del centro al azul del borde (la luz se comprime:
 //    el núcleo no quema la textura) y un ribete cromosférico rosado y fino en el borde; con la formación pasa de nada a
-//    una brasa roja y, al encenderse, a blanca azulada.
+//    una chispa blanca azulada y, al encenderse, a la estrella entera.
 //  · materia: las motas que cuentan la historia. Cada una tiene su sitio en la nube oscura del principio, en el disco que
 //    nace al caer y en su mundo: siete anillos (órbitas) en los que el disco se ordena alrededor de ella, dos mundos
 //    pequeños que se forman juntos en uno de ellos y las protuberancias, arcos rosas pegados a la superficie. Su posición
@@ -100,7 +100,7 @@ export function crearDeneb({ uScale, uPR }) {
         col = mix(col, 0.7 + 0.16 * (1.0 - exp(-(col - 0.7) * 6.0)), step(0.7, col));
         // Ribete cromosférico: una franja finísima rosada y nítida justo en el borde (el anillo de las espículas).
         col += vec3(1.0, 0.45, 0.62) * (1.0 - smoothstep(0.0, 0.07, mu)) * 0.5;
-        vec3 brasa = mix(vec3(0.4, 0.04, 0.01), vec3(1.0, 0.32, 0.08), cupula) * (0.4 + 0.6 * limbo);
+        vec3 brasa = vec3(0.86, 0.93, 1.0) * (0.55 + 0.45 * limbo);   // la chispa de la que nace (y a la que vuelve): un punto blanco azulado
         gl_FragColor = vec4(mix(brasa, col, uTemp) * uLuz * (1.0 + 0.06 * uPum), 1.0); }`
   }));
   superficie.renderOrder = -2; marco.add(superficie);
@@ -110,18 +110,15 @@ export function crearDeneb({ uScale, uPR }) {
   // estrella al encenderse, 3 uno de los dos mundos pequeños (aLinea.y = 0 o 1; aLinea.xz y aDato.x: su sitio en el grumo).
   const NL = 11000, NP = 1800, NW = 2 * 110, NA = 1100, N = NL + NP + NW + NA, F = 3;
   const nube = new Float32Array(N * 3), linea = new Float32Array(N * 4), dato = new Float32Array(N * 4);
-  // Nube oscura: hilos de polvo serpenteantes en una cáscara achatada de 1,9 a 4,4 radios.
+  // La nube del principio está en el mismo plano que sus anillos (es su mundo antes de ordenarse): un disco ancho y
+  // tenue, de 1,5 a 5 radios, de arcos de polvo que giran en espiral, con poco grosor.
   const caminantes = [];
-  for (let c = 0; c < 70; c++) {
-    const p = [0, 0, 0], d = [azar() - 0.5, azar() - 0.5, azar() - 0.5], z0 = azar() * 2 - 1, f0 = azar() * Math.PI * 2, q0 = Math.sqrt(1 - z0 * z0), r0 = 2.0 + azar() * 2.4;
-    p[0] = Math.cos(f0) * q0 * r0; p[1] = z0 * r0 * 0.55; p[2] = Math.sin(f0) * q0 * r0;
-    const pts = [];
+  for (let c = 0; c < 80; c++) {
+    let r = 1.5 + azar() * 3.5, f = azar() * Math.PI * 2;
+    const deriva = (azar() - 0.5) * 0.012, pts = [];
     for (let k = 0; k < 90; k++) {
-      for (let e = 0; e < 3; e++) d[e] += (azar() - 0.5) * 0.5;
-      const r = Math.hypot(p[0], p[1] / 0.55, p[2]), vuelve = r > 4.4 ? -0.5 : r < 1.9 ? 0.5 : 0;
-      for (let e = 0; e < 3; e++) d[e] += p[e] / Math.max(r, 1e-3) * vuelve;
-      const L = Math.hypot(...d) || 1; for (let e = 0; e < 3; e++) p[e] += d[e] / L * 0.07;
-      pts.push([...p]);
+      f += 0.022 + (azar() - 0.5) * 0.01; r = Math.min(5, Math.max(1.5, r + deriva + (azar() - 0.5) * 0.02));
+      pts.push([Math.cos(f) * r, (azar() + azar() - 1) * 0.06 * r * 0.4, Math.sin(f) * r]);
     }
     caminantes.push(pts);
   }
@@ -198,15 +195,15 @@ export function crearDeneb({ uScale, uPR }) {
       float onda = exp(-pow(uEdad / 0.5 * 7.5 - k, 2.0) * 0.7) * exp(-uEdad / 0.5) * uFuerza;
       float haciaElla = tipo < 0.5 ? exp(-pow((uMedioT - (6.0 - k) * 0.13) / 0.16, 2.0)) * step(0.0, uMedioT) : 0.0;
       float luz = tipo < 0.5 ? 0.5 + 0.75 * uGloria + 2.2 * onda + 2.6 * haciaElla + 0.5 * uMedio : tipo < 1.5 ? 1.4 + 0.6 * uGloria : 2.4;
-      float a = mix(mix(2.2, 1.1, disco), luz, hecho);
+      float a = mix(mix(1.5, 1.1, disco), luz, hecho);
       if (tipo > 1.5 && tipo < 2.5) a *= 1.0 - smoothstep(0.47, 0.53, tau);   // lo que cae, se lo traga la estrella al encenderse
-      vec3 frio = vec3(0.55, 0.6, 1.0), caliente = mix(vec3(1.0, 0.86, 0.78), vec3(0.85, 0.9, 1.0), uEstrella);
-      // Colores de los anillos: blanco azulado, rosa y oro pálido alternos; las protuberancias, rosas; los mundos, uno rosa y otro dorado.
+            // Colores de los anillos: blanco azulado, rosa y oro pálido alternos; las protuberancias, rosas; los mundos, uno rosa y otro dorado.
       float m = mod(k + 0.5, 3.0);
       vec3 cAnillo = m < 1.0 ? mix(vec3(0.78, 0.87, 1.0), vec3(1.0), aDato.z * 0.5) : m < 2.0 ? mix(vec3(1.0, 0.72, 0.85), vec3(1.0, 0.9, 0.95), aDato.z * 0.5) : mix(vec3(1.0, 0.86, 0.62), vec3(1.0, 0.95, 0.85), aDato.z * 0.5);
       vec3 cHecho = tipo < 0.5 ? cAnillo : tipo < 1.5 ? mix(vec3(1.0, 0.48, 0.64), vec3(1.0, 0.78, 0.86), aDato.z) : (aLinea.y < 0.5 ? vec3(1.0, 0.7, 0.86) : vec3(1.0, 0.86, 0.6));
       cHecho = mix(cHecho, mix(vec3(1.0, 0.7, 0.82), vec3(1.0, 0.86, 0.62), aDato.z), uCalido * 0.4 * step(tipo, 0.5));
-      vC = mix(mix(frio, caliente, disco), cHecho, hecho);
+      // La nube y el disco, con los mismos colores que su mundo (más tenues): todo el clip con la misma paleta.
+      vC = mix(mix(cAnillo * 0.85, mix(vec3(0.88, 0.93, 1.0), cAnillo, 0.6), disco), cHecho, hecho);
       // Mientras el tiempo va hacia atrás, todo se tiñe de un azul helado (se nota que es un rebobinado, no otra cosa).
       vC = mix(vC, vec3(0.62, 0.86, 1.0), uRebobina * 0.55); a *= 1.0 + 0.35 * uRebobina;
       // Estela: los fantasmas solo se ven mientras la mota se mueve deprisa (rebobinado, caída), más tenues cuanto más atrás.
@@ -288,8 +285,8 @@ export function crearDeneb({ uScale, uPR }) {
       const tau = mezcla(n.tau, e.tau, w), estrella = mezcla(n.estrella, e.estrella, w), brasa = e.brasa * w, gloria = mezcla(n.gloria, e.gloria, w), reloj = mezcla(1, e.reloj, w);
       tEstrella += dt * reloj;
       const dtau = tauAntes === null || dt <= 0 ? 0 : (tau - tauAntes) / dt; tauAntes = tau;
-      // Tamaño: nada → brasa (0,24 R) → estrella (con un pequeño rebote al encenderse); late con el bombo.
-      const tam = Math.max(0.001, brasa * 0.24 * (1 + 0.25 * e.pum) + estrella * (1 + 0.05 * Math.sin(Math.min(1, Math.max(0, e.encendido) / 1.2) * Math.PI) * w));
+      // Tamaño: nada → chispa (0,09 R) → estrella (con un pequeño rebote al encenderse); late con el bombo.
+      const tam = Math.max(0.001, brasa * 0.09 * (1 + 0.3 * e.pum) + estrella * (1 + 0.05 * Math.sin(Math.min(1, Math.max(0, e.encendido) / 1.2) * Math.PI) * w));
       superficie.visible = tam > 0.01; superficie.scale.setScalar(tam * (1 + (reducido ? 0 : 0.012) * e.pum * w));
       const destello = w > 0.5 && e.encendido >= 0 ? Math.exp(-e.encendido / 0.35) * Math.min(1, e.encendido / 0.08) : 0;
       // «in the middle»: cuando la luz de los anillos llega al centro, la estrella responde.

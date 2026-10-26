@@ -31,34 +31,27 @@ export const ESCENA_DENEB = {
 
 // La pista de cámara del videoclip (formato y ejes del director de cámara, js/util/directorCamara.js): t en segundos del
 // fragmento; pos = [azimut°, elevación°, distancia] alrededor de Deneb en radios de encuadre (1 = la distancia de llegada;
-// la estrella mide 0,22 y sus anillos llegan a 1,0); azimut 0 / elevación 0 = desde Deneb hacia casa, azimut hacia la
-// derecha, elevación hacia el eje Y del universo. Los anillos están en un plano inclinado 24° hacia casa: se ven de
-// lleno desde una elevación de 66° (el plano de «in the middle»). Suave en los versos; en el drop, cortes y golpes a compás.
+// la estrella mide 0,22 y sus anillos llegan a 1,0); azimut 0 / elevación 0 = desde Deneb hacia casa. Los anillos están en
+// un plano inclinado 24° hacia casa.
+// Un solo travelling lento y continuo (Carlos: movimientos suaves, con mucha sensibilidad): el azimut siempre avanza en el
+// mismo sentido (de 0 a 100° en toda la canción), la cámara sube despacio hasta ver los anillos de lleno en «in the
+// middle», se acerca un poco en el drop y vuelve a bajar hasta el mismo encuadre de la llegada: acaba como empezó. Sin cortes, sin giros
+// de cámara y sin cambios de sentido: todos los tramos encadenados (lineales, con tangentes continuas).
 const PISTA = [
-  { t: 0, pos: [0, 8, 1.0], mira: [0, 0, 0], fov: 55, curva: 'corte' },             // llegada: Deneb tal cual
-  { t: 2.3, pos: [12, 10, 0.92], curva: 'suave' },                                    // se acaba el ritmo: se acerca despacio
-  { t: 4.33, pos: [22, 12, 0.8], fov: 52, curva: 'suave' },                           // «turn back…»
-  { t: 6.4, pos: [8, 16, 1.05], fov: 55, curva: 'lineal' },                           // el rebobinado: la cámara también va hacia atrás
-  { t: 9.6, pos: [-25, 22, 1.5], fov: 58, curva: 'suave' },                           // ya no hay nada: la nube entera
-  { t: 11.03, pos: [-34, 20, 1.45], curva: 'suave' },                                 // «I promise»
-  { t: 12.0, pos: [-20, 14, 0.95], fov: 55, curva: 'rapida' },                        // la nube cae: la cámara va con ella
-  { t: 12.1, pos: [28, 14, 1.15], curva: 'corte' },                                   // «build»: corte al encendido
-  { t: 13.23, pos: [40, 22, 0.95], fov: 54, curva: 'suave' },                         // «new world»: el disco se ordena en anillos
-  { t: 14.93, pos: [55, 30, 0.9], curva: 'suave' },                                   // «us two»: nacen los dos mundos
-  { t: 16.01, pos: [40, 45, 1.0], curva: 'suave' },                                   // «with you»: sube…
-  { t: 17.49, pos: [20, 58, 1.05], curva: 'suave' },
-  { t: 19.16, pos: [0, 66, 1.05], fov: 55, curva: 'suave' },                          // «in the middle»: los anillos de lleno, ella en el centro
-  { t: 20.4, pos: [0, 70, 0.9], curva: 'lineal' },                                    // la tensión antes del drop
-  { t: 20.57, pos: [128, -14, 0.6], mira: [0, 0.05, 0], fov: 62, curva: 'corte', giro: 8 },   // DROP: desde abajo, entre los anillos
-  { t: 21.72, pos: [160, 10, 0.75], mira: [0, 0, 0], fov: 58, curva: 'rapida', giro: 0 },
-  { t: 22.87, pos: [200, 50, 0.95], fov: 56, curva: 'corte', giro: -6 },
-  { t: 25.15, pos: [250, -22, 0.62], fov: 60, curva: 'rapida', giro: 0 },
-  { t: 27.45, pos: [300, 62, 1.15], fov: 55, curva: 'corte' },                         // desde arriba: su mundo entero
-  { t: 29.72, pos: [340, 6, 0.45], mira: [0, 0.12, 0], fov: 64, curva: 'rapida', giro: 5 },   // rozando la superficie
-  { t: 32.0, pos: [300, 30, 0.95], mira: [0, 0, 0], fov: 55, curva: 'corte', giro: 0 },     // segunda mitad: un giro amplio
-  { t: 36.57, pos: [345, 32, 0.98], curva: 'lineal' },
-  { t: 41.15, pos: [372, 22, 1.0], curva: 'suave' },
-  { t: 43.4, pos: [380, 18, 1.0], curva: 'suave' }                                    // se queda con sus anillos abiertos
+  { t: 0, pos: [0, 10, 1.0], mira: [0, 0, 0], fov: 55, curva: 'corte' },     // llegada: Deneb tal cual
+  { t: 4.33, pos: [6, 12, 0.93], curva: 'lineal' },                           // «turn back the time»
+  { t: 9.6, pos: [18, 24, 1.15], curva: 'lineal' },                           // se aparta para ver cómo todo se deshace
+  { t: 12.0, pos: [24, 26, 1.05], curva: 'lineal' },                          // «promise… build»: se enciende
+  { t: 14.93, pos: [32, 36, 0.98], curva: 'lineal' },                         // «new world… us two»: los anillos se ordenan
+  { t: 17.49, pos: [40, 52, 1.0], curva: 'lineal' },                          // «with you»: sube despacio…
+  { t: 19.16, pos: [45, 64, 1.02], curva: 'lineal' },                         // «in the middle»: sus anillos de lleno, ella en el centro
+  { t: 20.57, pos: [50, 58, 0.9], curva: 'lineal' },                          // el drop: se acerca
+  { t: 24.0, pos: [60, 44, 0.8], curva: 'lineal' },
+  { t: 28.0, pos: [70, 34, 0.78], curva: 'lineal' },
+  { t: 32.0, pos: [80, 26, 0.84], curva: 'lineal' },                          // segunda mitad
+  { t: 36.57, pos: [88, 18, 0.92], curva: 'lineal' },
+  { t: 41.15, pos: [96, 12, 1.0], curva: 'lineal' },
+  { t: 43.4, pos: [100, 10, 1.0], curva: 'suave' }                            // se posa como al llegar (misma altura y distancia)
 ];
 export const CAMARA_DENEB = PISTA;
 ESCENA_DENEB.camara = PISTA;

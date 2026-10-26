@@ -58,10 +58,13 @@ test('Deneb: la pista de cámara, en orden, dentro de la canción y fuera de la 
     assert.ok(formas.has(p.curva) && p.pos.length === 3 && (!p.mira || p.mira.length === 3) && (p.fov === undefined || (p.fov > 30 && p.fov < 80)), `plano ${p.t}`);
     assert.ok(p.pos[2] > 0.3, `la cámara no entra en la estrella (0,22) en ${p.t}`);
   });
-  // En el drop, planos que cambian a compás (cortes o golpes); en los versos, suaves.
-  const drop = CAMARA_DENEB.filter(p => p.t >= m.drop && p.t < m.segunda);
-  assert.ok(drop.length >= 5 && drop.every(p => p.curva === 'corte' || p.curva === 'rapida'));
-  assert.ok(CAMARA_DENEB.some(p => cerca(p.t, m.medio) && p.pos[1] > 55 && p.curva === 'suave'), '«in the middle»: sus anillos de lleno, ella en el centro');
+  // Un travelling lento y continuo: sin cortes (salvo el plano de llegada), sin giros y el azimut siempre hacia el mismo
+  // lado, sin saltos grandes entre planos.
+  CAMARA_DENEB.slice(1).forEach((p, i) => { const a = CAMARA_DENEB[i];
+    assert.ok(p.curva !== 'corte' && !p.giro, `sin cortes ni giros en ${p.t}`);
+    assert.ok(p.pos[0] >= a.pos[0], `el azimut no cambia de sentido en ${p.t}`);
+    assert.ok((p.pos[0] - a.pos[0]) / (p.t - a.t) < 6, `despacio en ${p.t}`); });
+  assert.ok(CAMARA_DENEB.some(p => cerca(p.t, m.medio) && p.pos[1] > 55), '«in the middle»: sus anillos de lleno, ella en el centro');
   assert.equal(ESCENA_DENEB.camara, CAMARA_DENEB, 'el director la encuentra en la escena');
 });
 
