@@ -1,8 +1,9 @@
 // Deneb de cerca: una supergigante blanca azulada (tipo A2 Ia) y su mundo, y su videoclip: el nacimiento de la estrella
 // (tiempos y curvas: js/util/escenaDeneb.js). En el espacio del grupo de Deneb (cosmos.js; la cámara llega a ~450).
-//  · superficie: esfera opaca con granulación de convección (gránulos claros con forma de cúpula y calles más oscuras y
-//    azules entre ellos, que hierven y cambian de forma), un moteado fino, manchas grandes, fáculas junto al borde y un
-//    oscurecimiento al limbo marcado (del blanco del centro al azul profundo del borde); con la formación pasa de nada a
+//  · superficie: esfera opaca con granulación fina (unas 150 celdas a lo ancho del disco, contraste suave, que hierven
+//    despacio y se funden en su media cuando miden menos de dos píxeles), supergranulación, fáculas, rotación
+//    diferencial, oscurecimiento al limbo continuo del blanco cegador del centro al azul del borde (la luz se comprime:
+//    el núcleo no quema la textura) y un ribete cromosférico rosado y fino en el borde; con la formación pasa de nada a
 //    una brasa roja y, al encenderse, a blanca azulada.
 //  · materia: las motas que cuentan la historia. Cada una tiene su sitio en la nube oscura del principio, en el disco que
 //    nace al caer y en su mundo: siete anillos (órbitas) en los que el disco se ordena alrededor de ella, dos mundos
@@ -50,45 +51,57 @@ export function crearDeneb({ uScale, uPR }) {
 
   // ── Superficie ──
   const uS = { uRuido: { value: texturaRuido() }, uT: { value: 0 }, uLuz: { value: 1 }, uTemp: { value: 1 }, uGloria: { value: 0.55 }, uPum: { value: 0 } };
-  const superficie = new THREE.Mesh(new THREE.SphereGeometry(R, 96, 64), new THREE.ShaderMaterial({
+  const superficie = new THREE.Mesh(new THREE.SphereGeometry(R, 128, 96), new THREE.ShaderMaterial({
     // Transparente (con alfa 1 y profundidad): se dibuja después del cielo profundo, que es «opaco» pero de un grupo
     // con un orden mayor y se sumaba ENCIMA de la estrella (la teñía con sus paredes de polvo).
-    uniforms: uS, transparent: true, depthWrite: true,
+    uniforms: uS, transparent: true, depthWrite: true, extensions: { derivatives: true },
     vertexShader: 'varying vec3 vP; varying vec3 vN; varying vec3 vV; void main(){ vP = position; vN = normalize(normalMatrix * normal); vec4 mv = modelViewMatrix * vec4(position, 1.0); vV = mv.xyz; gl_Position = projectionMatrix * mv; }',
     fragmentShader: /* glsl */`uniform float uT, uLuz, uTemp, uGloria, uPum; varying vec3 vP; varying vec3 vN; varying vec3 vV;
       ${RUIDO_TABLA}
       vec3 hash3(vec3 p){ p = fract(p * vec3(0.1031, 0.1030, 0.0973)); p += dot(p, p.yxz + 33.33); return fract((p.xxy + p.yxx) * p.zyx); }
-      // Gránulos (Worley 2×2×2): distancia al centro del gránulo más cercano y su brillo propio. Los centros se mueven poco
-      // dentro de su celda (sin los cortes del método rápido) y laten: los gránulos crecen, se apagan y cambian de forma.
+      // Gránulos (Worley 2×2×2): distancia al centro del más cercano y su brillo propio; los centros se mueven despacio
+      // dentro de su celda (la superficie hierve).
       vec2 granulo(vec3 p, float t){
         vec3 i = floor(p - 0.5), f = p - i; float d1 = 9.0, id = 0.0;
         for (int x = 0; x < 2; x++) for (int y = 0; y < 2; y++) for (int z = 0; z < 2; z++){ vec3 o = vec3(float(x), float(y), float(z));
-          vec3 h = hash3(i + o); vec3 c = o + 0.5 + 0.3 * sin(t * (0.5 + h) + h * 6.2831) - f; float d = dot(c, c) * (0.85 + 0.3 * h.y);
+          vec3 h = hash3(i + o); vec3 c = o + 0.5 + 0.3 * sin(t * (0.5 + h) + h * 6.2831) - f; float d = dot(c, c) * (0.8 + 0.4 * h.y);
           if (d < d1) { d1 = d; id = h.z; } }
         return vec2(sqrt(d1), id); }
       void main(){
-        vec3 n = normalize(vP);
+        vec3 n0 = normalize(vP);
+        // Rotación diferencial: el ecuador gira algo más deprisa que los polos (el dibujo se desliza por latitudes).
+        float giro = uT * 0.012 * (1.0 - 0.35 * n0.y * n0.y), cg = cos(giro), sg = sin(giro);
+        vec3 n = vec3(cg * n0.x + sg * n0.z, n0.y, -sg * n0.x + cg * n0.z);
         float mu = clamp(dot(normalize(vN), -normalize(vV)), 0.0, 1.0);
-        float w = rn3(n * 2.4 + vec3(0.0, uT * 0.02, 0.0));            // manchas grandes (supergranulación)
-        // Torcido con ruido a la escala de los gránulos: formas irregulares, de tamaños distintos (no un panal).
-        vec3 p5 = n * 5.0 + vec3(0.0, 0.0, uT * 0.03);
-        vec3 q = n * 16.0 + (vec3(rn3(p5), rn3(p5 + 7.3), rn3(p5 + 13.1)) - 0.5) * 1.5;
-        vec2 g = granulo(q, uT * 0.55);
-        float cupula = 1.0 - smoothstep(0.35, 0.85, g.x);              // el gránulo: claro y ancho; la calle, fina y oscura
-        float fino = rn3(n * 58.0 + vec3(uT * 0.3, -uT * 0.2, 0.0));   // moteado fino dentro de los gránulos
+        // Granulación FINA: unas 150 celdas a lo ancho del disco (como en las fotos de la fotosfera del Sol), con contraste
+        // suave. Cuando una celda mide menos de ~2 píxeles se funde en su media (sin parpadeo ni moiré).
+        vec3 p5 = n * 9.0 + vec3(0.0, 0.0, uT * 0.02);
+        vec3 q = n * 75.0 + (vec3(rn3(p5), rn3(p5 + 7.3), rn3(p5 + 13.1)) - 0.5) * 3.0;
+        vec2 g = granulo(q, uT * 0.4);
+        float px = length(fwidth(q));                                    // celdas por píxel
+        float nitido = 1.0 - smoothstep(0.35, 0.7, px);
+        float cupula = 1.0 - smoothstep(0.25, 0.8, g.x);
+        float gran = mix(0.62, (0.55 + 0.45 * cupula) * (0.85 + 0.3 * g.y), nitido);
+        // Encima, la supergranulación y la red de fáculas (manchas mayores, muy suaves) y, cerca del borde, fáculas claras.
+        float w = rn3(n * 3.2 + vec3(0.0, uT * 0.015, 0.0)), red = rn3(n * 14.0 - vec3(uT * 0.01)), medio = rn3(n * 32.0 + vec3(uT * 0.04, 0.0, 0.0));
         float hierve = 0.75 + 0.45 * uGloria;
-        float l = mix(0.55, 1.0, cupula) * (0.82 + 0.18 * g.y) * (0.9 + 0.14 * fino) * (0.86 + 0.26 * w);
-        l = mix(1.0, l, hierve);
-        // Oscurecimiento al limbo de una estrella caliente, marcado, y el color con matices: centro casi blanco algo cálido,
-        // en medio blanco azulado, el borde azul profundo; las calles, más azules; fáculas claras junto al borde.
-        float limbo = 0.07 + 0.93 * pow(mu, 0.85);
-        vec3 tono = mix(vec3(0.22, 0.4, 1.0), vec3(0.82, 0.9, 1.0), smoothstep(0.0, 0.5, mu));
-        tono = mix(tono, vec3(1.0, 0.98, 0.95), smoothstep(0.5, 1.0, mu) * 0.85);
-        tono = mix(tono, vec3(0.24, 0.38, 1.0), (1.0 - cupula) * 0.75);
-        vec3 col = tono * l * limbo * 1.12;
-        col += vec3(0.7, 0.82, 1.0) * smoothstep(0.62, 0.8, w) * cupula * pow(1.0 - mu, 2.0) * 0.3;
+        float textura = 1.0 + ((gran - 0.62) * 0.4 + (w - 0.5) * 0.14 + (red - 0.5) * 0.1 + (medio - 0.5) * 0.14) * hierve;
+        // Oscurecimiento al limbo continuo y su color: el centro, blanco cegador apenas azulado; hacia el borde, cada vez más
+        // azul y más tenue (una estrella de 8 500 K), sin lila ni gris.
+        // (Valores lineales: la salida los pasa a sRGB, que aclara mucho los medios: el borde ha de ir muy abajo.)
+        // El oscurecimiento se hace sobre todo con el color (del blanco al azul saturado) y menos con la luz: oscurecer un
+        // blanco azulado lo vuelve gris; un azul intenso sigue pareciendo luz.
+        float limbo = 0.26 + 0.74 * pow(mu, 0.8);
+        vec3 tono = mix(vec3(0.07, 0.34, 1.0), vec3(0.45, 0.74, 1.0), smoothstep(0.0, 0.45, mu));
+        tono = mix(tono, vec3(0.97, 0.99, 1.0), smoothstep(0.4, 0.95, mu));
+        vec3 col = tono * limbo * textura * 0.86;
+        col += vec3(0.35, 0.55, 1.0) * smoothstep(0.6, 0.8, red) * pow(1.0 - mu, 2.0) * 0.12;   // fáculas
+        // Núcleo muy brillante sin quemar la textura: por encima de ~0,7 la luz se comprime en vez de recortarse.
+        col = mix(col, 0.7 + 0.16 * (1.0 - exp(-(col - 0.7) * 6.0)), step(0.7, col));
+        // Ribete cromosférico: una franja finísima rosada y nítida justo en el borde (el anillo de las espículas).
+        col += vec3(1.0, 0.45, 0.62) * (1.0 - smoothstep(0.0, 0.07, mu)) * 0.5;
         vec3 brasa = mix(vec3(0.4, 0.04, 0.01), vec3(1.0, 0.32, 0.08), cupula) * (0.4 + 0.6 * limbo);
-        gl_FragColor = vec4(mix(brasa, col, uTemp) * uLuz * (1.0 + 0.08 * uPum), 1.0); }`
+        gl_FragColor = vec4(mix(brasa, col, uTemp) * uLuz * (1.0 + 0.06 * uPum), 1.0); }`
   }));
   superficie.renderOrder = -2; marco.add(superficie);
 
@@ -226,7 +239,7 @@ export function crearDeneb({ uScale, uPR }) {
       vec3 dir = position;
       if (espicula > 0.5) { vec3 eje = normalize(uCam); vec3 d = position - eje * dot(position, eje); dir = normalize(normalize(d) + eje * (aDato.w - 0.5) * 0.25); }
       if (espicula > 0.5) { r = R * (1.0 + 0.085 * edad * (0.5 + aDato.w)); a = (1.0 - edad) * 2.2; }
-      else { r = R * (1.02 + 2.7 * pow(edad, 1.7)); a = pow(1.0 - edad, 1.2) * smoothstep(0.0, 0.04, edad) * 1.3; }
+      else { r = R * (1.02 + 2.7 * pow(edad, 1.7)); a = pow(1.0 - edad, 1.2) * smoothstep(0.0, 0.04, edad) * 1.9; }
       // Al encenderse, un frente de motas sale de la estrella y se deshace en el viento.
       if (uEncendido >= 0.0) { float k = smoothstep(0.9, 1.9, uEncendido), rf = R * (1.0 + uEncendido * 2.4 * (0.75 + 0.5 * aDato.w)); dir = position; r = mix(rf, r, k); a = mix(2.2 * (1.0 - smoothstep(1.1, 1.9, uEncendido)), a, k); }
       vec4 mv = modelViewMatrix * vec4(dir * r * mix(0.25, 1.0, uEstrella), 1.0); gl_Position = projectionMatrix * mv;
@@ -236,7 +249,7 @@ export function crearDeneb({ uScale, uPR }) {
   viento.frustumCulled = false; viento.renderOrder = 2; marco.add(viento);
 
   // ── Eyecciones: como mucho 6 chorros a la vez, de 180 motas cada uno, que salen en un cono y se apagan al alejarse ──
-  const NS = 6, PS = 180, dirE = new Float32Array(NS * PS * 3), datoE = new Float32Array(NS * PS * 3);
+  const NS = 6, PS = 260, dirE = new Float32Array(NS * PS * 3), datoE = new Float32Array(NS * PS * 3);
   for (let k = 0; k < NS * PS; k++) { const z = azar() * 2 - 1, f = azar() * Math.PI * 2, q = Math.sqrt(1 - z * z); dirE.set([Math.cos(f) * q, z, Math.sin(f) * q], k * 3); datoE.set([Math.floor(k / PS), 0.7 + azar() * 0.6, azar()], k * 3); }
   const gE = new THREE.BufferGeometry(); gE.setAttribute('position', new THREE.BufferAttribute(dirE, 3)); gE.setAttribute('aDato', new THREE.BufferAttribute(datoE, 3));
   const ejes = Array.from({ length: NS }, () => new THREE.Vector3(0, 1, 0)), edades = new Array(NS).fill(-1);
@@ -255,7 +268,7 @@ export function crearDeneb({ uScale, uPR }) {
       float r = R * (1.0 + e * aDato.y * 1.25);
       vec4 mv = modelViewMatrix * vec4(d * r, 1.0); gl_Position = projectionMatrix * mv;
       vC = mix(vec3(0.85, 0.92, 1.0), vec3(1.0, 0.62, 0.78), step(0.6, aDato.z));
-      float a = step(0.0, edad) * smoothstep(0.0, 0.06, edad) * (1.0 - smoothstep(0.5, 1.7, edad)) * 2.0;
+      float a = step(0.0, edad) * smoothstep(0.0, 0.06, edad) * (1.0 - smoothstep(0.6, 1.75, edad)) * 2.8;
       vA = uEstrella * a * tamMota(1.6 + aDato.z * 1.4, mv, 2.8) * fueraSilueta(mv, R * uEstrella) * uExpo; }`));
   eyecciones.frustumCulled = false; eyecciones.renderOrder = 2; marco.add(eyecciones);
   let siguiente = 0, cuentaEy = 0, ultimaEy = 0, edadAntes = 9, pulsos = 0, encendidaEy = false;
@@ -291,7 +304,7 @@ export function crearDeneb({ uScale, uPR }) {
       viento.visible = estrella > 0.002; uV.uViento.value += dt * reloj * (reducido ? 0.03 : 0.06 + 0.06 * gloria); uV.uEstrella.value = estrella; uV.uGloria.value = gloria; uV.uPum.value = e.pum * w;
       uV.uEncendido.value = w > 0.5 ? e.encendido : -1; uV.uT.value = t; uV.uTitileo.value = reducido ? 0 : 1;
       // Eyecciones: en la escena, una cada dos golpes del bombo donde suena fuerte (el drop) y tres a la vez al encenderse;
-      // fuera de ella, una cada ~4 s. Con movimiento reducido, ninguna.
+      // fuera de ella, una cada ~2,6 s. Con movimiento reducido, ninguna.
       for (let k = 0; k < NS; k++) if (edades[k] >= 0) { edades[k] += dt * Math.max(0, reloj); if (edades[k] > 1.8) edades[k] = -1; }
       if (!reducido && estrella > 0.9) {
         if (w > 0.5) {
@@ -299,7 +312,7 @@ export function crearDeneb({ uScale, uPR }) {
           if (nuevo && (e.fuerza ?? 0) > 0.6 && pulsos++ % 2 === 0) lanzar();
           if (e.encendido >= 0.3 && !encendidaEy) { encendidaEy = true; lanzar(); lanzar(); lanzar(); }
           if (e.encendido < 0) encendidaEy = false;
-        } else if (t - ultimaEy > 4) { ultimaEy = t; lanzar(); }
+        } else if (t - ultimaEy > 2.6) { ultimaEy = t; lanzar(); }
       }
       eyecciones.visible = estrella > 0.002 && edades.some(x => x >= 0); uE.uEstrella.value = estrella;
     }

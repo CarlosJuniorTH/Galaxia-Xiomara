@@ -51,7 +51,7 @@ const PISTA = [
   { t: 20.4, pos: [0, 70, 0.9], curva: 'lineal' },                                    // la tensión antes del drop
   { t: 20.57, pos: [128, -14, 0.6], mira: [0, 0.05, 0], fov: 62, curva: 'corte', giro: 8 },   // DROP: desde abajo, entre los anillos
   { t: 21.72, pos: [160, 10, 0.75], mira: [0, 0, 0], fov: 58, curva: 'rapida', giro: 0 },
-  { t: 22.87, pos: [210, 32, 0.95], fov: 56, curva: 'corte', giro: -6 },
+  { t: 22.87, pos: [200, 50, 0.95], fov: 56, curva: 'corte', giro: -6 },
   { t: 25.15, pos: [250, -22, 0.62], fov: 60, curva: 'rapida', giro: 0 },
   { t: 27.45, pos: [300, 62, 1.15], fov: 55, curva: 'corte' },                         // desde arriba: su mundo entero
   { t: 29.72, pos: [340, 6, 0.45], mira: [0, 0.12, 0], fov: 64, curva: 'rapida', giro: 5 },   // rozando la superficie
