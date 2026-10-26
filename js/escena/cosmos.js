@@ -334,7 +334,7 @@ export function* construirCosmos({ uScale, uPR }) {
   // curva sobre la sombra (lente en cada mota) y la lente de pantalla (lente.js) curva lo que hay detrás ──
   const gigantesco = new THREE.Group(); gigantesco.position.copy(direccionCielo(SITIO.agujero[0], SITIO.agujero[1], SITIO.agujero[2])); raiz.add(gigantesco);
   const R = 215; gigantesco.scale.setScalar(0.55 * ESCALA_TON);
-  const piezasTon = yield* construirTon618({ uScale, uPR, R, grupo: gigantesco, encuadre: 1100 / 0.55 });   // encuadre: el de objetivo('ton618') en unidades del grupo
+  const piezasTon = yield* construirTon618({ uScale, uPR, R, grupo: gigantesco });
   // Disco casi de canto visto desde casa (contiene la dirección de casa, inclinado 9°).
   piezasTon.orientar(gigantesco.position.clone().multiplyScalar(-1), 0.16);
 
@@ -497,8 +497,6 @@ export function* construirCosmos({ uScale, uPR }) {
     segundoAgujero: id => escenaG && escenaG.viva && escenaG.id === id ? escenaG.t : null,
     agujeros: { ton618: piezasTon, sagitario: piezasSgr },   // (diagnóstico y pruebas)
     get escenaAgujeroEstado() { return escenaG ? { id: escenaG.id, t: escenaG.t, presencia: escenaG.presencia, viva: escenaG.viva, guion: { ...escenaG.guion } } : null; },
-    // Cámara del videoclip de TON 618 (su pista, CAMARA_TON618; index.js la llama en cada cuadro).
-    derivar(camera, objetivo, dt, tocando) { return escenaG?.id === 'ton618' && piezasTon.derivar(camera, objetivo, dt, escenaG, tocando); },
     actualizar(t, dt, { camera }) {
       // El cielo acompaña a la cámara (index.js): en el espacio de la raíz, la cámara está aquí.
       const camara = camLocal.copy(camera.position).sub(raiz.position).divideScalar(raiz.scale.x);

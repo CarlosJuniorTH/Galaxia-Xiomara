@@ -3,7 +3,7 @@
 // reloj salta (la canción llega tarde, se apaga la música, se vuelve de otra pestaña) la imagen es la de ese segundo, sin
 // estados que se queden a medias. Cada función rellena un objeto propio (sin memoria nueva en cada cuadro).
 import { MOMENTOS } from '../data/bandaSonora.js';
-import { MARCAS_TON618, REPOSO_TON618, DURACION_TON618 } from './guionTon618.js';
+import { MARCAS_TON618, REPOSO_TON618, DURACION_TON618, CAMARA_TON618 } from './guionTon618.js';
 // El guion de TON 618 vive en su propio archivo (js/util/guionTon618.js): la estrella que cae, el disco que se enciende y
 // su pista de cámara.
 export { guionTon618 } from './guionTon618.js';
@@ -23,8 +23,8 @@ function aCompases(t, a, b, compas) {
 export const PULSO = Object.freeze({ ton618: { periodo: 0.4445, inicio: 0 }, sagitario: { periodo: 0.5862, inicio: 0 } });
 export const DURACION = Object.freeze({ ton618: DURACION_TON618, sagitario: 38.1 });
 // Pistas de cámara de sus videoclips (formato: js/util/directorCamara.js; segundos del fragmento, radios de encuadre).
-// null: sin pista (la cámara se queda en la llegada con los controles bloqueados; TON 618 deriva despacio).
-export const CAMARA_AGUJEROS = { ton618: null, sagitario: null };
+// null: sin pista (la cámara se queda en la llegada con los controles bloqueados). La de TON 618: js/util/guionTon618.js.
+export const CAMARA_AGUJEROS = { ton618: CAMARA_TON618, sagitario: null };
 // Marcas por defecto (las mismas que js/data/bandaSonora.js; si allí faltan, la escena conserva su guion).
 const POR_DEFECTO = {
   ton618: { ...MARCAS_TON618 },

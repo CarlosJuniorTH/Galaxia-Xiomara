@@ -1125,8 +1125,6 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       // menor se quedaba atrás y se notaba un frenito).
       giro.actualizar(Math.min(0.1, dtReal), !mirada && !vuelo && !dirige, ahora);
       zoom.actualizar(Math.min(0.1, dtReal), !mirada && !vuelo && !dirige);
-      // La escena de TON 618 mueve la cámara muy despacio (cosmos.derivar); si la persona la toca, deja de hacerlo.
-      if (!mirada && !movimientoReducido && !dirige) cosmos.derivar(camera, controls.target, dt, gesto || giro.moviendo || zoom.moviendo);
     }
     if (ajuste && !vuelo) {
       // Mantiene la dirección actual de la cámara (su órbita) y cambia la distancia y el punto de mira.

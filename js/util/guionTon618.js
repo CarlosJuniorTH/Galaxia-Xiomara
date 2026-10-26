@@ -67,7 +67,6 @@ export const estrella = (t, o) => caminoCaida(t - MARCAS_TON618.tuyo, 4, o);
 //  latidoEstrella   el destello de la estrella en «my heart»
 //  avivar     el disco que come brilla más (1 en reposo; sube con el mantra hasta la cumbre y vuelve a 1)
 //  flujo      velocidad con la que el disco cae en espiral hacia el centro (1 = la de siempre)
-//  deriva     cuánto manda la pista de cámara (entra al llegar y se va al final)
 //  calma      0 → 1 en el fundido
 const ENCENDIDO = [[MARCAS_TON618.tuyo, 0.26], [12.98, 0.34], [14.74, 0.42], [18.3, 0.52], [21.82, 0.62], [25.39, 0.72], [28.95, 0.84], [32.51, 1]];
 export function guionTon618(t, M = MARCAS_TON618, { reducido = false } = {}, o = {}) {
@@ -93,18 +92,17 @@ export function guionTon618(t, M = MARCAS_TON618, { reducido = false } = {}, o =
   o.avivar = 1 + 0.45 * suave(t, M.tuyo, M.mantra) + 0.35 * suave(t, 28.95, M.cumbre) - 0.8 * suave(t, M.cumbre + 0.5, M.fundido + 2);
   o.flujo = 1 + 4 * suave(t, M.tuyo, M.mantra) * (1 - suave(t, M.cumbre, M.fundido + 2));
   o.calma = muySuave(t, M.fundido, M.fundido + 2.3);
-  o.deriva = 1 - suave(t, DURACION_TON618 - 0.4, DURACION_TON618 + 0.4);
   return o;
 }
-export const REPOSO_TON618 = Object.freeze({ t: 0, encendido: 1, avivar: 1, revelar: 1, destello: 0, ola: -1, olaR0: 6.8, olaF: 0, bombo: 0, latidoEstrella: 0, caida: 0, flujo: 1, calma: 0, deriva: 0 });
+export const REPOSO_TON618 = Object.freeze({ t: 0, encendido: 1, avivar: 1, revelar: 1, destello: 0, ola: -1, olaR0: 6.8, olaF: 0, bombo: 0, latidoEstrella: 0, caida: 0, flujo: 1, calma: 0 });
 
-// ── Pista de cámara (contrato del director, js/util/directorCamara.js): segundos del fragmento; pos = [azimut°, elevación°,
-// distancia] respecto al centro, en el marco del disco (azimut 0 = el lado por el que se llega, hacia casa; elevación sobre
-// el plano del disco); distancia y mira en unidades del encuadre de llegada (cosmos.objetivo('ton618').distancia con el
-// factor de aspecto de index.js: 1 = donde deja el viaje; la sombra mide 0,11). ──
+// ── Pista de cámara (la lleva el director común, js/util/directorCamara.js): segundos del fragmento; pos = [azimut°,
+// elevación°, distancia] respecto al centro, en el marco del disco (azimut 0 = el lado de casa; elevación sobre el plano
+// del disco); distancia y mira en radios de encuadre (la distancia de llegada: 1 = donde deja el viaje; la sombra mide
+// 0,11 y el disco 0,7). El primer plano no es un corte: el director entra en la pista desde donde esté la cámara. ──
 export const CAMARA_TON618 = Object.freeze([
   // Llegada: el agujero dormido y, por encima de él, lejos, la estrella que viene. Casi quieta (el compás de entrada).
-  { t: 0, pos: [0, 9.2, 1.0], mira: [0, 0, 0], fov: 60, curva: 'corte' },
+  { t: 0, pos: [0, 9.2, 1.0], mira: [0, 0, 0], fov: 60, curva: 'suave' },
   // «secrets…»: la cámara empieza a rodear el agujero por el lado contrario a la estrella, para tenerla siempre detrás de
   // él: así se la ve caer desde arriba hacia la sombra (y, al acercarse, su luz se curva alrededor).
   { t: 1.42, pos: [-2, 9.5, 0.98], mira: [0, 0.03, 0], fov: 60, curva: 'suave' },
@@ -138,18 +136,3 @@ export const CAMARA_TON618 = Object.freeze([
   // devuelve el control.
   { t: 37.3, pos: [-360, 14, 0.95], mira: [0, 0, 0], fov: 60, curva: 'suave' }
 ]);
-
-// Muestreo de la pista (el mismo contrato que el director: Catmull-Rom por tramos con la curva de cada plano). Lo usa
-// js/escena/ton618.js mientras el director común no esté; puro y sin memoria nueva (o: objeto de salida).
-const CURVAS = { suave: u => u * u * (3 - 2 * u), rapida: u => 1 - Math.pow(1 - u, 3), lineal: u => u, corte: () => 1 };
-const cr = (a, b, c, d, u) => 0.5 * (2 * b + (c - a) * u + (2 * a - 5 * b + 4 * c - d) * u * u + (3 * b - a - 3 * c + d) * u * u * u);
-export function muestrearPista(pista, t, o = { pos: [0, 0, 0], mira: [0, 0, 0], fov: 60, giro: 0 }) {
-  const n = pista.length;
-  let i = 1; while (i < n && pista[i].t <= t) i++;
-  if (i >= n) { const p = pista[n - 1]; for (let k = 0; k < 3; k++) { o.pos[k] = p.pos[k]; o.mira[k] = p.mira[k]; } o.fov = p.fov ?? 60; o.giro = p.giro ?? 0; return o; }
-  const A = pista[Math.max(0, i - 2)], B = pista[i - 1], C = pista[i], D = pista[Math.min(n - 1, i + 1)];
-  const u = (CURVAS[C.curva] || CURVAS.suave)(Math.min(1, Math.max(0, (t - B.t) / (C.t - B.t))));
-  for (let k = 0; k < 3; k++) { o.pos[k] = cr(A.pos[k], B.pos[k], C.pos[k], D.pos[k], u); o.mira[k] = cr(A.mira[k], B.mira[k], C.mira[k], D.mira[k], u); }
-  o.fov = (B.fov ?? 60) + ((C.fov ?? 60) - (B.fov ?? 60)) * u; o.giro = (B.giro ?? 0) + ((C.giro ?? 0) - (B.giro ?? 0)) * u;
-  return o;
-}

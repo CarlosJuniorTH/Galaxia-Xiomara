@@ -5,12 +5,12 @@
 // Su videoclip (js/util/guionTon618.js), con «I Wanna Be Yours», cuenta lo que hace un agujero negro: tragar lo que cae.
 // Al llegar duerme (un disco frío y tenue); una estrella cae hacia él, la marea la estira en un hilo, pasa rozando el
 // horizonte en el primer «yours» y su materia se enrosca en anillos que encienden el disco, uno en cada «yours», hasta el
-// disco completo que se queda. La cabeza del hilo cruza el horizonte y desaparece. La cámara sigue la pista del guion
-// (CAMARA_TON618). Todo se crea en la carga (la preparación lo compila y lo calienta); por cuadro solo cambian uniformes.
+// disco completo que se queda. La cabeza del hilo cruza el horizonte y desaparece. La cámara la lleva el director común
+// con la pista del guion (CAMARA_TON618). Todo se crea en la carga (la preparación lo compila y lo calienta); por cuadro solo cambian uniformes.
 import * as THREE from 'three';
 import { GLSL_LENTE, GLSL_TAMANO, GLSL_OCULTA, geometriaMotas, materialMotas, crearAnilloFotones } from './curvaLuz.js';
 import { materialSombra } from './materiales.js';
-import { REPOSO_TON618, CAMARA_TON618, CAIDA, MARCAS_TON618, muestrearPista } from '../util/guionTon618.js';
+import { REPOSO_TON618, CAIDA, MARCAS_TON618, estiramiento } from '../util/guionTon618.js';
 
 // Medidas en radios de sombra (R): borde interior del disco (la última órbita estable, algo por fuera de la sombra),
 // borde exterior y las motas de cada parte (las mismas en el móvil y en el PC).
@@ -68,8 +68,7 @@ const GLSL_FINAL = /* glsl */`
     vC = c; vA = brillo * luz * im.w * (aImagen > 0.5 ? 1.5 * uRevelar : 1.0);   // las imágenes curvadas, algo más vivas (se reparten en un arco fino); la escena las despierta`;
 
 // grupo: el del agujero en el cosmos (su posición y su escala); aquí se le añaden las piezas.
-// encuadre: la distancia de llegada (cosmos.objetivo) en unidades del grupo: la unidad de la pista de cámara.
-export function* construirTon618({ uScale, uPR, R, grupo, encuadre = R * 9.3 }) {
+export function* construirTon618({ uScale, uPR, R, grupo }) {
   const planoDisco = new THREE.Group(), galaxia = new THREE.Group(); grupo.add(planoDisco, galaxia);
   const comunes = { uScale, uPR, uMaximo: { value: 3 }, uSombra: { value: R }, uR: { value: R }, uUnidad: { value: R }, uGiro: { value: 0 },
     uEnc: { value: 1 }, uRevelar: { value: 1 }, uOla: { value: -1 }, uOlaR0: { value: 6.8 }, uOlaF: { value: 0 }, uBombo: { value: 0 }, uAvivar: { value: 1 }, uCamLocal: { value: new THREE.Vector3(0, 0, 1e6) } };
@@ -220,16 +219,8 @@ export function* construirTon618({ uScale, uPR, R, grupo, encuadre = R * 9.3 }) 
   let giro = 0, flujo = 0;
   // Mezcla del guion de la escena con el reposo según su presencia (al entrar y al salir, sin saltos).
   const mezclar = (s, w) => { for (const k in REPOSO_TON618) v[k] = REPOSO_TON618[k] + ((s ? s[k] : REPOSO_TON618[k]) - REPOSO_TON618[k]) * w; return v; };
-  // Cámara: muestra de la pista, pose de partida (para entrar en la pista sin salto) y vectores de trabajo.
-  const muestra = { pos: [0, 0, 0], mira: [0, 0, 0], fov: 60, giro: 0 }, inicio = { activo: false, pos: new THREE.Vector3(), mira: new THREE.Vector3(), fov: 60 };
-  const pPista = new THREE.Vector3(), mPista = new THREE.Vector3();
-  const suave = (x, a, b) => { const k = Math.min(1, Math.max(0, (x - a) / (b - a))); return k * k * (3 - 2 * k); };
   return {
     planoDisco, sombra, base, anillo, discoEstrellas, motasDisco, motasCaida, R, rFuera: R_FUERA,
-    // Marco de la pista de cámara (el del disco: azimut 0 hacia casa, elevación sobre el disco) y su unidad (la distancia
-    // de llegada, con el mismo factor de aspecto que index.js).
-    marco: planoDisco, pista: CAMARA_TON618,
-    unidadPista(aspecto) { return encuadre * grupo.matrixWorld.getMaxScaleOnAxis() * Math.max(1, Math.min(1.6, 0.95 / aspecto)); },
     // El disco (y su galaxia de estrellas) contiene la dirección «hacia» y se inclina un poco sobre ella.
     orientar(hacia, inclinacion) { for (const o of [planoDisco, galaxia]) { o.lookAt(hacia); o.rotateX(inclinacion); } },
     // escena: null (reposo) o { guion, presencia } (js/escena/cosmos.js la mezcla con el reposo al entrar y al salir).
@@ -249,7 +240,7 @@ export function* construirTon618({ uScale, uPR, R, grupo, encuadre = R * 9.3 }) 
       comunes.uOla.value = escena && w > 0 ? escena.guion.ola : -1; comunes.uOlaR0.value = escena ? escena.guion.olaR0 : 6.8; comunes.uOlaF.value = s.olaF;
       // La estrella: su reloj es el de la canción; estiramiento de la marea (guionTon618.estiramiento).
       const tE = escena ? escena.guion.t : 0;
-      mCaida.uT.value = tE; mCaida.uE.value = 0.012 + 0.35 * suave(tE, MARCAS_TON618.esconder, 10.2) + 0.5 * Math.max(0, tE - 10.2);
+      mCaida.uT.value = tE; mCaida.uE.value = estiramiento(tE);
       mCaida.uCaida.value = s.caida; mCaida.uLatidoE.value = s.latidoEstrella; motasCaida.visible = s.caida > 0.001;
       discoEstrellas.material.uniforms.uT.value = t;
       // Anillo de fotones: mira a la cámara; su lado brillante es el del disco que se acerca. Dormido, más tenue; en cada
@@ -259,32 +250,6 @@ export function* construirTon618({ uScale, uPR, R, grupo, encuadre = R * 9.3 }) 
       tmp.applyQuaternion(planoDisco.getWorldQuaternion(q)).applyQuaternion(anillo.getWorldQuaternion(qa).invert());
       anillo.material.uniforms.uLado.value.set(tmp.x, tmp.y).normalize();
       anillo.material.uniforms.uLuz.value = 0.8 * (0.55 + 0.45 * Math.min(1.2, s.revelar)) + 0.5 * s.destello;
-      if (!escena) inicio.activo = false;
-    },
-    // Cámara del videoclip: sigue la pista del guion (CAMARA_TON618) en el reloj de la canción. Entra desde donde esté la
-    // cámara (en los dos primeros segundos, sin salto) y, al final, la pista vuelve al encuadre de llegada y devuelve el
-    // control. Mientras dura, la escena no se puede saltar: la cámara la lleva el clip (aunque se toque). Si se sale a
-    // mitad, la cámara se queda donde está. Sin memoria nueva por cuadro.
-    derivar(camera, objetivo, dt, escena) {
-      const g = escena?.guion;
-      if (!escena || !escena.viva || g.deriva <= 0.001) {
-        // Al soltar la cámara, el campo de visión vuelve al de siempre (la pista termina en él; si se sale a mitad, no).
-        if (inicio.activo && camera.fov !== 60) { camera.fov = 60; camera.updateProjectionMatrix(); }
-        inicio.activo = false; return false;
-      }
-      grupo.getWorldPosition(centro); planoDisco.getWorldQuaternion(q);
-      const U = this.unidadPista(camera.aspect), m = muestrearPista(CAMARA_TON618, g.t, muestra), rad = Math.PI / 180;
-      const az = m.pos[0] * rad, el = m.pos[1] * rad;
-      pPista.set(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)).multiplyScalar(m.pos[2] * U).applyQuaternion(q).add(centro);
-      mPista.set(m.mira[0], m.mira[1], m.mira[2]).multiplyScalar(U).applyQuaternion(q).add(centro);
-      if (!inicio.activo) { inicio.activo = true; inicio.pos.copy(camera.position); inicio.mira.copy(objetivo); inicio.fov = camera.fov; }
-      // Entrada en la pista: de la pose de llegada a la de la pista en 2 s.
-      const k = suave(g.t, 0, 2);
-      camera.position.lerpVectors(inicio.pos, pPista, k); objetivo.lerpVectors(inicio.mira, mPista, k);
-      const fov = inicio.fov + (m.fov - inicio.fov) * k;
-      if (Math.abs(camera.fov - fov) > 1e-3) { camera.fov = fov; camera.updateProjectionMatrix(); }
-      camera.lookAt(objetivo);
-      return true;
     }
   };
 }

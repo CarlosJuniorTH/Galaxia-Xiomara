@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { guionTon618, MARCAS_TON618 as M, TUYOS, REPOSO_TON618, CAMARA_TON618, muestrearPista, caminoCaida, estrella, DURACION_TON618 } from '../js/util/guionTon618.js';
+import { guionTon618, MARCAS_TON618 as M, TUYOS, REPOSO_TON618, CAMARA_TON618, caminoCaida, estrella, DURACION_TON618 } from '../js/util/guionTon618.js';
+import { muestrearCamara, pistaDe, crearMuestra } from '../js/util/directorCamara.js';
+const muestrearPista = (pista, t) => muestrearCamara(pista, t, crearMuestra());
 import { MOMENTOS } from '../js/data/bandaSonora.js';
 import { marcasDe, finEscena } from '../js/util/guionAgujeros.js';
 
@@ -41,6 +43,8 @@ test('TON 618: el disco empieza dormido, se enciende a saltos en cada «yours» 
 
 test('TON 618: la pista de cámara sigue la canción y devuelve el control en el encuadre de llegada', () => {
   for (let i = 1; i < CAMARA_TON618.length; i++) assert.ok(CAMARA_TON618[i].t > CAMARA_TON618[i - 1].t, 'en orden');
+  assert.equal(pistaDe('ton618').length, CAMARA_TON618.length, 'el director la usa entera');
+  assert.notEqual(CAMARA_TON618[0].curva, 'corte', 'el director entra en la pista desde donde esté la cámara');
   assert.ok(Math.abs(CAMARA_TON618.at(-1).t - DURACION_TON618) < 0.01, 'dura lo que la canción');
   const fin = muestrearPista(CAMARA_TON618, 50), ini = muestrearPista(CAMARA_TON618, 0);
   assert.ok(fin.pos[2] > 0.8 && fin.pos[2] < 1.2 && fin.fov === 60 && fin.mira.every(v => v === 0), 'acaba cerca del encuadre normal, mirando al centro');
