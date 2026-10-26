@@ -35,7 +35,9 @@ export function crearNucleo(canvas) {
   //    así que en móvil empieza en DPR 2 y la resolución dinámica de index.js la ajusta.
   //    La pasada de salida la reescala a la nativa con un enfoque adaptativo (salida.js).
   const prMaximo = Math.min(devicePixelRatio, Q.pr);
-  let pr = esMovil ? Math.min(prMaximo, nivelSeguro >= 2 ? 1.25 : 2) : prMaximo;   // 2 en el móvil (a 1,75 se veía pixelado en una pantalla de DPR 3); la resolución dinámica sube hasta 2,5 si el aparato va sobrado y baja si se calienta
+  // En el móvil empieza en 2,25 (lo más nítido que se reserva; antes 2 y subía a los ~9 s si iba sobrado): Carlos prefiere
+  // nitidez. Si el aparato no llega, la resolución dinámica baja en ~1 s (y deshace la bajada si no ayudaba).
+  let pr = esMovil ? Math.min(prMaximo, nivelSeguro >= 2 ? 1.25 : nivelSeguro ? 2 : 2.25) : prMaximo;   // 2 en el móvil (a 1,75 se veía pixelado en una pantalla de DPR 3); la resolución dinámica sube hasta 2,5 si el aparato va sobrado y baja si se calienta
   // Lo más alto que puede llegar la escena con la resolución dinámica (index.js, regulador): los búferes se reservan a
   // este tamaño una sola vez y cambiar de resolución solo cambia la zona en la que se dibuja (zona.js).
   // En el móvil, 2,25 como mucho: reservar a 2,5 eran ~25 MB más de memoria de la tarjeta gráfica en un iPhone.
