@@ -21,7 +21,7 @@ import * as THREE from 'three';
 import { EXPOSICION } from './exposicion.js';
 import { ESCENA_PULSAR, vueltasPulsar } from '../util/escenaPulsar.js';
 
-export const PULSAR = Object.freeze({ estrella: 34, haz: 3600, viento: 650, nebulosa: [3000, 2300, 2400] });
+export const PULSAR = Object.freeze({ estrella: 34, haz: 4400, viento: 650, nebulosa: [3000, 2300, 2400] });
 const DORMIDO = ESCENA_PULSAR.giros[0][1];   // vueltas por pulso dormido
 
 function azarCon(semilla) { let s = semilla >>> 0; return () => { s = (Math.imul(1664525, s) + 1013904223) >>> 0; return s / 4294967296; }; }

@@ -445,7 +445,7 @@ export function* construirCosmos({ uScale, uPR }) {
       piezasPulsar.actualizar({ e: estadoP, e0: pulsarDormido, w: wP, activa: dP.activa, s: sP, t, dt, camara: camaraEnPulsar(), reducido });
       // Las paredes de polvo del cielo profundo y las nebulosas cercanas (nubes moradas y naranjas de bordes blancos) se apagan
       // mientras se le mira: su nebulosa es la suya, de filamentos (js/util/fondoEscena.js). Al irse, vuelven.
-      if (wP > 0.0005) { pulsar.getWorldPosition(centroPulsar); atenuandoPulsar = true; atenuarFondo(centroPulsar.x, centroPulsar.y, centroPulsar.z, 12 * 3850 * pulsar.getWorldScale(camPulsar).x, wP * Math.min(0.9, 1.06 * Math.max(0, estadoP.foco))); }
+      if (wP > 0.0005) { pulsar.getWorldPosition(centroPulsar); atenuandoPulsar = true; atenuarFondo(centroPulsar.x, centroPulsar.y, centroPulsar.z, 12 * 3850 * pulsar.getWorldScale(camPulsar).x, wP * 0.9 * THREE.MathUtils.smoothstep(estadoP.foco, 0, 0.3)); }
       else if (atenuandoPulsar) { atenuandoPulsar = false; atenuarFondo(0, 0, 0, 0, 0); }
       for (const h of animar) h.material.uniforms.uT.value = t;
       // Deneb: su videoclip (nace de la nada con «Middle») sobre su estado de siempre (deneb.js, js/util/escenaDeneb.js).
