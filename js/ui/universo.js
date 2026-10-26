@@ -31,7 +31,7 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
   const supernovaAmor = crearSupernovaAmor({ escena, progreso, musica, banda, alDescubrir: () => { if (actual === 'supernova') situar('supernova'); } });
   // El púlsar y Deneb: su escena al llegar (sincronizable con su audio: relojDe).
   const escenasGigantes = crearEscenasGigantes({ escena, banda });
-  // El faro del cuásar: su recorrido con frases y la carta que espera al final.
+  // La carta del cuásar: a la vista cuando su videoclip se ha visto entero.
   const faro = crearFaroCuasar({ escena, progreso, mostrarLectura, alCambiar: () => { if (actual === 'cuasar') situar('cuasar'); } });
   // TON 618 y Sagitario A*: su escena empieza sola al llegar, con su canción (js/ui/escenaAgujeros.js).
   const escenaAgujeros = crearEscenaAgujeros({ escena, banda, alRepetir: (id, segundos) => escenaEnCurso(id, segundos) });
@@ -94,7 +94,7 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
   async function contemplar() {
     if (celebrando || tour || contemplando || escenaActual) return;
     if (panel.open) cerrarPanel();
-    faro.cancelar(); contemplando = true; const mia = ++revisionContemplar;
+    contemplando = true; const mia = ++revisionContemplar;
     document.body.classList.add('paseo-contemplar'); musica?.reproducir?.(true);
     avisar('Un paseo sin prisa por nuestro universo. Toca la pantalla cuando quieras volver.');
     setTimeout(() => { if (contemplando && mia === revisionContemplar) for (const evento of ['pointerdown', 'keydown']) document.addEventListener(evento, terminarContemplar, { once: true, capture: true }); }, 900);
@@ -173,7 +173,7 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     $('lugar-accion').replaceChildren(document.createTextNode(textoAccion), el('span', '', '↗'));
     // En el corazón ya nacido: contemplarlo aislado o con el universo, y guardar su postal.
     $('lugar-extra').hidden = !nacido;
-    $('lugar-faro').hidden = !(id === 'cuasar' && faro.cartaLista && faro.estado === 'inactivo');
+    $('lugar-faro').hidden = !(id === 'cuasar' && faro.cartaLista);
     $('faro-carta').textContent = faro.accionCarta;
     aislarCorazon(nacido && document.body.dataset.supernovaAislada === 'true');   // el botón refleja el estado real
     if (id !== 'constelacion' && !celebrando && !tour) $('tejido').hidden = true;
@@ -211,7 +211,6 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     if (id === 'supernova') return verSupernova();
     if (escenaAgujeros.propia(id)) return escenaAgujeros.repetir(id);
     if (!escenasGigantes.tiene(id) || escenasGigantes.enCurso) return;
-    faro.cancelar();
     banda?.ceremonia(id);
     escenaEnCurso(id, duracionClip(id));
     await clipGigante(id);
@@ -224,7 +223,6 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     if (forzado) terminarEscena();
     if (panel.open) cerrarPanel();
     if (tour) terminarRuta(false, false);
-    faro.cancelar();
     // Ya estamos en ese lugar lejano: no se vuelve a viajar a él.
     const lejano = LEJANOS.find(l => l.id === id);
     if (lejano && escena.destino === id && !escena.viajando) { avisar(`Ya estás aquí: ${lejano.nombre}.`); return; }

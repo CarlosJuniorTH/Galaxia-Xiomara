@@ -243,7 +243,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // supernova) el cielo deja de acompañar a la cámara ('fijo') y la cámara viaja hasta donde
   // está de verdad. Al volver, el cielo se recoge poco a poco en el tramo final ('regreso').
   const ID_LEJANOS = new Set(LEJANOS.map(l => l.id));
-  let lejano = null, partida = null, faroBase = null;
+  let lejano = null, partida = null;
   const soltarCielo = () => { lejano = null; };   // se deja de visitar un objeto lejano
   const velo = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
     uniforms: { uVelo: { value: 0 } },
@@ -1426,16 +1426,6 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     aplazarSupernova: s => cosmos.supernova.aplazar(s),
     // El remanente es un lugar duradero, no un evento que desaparece al volver a casa.
     recordarSupernova() { cosmos.supernova.recordar(); },
-    async encuadrarSupernova() {
-      if (!lejano || lejano.id !== 'supernova') return false;
-      cosmos.supernova.orientar();
-      const { posicion, objetivo, distancia } = encuadreCorazon();
-      lejano.dist = distancia;
-      controls.minDistance = distancia * LIMITES.min; controls.maxDistance = distancia * LIMITES.max;
-      const ok = await desplazar(posicion, objetivo, movimientoReducido ? 2 : 7.5, undefined, { corriente: 0 });
-      if (destinoActual === 'supernova') controls.autoRotate = false;
-      return ok;
-    },
     // reloj(): segundo de «Sparks» (bandaSonora.tiempo('supernova')); sin él (o mientras no suena), el tiempo de la ceremonia.
     // Con pista de cámara (CAMARA_SUPERNOVA, js/util/supernovaAmor.js) la cámara la lleva el director: sin acercarse a la
     // estrella al repetir ni retirarse al corazón (la pista ya cuenta esos planos).
@@ -1500,7 +1490,6 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       return terminada;
     },
     cancelarEscenaGigante: id => cosmos.escenas.cancelar(id),
-    segundoEscena: id => cosmos.escenas.segundo(id),
     get escenaGiganteEnCurso() { return cosmos.escenas.enCurso; },
     // El videoclip en curso (director de cámara): gigante, fase ('clip' o 'salida'), si sigue una pista y su segundo; y los
     // límites del zoom y la distancia de la cámara al punto mirado (pruebas y diagnóstico).
@@ -1550,29 +1539,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       if (id === 'constelacion') return desplazar(en(480), centro, 3, undefined, { corriente: 0 });
       return Promise.resolve(true);
     },
-    // El faro del cuásar: recorrido de cámara por fases ('inicio', 'arco', 'chorros', 'final'), siempre
-    // por fuera: a la distancia de llegada y lejos del eje de los chorros (elevación 20–32° sobre el
-    // plano del disco), sin cruzar la sombra, el disco, el anillo ni los chorros. Con movimiento
-    // reducido la cámara no se mueve. Devuelve una promesa (false si se interrumpe).
-    faro(fase) {
-      if (vuelo || destinoActual !== 'cuasar' || !lejano || lejano.id !== 'cuasar') return Promise.resolve(false);
-      if (movimientoReducido) return Promise.resolve(true);
-      const c = lejano.centro, R = lejano.dist, g = Math.PI / 180;
-      if (fase === 'inicio' || !faroBase) {
-        const n = cosmos.ejeCuasar(), rel = camera.position.clone().sub(c);
-        const u = rel.clone().projectOnPlane(n); if (u.lengthSq() < 1e-6) u.copy(new THREE.Vector3(1, 0, 0).projectOnPlane(n)); u.normalize();
-        faroBase = { u, w: n.clone().cross(u).normalize(), n, lado: Math.sign(rel.dot(n)) || 1 };
-      }
-      const b = faroBase, en = (az, el, k = 1) => c.clone().addScaledVector(b.u, Math.cos(el * g) * Math.cos(az * g) * R * k).addScaledVector(b.w, Math.cos(el * g) * Math.sin(az * g) * R * k).addScaledVector(b.n, b.lado * Math.sin(el * g) * R * k);
-      const ir = (puntos, s) => { const fin = puntos.pop(); return desplazar(fin, c, s, undefined, { paso: puntos, mirarAntes: 1, corriente: 0, fija: true }); };
-      if (fase === 'inicio') return ir([en(0, 30, 1.04)], 4.5);
-      if (fase === 'arco') return ir([20, 40, 60, 80, 100].map(a => en(a, 30 - a * 0.06, 1.04 - a * 0.0004)), 10);
-      if (fase === 'chorros') return ir([en(108, 24, 1), en(118, 23, 0.99)], 7.5);
-      if (fase === 'final') return ir([en(128, 25, 0.98), en(138, 27, 0.97)], 5.5);
-      return Promise.resolve(false);
-    },
+    // La señal de luz de la carta del cuásar (js/ui/faroCuasar.js): sube por los chorros (0–1; −1 apagada).
     faroAcento: v => cosmos.acentoCuasar(v),
-    olvidarFaro() { faroBase = null; cosmos.acentoCuasar(-1); },
     // Segunda y tercera pista: iluminar la zona y acercar la cámara a ella (sin la estrella).
     zonaPista(i) { return !!secretas.iluminarZona(i); },
     acercarZona(i) {

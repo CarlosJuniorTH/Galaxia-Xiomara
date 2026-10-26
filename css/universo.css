@@ -350,19 +350,8 @@ body.en-ruta #supernova-aviso{display:none;}
 @media(prefers-reduced-motion:reduce){#destello-viaje.activo{animation-duration:.4s}}
 
 /* El faro del cuásar: una frase cada vez, arriba (lejos del núcleo, que queda en el centro), y un botón discreto para saltar. */
-.faro-frase{position:fixed;left:50%;top:calc(var(--arriba) + 96px);transform:translate(-50%,-6px);z-index:27;width:min(560px,86vw);text-align:center;pointer-events:none;opacity:0;transition:opacity .7s ease,transform .7s ease;}
-.faro-frase[hidden]{display:none;}
-.faro-frase.visible{opacity:1;transform:translate(-50%,0);}
-.faro-frase p{margin:0;font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1.55rem;line-height:1.35;color:#f6e6dc;text-shadow:0 0 18px #0009,0 0 3px #000c;}
-.faro-saltar{position:fixed;left:50%;bottom:calc(var(--abajo) + 34px);transform:translateX(-50%);z-index:30;border:1px solid var(--linea);background:#21172c99;color:#decfe5;padding:11px 20px;border-radius:30px;font-size:.62rem;letter-spacing:.6px;cursor:pointer;}
-.faro-saltar[hidden]{display:none;}
-.faro-saltar:focus-visible{outline:2px solid #f6d6a9;outline-offset:3px;}
-body.faro-en-curso #brindis,body.faro-en-curso #cometa-frase,body.faro-en-curso #pista{display:none!important}
-body.faro-en-curso #titulo,body.faro-en-curso #mensaje,body.faro-en-curso #btn-mirar-casa{opacity:0!important;pointer-events:none!important;transition:opacity .8s ease;}
 .lectura #lectura-texto p{white-space:pre-line;}
 .lectura.sin-firma .firma{display:none;}
-@media(max-width:600px){.faro-frase{top:calc(var(--arriba) + 128px);width:min(76vw,330px);}.faro-frase p{font-size:1.3rem;}.faro-saltar{bottom:calc(var(--abajo) + 30px);}}
-@media(prefers-reduced-motion:reduce){.faro-frase{transition:none;transform:translate(-50%,0);}}
 
 /* Aviso de actualización de los paquetes del universo (js/util/paquetes.js). */
 .aviso-actualizacion{

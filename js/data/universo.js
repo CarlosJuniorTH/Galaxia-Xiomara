@@ -41,14 +41,8 @@ export const ZONAS_LUGARES = Object.freeze({
 });
 export const lugarPorId = id => DESTINOS.find(d => d.id === id) || LEJANOS.find(d => d.id === id) || null;
 export const lugaresDeZona = zona => ZONAS_LUGARES[zona].map(lugarPorId);
-// El faro del cuásar: las frases de su recorrido (una cada vez) y la carta que espera al final.
+// El cuásar: la carta que espera al final de su videoclip (js/ui/faroCuasar.js).
 export const FARO_CUASAR = {
-  frases: [
-    'Hay una luz que cruza la distancia.',
-    'Sale de donde estoy…',
-    '…y lleva un poquito de mí hasta donde estás tú.',
-    'Aunque nuestros días tengan horas distintas, siempre encuentro una forma de llegar a ti.'
-  ],
   accionCarta: 'Hay algo para ti',
   carta: {
     id: 'faro', ceja: 'UNA LUZ QUE TE ESPERABA', titulo: 'El faro que siempre te encuentra',
