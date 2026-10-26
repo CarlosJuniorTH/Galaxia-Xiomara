@@ -20,6 +20,7 @@ const CHROME = process.env.CHROME || homedir() + '/.cache/ms-playwright/chromium
 export const PERFILES = {
   pc: { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 },
   iphoneMax: { ...devices['iPhone 13'], viewport: { width: 430, height: 775 }, screen: { width: 430, height: 932 } },
+  iphone: { ...devices['iPhone 13'], viewport: { width: 390, height: 844 }, screen: { width: 390, height: 844 } },   // 390×844, DPR 3
   android: { ...devices['Pixel 7'] }
 };
 
@@ -41,6 +42,16 @@ export function pararServidor() { servidor?.kill(); servidor = null; }
 // (Los audios de prueba de assets/musica/prueba/, con ?pruebaAudio, no se bloquean.)
 export async function lanzar(perfil = 'pc', { musica = false } = {}) {
   if (!existsSync(CHROME)) { console.error('No encuentro Chromium en ' + CHROME + ' (variable CHROME).'); process.exit(2); }
+  // La GPU del equipo se comparte con otros procesos: a veces Vulkan no deja crear el dispositivo y ese Chromium arranca sin
+  // WebGL (la página diría «Chrome no ha permitido crear el contexto 3D»). Se comprueba en una página en blanco y, si
+  // falta, se lanza otro (hasta ~2 minutos): no es un fallo de la página.
+  for (let intento = 1; ; intento++) {
+    const r = await lanzarUna(perfil, { musica });
+    if (process.env.GL === 'sw' || intento >= 12 || await r.pagina.evaluate(() => !!document.createElement('canvas').getContext('webgl2'))) return r;
+    await r.navegador.close(); await new Promise(f => setTimeout(f, 10000));
+  }
+}
+async function lanzarUna(perfil, { musica }) {
   const navegador = await chromium.launch({ executablePath: CHROME, headless: true, args: process.env.GL === 'sw' ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : ['--enable-gpu', '--ignore-gpu-blocklist', '--use-angle=vulkan', '--enable-features=Vulkan'] });
   const contexto = await navegador.newContext(PERFILES[perfil]);
   if (!musica) await contexto.route('**/assets/musica/*.m4a', r => r.fulfill({ status: 404, body: '' }));
