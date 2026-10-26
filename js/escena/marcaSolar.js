@@ -44,7 +44,12 @@ export function crearMarcaSolar({ uScale, uPR, etiqueta }) {
     m.frustumCulled = false; return m;
   };
   // El Sol: crema dorado, por debajo del umbral del resplandor (sin halo).
-  const sol = discos([{ pos: new THREE.Vector3(), radio: RADIO_SOL, color: '#ffd9a0', luz: 0.74 }], 5, { value: 1 });
+  const sol = discos([{ pos: new THREE.Vector3(), radio: RADIO_SOL, color: '#ffe0a8', luz: 0.76 }], 7, { value: 1 });
+  // Sus rayos: una cruz de trazos finos de 1 px (como el destello del Sol al que se llega), siempre de cara a la cámara y
+  // del mismo tamaño en pantalla; sin brillo difuso.
+  const rayos = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([[-1, 0], [-0.18, 0], [0.18, 0], [1, 0], [0, -0.7], [0, -0.16], [0, 0.16], [0, 0.7]].map(([x, y]) => new THREE.Vector3(x, y, 0))),
+    new THREE.LineBasicMaterial({ color: '#ffe6bd', transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending }));
+  rayos.frustumCulled = false; grupo.add(rayos);
   const planetas = discos(CUERPOS_SOLARES.map(c => ({ ...c, luz: 0.7 })), 1.5, uOpPlanetas);
   mini.add(sol, planetas);
   // Órbitas: los mismos círculos que en la escena del sistema solar (planetas.js), igual de tenues.
@@ -55,13 +60,14 @@ export function crearMarcaSolar({ uScale, uPR, etiqueta }) {
   }
   // El nombre, encima: se lee de lejos y se aparta al acercarse (antes crecía hasta cubrir la pantalla).
   const nombre = new THREE.Sprite(new THREE.SpriteMaterial({ map: etiqueta, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending }));
-  nombre.scale.set(190, 30, 1); nombre.position.y = 70; grupo.add(nombre);
+  nombre.scale.set(190, 30, 1); nombre.position.y = 44; grupo.add(nombre);
   return {
     grupo,
     // Cada cuadro: posición en el brazo, giro del marco del sistema solar y lo que se ve según la distancia.
     actualizar(camera, punto, giro, tiempo) {
       grupo.position.copy(punto); mini.rotation.y = giro;
       const d = camera.position.distanceTo(punto);
+      rayos.quaternion.copy(camera.quaternion); rayos.scale.setScalar(d * 0.032 * (1 + (uLatido.value - 1) * 0.6));
       uLatido.value = 1 + Math.sin(tiempo * 2.2) * 0.18 * THREE.MathUtils.smoothstep(d, 300, 900);   // late de lejos; de cerca, quieto
       const cerca = 1 - THREE.MathUtils.smoothstep(d, 260, 1100);
       materialOrbita.opacity = 0.13 * cerca; uOpPlanetas.value = 0.35 + 0.65 * cerca;
