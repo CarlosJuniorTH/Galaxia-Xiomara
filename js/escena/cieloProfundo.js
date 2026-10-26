@@ -47,7 +47,7 @@ export function crearCieloProfundo({ renderer, scene }) {
     actualizar() {
       // Aparece con un fundido suave cuando sus imágenes ya están en la GPU.
       // Durante el videoclip de un gigante (js/util/fondoEscena.js) las paredes de polvo se atenúan: no le roban el encuadre.
-      uVisible.value = (listo ? Math.min(1, (performance.now() - listo) / 1500) : 0) * (1 - 0.92 * FONDO_ESCENA.k);
+      uVisible.value = (listo ? Math.min(1, (performance.now() - listo) / 1500) : 0) * (1 - Math.min(1, FONDO_ESCENA.k * 1.15));   // k 0,88 en el clip: apagadas; en la calma, a medias
       fondo.visible = uVisible.value > 0 && uI.value > 0.003;
     }
   };
