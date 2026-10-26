@@ -37,7 +37,8 @@ class AppHandler(SimpleHTTPRequestHandler):
         for carpeta in sorted(CARPETAS):
             for f in sorted((ROOT / carpeta).rglob('*')):
                 rel = f.relative_to(ROOT)
-                if f.is_file() and not any(p.startswith('.') for p in rel.parts):
+                # (sin los audios de prueba ni la escucha a ciegas, que tampoco se publican: preparar-pages.mjs)
+                if f.is_file() and not any(p.startswith('.') for p in rel.parts) and not rel.as_posix().startswith(('assets/musica/prueba/', 'assets/escucha-ciegas/')):
                     todos[rel.as_posix()] = f.stat().st_size
         cuerpo = json.dumps(todos).encode()
         self.send_response(200)
