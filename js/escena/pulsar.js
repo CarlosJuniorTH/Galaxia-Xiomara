@@ -1,7 +1,6 @@
 // El púlsar del Cangrejo («El corazón que late por ti»): una estrella de neutrones que GIRA y EMITE. Todo nítido (nada de
 // halos, humo ni degradados que tapen): la estrella es una esfera pequeña y opaca; los haces, líneas finas de 1 px y motas
-// de 1,5–2,6 px; el viento ecuatorial y la nebulosa, motas e hilos finos. Presupuesto pequeño (≈ 3400 hilos, ≈ 3800 motas)
-// para ir a 60 FPS en un móvil de gama media; geometrías y materiales se crean en la carga y en cada cuadro solo cambian
+// de 1,5–2,8 px; el viento ecuatorial, anillos de motas finas. Presupuesto pequeño (≈ 100 hilos, ≈ 7000 motas) para ir a 60 FPS en un móvil de gama media; geometrías y materiales se crean en la carga y en cada cuadro solo cambian
 // uniformes.
 //
 // Física (y coherencia, que antes fallaba: había un haz quieto y otro que giraba):
@@ -9,7 +8,8 @@
 //    `inclinacion` grados; la estrella (con sus casquetes polares calientes) y los DOS haces opuestos van en `magnetico`,
 //    así que giran juntos, como un faro: cada haz barre un cono alrededor del eje de giro.
 //  · El viento del púlsar sale por el ecuador del giro (anillos de motas y ondas que se alejan, como los «wisps» del
-//    Cangrejo) y la nebulosa son filamentos en una cáscara alrededor; los haces iluminan los filamentos que barren.
+//    Cangrejo). Sin nebulosa de filamentos ni motas sueltas alrededor (Carlos: «ya tenemos la telaraña»): lo bello es la
+//    estrella cegadora y el barrido de su faro.
 //  · Dormido (su estado de siempre, fuera de su escena): estrella tibia, sin haces ni viento. En su escena despierta con
 //    la canción (js/util/escenaPulsar.js) y queda despierto mientras se le mira.
 // Ejes: `giro` coincide con el marco del director de cámara (js/util/directorCamara.js): y = eje Y del universo (el eje de
@@ -149,90 +149,13 @@ export function* construirPulsar({ uScale, uPR, config = ESCENA_PULSAR }) {
   }
   yield;
 
-  // ── Nebulosa: filamentos coherentes (hilos de 1 px, ≈ 8400 tramos) en una cáscara elipsoidal (0,82–0,97 de 3000 × 2300 × 2400,
-  // como el Cangrejo) y 2400 motas azules de sincrotrón dentro. Rosas, violetas y algunos turquesa (sin naranjas). Los haces
-  // iluminan lo que barren; con el estribillo se encienden del centro hacia fuera y cada latido sale del centro. ──
-  const uN = { uScale, uPR, uExpo: EXPOSICION, uHaz: { value: new THREE.Vector3(0, 1, 0) }, uBarrido: { value: 0 }, uFrente: { value: 0 }, uLuz: { value: 0 }, uBase: { value: 0.5 },
-    uPulso: { value: 0 }, uEdad: { value: 9 }, uTibio: { value: 0 }, uSilueta: { value: R * 2.2 } };
-  const NEB = /* glsl */`uniform float uScale, uPR, uExpo, uBarrido, uFrente, uLuz, uBase, uPulso, uEdad, uTibio, uSilueta; uniform vec3 uHaz; attribute vec3 aDato; varying vec3 vC; varying float vA; ${ESPACIO}
-    float luzNebulosa(vec3 p, float r, float azar){ vec3 d = normalize(p); float barre = smoothstep(0.982, 0.997, abs(dot(d, uHaz))) * uBarrido;
-      float enc = smoothstep(r - 0.1, r, uFrente), onda = exp(-pow((uEdad * 1.7 - r) * 6.0, 2.0)) * uPulso;
-      return uBase * (0.45 + 0.55 * azar) + uLuz * enc * (0.6 + 0.4 * azar + onda) + barre * 2.2; }
-    vec3 tinte(vec3 c, float azar){ return mix(c, mix(vec3(1.0, 0.6, 0.78), vec3(1.0, 0.84, 0.55), azar), uTibio * 0.55); }`;
-  const ESCALA = [NX, NY, NZ];
-  {
-    // Filamentos COHERENTES, como los del Cangrejo: siguen la superficie de la cáscara elipsoidal a lo largo de las curvas de
-    // nivel de un campo suave sobre la esfera (sumas de ondas; su gradiente girado 90° en el plano tangente): así forman
-    // celdas, lazos y hebras largas que se curvan juntas, no garabatos. Cada filamento se integra hacia los dos lados desde
-    // su semilla; algunos echan ramas cortas. Están en una cáscara fina (0,82–0,97), así que se ven más densos en el borde
-    // (de canto se superponen), como en las fotos. Nudos de más luz donde el campo tiene crestas.
-    // Ondas largas (las celdas) y unas pocas cortas y débiles (los filamentos ondulan y se retuercen, no son curvas de mapa).
-    const onda = (f0, f1, a0, a1) => { const z = azar() * 2 - 1, f = azar() * Math.PI * 2, q = Math.sqrt(1 - z * z); return [Math.cos(f) * q, z, Math.sin(f) * q, f0 + azar() * (f1 - f0), azar() * 6.28, a0 + azar() * (a1 - a0)]; };
-    const ONDAS = [...Array.from({ length: 7 }, () => onda(2, 5.5, 0.5, 1)), ...Array.from({ length: 4 }, () => onda(10, 16, 0.12, 0.22))];
-    const gradiente = (x, y, z, g) => { g[0] = g[1] = g[2] = 0; let n = 0;
-      for (const [kx, ky, kz, f, fase, a] of ONDAS) { const arg = (kx * x + ky * y + kz * z) * f + fase, c = Math.cos(arg) * a * f; n += Math.sin(arg) * a; g[0] += c * kx; g[1] += c * ky; g[2] += c * kz; }
-      return n; };
-    const SEMILLAS = 150, PASOS = 26, PASO = 0.022, RAMAS = 70, PASOSR = 9, total = (SEMILLAS * PASOS * 2 + RAMAS * PASOSR) * 2;
-    const pos = new Float32Array(total * 3), dato = new Float32Array(total * 3), g3 = [0, 0, 0], p = [0, 0, 0], q = [0, 0, 0]; let j = 0;
-    const poner = (v, r, color, luz) => { pos.set([v[0] * r * NX, v[1] * r * NY, v[2] * r * NZ], j * 3); dato.set([r, color, luz], j * 3); j++; };
-    // Un paso a lo largo de la curva de nivel (tangente = p × ∇n, normalizada), sobre la esfera unidad; `giro` la tuerce (ramas).
-    const paso = (v, signo, giro) => {
-      const n = gradiente(v[0], v[1], v[2], g3), d = g3[0] * v[0] + g3[1] * v[1] + g3[2] * v[2];
-      const gx = g3[0] - d * v[0], gy = g3[1] - d * v[1], gz = g3[2] - d * v[2];
-      let tx = v[1] * gz - v[2] * gy, ty = v[2] * gx - v[0] * gz, tz = v[0] * gy - v[1] * gx;
-      tx += gx * giro; ty += gy * giro; tz += gz * giro;
-      const L = Math.hypot(tx, ty, tz) || 1, k = signo * PASO / L;
-      v[0] += tx * k; v[1] += ty * k; v[2] += tz * k; const lv = Math.hypot(v[0], v[1], v[2]); v[0] /= lv; v[1] /= lv; v[2] /= lv;
-      return n;
-    };
-    const radio = v => 0.82 + 0.15 * (0.5 + 0.5 * Math.sin(v[0] * 5.1 + v[1] * 3.7 - v[2] * 4.3));
-    const brotes = [];
-    for (let i = 0; i < SEMILLAS; i++) {
-      if (i % 50 === 49) yield;
-      // Semillas repartidas por igual (espiral de Fibonacci con un poco de azar).
-      const zz = 1 - 2 * (i + 0.5) / SEMILLAS, ff = i * 2.39996 + azar() * 0.3, qq = Math.sqrt(1 - zz * zz);
-      const color = azar(), luz = 0.5 + azar() * 0.5;
-      for (const signo of [1, -1]) {
-        p[0] = Math.cos(ff) * qq; p[1] = zz; p[2] = Math.sin(ff) * qq;
-        for (let k = 0; k < PASOS; k++) {
-          q[0] = p[0]; q[1] = p[1]; q[2] = p[2]; const ra = radio(q);
-          const n = paso(p, signo, 0), rb = radio(p), punta = 1 - k / PASOS, nudo = 0.6 + 0.4 * Math.abs(n) / 2;
-          poner(q, ra, color, luz * punta * nudo); poner(p, rb, color, luz * (1 - (k + 1) / PASOS) * nudo);
-          if (k === 8 || k === 17) brotes.push([p[0], p[1], p[2], signo, color, luz * punta]);
-        }
-      }
-    }
-    for (let i = 0; i < RAMAS; i++) {
-      const [x, y, z, signo, color, luz] = brotes[Math.floor(azar() * brotes.length)], giro = (azar() < 0.5 ? -1 : 1) * (0.7 + azar() * 0.6);
-      p[0] = x; p[1] = y; p[2] = z;
-      for (let k = 0; k < PASOSR; k++) { q[0] = p[0]; q[1] = p[1]; q[2] = p[2]; paso(p, signo, giro * (1 - k / PASOSR)); poner(q, radio(q), color, luz * 0.7 * (1 - k / PASOSR)); poner(p, radio(p), color, luz * 0.7 * (1 - (k + 1) / PASOSR)); }
-    }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aDato', new THREE.BufferAttribute(dato, 3));
-    var filamentos = new THREE.LineSegments(g, material(uN, /* glsl */`${NEB}
-      void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv;
-        vec3 c = aDato.y < 0.55 ? vec3(1.0, 0.42, 0.64) : aDato.y < 0.8 ? vec3(0.72, 0.5, 1.0) : vec3(0.4, 0.95, 0.88);
-        vC = tinte(c, aDato.y); vA = luzNebulosa(position, aDato.x, aDato.z) * aDato.z * 1.15 * junto(${NX.toFixed(1)}) * fueraSilueta(mv) * uExpo; }`, FRAG_HILO));
-    filamentos.frustumCulled = false; filamentos.name = 'filamentosPulsar'; grupo.add(filamentos);
-  }
-  {
-    const N = 2400, pos = new Float32Array(N * 3), dato = new Float32Array(N * 3);
-    // Más juntas hacia el centro (el sincrotrón brilla más cerca del púlsar).
-    for (let i = 0; i < N;) { const x = azar() * 2 - 1, y = azar() * 2 - 1, z = azar() * 2 - 1, r = Math.hypot(x, y, z); if (r > 0.6 || r < 0.1 || azar() > 1.15 - r * 1.6) continue; pos.set([x * NX, y * NY, z * NZ], i * 3); dato.set([r, azar(), azar()], i * 3); i++; }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aDato', new THREE.BufferAttribute(dato, 3));
-    var sincrotron = new THREE.Points(g, material(uN, /* glsl */`${NEB}
-      void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv;
-        vC = tinte(mix(vec3(0.55, 0.7, 1.0), vec3(0.8, 0.88, 1.0), aDato.y), aDato.y);
-        vA = luzNebulosa(position, aDato.x, aDato.z) * 0.7 * tamMota(16.0 + aDato.z * 14.0, mv, 2.6) * junto(${NX.toFixed(1)}) * fueraSilueta(mv) * uExpo; }`, FRAG_MOTA));
-    sincrotron.frustumCulled = false; grupo.add(sincrotron);
-  }
-
   // ── Fase ──
   const P = config.pulso, DOS_PI = Math.PI * 2, vista = new THREE.Vector3(), haz = new THREE.Vector3();
   let psi = 0, psi0 = 0, delta = 0, flujo = 0, tViento = 0;
   const ajuste = config.marcas.quererte;   // la fase se lleva a la de la canción antes de que se le vea girar
   return {
     grupo, giro, magnetico, estrella, viento, hilosHaz,
-    medidas: { estrella: R, haz: L, viento: radioViento, nebulosa: Math.max(NX, NY, NZ) },
+    medidas: { estrella: R, haz: L, viento: radioViento, nebulosa: Math.max(NX, NY, NZ) },   // nebulosa: la extensión de su región (tabla de escalas)
     // Ejes del giro en el espacio del grupo (los del marco de la cámara: x derecha, y arriba = eje de giro, z hacia casa).
     orientar(x, y, z) { giro.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z)); },
     // Al empezar su escena: la fase que falta para ir con la canción (se recorre en `ajuste` segundos, sin verse).
@@ -258,8 +181,6 @@ export function* construirPulsar({ uScale, uPR, config = ESCENA_PULSAR }) {
       motasHaz.material.uniforms.uFlujo.value = flujo;
       tViento += dt * (0.4 + 0.6 * v('viento'));
       uV.uT.value = tViento; uV.uViento.value = v('viento'); uV.uOnda.value = Math.min(1, e.ondaEdad / Math.min(e.ondaPeriodo, 1.3)); uV.uOndas.value = v('ondas'); uV.uPulso.value = pulso; uV.uTibio.value = v('tibio');
-      uN.uHaz.value.copy(haz); uN.uBarrido.value = v('barrido'); uN.uFrente.value = v('frente'); uN.uLuz.value = v('brillo') * 1.1; uN.uBase.value = 0.5 + 0.25 * w * e.brillo;
-      uN.uPulso.value = reducido ? 0 : pulso; uN.uEdad.value = e.edad; uN.uTibio.value = v('tibio');
       return alineado;
     }
   };

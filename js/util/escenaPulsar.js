@@ -40,25 +40,19 @@ export const ESCENA_PULSAR = {
   // 360°·vueltas (azimutHaz). Los planos «en el haz» están a +30° de elevación (o −30° y 180° más para
   // el haz de abajo) y el haz los atraviesa en el golpe: 270° en los compases del pre-estribillo, 180° cada dos pulsos
   // del estribillo (el primero, justo en el grave del 16,71).
+  // Cámara LENTA y suave (Carlos): sin cortes ni giros bruscos; un solo arco que rodea al púlsar hacia la izquierda (~9°/s)
+  // mientras se acerca, y que pasa por el camino del haz justo en los golpes (270° en el pre-estribillo, 180° en el grave).
   camara: [
-    { t: 0, pos: [0, 8, 1.0], mira: [0, 0, 0], fov: 50, curva: 'suave' },                 // llegada (fundido desde donde esté): dormido
-    { t: 1.38, pos: [-6, 9, 0.93], mira: [0, 0, 0], fov: 50, curva: 'lineal' },           // «quererte»: nacen los haces
-    { t: 4.3, pos: [-25, 14, 0.6], mira: [0, 0, 0], fov: 46, curva: 'suave' },            // se acerca mientras crecen
-    { t: 6.7, pos: [-40, 16, 0.33], mira: [0, 0, 0], fov: 36, curva: 'suave' },           // «caliente»: el corazón, de cerca
-    { t: 8.6, pos: [-52, 19, 0.32], mira: [0, 0, 0], fov: 36, curva: 'lineal' },          // acelera y late, muy cerca
-    { t: 10.5, pos: [-90, 30, 0.44], mira: [0, 0, 0], fov: 44, curva: 'suave' },          // al camino del haz (compás 11,14)
-    { t: 12.4, pos: [-92, 31, 0.4], mira: [0, 0, 0], fov: 44, curva: 'lineal' },          // «nunca ha fallado»: lo atraviesa
-    { t: 14.9, pos: [-125, 68, 0.56], mira: [0, 0, 0], fov: 46, curva: 'suave' },         // «siempre»: desde arriba, el faro
-    { t: 16.6, pos: [-160, 40, 0.7], mira: [0, 0, 0], fov: 52, curva: 'suave' },          // «de tu amor»: tensión, se aleja
-    { t: 16.71, pos: [180, 30, 0.36], mira: [0, 0, 0], fov: 44, curva: 'corte' },         // GRAVE: el haz por la cámara
-    { t: 19.9, pos: [174, 32, 0.33], mira: [0, 0, 0], fov: 42, curva: 'lineal', giro: 6 },
-    { t: 20.9, pos: [0, -30, 0.38], mira: [0, 0, 0], fov: 44, curva: 'rapida' },          // al haz de abajo (21,17 · 22,28)
-    { t: 22.2, pos: [6, -28, 0.37], mira: [0, 0, 0], fov: 42, curva: 'lineal', giro: -4 },
-    { t: 23.6, pos: [40, 12, 1.05], mira: [0, 0, 0], fov: 52, curva: 'rapida' },          // «no sé»: la nebulosa entera
-    { t: 27.9, pos: [110, 18, 0.95], mira: [0, 0, 0], fov: 50, curva: 'lineal' },         // instrumental: travelling
-    { t: 28.9, pos: [170, 28, 0.42], mira: [0, 0, 0], fov: 40, curva: 'rapida' },          // segunda vuelta: al haz (28,97)
-    { t: 30.9, pos: [184, 30, 0.38], mira: [0, 0, 0], fov: 40, curva: 'lineal' },
-    { t: 33.6, pos: [215, 14, 0.85], mira: [0, 0, 0], fov: 50, curva: 'suave' }           // queda despierto: encuadre final
+    { t: 0, pos: [0, 8, 1.0], mira: [0, 0, 0], fov: 50, curva: 'suave' },             // llegada: dormido, sin haces
+    { t: 4.86, pos: [-35, 18, 0.66], mira: [0, 0, 0], fov: 46, curva: 'suave' },      // «quererte»: nacen los haces; se acerca
+    { t: 8.6, pos: [-75, 27, 0.46], mira: [0, 0, 0], fov: 42, curva: 'suave' },       // «caliente»: late y acelera
+    { t: 12.4, pos: [-95, 30, 0.42], mira: [0, 0, 0], fov: 42, curva: 'lineal' },     // en el camino del haz (11,14): «nunca falla»
+    { t: 14.5, pos: [-137, 30, 0.43], mira: [0, 0, 0], fov: 43, curva: 'lineal' },    // «de tu amor»: sigue el arco, sin prisa
+    { t: 16.7, pos: [-180, 30, 0.44], mira: [0, 0, 0], fov: 44, curva: 'lineal' },    // el haz la atraviesa en el grave
+    { t: 22.3, pos: [-212, 28, 0.42], mira: [0, 0, 0], fov: 44, curva: 'lineal' },    // estribillo: el faro barre una y otra vez
+    { t: 27.9, pos: [-245, 18, 0.78], mira: [0, 0, 0], fov: 50, curva: 'suave' },     // instrumental: se abre despacio
+    { t: 31.2, pos: [-268, 24, 0.55], mira: [0, 0, 0], fov: 46, curva: 'suave' },     // segunda vuelta: vuelve a acercarse
+    { t: 33.6, pos: [-285, 14, 0.85], mira: [0, 0, 0], fov: 50, curva: 'suave' }      // queda despierto: encuadre final
   ]
 };
 

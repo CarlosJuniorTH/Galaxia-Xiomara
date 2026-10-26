@@ -34,7 +34,9 @@ test('el púlsar nunca se para: su giro solo cambia con la música y es continuo
   for (let k = 16; k <= 28; k += 4) assert.ok(Math.abs(azimutHaz(k * P, c) - 270) < 1e-6, `compás ${k / 4}`);
   for (let k = 30; k <= 58; k += 2) assert.ok(Math.abs(azimutHaz(k * P, c) - 180) < 1e-6, `pulso ${k}`);
   const enHaz = c.camara.filter(p => Math.abs(Math.abs(p.pos[1]) - elevacionHaz(c)) < 3);
-  assert.ok(enHaz.length >= 6, 'planos en el camino del haz');
+  assert.ok(enHaz.length >= 3, 'planos en el camino del haz');
+  // Cámara lenta (Carlos): sin cortes ni golpes de cámara.
+  assert.ok(c.camara.every(p => p.curva === 'suave' || p.curva === 'lineal'), 'solo planos suaves o travellings');
 });
 
 test('el púlsar despierta con la canción: haces, latido, viento y nebulosa, y queda despierto', () => {
