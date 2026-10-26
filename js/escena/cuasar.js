@@ -590,11 +590,12 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
     escena(e, peso) {
       const w = peso > 0.0005 ? peso : 0, por = (v, r = 1) => r + (v - r) * w;
       uAlc.value = por(e.alcance, 1.05); uLob.value = por(e.lobulo);
-      disco.material.uniforms.uLuzD.value = por(e.disco); disco.material.uniforms.uOndaK.value = e.ondaK * w; disco.material.uniforms.uOndaF.value = e.ondaFase;
+      const late = e.pulso * w;
+      disco.material.uniforms.uLuzD.value = por(e.disco) * (1 + 0.18 * late); disco.material.uniforms.uOndaK.value = e.ondaK * w; disco.material.uniforms.uOndaF.value = e.ondaFase;
       disco.material.uniforms.uCalido.value = e.calido * w;
-      fotones.material.uniforms.uFot.value = por(e.fotones); caida.material.uniforms.uLuzC.value = por(Math.min(e.caida, 1.5));
+      fotones.material.uniforms.uFot.value = por(e.fotones) * (1 + 0.6 * late); caida.material.uniforms.uLuzC.value = por(Math.min(e.caida, 1.5));
       for (const [u, i, a, b] of capasChorro) { u.uI.value = i * por(e.chorro); u.uA.value.copy(a).lerp(calidoA, e.calido * w * 0.45); u.uB.value.copy(b).lerp(calidoB, e.calido * w * 0.45); }
-      luzNucleo = por(e.destello); this.giro = por(e.giro); this.prisa = por(e.caida);
+      luzNucleo = por(e.destello) * (1 + 0.7 * late); this.giro = por(e.giro); this.prisa = por(e.caida);
       uAcK.value = e.acento >= 0 ? 0.5 + 1.1 * e.frente : 1;
     },
     giro: 1, prisa: 1,

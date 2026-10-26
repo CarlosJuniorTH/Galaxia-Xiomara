@@ -53,38 +53,28 @@ export const ESCENA_PULSAR = { id: 'pulsar', duracion: 33.6, pulso: 60 / 108, co
 //             disco. Queda el cuásar de siempre, entero, para explorarlo.
 // camara: la pista del videoclip para el director de cámara (js/util/directorCamara.js): azimut 0 hacia casa (por donde se
 // llega: [≈4°, 44°, 1,0]), elevación sobre el disco (+90 = el chorro del lado de casa), distancia en radios de encuadre
-// (lejano.dist; en el cuásar el disco mide ~0,21, la galaxia ~0,92 y cada chorro ~1,46). Ningún plano más cerca de ~0,62 R
-// con fov ≥ 44: más cerca la imagen horneada del remolino (4096 px; 2048 en el móvil) se amplía y se ve borrosa. giro: el
-// director pone «arriba» en el eje de los chorros (se verían siempre verticales); con −135° la imagen es la de la llegada
-// (chorros en diagonal, como el diseño) y el clip juega alrededor (−160…−120) para que los chorros cambien de diagonal. El
-// último (−136) es el del encuadre en el que el director devuelve el control: así el fundido de salida no gira la imagen.
+// (lejano.dist; el disco mide ~0,21, la galaxia ~0,92 y cada chorro ~1,46). Un solo travelling lento y continuo (Carlos: «lentos,
+// suaves, siguiendo con suavidad; nada de girar a un lado y luego a otro»): el azimut avanza siempre hacia el mismo lado (≈3°/s),
+// sin cortes, con tramos 'lineal' (Catmull-Rom: sin pararse en cada plano) y solo el último 'suave' para posarse. giro: el
+// director pone «arriba» en el eje de los chorros; cada plano lleva el alabeo que deja la vertical del universo arriba (el
+// mismo que al llegar, −135°, y el del encuadre en el que se devuelve el control), así la imagen no se ladea. Ningún plano
+// más cerca de ~0,62 R con fov ≥ 44: más cerca la imagen horneada del remolino se amplía y se ve borrosa.
 export const ESCENA_CUASAR = {
   id: 'cuasar', duracion: 31,
-  marcas: { inicio: 0, recogido: 1.3, vi: 3.18, salir: 4.9, excusa: 5.74, pedir: 8, novios: 9.3, increible: 10.58, simple: 12.1, wow: 13.32,
+  marcas: { inicio: 0, recogido: 1.3, vi: 3.18, pedi: 4.36, salir: 4.9, excusa: 5.74, pedir: 8, novios: 9.3, increible: 10.58, simple: 12.1, wow: 13.32,
     otras: 14.52, bellas: 18.6, pero: 21.02, golpe1: 21.85, golpe2: 23.13, golpe3: 24.43, reir: 25.06, disfrutar: 25.98, ideal: 27.58, cima: 28.64,
     estalla: 29.4, fin: 31 },
   camara: [
-    { t: 0, pos: [0, 44, 1.0], mira: [0, 0, 0], fov: 50, curva: 'suave', giro: -135 },              // el encuadre de llegada (desde casa)
-    { t: 1.3, pos: [10, 30, 0.88], mira: [0, 0, 0], fov: 48, curva: 'suave', giro: -140 },          // los chorros se recogen
-    { t: 3.0, pos: [25, 20, 0.66], mira: [0, 0, 0], fov: 46, curva: 'suave', giro: -148 },          // «desde la primera vez…»: hacia el núcleo dormido
-    { t: 3.18, pos: [40, 6, 0.72], mira: [0, 0.04, 0], fov: 46, curva: 'corte', giro: -160 },       // «…la vi»: corte a ras del disco: la chispa
-    { t: 4.8, pos: [52, 9, 0.74], mira: [0, 0.05, 0], fov: 46, curva: 'lineal', giro: -158 },
-    { t: 5.8, pos: [65, 15, 0.86], mira: [0, 0.1, 0], fov: 46, curva: 'rapida', giro: -150 },       // salir: sigue el estirón de los chorros
-    { t: 7.7, pos: [120, 40, 0.7], mira: [0, 0, 0], fov: 46, curva: 'suave', giro: -140 },          // las excusas: desde arriba, la caída en espiral
-    { t: 8.0, pos: [170, 4, 1.15], mira: [0, 0, 0], fov: 48, curva: 'corte', giro: -120 },          // «y le pedí…» (golpe de la música): de lado, los dos chorros
-    { t: 10.2, pos: [182, 6, 1.28], mira: [0, 0, 0], fov: 48, curva: 'suave', giro: -125 },         // novios: se lanzan juntos
-    { t: 13.32, pos: [205, 28, 0.64], mira: [0, 0, 0], fov: 44, curva: 'suave', giro: -140 },       // «simplemente increíble»: acercamiento al núcleo
-    { t: 14.3, pos: [210, 30, 0.66], mira: [0, 0, 0], fov: 44, curva: 'lineal', giro: -142 },
-    { t: 17.9, pos: [240, 58, 1.7], mira: [0, 0, 0], fov: 55, curva: 'suave', giro: -150 },         // las otras: la galaxia entera, desde arriba
-    { t: 20.9, pos: [270, 52, 1.65], mira: [0, 0, 0], fov: 55, curva: 'lineal', giro: -160 },
-    { t: 22.0, pos: [290, 18, 0.82], mira: [0, 0.05, 0], fov: 46, curva: 'rapida', giro: -130 },    // «pero ella»: de vuelta al centro, rápido
-    { t: 24.9, pos: [315, 10, 0.9], mira: [0, 0.15, 0], fov: 46, curva: 'lineal', giro: -125 },     // los tres golpes: travelling junto a los chorros
-    { t: 25.5, pos: [322, 22, 0.72], mira: [0, 0, 0], fov: 46, curva: 'rapida', giro: -128 },   // «me hace reír»: un vaivén
-    { t: 26.0, pos: [326, 24, 0.7], mira: [0, 0, 0], fov: 45, curva: 'suave', giro: -137 },
-    { t: 27.4, pos: [340, 26, 0.66], mira: [0, 0, 0], fov: 44, curva: 'suave', giro: -132 },    // disfrutar con ella: órbita lenta y cálida
-    { t: 28.6, pos: [350, 20, 0.66], mira: [0, 0, 0], fov: 45, curva: 'suave', giro: -135 },        // «es mi mujer…»: lo más cerca del núcleo
-    { t: 29.9, pos: [365, 12, 1.6], mira: [0, 0, 0], fov: 52, curva: 'rapida', giro: -128 },        // «…ideal»: hacia atrás con los chorros disparados
-    { t: 31, pos: [370, 24, 1.1], mira: [0, 0, 0], fov: 50, curva: 'suave', giro: -136 }            // se queda: el cuásar entero
+    { t: 0, pos: [4, 44, 1.0], mira: [0, 0, 0], fov: 50, curva: 'suave', giro: -135 },     // el encuadre de llegada
+    { t: 3.0, pos: [-4, 32, 0.82], fov: 49, curva: 'lineal', giro: -128 },                 // el recuerdo: se acerca despacio al núcleo dormido
+    { t: 6.5, pos: [-12, 20, 0.76], fov: 48, curva: 'lineal', giro: -123 },                // la chispa y el nervio: baja hacia el disco
+    { t: 10.0, pos: [-22, 14, 0.95], fov: 50, curva: 'lineal', giro: -118 },               // novios: se aparta un poco para ver los dos chorros
+    { t: 13.6, pos: [-32, 22, 0.72], fov: 48, curva: 'lineal', giro: -116 },               // «increíble»: vuelve hacia el núcleo
+    { t: 18.5, pos: [-45, 46, 1.35], fov: 54, curva: 'lineal', giro: -102 },               // las otras: sube y ve la galaxia entera
+    { t: 21.2, pos: [-52, 46, 1.3], fov: 54, curva: 'lineal', giro: -98 },
+    { t: 25.0, pos: [-62, 24, 0.84], fov: 50, curva: 'lineal', giro: -107 },               // «pero ella»: baja despacio hacia ella
+    { t: 28.4, pos: [-72, 20, 0.68], fov: 48, curva: 'lineal', giro: -106 },               // la risa, disfrutar, «es mi mujer…»: cerca y cálido
+    { t: 31, pos: [-84, 18, 1.15], fov: 50, curva: 'suave', giro: -110 }                   // «…ideal»: se aparta despacio y queda el cuásar entero
   ]
 };
 
@@ -160,7 +150,7 @@ function curva(s, p) {
 }
 
 // Reposo del cuásar (su diseño de siempre): fuera de la escena y al terminarla todo vale esto.
-export const REPOSO_CUASAR = Object.freeze({ tiempo: 1, alcance: 1.05, frente: 0, chorro: 1, disco: 1, giro: 1, gas: 1, caida: 1, fotones: 1, destello: 1, ondaK: 0, ondaFase: 0,
+export const REPOSO_CUASAR = Object.freeze({ tiempo: 1, pulso: 0, alcance: 1.05, frente: 0, chorro: 1, disco: 1, giro: 1, gas: 1, caida: 1, fotones: 1, destello: 1, ondaK: 0, ondaFase: 0,
   otras: 0, calido: 0, conv: -1, cima: -1, estallido: -1, lobulo: 1, acento: -1, foco: 0 });
 
 // Curvas del cuásar (con las marcas de ESCENA_CUASAR; si se escala la escena, se recalculan).
@@ -168,7 +158,7 @@ function curvasCuasar(m) {
   const g = [m.golpe1, m.golpe2, m.golpe3];
   return {
     // Largo de los chorros (fracción de su largo; ≥ 1,03: enteros). Se recogen al empezar y crecen en las frases clave.
-    alcance: [[0, 1.05], [m.recogido, 0], [m.vi, 0], [m.vi + 0.55, 0.1, 'r'], [m.salir, 0.1], [m.salir + 0.7, 0.25, 'r'], [m.novios, 0.25], [m.novios + 0.75, 0.5, 'r'],
+    alcance: [[0, 1.05], [m.recogido, 0], [m.vi, 0], [m.vi + 0.55, 0.1, 'r'], [m.pedi, 0.1], [m.pedi + 0.3, 0.13, 'r'], [m.salir, 0.13], [m.salir + 0.7, 0.25, 'r'], [m.novios, 0.25], [m.novios + 0.75, 0.5, 'r'],
       [m.wow, 0.5], [m.wow + 0.65, 0.62, 'r'], [g[0], 0.62], [g[0] + 0.5, 0.68, 'r'], [g[1], 0.68], [g[1] + 0.5, 0.74, 'r'], [g[2], 0.74], [g[2] + 0.5, 0.8, 'r'],
       [m.reir + 0.46, 0.8], [m.reir + 0.95, 0.85, 'r'], [m.cima, 0.85], [m.estalla, 1.05, 'r']],
     disco: [[0, 1], [m.recogido, 0.2], [m.vi, 0.26], [m.vi + 0.3, 0.6, 'r'], [m.salir, 0.6], [m.salir + 0.5, 0.65], [m.excusa, 0.65], [m.pedir - 0.3, 0.85], [m.novios, 0.85], [m.novios + 0.4, 0.95, 'r'],
@@ -182,13 +172,25 @@ function curvasCuasar(m) {
       [m.estalla + 0.5, 1.6], [m.fin, 1]],
     destello: [[0, 1], [m.recogido, 0.35], [m.vi, 0.35], [m.vi + 0.25, 0.8, 'r'], [m.ideal, 0.8], [m.cima, 0.6], [m.cima + 0.3, 1.1, 'r'], [m.fin, 1]],
     // Las ondas del disco: la chispa de «la vi» y la risa (un tren de ondas rápido mientras dice «me hace reír»).
-    ondaK: [[0, 0], [m.vi, 0], [m.vi + 0.12, 0.8, 'r'], [m.vi + 1.0, 0], [m.reir - 0.05, 0], [m.reir + 0.1, 1, 'r'], [m.disfrutar, 1], [m.disfrutar + 0.6, 0]],
+    ondaK: [[0, 0], [m.vi, 0], [m.vi + 0.12, 0.8, 'r'], [m.vi + 1.0, 0], [m.novios - 0.05, 0], [m.novios + 0.1, 0.7, 'r'], [m.novios + 1.0, 0], [m.reir - 0.05, 0], [m.reir + 0.1, 1, 'r'], [m.disfrutar, 1], [m.disfrutar + 0.6, 0]],
     otras: [[0, 0], [m.otras, 0], [m.otras + 1.4, 0.5], [m.bellas - 0.7, 0.7], [m.bellas, 0.7], [m.bellas + 1.3, 1], [m.pero, 1], [m.pero + 0.8, 0, 'r']],
     calido: [[0, 0], [m.disfrutar - 0.2, 0], [m.disfrutar + 1, 1], [m.estalla, 1], [m.fin, 0]],
     foco: [[0, 0], [m.recogido, 0.5], [m.estalla, 0.5], [m.fin, 0]]
   };
 }
 const curvasGuardadas = new WeakMap();
+
+// Latidos de luz del núcleo (el destello, el anillo del horizonte y el disco), cada uno en una sílaba o un golpe: la chispa
+// de «la vi»; el nervio de pedirle salir (cuatro titubeos pequeños: «y le pedí que…»); «novios»; «increíble»; los tres golpes
+// de la música tras «pero ella»; la risa (cuatro, con las sílabas de «me hace reír»); «ideal» y la subida final de la música.
+// [segundo relativo a la marca, marca, fuerza]. Cada uno sube de golpe y se apaga en ~0,2 s (nítido, no un resplandor).
+const PULSOS_CUASAR = [[0, 'vi', 1.2], [0, 'pedi', 0.35], [0.1, 'pedi', 0.3], [0.4, 'pedi', 0.35], [0, 'salir', 0.55], [0, 'novios', 0.8], [0, 'wow', 0.8],
+  [0, 'golpe1', 0.6], [0, 'golpe2', 0.6], [0, 'golpe3', 0.6], [0, 'reir', 0.5], [0.18, 'reir', 0.5], [0.46, 'reir', 0.6], [0.7, 'reir', 0.5], [0, 'cima', 1.3], [0, 'estalla', 0.8]];
+function pulsosCuasar(s, m) {
+  let v = 0;
+  for (const [d, marca, k] of PULSOS_CUASAR) { const x = s - m[marca] - d; if (x >= 0 && x < 1.2) v += k * Math.exp(-x / 0.18) * Math.min(1, x * 40); }
+  return v;
+}
 
 // Estado del cuásar en el segundo `s` (escribe en `e`, sin memoria nueva en cada cuadro). En s = 0 y en s ≥ fin coincide
 // con su diseño de siempre (REPOSO_CUASAR). Campos (1 = como siempre):
@@ -199,7 +201,8 @@ const curvasGuardadas = new WeakMap();
 //  ondaK / ondaFase  ondas de luz que salen del centro del disco (fuerza y fase);  otras  lucecitas de la galaxia (0–1);
 //  calido    rosa y oro (0–1);  conv  la luz de la galaxia que se recoge en el núcleo (0–1; −1 nada);
 //  cima      segundos desde «ideal» (−1 antes): la onda de motas;  estallido  segundos desde que florecen los lóbulos (−1);
-//  lobulo    luz de los lóbulos de las puntas (0 sin chorros enteros, 1 normal, más al florecer);  foco  penumbra del resto.
+//  lobulo    luz de los lóbulos de las puntas (0 sin chorros enteros, 1 normal, más al florecer);  foco  penumbra del resto;
+//  pulso     latidos de luz del núcleo en las sílabas y golpes (0 en reposo; ~0–1,3).
 export function estadoCuasar(s, config, e = {}, reducido = false) {
   const m = config.marcas;
   let c = curvasGuardadas.get(config); if (!c) { c = curvasCuasar(m); curvasGuardadas.set(config, c); }
@@ -214,6 +217,7 @@ export function estadoCuasar(s, config, e = {}, reducido = false) {
   e.disco = curva(s, c.disco); e.giro = reducido ? 1 + (curva(s, c.giro) - 1) * 0.5 : curva(s, c.giro);
   e.gas = curva(s, c.gas); e.caida = curva(s, c.caida); e.fotones = curva(s, c.fotones); e.destello = curva(s, c.destello);
   e.ondaK = curva(s, c.ondaK) * (reducido ? 0.4 : 1); e.ondaFase = s * (reducido ? 1.5 : 3.2);
+  e.pulso = pulsosCuasar(s, m) * (reducido ? 0.35 : 1);
   e.otras = curva(s, c.otras); e.calido = curva(s, c.calido); e.foco = curva(s, c.foco);
   e.conv = s >= m.ideal - 0.3 && s < m.cima ? (s - m.ideal + 0.3) / (m.cima - m.ideal + 0.3) : -1;
   e.cima = s >= m.cima ? s - m.cima : -1;
