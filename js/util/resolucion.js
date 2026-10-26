@@ -10,13 +10,19 @@
 //  · Si ya está en el mínimo y sigue lento, avisa (alAgotar) para aligerar efectos (index.js); con margen estable,
 //    alRecuperar los devuelve uno a uno antes de volver a subir la resolución (el teléfono se ha enfriado).
 //  · reiniciar() descarta la ventana en curso (pausas, cambios de estado o de tamaño).
+//  · Una bajada que no acelera se deshace: si en la ventana siguiente la mediana no ha mejorado al menos un 10 %, lo que no
+//    llega es el procesador (bajar píxeles solo descarga la tarjeta gráfica): vuelve a la resolución de antes y no la baja
+//    de ahí (ni aligera) durante ~1 minuto. Antes, con la CPU ×4 o en un móvil de procesador modesto, la imagen perdía
+//    nitidez al llegar a casa sin ganar ni un cuadro.
 export function crearReguladorResolucion({ minimo, maximo, inicial, paso = 0.25, ventanaMs = 1500, ventanasParaSubir = 6, alAgotar = () => {}, alRecuperar = () => false }) {
   let actual = inicial, techo = maximo, tiempos = [], suma = 0, estables = 0, subio = false;
-  function bajar(pasos) {
+  let prueba = null, suelo = minimo, esperaSuelo = 0;   // bajada en observación; mínimo provisional tras una que no sirvió
+  function bajar(pasos, mediana) {
     estables = 0;
-    if (actual - paso < minimo - 1e-9) { alAgotar(); return null; }
+    if (actual - paso < suelo - 1e-9) { if (suelo <= minimo + 1e-9) alAgotar(); return null; }
     if (subio) techo = actual - paso;
-    subio = false; actual = Math.max(minimo, actual - paso * pasos); return actual;
+    else prueba = { desde: actual, mediana };   // (deshacer una subida que no se sostuvo no se pone a prueba)
+    subio = false; actual = Math.max(suelo, actual - paso * pasos); return actual;
   }
   function registrar(ms) {
     tiempos.push(ms); suma += ms;
@@ -24,8 +30,13 @@ export function crearReguladorResolucion({ minimo, maximo, inicial, paso = 0.25,
     tiempos.sort((a, b) => a - b);
     const mediana = tiempos[tiempos.length >> 1], p90 = tiempos[Math.floor(tiempos.length * 0.9)];
     tiempos = []; suma = 0;
-    if (mediana > 26) return bajar(2);
-    if (mediana > 19.5) return bajar(1);
+    if (esperaSuelo > 0 && --esperaSuelo === 0) suelo = minimo;
+    if (prueba) {
+      const { desde, mediana: antes } = prueba; prueba = null;
+      if (mediana > antes * 0.9) { suelo = desde; esperaSuelo = 40; estables = 0; actual = desde; return actual; }
+    }
+    if (mediana > 26) return bajar(2, mediana);
+    if (mediana > 19.5) return bajar(1, mediana);
     subio = false;
     if (p90 >= 18.5) { estables = 0; return null; }
     if (++estables >= ventanasParaSubir) {

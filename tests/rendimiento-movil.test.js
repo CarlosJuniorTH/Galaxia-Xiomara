@@ -7,13 +7,24 @@ import { crearDestellos } from '../js/escena/materiales.js';
 // Una ventana del regulador dura 1,5 s.
 const ventana = (registrar, ms, segundos = 1.5) => { let r = null; for (let t = 0; t < segundos * 1000; t += ms) { const v = registrar(ms); if (v !== null) r = v; } return r; };
 
-test('a 25 FPS la resolución baja enseguida y a pasos grandes hasta el mínimo; después aligera efectos', () => {
+test('a 25 FPS (la tarjeta gráfica no llega) la resolución baja enseguida y a pasos grandes hasta el mínimo; después aligera efectos', () => {
+  let agotado = 0, res = 2;
+  const registrar = crearReguladorResolucion({ minimo: 1, maximo: 3, inicial: 2, alAgotar: () => agotado++ });
+  // Cuadros que dependen de los píxeles: con menos resolución van más rápido.
+  const paso = () => { const r = ventana(ms => registrar(ms), 20 + 19 * (res / 2) ** 2); if (r !== null) res = r; return r; };
+  assert.equal(paso(), 1.5, 'menos de 38 FPS: baja medio punto en 1,5 s');
+  assert.equal(paso(), 1, 'la bajada aceleró: sigue bajando');
+  assert.equal(paso(), null, 'no baja del mínimo');
+  assert.equal(agotado, 1, 'en el mínimo y aún lento: avisa para aligerar');
+});
+
+test('si bajar la resolución no acelera (el procesador no llega), vuelve a la de antes y no insiste ni aligera', () => {
   let agotado = 0;
   const registrar = crearReguladorResolucion({ minimo: 1, maximo: 3, inicial: 2, alAgotar: () => agotado++ });
-  assert.equal(ventana(registrar, 39), 1.5, 'menos de 38 FPS: baja medio punto en 1,5 s');
-  assert.equal(ventana(registrar, 39), 1);
-  assert.equal(ventana(registrar, 39), null, 'no baja del mínimo');
-  assert.equal(agotado, 1, 'en el mínimo y aún lento: avisa para aligerar');
+  assert.equal(ventana(registrar, 39), 1.5, 'lo intenta una vez');
+  assert.equal(ventana(registrar, 39), 2, 'no sirvió: vuelve a la nitidez de antes');
+  for (let i = 0; i < 10; i++) assert.equal(ventana(registrar, 39), null, 'no lo reintenta enseguida');
+  assert.equal(agotado, 0, 'tampoco aligera (no aliviaría al procesador)');
 });
 
 test('a 45 FPS baja un cuarto en una sola ventana (la mediana ignora un tirón aislado)', () => {
