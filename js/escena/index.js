@@ -31,7 +31,7 @@ import { crearGestorCalidad } from './calidad/gestor.js';
 import { crearRutas } from './camara/rutas.js';
 import { construirMaravillas } from './maravillas.js';
 import { crearPolvo } from './polvo.js';
-import { texturasListas, texturasTodas } from './fabricaTexturas.js';
+import { texturasListas, texturasTodas, subirAlLlegar } from './fabricaTexturas.js';
 import { hornoListo, soltarHorno } from '../util/horno.js';
 import { DESTINOS, LEJANOS, ZONAS_LUGARES } from '../data/universo.js';
 import { encuadreHogar, escalaSimbolos, desplazamientoZonaLibre, compensacionPuntos, distanciaDestino, correccionAlLlegar, cambioInterfazApreciable } from '../util/encuadre.js';
@@ -110,6 +110,10 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   const datosTelarana = pedirDatosTelarana();
   const nucleo = crearNucleo(canvas);
   const { renderer, scene, camera, controls, composer, bloom } = nucleo;
+  // Cada textura calculada o descargada va a la GPU en cuanto llega (las que sueltan su copia, la sueltan ya): antes todas
+  // esperaban en memoria al final de la carga y se juntaban con todo lo demás (el pico de memoria que cerraba el iPhone).
+  { const anisotropiaMax = renderer.capabilities.getMaxAnisotropy();
+    subirAlLlegar(t => { if (t.anisotropy > 1 && t.anisotropy < anisotropiaMax) t.anisotropy = anisotropiaMax; renderer.initTexture(t); }); }
   // Cada objeto añadido a la escena recuerda su capa: permite aislarlas en el diagnóstico.
   // Cada capa tiene su propia semilla (derivada de su nombre): lo que una capa genere de más o de
   // menos en un dispositivo no desplaza el mapa de las demás. El universo es el mismo en PC y móvil.
@@ -150,6 +154,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // La telaraña cósmica: filamentos y cúmulos de galaxias por todo el universo (se ve desde cualquier destino).
   await ceder();
   const telarana = await capaPorPasos('telarana', async () => crearTelaranaCosmica(nucleo, await datosTelarana));
+  const { subirTexturas, subirGeometrias, compilarTodo, calentar } = crearPreparacion({ renderer, camera, scene, nucleo, solar, telarana, composer, obtenerCapaVolumen: () => capaVolumen });   // carga/preparacion.js
+  // Sus puntos (decenas de MB) a la GPU ya: sueltan su copia en memoria antes de que se creen las capas siguientes.
+  subirGeometrias([telarana.raiz, telarana.capaGalaxias]);
   // También Deneb (no está entre los cuerpos de navegación): la telaraña que queda detrás de su estrella no se ve encima.
   telarana.fijarGigantes([...cosmos.cuerpos().filter(c => c.id !== 'xiomara').map(c => ({ centro: c.centro, radio: c.visible })), { centro: cosmos.objetivo('deneb').centro, radio: cosmos.medidas().deneb.estrella * 1.15 }]);
   // Maravillas: rincones impresionantes (el Ojo, la enana de las burbujas, la espiral de hebras, la nube de fuego).
@@ -273,7 +280,6 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // muestra «Preparando tu universo». Antes ocurría al aparecer cada objeto en
   // pantalla por primera vez y provocaba tirones al girar la cámara.
   // Con KHR_parallel_shader_compile la compilación no congela la pantalla de carga.
-  const { subirTexturas, compilarTodo, calentar } = crearPreparacion({ renderer, camera, scene, nucleo, solar, telarana, composer, obtenerCapaVolumen: () => capaVolumen });   // carga/preparacion.js
   restaurarAzar();
   // Carga completa, como un videojuego: antes de entrar se crean todas las nebulosas, se calculan todas las texturas,
   // llega el cielo, se compilan todos los programas de GPU (también los del sistema solar) y todo se sube a la
@@ -331,10 +337,12 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // continuos el teléfono se calentaba y a los pocos minutos bajaba su GPU a la mitad (28 FPS con TODO). ?ritmo=fluido: siempre 60.
   // El rato era de 4 s: al mirar un gigante (su disco, sus chorros, sus haces), la galaxia de Xiomara o el sistema solar sin
   // tocar, a los 4 s todo pasaba a 30 y las animaciones se veían pesadas, a saltitos (Carlos, en su iPhone: «se sienten
-  // lentas»). Ahora, 30 s: mientras se mira y se explora, 60; solo con el teléfono olvidado en la mano o en la mesa, 30.
+  // lentas»). Luego se subió a 30 s, pero el iPhone se calentaba igual (60 continuos) y bajaba a ~28 FPS. Ahora, 10 s: las
+  // animaciones (clips de los gigantes, viajes, la entrada, la inercia del giro) cuentan como movimiento y van a 60 siempre;
+  // solo mirando quieto sin tocar más de 10 s se pasa a 30.
   const ritmoAhorro = tactil && new URLSearchParams(location.search).get('ritmo') !== 'fluido';
   // En el PC con pantalla rápida, ~120 por segundo (planificador.js); en el móvil, 60 (calor y batería).
-  const planificador = crearPlanificador({ interaccion: 60, contemplacion: ritmoAhorro ? 30 : 60, alto: esMovil ? 0 : 120, esperaMs: ritmoAhorro ? 30000 : 4000 });
+  const planificador = crearPlanificador({ interaccion: 60, contemplacion: ritmoAhorro ? 30 : 60, alto: esMovil ? 0 : 120, esperaMs: ritmoAhorro ? 10000 : 4000 });
   let gesto = false, modoAnterior = null, cuadrosDibujados = 0, finGesto = -Infinity;
   const AMORTIGUACION = controls.dampingFactor;   // la de 60 FPS (nucleo.js)
   const marcarActividad = () => planificador.actividad(performance.now());
@@ -1063,8 +1071,15 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   addEventListener('resize', () => { clearTimeout(esperaAjuste); esperaAjuste = setTimeout(reencuadrar, 220); nucleo.redimensionar(); regular.reiniciar(); planificador.pedirCuadro(); if (camera.view?.enabled) camera.setViewOffset(vista.ancho, vista.alto, 0, desplazamiento, vista.ancho, vista.alto); medirZonaLibre(); });
   document.addEventListener('visibilitychange', () => { prev = performance.now(); });
   canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); delete canvas.dataset.viaje; suspendida = true; vuelo?.resolver(false); vuelo = null; alProblema('El navegador ha pausado los gráficos. Tu viaje está guardado. Podemos volver a encender las estrellas.'); });
-  // Al recuperar el contexto se recarga: las texturas que soltaron su copia en memoria (planetas) no podrían volver a subirse.
-  canvas.addEventListener('webglcontextrestored', () => location.reload());
+  // Al recuperar el contexto hay que recargar (las texturas que soltaron su copia en memoria no podrían volver a subirse),
+  // pero como mucho UNA vez por sesión: en un iPhone sin memoria el contexto se pierde, se recupera, se recarga, se vuelve a
+  // perder… y la página se recargaba sola una y otra vez descargándolo todo. La segunda vez se queda la pantalla «Volvamos
+  // a encender el cielo» (alProblema, ya mostrada al perderlo) y quien mira decide con «Reintentar».
+  canvas.addEventListener('webglcontextrestored', () => {
+    let yaRecargo = true;
+    try { yaRecargo = sessionStorage.getItem('xiomara:recarga-contexto') === '1'; if (!yaRecargo) sessionStorage.setItem('xiomara:recarga-contexto', '1'); } catch {}
+    if (!yaRecargo) location.reload();
+  });
 
   const tmpDir = new THREE.Vector3(), tmpProy = new THREE.Vector3();   // temporales del bucle (sin crear objetos en cada cuadro)
   function animar(ahora) {

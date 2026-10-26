@@ -35,13 +35,14 @@ export function crearNucleo(canvas) {
   //    así que en móvil empieza en DPR 2 y la resolución dinámica de index.js la ajusta.
   //    La pasada de salida la reescala a la nativa con un enfoque adaptativo (salida.js).
   const prMaximo = Math.min(devicePixelRatio, Q.pr);
-  // En el móvil empieza en 2,25 (lo más nítido que se reserva; antes 2 y subía a los ~9 s si iba sobrado): Carlos prefiere
-  // nitidez. Si el aparato no llega, la resolución dinámica baja en ~1 s (y deshace la bajada si no ayudaba).
-  let pr = esMovil ? Math.min(prMaximo, nivelSeguro >= 2 ? 1.25 : nivelSeguro ? 2 : 2.25) : prMaximo;   // 2 en el móvil (a 1,75 se veía pixelado en una pantalla de DPR 3); la resolución dinámica sube hasta 2,5 si el aparato va sobrado y baja si se calienta
+  // En el móvil, 2 (de nuevo; unas horas estuvo en 2,25): los búferes de la escena se reservan a este tamaño y a 2,25 eran
+  // ~25 MB más de memoria de la GPU, encima de un pico de carga que en el iPhone ya rozaba el límite (iOS cerraba la página
+  // y la recargaba sola, hasta tres veces). La pasada de salida reescala a la nativa con su enfoque.
+  let pr = esMovil ? Math.min(prMaximo, nivelSeguro >= 2 ? 1.25 : 2) : prMaximo;   // 2 en el móvil (a 1,75 se veía pixelado en una pantalla de DPR 3); la resolución dinámica sube hasta 2,5 si el aparato va sobrado y baja si se calienta
   // Lo más alto que puede llegar la escena con la resolución dinámica (index.js, regulador): los búferes se reservan a
   // este tamaño una sola vez y cambiar de resolución solo cambia la zona en la que se dibuja (zona.js).
-  // En el móvil, 2,25 como mucho: reservar a 2,5 eran ~25 MB más de memoria de la tarjeta gráfica en un iPhone.
-  const prTope = esMovil ? Math.min(prMaximo, Math.max(pr, 2.25 - (nivelSeguro >= 2 ? 1 : nivelSeguro ? 0.5 : 0))) : prMaximo;
+  // En el móvil, 2 como mucho (memoria de la GPU, ver arriba).
+  const prTope = esMovil ? Math.min(prMaximo, Math.max(pr, 2 - (nivelSeguro >= 2 ? 0.75 : 0))) : prMaximo;
   renderer.setPixelRatio(pr);
   canvas.dataset.resolucion3d = String(pr);
   renderer.setSize(innerWidth, innerHeight);

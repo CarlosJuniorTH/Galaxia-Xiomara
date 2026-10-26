@@ -236,6 +236,9 @@ export function crearCampoGalaxias({ lista, texturas, descriptores, uPR }) {
       if (performance.now() - t0 > 20) { await new Promise(r => setTimeout(r, 0)); t0 = performance.now(); }
       if (!colorMedio(t, colores)) return false;
     }
+    // Calibradas (su luz media queda guardada en luzTextura): nadie vuelve a leer sus píxeles y la carga suelta su copia
+    // en memoria en cuanto están en la GPU (~15 MB en un móvil).
+    for (const t of colores.keys()) t.userData.liberable = true;
     aplicarColores(colores); return true;
   }
   // Diagnóstico (pruebas de luz): un grupo con SOLO esa galaxia, con los mismos materiales.

@@ -25,7 +25,12 @@ export function crearCieloProfundo({ renderer, scene }) {
   let listo = 0;
   const cargado = Promise.all(CARAS.map(c => fetch(`assets/cielo/${c}-${sufijo}.webp`).then(r => { if (!r.ok) throw Error(r.status); const n = Number(r.headers.get('content-length')) || 0; return r.blob().then(b => { descargas.hecho(n); return b; }); })
     .then(b => createImageBitmap(b, { imageOrientation: 'none', premultiplyAlpha: 'none', colorSpaceConversion: 'none' }))))
-    .then(caras => { textura.images = caras; textura.needsUpdate = true; renderer.initTexture?.(textura); listo = performance.now(); })
+    .then(caras => {
+      textura.images = caras; textura.needsUpdate = true; renderer.initTexture?.(textura); listo = performance.now();
+      // Ya en la tarjeta gráfica: las seis imágenes decodificadas (6 × 2048² × 4 = 96 MB en un iPhone) se sueltan. Antes se
+      // quedaban para siempre en la memoria de la página (iOS la cerraba por memoria y la recargaba sola).
+      if (renderer.initTexture) { textura.images = caras.map(b => ({ width: b.width, height: b.height })); for (const b of caras) b.close?.(); }
+    })
     .catch(e => console.warn('No se pudo cargar el cielo profundo', e));
   // Al entrar ya está todo: sin fundido (la carga espera a que llegue).
   cargado.then(() => { listo = performance.now() - 2000; });

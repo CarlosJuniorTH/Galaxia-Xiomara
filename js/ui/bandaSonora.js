@@ -95,7 +95,7 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
     return ctx;
   }
   function prepararElemento(p) {
-    const el = p.el = new Audio(); el.preload = 'auto'; el.loop = !!p.conf.bucle; el.setAttribute('playsinline', '');
+    const el = p.el = new Audio(); el.preload = p.contar ? 'auto' : 'metadata'; el.loop = !!p.conf.bucle; el.setAttribute('playsinline', '');
     p.ganancia = ctx.createGain(); p.ganancia.gain.value = 0;
     ctx.createMediaElementSource(el).connect(p.ganancia); p.ganancia.connect(maestro);
     el.addEventListener('ended', () => { p.sonando = false; p.fin = { t: duracionDe(p) || el.currentTime, en: performance.now() }; if (objetivo === p.nombre) despues(p); });

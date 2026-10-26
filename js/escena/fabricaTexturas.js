@@ -136,16 +136,27 @@ function iniciarObreros() {
   } catch { obreros = []; }
 }
 
-function dataTextura(ancho, alto, relleno) {
-  const datos = new Uint8Array(ancho * alto * 4);
+// Sin memoria hasta que llegan sus píxeles: antes cada textura reservaba ya su relleno (ancho×alto×4) al crearse y, al llegar
+// la imagen, se copiaba encima (dos copias a la vez). Con ~110 texturas eran ~100 MB de golpe en la carga de un iPhone (iOS
+// cierra la página sin memoria y la recarga sola). Ahora la imagen que llega se usa tal cual (sin copia) y el relleno de
+// color solo se crea si la imagen no llega (nada se dibuja antes: la carga espera a todas, texturasTodas).
+function rellenar(t, relleno) {
+  const datos = new Uint8Array(t.image.width * t.image.height * 4);
   new Uint32Array(datos.buffer).fill(new Uint32Array(new Uint8Array([relleno[0], relleno[1], relleno[2], 255]).buffer)[0]);   // (de una vez: el bucle tardaba ~1 s en un móvil)
-  const t = new THREE.DataTexture(datos, ancho, alto, THREE.RGBAFormat);
+  t.image.data = datos; t.needsUpdate = true;
+}
+function dataTextura(ancho, alto) {
+  const t = new THREE.DataTexture(null, ancho, alto, THREE.RGBAFormat);
   // Filas de arriba abajo, como un lienzo: se voltean al subirlas (igual que CanvasTexture).
   t.flipY = true; t.wrapS = THREE.RepeatWrapping; t.anisotropy = 4;
   t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true;
-  t.needsUpdate = true;
   return t;
 }
+// Quien sube las texturas a la GPU en cuanto llegan (index.js, con el renderizador): así las que sueltan su copia
+// (liberable) la sueltan ya en la carga, y no se acumulan todas en memoria hasta el final (pico de memoria del iPhone).
+let alLlegar = null;
+export function subirAlLlegar(fn) { alLlegar = fn; }
+const comoBytes = d => (d instanceof Uint8Array ? d : new Uint8Array(d.buffer, d.byteOffset, d.byteLength));
 
 // claves: nombres de los resultados (p. ej. ['superficie', 'mascara']); por defecto uno solo.
 // bloquea = false: la carga no la espera (cielo de fondo: negro e invisible hasta que llega).
@@ -155,7 +166,7 @@ const soltarCopia = t => { t.image = { width: t.image.width, height: t.image.hei
 export function texturaPlaneta(tipo, opciones, { claves = ['pixeles'], relleno = [120, 110, 140], bloquea = true, liberable = false } = {}) {
   const { ancho, alto } = opciones;
   if (typeof window !== 'undefined') (window.__pedidosTextura ||= []).push({ tipo, opciones, claves });
-  const texturas = Object.fromEntries(claves.map(c => [c, dataTextura(ancho, alto, relleno)]));
+  const texturas = Object.fromEntries(claves.map(c => [c, dataTextura(ancho, alto)]));
   const promesa = new Promise(resolve => {
     const clave = `${tipo} ${ancho}×${alto}`; enCurso.set(promesas.length + todas.length + Math.random(), clave);
     const marca = [...enCurso.keys()].at(-1);
@@ -165,9 +176,11 @@ export function texturaPlaneta(tipo, opciones, { claves = ['pixeles'], relleno =
     const pedido = { tipo, opciones, resolver: datos => {
       if (hecho) return; hecho = true;
       try {
-        for (const c of claves) { const t = texturas[c]; if (!t.image.data || !datos?.[c] || datos[c].length !== t.image.data.length) throw new Error(`${clave}: datos que no encajan (${datos?.[c]?.length} para ${t.image.data?.length})`);
-          t.image.data.set(datos[c]); t.needsUpdate = true; t.userData.lista = performance.now(); if (liberable) t.onUpdate = soltarCopia; }
+        for (const c of claves) { const t = texturas[c], n = ancho * alto * 4; if (!datos?.[c] || datos[c].length !== n) throw new Error(`${clave}: datos que no encajan (${datos?.[c]?.length} para ${n})`);
+          t.image.data = comoBytes(datos[c]); t.needsUpdate = true; t.userData.lista = performance.now(); if (liberable) t.onUpdate = soltarCopia; }
       } catch (e) { errores.push(String(e.message || e)); console.warn('Textura', e); }
+      for (const c of claves) if (!texturas[c].image.data) rellenar(texturas[c], relleno);   // (la que no llegó: su color de relleno)
+      if (alLlegar) for (const c of claves) { try { alLlegar(texturas[c]); } catch (e) { console.warn('Textura', e); } }
       enCurso.delete(marca); resolve();
     } };
     const enviar = () => { iniciarObreros(); (bloquea ? colaBloquea : colaResto).push(pedido); despachar(); };

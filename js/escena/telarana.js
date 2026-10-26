@@ -86,13 +86,29 @@ export function pedirDatosTelarana() {
 // Una nube de puntos en bloques: cada bloque es un Points con su esfera envolvente que comparte los MISMOS atributos
 // (se suben una vez a la GPU) con su tramo de dibujo: lo que queda fuera de la vista no se dibuja.
 function enBloques({ atributos, bloques }, material, O, fraccion = 1) {
+  // Con una muestra (el móvil dibuja el 70 % del polvo y las nubes y el 45 % de las galaxias), a la tarjeta gráfica solo va
+  // lo que se dibuja: el principio de cada bloque (sus puntos están barajados). Antes se subía todo y el resto ocupaba
+  // memoria sin verse nunca (~25 MB en un iPhone). La calidad automática solo baja de esa muestra y vuelve a ella.
+  const originales = Object.values(atributos);
+  if (fraccion < 1) {
+    const guardar = bloques.map(b => Math.min(b.n, Math.max(1, Math.ceil(b.n * fraccion)))), total = guardar.reduce((a, n) => a + n, 0);
+    const inicios = []; { let o = 0; for (const n of guardar) { inicios.push(o); o += n; } }
+    atributos = Object.fromEntries(Object.entries(atributos).map(([n, { datos, k }]) => {
+      const nuevo = new datos.constructor(total * k);
+      bloques.forEach((b, i) => nuevo.set(datos.subarray(b.a * k, (b.a + guardar[i]) * k), inicios[i] * k));
+      return [n, { datos: nuevo, k }];
+    }));
+    bloques = bloques.map((b, i) => ({ ...b, a: inicios[i], guardados: guardar[i] }));
+  }
   // Una vez en la tarjeta gráfica, la copia en memoria ya no hace falta (son decenas de MB: en un iPhone cuenta mucho).
   const liberar = function () { this.array = null; };
   const attr = Object.fromEntries(Object.entries(atributos).map(([n, { datos, k }]) => [n, new THREE.BufferAttribute(datos, k).onUpload(liberar)]));
+  // Y la referencia de los datos de los obreros (la promesa de index.js los retenía: ~65 MB del móvil que nunca se soltaban).
+  for (const a of [...originales, ...Object.values(atributos)]) a.datos = null;
   const grupo = new THREE.Group(); grupo.position.copy(O); grupo.renderOrder = -1.5;
   for (const b of bloques) {
     const g = new THREE.BufferGeometry(); for (const [n, a] of Object.entries(attr)) g.setAttribute(n, a);
-    g.setDrawRange(b.a, Math.max(1, Math.ceil(b.n * fraccion)));   // una muestra repartida (los puntos de cada bloque están barajados)
+    g.setDrawRange(b.a, Math.min(b.guardados ?? b.n, Math.max(1, Math.ceil(b.n * fraccion))));   // una muestra repartida (los puntos de cada bloque están barajados)
     g.boundingSphere = new THREE.Sphere(new THREE.Vector3(...b.centro), b.radio);
     const t = new THREE.Points(g, material); t.renderOrder = -1.5; t.userData.bloque = b;
     grupo.add(t);
@@ -305,7 +321,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
     escalarCapaGalaxias(k) { escalaCapa = k; escalaMax = Math.max(escalaMax, k); uPRgal.value = k; },
     escalaCapaInicial: esMovil ? ESCALA_MOVIL : CAPA_PC, muestraInicial: MUESTRA,
     // Fracción de puntos que se dibuja en cada bloque (barajados), con la luz compensada.
-    fijarMuestra(f) { muestraActual = f; for (const grupo of [bloquesGalaxias, bloquesNubes, bloquesPolvo]) for (const t of grupo.children) { const b = t.userData.bloque; t.geometry.setDrawRange(b.a, Math.max(1, Math.ceil(b.n * f * (grupo === bloquesGalaxias ? PROP_GAL : 1)))); } uComp.value = 1 / Math.sqrt(f); },
+    fijarMuestra(f) { muestraActual = f; for (const grupo of [bloquesGalaxias, bloquesNubes, bloquesPolvo]) for (const t of grupo.children) { const b = t.userData.bloque; t.geometry.setDrawRange(b.a, Math.min(b.guardados ?? b.n, Math.max(1, Math.ceil(b.n * f * (grupo === bloquesGalaxias ? PROP_GAL : 1))))); } uComp.value = 1 / Math.sqrt(f); },
     get escalaCapaGalaxias() { return escalaCapa; },
     // Unidos dibujan todos los puntos (no la muestra): la luz de cada uno vuelve a ser la normal.
     get densidadWeb() { return densidadWeb; }, get expoAuto() { return expoAuto; },

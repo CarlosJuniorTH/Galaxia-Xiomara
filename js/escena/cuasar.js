@@ -273,7 +273,8 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
           alfa *= capa * mix(0.55, 1.0, smoothstep(0.08, 0.35, vC));
           gl_FragColor = vec4(fin * capa, alfa); }`;
   const LADO_REM = nivelSeguro ? 1024 : esMovilCuasar ? 2048 : 4096;   // tras un cierre por memoria, la textura del remolino más pequeña
-  const rtRemolino = new THREE.WebGLRenderTarget(LADO_REM, LADO_REM, { generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter });
+  // Sin búfer de profundidad: se pinta una sola vez sin pruebas de profundidad (eran 16 MB de la GPU del móvil sin uso).
+  const rtRemolino = new THREE.WebGLRenderTarget(LADO_REM, LADO_REM, { depthBuffer: false, stencilBuffer: false, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter });
   const texRemolino = rtRemolino.texture; texRemolino.colorSpace = THREE.NoColorSpace; texRemolino.anisotropy = 8;
   function hornearRemolino(renderer) {
     const m = new THREE.ShaderMaterial({ uniforms: { uT: { value: 0 }, uIn: { value: R_IN }, uOut: { value: R_OUT }, uH: { value: 0 } },

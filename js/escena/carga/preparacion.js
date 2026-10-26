@@ -18,8 +18,24 @@ export function crearPreparacion({ renderer, camera, scene, nucleo, solar, telar
         renderer.initTexture(v);
         // Ya en la tarjeta gráfica: las imágenes que nadie vuelve a leer sueltan su copia en memoria (decenas de MB en un iPhone).
         if (v.userData.liberable && v.image?.data && v.version > 0) v.image = { width: v.image.width, height: v.image.height, data: null };
+        // Los lienzos de las texturas dibujadas (frases, rótulos, brillos): nadie los vuelve a dibujar ni a subir, así que su
+        // copia en la memoria de la página (hasta 1100×240×4 cada una, ~25 MB en total) se suelta en cuanto están en la GPU.
+        else if (v.isCanvasTexture && v.version > 0 && !v.userData.redibujable && typeof HTMLCanvasElement !== 'undefined' && v.image instanceof HTMLCanvasElement && v.image.width > 1) {
+          const c = v.image; v.image = { width: c.width, height: c.height }; c.width = c.height = 1;
+        }
       }
     }
+  };
+  // Sube a la GPU los búferes de unos objetos ya, sin esperar al calentamiento del final: los que sueltan su copia en
+  // memoria al subirse (la telaraña, decenas de MB) la sueltan en el acto y no coinciden con todo lo demás de la carga.
+  // Se dibujan una vez con un material mínimo (three.js sube todos los atributos de cada geometría que dibuja).
+  const escenaSubida = new THREE.Scene(), rtSubida = new THREE.WebGLRenderTarget(4, 4, { depthBuffer: false });
+  escenaSubida.overrideMaterial = new THREE.PointsMaterial({ size: 1 }); escenaSubida.matrixWorldAutoUpdate = false;
+  const subirGeometrias = objetos => {
+    const tocados = []; for (const raiz of objetos) raiz.traverse(o => { tocados.push([o, o.visible, o.frustumCulled]); o.visible = true; o.frustumCulled = false; });
+    const previo = renderer.getRenderTarget();
+    try { escenaSubida.children = objetos; renderer.setRenderTarget(rtSubida); renderer.render(escenaSubida, camera); } catch (e) { console.warn('Subida', e); }
+    finally { escenaSubida.children = []; renderer.setRenderTarget(previo); for (const [o, v, f] of tocados) { o.visible = v; o.frustumCulled = f; } }
   };
   const paralela = renderer.compileAsync && renderer.extensions.has('KHR_parallel_shader_compile');
   // Las texturas de los planetas llegan del Web Worker en paralelo a la compilación.
@@ -76,5 +92,5 @@ export function crearPreparacion({ renderer, camera, scene, nucleo, solar, telar
     try { capaVolumen.dibujar(camera, 64); telarana.dibujarGalaxias(renderer, camera); composer.render(); } catch (e) { console.warn('Calentamiento', e); }
     pasadas.forEach((p, i) => { p.enabled = antes[i]; });
   };
-  return { subirTexturas, compilarTodo, calentar };
+  return { subirTexturas, subirGeometrias, compilarTodo, calentar };
 }
