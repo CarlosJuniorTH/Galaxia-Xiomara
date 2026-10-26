@@ -78,7 +78,7 @@ export function* construirSolar({ haciaCentroGalactico, uPR = { value: 1 } }) {
         else if (nt < 0.4) { cB.setHSL(0.92 + azar() * 0.05, 1.0, 0.62); realce = 1.25; }
         else if (nt < 0.7) { cB.setHSL(0.94 + azar() * 0.05, 1.0, 0.56); realce = 1.3; }
         else { cB.copy(violeta).lerp(rosa, azar() * 0.5); realce = 1.3; }
-        const luz = THREE.MathUtils.clamp(0.07 * Math.pow(420 / d, 1.15), 0.03, 0.34) * (0.55 + 0.45 * azar()) * realce;
+        const luz = THREE.MathUtils.clamp(0.2 * Math.pow(420 / d, 1.05), 0.085, 0.5) * (0.6 + 0.4 * azar()) * realce;
         mota(l, b, cB, luz, d < 140 ? 1.6 + azar() * 0.6 : 1 + azar() * 0.7);
       }
     }
@@ -180,13 +180,17 @@ export function* construirSolar({ haciaCentroGalactico, uPR = { value: 1 } }) {
       void main(){
         vec3 q = normalize(vP);
         float g = smoothstep(0.0, 0.5, celdas(q * 75.0)), fina = rn3(q * 220.0 + uT * 0.05);
-        float mancha = fbm3(q * 3.2 + 11.0), umbra = smoothstep(0.73, 0.76, mancha), penumbra = smoothstep(0.69, 0.72, mancha) - umbra;
-        float fac = smoothstep(0.64, 0.7, fbm3(q * 7.0 - uT * 0.01));
-        float mu = max(dot(normalize(vN), vec3(0.0, 0.0, 1.0)), 0.0), limbo = 0.42 + 0.58 * pow(mu, 0.55);
-        // Dorado intenso en el centro y naranja rojizo en el borde: luminancia ≤ ~0,65 (bajo el umbral) con el color saturado.
-        vec3 col = mix(vec3(0.95, 0.3, 0.05), vec3(1.0, 0.6, 0.18), pow(mu, 0.45)) * (0.68 + 0.32 * g) * (0.9 + 0.1 * fina);
-        col *= 1.0 - penumbra * 0.45 - umbra * 0.85; col += vec3(1.0, 0.75, 0.4) * fac * (1.0 - mu) * 0.3;
-        gl_FragColor = vec4(min(col * limbo * 0.95, vec3(0.98, 0.66, 0.3)), 1.0); }`
+        // Pocas manchas y pequeñas: solo donde un ruido de frecuencia alta pasa de un umbral alto.
+        float mancha = fbm3(q * 5.5 + 11.0), umbra = smoothstep(0.835, 0.845, mancha), penumbra = smoothstep(0.815, 0.825, mancha) - umbra;
+        float mu = max(dot(normalize(vN), vec3(0.0, 0.0, 1.0)), 0.0);
+        // Una estrella ardiente: centro amarillo dorado claro, limbo naranja rojizo intenso. Valores LINEALES (la salida los
+        // pasa a sRGB, que aclara los medios: con 0,66 de verde salía beige): en pantalla ≈ (255, 200, 90) en el centro,
+        // (255, 140, 20) en medio y (200, 60, 10) en el borde. Luminancia del centro ≈ 0,64, bajo el umbral de 0,78.
+        vec3 centro = vec3(1.0, 0.58, 0.1), medio = vec3(1.0, 0.27, 0.008), borde = vec3(0.58, 0.045, 0.003);
+        vec3 col = mix(borde, medio, smoothstep(0.0, 0.45, mu)); col = mix(col, centro, smoothstep(0.45, 1.0, mu));
+        col *= (0.78 + 0.22 * g) * (0.94 + 0.06 * fina);              // granulación sutil
+        col *= 1.0 - penumbra * 0.35 - umbra * 0.7;
+        gl_FragColor = vec4(col, 1.0); }`
   }));
   sol.add(superficie);
   yield;
@@ -198,10 +202,10 @@ export function* construirSolar({ haciaCentroGalactico, uPR = { value: 1 } }) {
       void main(){ float r = length(vP) / ${RADIO_SOL.toFixed(1)}, a = atan(vP.y, vP.x);
         // Cada filamento es una franja angular estrecha (borde nítido) que se curva un poco con la altura y se corta a su largo.
         float u = a * 34.0 + sin(a * 5.0 + r * 3.0 + uT * 0.1) * 1.2, id = floor(u), f = fract(u);
-        float largo = 1.05 + 0.42 * h3(vec3(id, 3.0, 1.0)), ancho = 0.04 + 0.05 * h3(vec3(id, 5.0, 2.0));
-        float hilo = step(abs(f - 0.5), ancho) * step(r, largo) * step(1.0, r) * step(0.55, h3(vec3(id, 9.0, 4.0)));
-        float k = hilo * (0.5 - 0.35 * (r - 1.0) / (largo - 1.0 + 1e-3));
-        gl_FragColor = vec4(vec3(1.0, 0.8, 0.55) * k, k); }`,
+        float largo = 1.03 + 0.22 * h3(vec3(id, 3.0, 1.0)), ancho = 0.04 + 0.04 * h3(vec3(id, 5.0, 2.0));
+        float hilo = step(abs(f - 0.5), ancho) * step(r, largo) * step(1.0, r) * step(0.7, h3(vec3(id, 9.0, 4.0)));
+        float k = hilo * (0.4 - 0.3 * (r - 1.0) / (largo - 1.0 + 1e-3));
+        gl_FragColor = vec4(vec3(1.0, 0.35, 0.04) * k, k); }`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide
   }));
   sol.add(corona);
@@ -213,14 +217,14 @@ export function* construirSolar({ haciaCentroGalactico, uPR = { value: 1 } }) {
     const m = new THREE.Points(g, new THREE.ShaderMaterial({ uniforms: { uT: superficie.material.uniforms.uT, uPR },
       vertexShader: /* glsl */`attribute vec2 aDat; uniform float uT, uPR; varying float vA;
         void main(){ float f = fract(aDat.x + uT * 0.03 * aDat.y); vec3 p = position * ${RADIO_SOL.toFixed(1)} * (1.02 + f * 0.6);
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); gl_PointSize = (1.0 + aDat.y) * uPR; vA = (1.0 - f) * 0.4; }`,
-      fragmentShader: 'varying float vA; void main(){ gl_FragColor = vec4(vec3(1.0, 0.82, 0.55) * vA, 1.0); }',
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); gl_PointSize = (1.0 + aDat.y) * uPR; vA = (1.0 - f) * 0.4 * (1.0 - smoothstep(1200.0, 2600.0, -(modelViewMatrix * vec4(p, 1.0)).z));   /* de lejos, solo el disco */ }`,
+      fragmentShader: 'varying float vA; void main(){ gl_FragColor = vec4(vec3(1.0, 0.4, 0.06) * vA, 1.0); }',
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
     m.frustumCulled = false; sol.add(m); return m;
   })();
   // Rayos cortos y finos (1 px), de cara a la cámara: ocho, del borde a ~1,6 radios. Una pista de lucero, no una cruz.
-  const rayos = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(Array.from({ length: 8 }, (_, i) => { const a = i / 8 * Math.PI * 2 + 0.2, l = i % 2 ? 1.45 : 1.75; return [new THREE.Vector3(Math.cos(a) * 1.12, Math.sin(a) * 1.12, 0), new THREE.Vector3(Math.cos(a) * l, Math.sin(a) * l, 0)]; }).flat().map(v => v.multiplyScalar(RADIO_SOL))),
-    new THREE.LineBasicMaterial({ color: '#ffe2b8', transparent: true, opacity: 0.45, depthWrite: false, blending: THREE.AdditiveBlending }));
+  const rayos = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(Array.from({ length: 6 }, (_, i) => { const a = i / 6 * Math.PI * 2 + 0.3, l = i % 2 ? 1.3 : 1.42; return [new THREE.Vector3(Math.cos(a) * 1.1, Math.sin(a) * 1.1, 0), new THREE.Vector3(Math.cos(a) * l, Math.sin(a) * l, 0)]; }).flat().map(v => v.multiplyScalar(RADIO_SOL))),
+    new THREE.LineBasicMaterial({ color: '#ffd28a', transparent: true, opacity: 0.4, depthWrite: false, blending: THREE.AdditiveBlending }));
   rayos.frustumCulled = false; sol.add(rayos);
   yield;
   // Protuberancias: arcos de plasma que salen de la superficie siguiendo el campo magnético.
@@ -229,15 +233,15 @@ export function* construirSolar({ haciaCentroGalactico, uPR = { value: 1 } }) {
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
     fragmentShader: RUIDO + `uniform float uT; varying vec2 vUv;
       void main(){ float n = fbm3(vec3(vUv.x * 12.0, vUv.y * 3.0, uT * 0.3));
-        float k = (0.45 + 0.9 * n) * (0.6 + 0.4 * sin(vUv.x * 3.14159)); vec3 c = mix(vec3(1.0, 0.35, 0.12), vec3(1.0, 0.75, 0.45), n);
-        gl_FragColor = vec4(c * k * 1.6, k); }`,
+        float k = (0.55 + 0.6 * n) * (0.5 + 0.5 * sin(vUv.x * 3.14159)); vec3 c = mix(vec3(1.0, 0.12, 0.01), vec3(1.0, 0.3, 0.03), n);
+        gl_FragColor = vec4(c * k * 0.9, k); }`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide
   });
   const arcos = [];
   for (const [lat, lon, tam] of [[0.3, 0.5, 0.32], [-0.5, 2.1, 0.26], [0.9, 3.6, 0.22], [-0.15, 4.6, 0.36], [0.55, 5.6, 0.2]]) {
     const base = new THREE.Group(), n = new THREE.Vector3(Math.cos(lat) * Math.cos(lon), Math.sin(lat), Math.cos(lat) * Math.sin(lon));
     base.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), n);
-    const arco = new THREE.Mesh(new THREE.TorusGeometry(RADIO_SOL * tam, RADIO_SOL * 0.035, 10, 64, Math.PI), materialArco);
+    const arco = new THREE.Mesh(new THREE.TorusGeometry(RADIO_SOL * tam, RADIO_SOL * 0.011, 6, 64, Math.PI), materialArco);
     arco.position.y = RADIO_SOL * 0.96; arco.rotation.y = lon * 2.3; base.add(arco); sol.add(base); arcos.push(arco);
   }
 
@@ -249,7 +253,7 @@ export function* construirSolar({ haciaCentroGalactico, uPR = { value: 1 } }) {
       for (const [i, a] of arcos.entries()) a.scale.setScalar(1 + Math.sin(t * 0.3 + i * 1.7) * 0.12);
       superficie.rotation.y = t * 0.01; corona.lookAt(camera.position); rayos.quaternion.copy(camera.quaternion);
       // De lejos el Sol no puede quedarse en un punto de 1 px: la corona y los rayos crecen lo justo para que se reconozca.
-      const k = Math.max(1, camera.position.length() / 5200); rayos.scale.setScalar(k); motasCorona.scale.setScalar(Math.min(1.6, k));
+      const k = Math.max(1, camera.position.length() / 5200); rayos.scale.setScalar(Math.min(1.8, k));
     }
   };
 }
