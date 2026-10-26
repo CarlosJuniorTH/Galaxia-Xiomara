@@ -88,7 +88,7 @@ try {
     // La banda sonora funde a la música de los viajes al despegar y a la del destino (o al reposo) al llegar. (Un viaje que
     // cruza al sistema solar sigue siéndolo también en el fundido entre sus dos tramos, restanteViaje: si en ese instante no
     // hay vuelo, la banda no lo da por terminado ni suena la del destino antes de tiempo.)
-    alViajar: id => { interfaz?.situar(id); contemplacion?.despertar(); viaje.anotarDestino(id); banda.viajar(id, { viajando: () => !!escena?.viajando || (escena?.restanteViaje ?? 0) > 0, restante: () => escena?.restanteViaje ?? 0, ceremoniaPendiente: d => d === 'supernova' && escena?.estadoSupernova !== 'remanente' }); },
+    alViajar: id => { interfaz?.situar(id); contemplacion?.despertar(); viaje.anotarDestino(id); banda.viajar(id, { viajando: () => !!escena?.viajando || (escena?.restanteViaje ?? 0) > 0, restante: () => escena?.restanteViaje ?? 0, ceremoniaPendiente: d => d === 'supernova' }); },
     // El viaje terminó (en este cuadro): la canción del destino y la escena del gigante empiezan a la vez.
     alLlegar: id => { banda.llegada(id); interfaz?.llegada(id); }, alProblema: problema,
     alProgreso: (f, techo) => entrada.progreso(0.08 + 0.92 * f, 0.08 + 0.92 * techo)

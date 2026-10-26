@@ -29,6 +29,14 @@ export default async function ({ base, informe }) {
     const lejos = await medir();
     informe.comprobar(lejos.distancia <= lejos.ideal * 3.05, 'alejando con la rueda al máximo no se va lejísimos', lejos);
     await pagina.screenshot({ path: '.pruebas/capturas/navegador/supernova-final-alejada.png' });
+    // Volver a ella con el corazón ya nacido: como los demás gigantes, su videoclip empieza al llegar (la estrella renace y
+    // vuelve a estallar), con la interfaz bloqueada y su canción esperando a la ceremonia (no suena ya avanzada sin clip).
+    await visitar(pagina, 'cuasar');
+    await pagina.waitForFunction(() => !document.body.classList.contains('escena-gigante'), null, { timeout: 120000, polling: 250 });
+    await visitar(pagina, 'supernova');
+    const vuelta = await pagina.waitForFunction(() => !document.getElementById('supernova-amor').hidden, null, { timeout: 15000, polling: 100 }).then(() => true, () => false);
+    const estado = await pagina.evaluate(() => ({ escena: document.body.classList.contains('escena-gigante'), ceremonia: document.body.classList.contains('supernova-en-escena') }));
+    informe.comprobar(vuelta && estado.escena && estado.ceremonia, 'al volver a la supernova ya nacida, su ceremonia empieza sola al llegar', estado);
     informe.comprobar(errores.length === 0, 'sin errores en la consola', errores.slice(0, 5));
   } finally { await navegador.close(); }
 }

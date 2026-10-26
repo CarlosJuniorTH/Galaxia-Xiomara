@@ -78,8 +78,8 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
   // Al terminar un viaje (en el mismo cuadro que la canción del destino): la escena de un gigante empieza ya.
   function llegada(id) {
     if (!GIGANTES.has(id)) { terminarEscena(); return; }
-    const ceremonia = id === 'supernova' && !corazonNacido();
-    const duracion = ceremonia ? TIEMPOS_AMOR.espera + TIEMPOS_AMOR.revelar + 4.5 : banda?.duracion(id) || 0;
+    // La supernova, en cada visita, su ceremonia (la primera vez estalla; después renace y vuelve a estallar).
+    const duracion = id === 'supernova' ? (corazonNacido() ? 4 : 0) + TIEMPOS_AMOR.espera + TIEMPOS_AMOR.revelar + 4.5 : banda?.duracion(id) || 0;
     if (duracion) escenaEnCurso(id, duracion);
   }
   // Contemplar: un paseo lento y sin interfaz por todos los lugares; cualquier toque lo termina.
@@ -227,9 +227,10 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     const lejano = LEJANOS.find(l => l.id === id);
     if (lejano && escena.destino === id && !escena.viajando) { avisar(`Ya estás aquí: ${lejano.nombre}.`); return; }
     const llegado = await escena.viajar(id);
-    // Si la estrella aún no ha estallado, al llegar empieza su cuenta atrás; el corazón ya nacido no.
-    // En cuanto se llega (sin espera: la ceremonia y su canción empiezan con la llegada).
-    if (llegado && id === 'supernova' && actual === 'supernova' && !corazonNacido() && !escena.viajando) accionLugar('supernova');
+    // La supernova, como los demás gigantes, tiene su videoclip en cada visita: la primera vez la estrella estalla; si el
+    // corazón ya nació, renace y vuelve a estallar (lo mismo que «Volver a sentirlo»). En cuanto se llega (sin espera: la
+    // ceremonia y su canción empiezan con la llegada).
+    if (llegado && id === 'supernova' && actual === 'supernova' && !escena.viajando) accionLugar('supernova');
     if (llegado && escenasGigantes.tiene(id) && actual === id) clipGigante(id);
     if (llegado) { progreso.anotar('visitas', id); if (id === 'constelacion') avisar('La luz blanca te muestra por dónde empezar. Puedes tocar las luces o unirlas con el botón.'); }
   }
