@@ -1,5 +1,6 @@
 # Verificación objetiva de las estancias (scripts/preparar-estancias.py): duración, volumen, silencios y huecos, clics y
-# saltos de energía o de pulso en las uniones, melodía presente donde cantaba la voz y continuidad con el final del clip.
+# saltos de energía o de pulso en las uniones, que la instrumental sea la canción original donde no hay voz (SDR y
+# correlación) y continuidad con el final del clip.
 # (Los restos de voz se miden aparte con Whisper: solo cuenta palabras, nunca escribe la letra.)
 # Uso: .pruebas/audio/bin/python scripts/verificar-estancias.py --informe DIR [lugares…] [--destino assets/musica]
 import argparse, json, subprocess, sys
@@ -27,10 +28,10 @@ for lugar in lugares:
     ruta = Path(A.destino) / f'{lugar}-estancia.m4a'; x = leer(ruta); dur = len(x) / SR
     fallos, datos = [], {}
     lufs, tp = ebu(ruta); datos['duración'] = round(dur, 1); datos['LUFS'] = lufs; datos['pico'] = tp
-    if not 45 <= dur <= 90: fallos.append(f'duración {dur:.1f} s fuera de 45–90')
+    if not 20 <= dur <= 120: fallos.append(f'duración {dur:.1f} s fuera de 20–120')
     if abs(lufs + 20) > 0.7: fallos.append(f'volumen {lufs} LUFS')
     # silencios (< −50 dBFS) y huecos de energía (12 dB bajo la mediana) de más de 0,4 s, salvo el final (4 s)
-    d = rms_db(x, 0.05); med = np.median(d); cuerpo = d[:int((dur - 4) / 0.05)]
+    d = rms_db(x, 0.05); med = np.median(d); cuerpo = d[:int((dur - 6) / 0.05)]  # (los 6 s finales: la cola natural)
     def tramos(mask):
         out, i = [], 0
         while i < len(mask):
@@ -82,12 +83,29 @@ for lugar in lugares:
         r['pulso_limite'] = round(lim_pulso, 3)
         if desv > lim_pulso: fallos.append(f'pulso irregular junto a {t} ({desv:.2f})')
     datos['pulso_desv_global_p95'] = round(float(np.percentile(np.abs(ibi / ibi_med - 1), 95)), 3)
-    # melodía: % del tiempo con voz en la canción original que queda cubierto por notas
-    datos['notas'] = info['notas']; datos['transporte'] = info['transporte']
-    for c in ('cobertura_melodia', 'fidelidad_melodia', 'melodia_vs_instrumental_dB', 'afinacion'):
-        if c in info: datos[c] = info[c]
-    if info['notas'] and info.get('cobertura_melodia', 1) < 0.75: fallos.append('la melodía no cubre la voz')
-    if info['notas'] and info.get('fidelidad_melodia', 1) < 0.8: fallos.append('la melodía no sigue a la voz')
+    # intacta: en las zonas donde la canción no tiene voz, la estancia debe ser la canción original (tras igualar la
+    # ganancia): SDR y correlación frente al original en esos tramos
+    if 'cancion' in info:
+        import hashlib, soundfile as sf
+        ORIG = RAIZ.parent.parent.parent / 'audios-originales' if 'worktrees' in str(RAIZ) else RAIZ / 'audios-originales'
+        ro = ORIG / info['cancion']; base = ro.parent / '.separado' / hashlib.sha1(ro.read_bytes()).hexdigest()[:12] / info['separacion']
+        o = leer(ro).mean(1); v = sf.read(base / 'vocals.wav', dtype='float64')[0]; v = v.mean(1) if v.ndim == 2 else v
+        a0 = int(info['tramo'][0] * SR); n = min(len(m), len(o) - a0)
+        oo, vv, xx = o[a0:a0 + n], v[a0:a0 + n], m[:n]
+        # desfase del AAC (relleno del códec): el que más correlaciona en ±50 ms
+        c = ss.correlate(xx[SR:SR * 11], oo[SR:SR * 11], mode='full', method='fft'); mitad = len(c) // 2; L = int(0.05 * SR)
+        lag = int(np.argmax(c[mitad - L:mitad + L + 1])) - L
+        if lag > 0: xx = xx[lag:]; oo = oo[:len(xx)]; vv = vv[:len(xx)]
+        elif lag < 0: oo = oo[-lag:]; vv = vv[-lag:]; xx = xx[:len(oo)]
+        dv = rms_db(vv, 0.05); libre = dv < np.percentile(rms_db(v, 0.05), 95) - 40
+        libre = np.convolve(libre, np.ones(21), 'same') >= 21; libre[:int(1 / 0.05)] = False; libre[-int(4 / 0.05):] = False
+        mk = np.repeat(libre, int(0.05 * SR)); mk = np.pad(mk, (0, max(0, len(xx) - len(mk))))[:len(xx)]
+        datos['zonas_sin_voz_s'] = round(float(mk.sum() / SR), 1); datos['desfase_aac_muestras'] = lag
+        if mk.sum() > SR:
+            g = np.dot(oo[mk], xx[mk]) / np.dot(xx[mk], xx[mk])
+            datos['intacta_sdr_dB'] = round(float(10 * np.log10(np.sum(oo[mk] ** 2) / np.sum((oo[mk] - g * xx[mk]) ** 2))), 1)
+            datos['intacta_correlacion'] = round(float(np.corrcoef(oo[mk], xx[mk])[0, 1]), 4)
+            if datos['intacta_correlacion'] < 0.95: fallos.append(f"la instrumental no es la original donde no hay voz (r = {datos['intacta_correlacion']})")
     # continuidad con el clip: últimos 3 s del fragmento del clip contra los 3 primeros de la estancia
     clip = Path(A.destino) / f'{lugar}.m4a'
     if info.get('continua_clip') and clip.exists():

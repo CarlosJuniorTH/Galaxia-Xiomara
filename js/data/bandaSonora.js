@@ -13,13 +13,13 @@
                   volumen  0–1, sobre el volumen general de CONFIG.volumen
                   bucle    true = vuelve a empezar al terminar; false = al terminar se funde con lo siguiente
                   marcas   { nombre: segundo }: avisos para las animaciones (bandaSonora.alMarca); null = sin marca
-                  estancia (opcional) { archivo, volumen }: la instrumental de la misma canción, con la parte que NO
-                           suena en el clip (scripts/preparar-estancias.py; tramos usados en indice.json). Empieza 3 s antes
-                           del final del fragmento y entra con un fundido de 3 s en el mismo compás: la canción sigue sin
-                           voz pero con su melodía (piano eléctrico que toca lo que cantaba la voz; el original tal cual en
-                           sus partes instrumentales) hasta su final natural, 45–90 s a −20 LUFS. Mientras se sigue mirando
-                           el lugar; al acabar ella, el ambiente generativo (que nunca se repite). Nada va en bucle salvo el
-                           ambiente. Se descarga en segundo plano después de su canción, no en la carga.
+                  estancia (opcional) { archivo, volumen }: la instrumental de la misma canción, tal cual, solo sin la
+                           voz (separador profesional RoFormer; scripts/preparar-estancias.py; tramo y modelo en
+                           indice.json): un tramo continuo, sin empalmes ni nada añadido, que empieza 3 s antes del final
+                           del fragmento (entra con un fundido de 3 s en el mismo compás: la canción sigue) y llega hasta su
+                           final natural, a −20 LUFS. Mientras se sigue mirando el lugar; al acabar ella, el ambiente
+                           generativo (que nunca se repite). Nada va en bucle salvo el ambiente. Se descarga en segundo
+                           plano después de su canción, no en la carga.
    ════════════════════════════════════════════════════════════════ */
 import { TIEMPOS_AMOR } from '../util/supernovaAmor.js';
 import { ESCENA_PULSAR, ESCENA_CUASAR, ESCENA_DENEB } from '../util/escenasGigantes.js';
