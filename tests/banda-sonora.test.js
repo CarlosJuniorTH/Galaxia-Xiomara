@@ -84,3 +84,19 @@ test('el videoclip de la intro va a 1:1 con «Maps» y sus hitos de imagen caen 
   // Los pulsos, crecientes y a ~0,5 s (120 BPM) de 0 a 32.
   for (let i = 1; i < PULSOS.length; i++) assert.ok(Math.abs(PULSOS[i] - PULSOS[i - 1] - 0.5) < 0.06, `pulso ${i}`);
 });
+
+test('cada estancia es la continuación de su canción: 45–90 s, −20 LUFS y empieza 3 s antes del final del clip', async () => {
+  const { readFileSync } = await import('node:fs');
+  const indice = JSON.parse(readFileSync(new URL('../assets/musica/indice.json', import.meta.url)));
+  for (const n of ['supernova', 'pulsar', 'deneb', 'cuasar', 'ton618', 'sagitario', 'hogar']) {
+    const e = indice[`${n}-estancia.m4a`], c = indice[`${n}.m4a`];
+    assert.ok(e && e.duracion >= 45 && e.duracion <= 90, `${n}: ${e?.duracion} s`);
+    assert.equal(e.lufs, -20, n);
+    assert.ok(Array.isArray(e.tramos) && e.tramos.length >= 1, `${n}: tramos de la canción usados`);
+    // Ningún tramo repite lo que suena en el clip (salvo los 3 s del fundido, que son el mismo compás).
+    if (c.origen === e.origen) {
+      assert.ok(Math.abs(e.desde - (c.hasta - 3)) < 0.01, `${n}: la estancia arranca en ${e.desde}, el clip acaba en ${c.hasta}`);
+      for (const t of e.tramos.slice(1)) assert.ok(t.hasta <= c.desde + 0.01 || t.desde >= c.hasta - 0.01, `${n}: ${t.desde}–${t.hasta} pisa el clip`);
+    }
+  }
+});

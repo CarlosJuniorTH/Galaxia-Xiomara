@@ -13,9 +13,12 @@
                   volumen  0–1, sobre el volumen general de CONFIG.volumen
                   bucle    true = vuelve a empezar al terminar; false = al terminar se funde con lo siguiente
                   marcas   { nombre: segundo }: avisos para las animaciones (bandaSonora.alMarca); null = sin marca
-                  estancia (opcional) { archivo, volumen }: versión instrumental tranquila de la misma canción (Demucs, a
-                           −20 LUFS) que entra con un fundido de 3 s cuando acaba el fragmento, mientras se sigue mirando el
-                           lugar; al acabar ella, el ambiente generativo (que nunca se repite). Nada va en bucle salvo el
+                  estancia (opcional) { archivo, volumen }: la instrumental de la misma canción, con la parte que NO
+                           suena en el clip (scripts/preparar-estancias.py; tramos usados en indice.json). Empieza 3 s antes
+                           del final del fragmento y entra con un fundido de 3 s en el mismo compás: la canción sigue sin
+                           voz pero con su melodía (piano eléctrico que toca lo que cantaba la voz; el original tal cual en
+                           sus partes instrumentales) hasta su final natural, 45–90 s a −20 LUFS. Mientras se sigue mirando
+                           el lugar; al acabar ella, el ambiente generativo (que nunca se repite). Nada va en bucle salvo el
                            ambiente. Se descarga en segundo plano después de su canción, no en la carga.
    ════════════════════════════════════════════════════════════════ */
 import { TIEMPOS_AMOR } from '../util/supernovaAmor.js';
@@ -61,7 +64,7 @@ export const MOMENTOS = {
   // las de la escena (js/util/escenasGigantes.js): se ajustan allí y valen para las dos cosas.
   pulsar: momento({ archivo: 'pulsar.m4a', marcas: { ...ESCENA_PULSAR.marcas }, estancia: estancia('pulsar-estancia.m4a') }),
   deneb: momento({ archivo: 'deneb.m4a', marcas: { ...ESCENA_DENEB.marcas }, estancia: estancia('deneb-estancia.m4a') }),                    // «Middle»
-  // (La voz del cuásar es un mensaje; su estancia es la instrumental de «I Saw Your Face Today».)
+  // (La voz del cuásar es un mensaje; su estancia es «I Saw Your Face Today» desde su solo instrumental hasta el final.)
   cuasar: momento({ archivo: 'cuasar.m4a', marcas: { ...ESCENA_CUASAR.marcas }, estancia: estancia('cuasar-estancia.m4a') }),
   // TON 618 («I Wanna Be Yours», 136 BPM) y Sagitario A* («Say Yes to Heaven», 103 BPM): su escena (js/escena/ton618.js,
   // js/escena/sagitario.js, js/util/guionAgujeros.js) empieza al llegar, con la canción, y cae en estas marcas.

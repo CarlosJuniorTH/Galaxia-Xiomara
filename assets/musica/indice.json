@@ -1,11 +1,19 @@
 {
   "cuasar-estancia.m4a": {
-    "bytes": 1053663,
-    "duracion": 64.714,
-    "origen": "no_vocals.wav",
-    "desde": 55.751,
-    "hasta": 120.465,
-    "lufs": -20
+    "bytes": 1153031,
+    "duracion": 70.7,
+    "origen": "Galaxia-Analizar3",
+    "desde": 95.202,
+    "hasta": 170.41,
+    "lufs": -20,
+    "tramos": [
+      {
+        "modo": "mezcla",
+        "desde": 95.202,
+        "hasta": 170.41
+      }
+    ],
+    "melodia": true
   },
   "cuasar.m4a": {
     "bytes": 506734,
@@ -16,12 +24,20 @@
     "lufs": -16
   },
   "deneb-estancia.m4a": {
-    "bytes": 1091559,
-    "duracion": 66.664,
-    "origen": "no_vocals.wav",
-    "desde": 0,
-    "hasta": 66.664,
-    "lufs": -20
+    "bytes": 1459114,
+    "duracion": 88.8,
+    "origen": "Deneb-Galaxia",
+    "desde": 196.25,
+    "hasta": 300.33,
+    "lufs": -20,
+    "tramos": [
+      {
+        "modo": "mezcla",
+        "desde": 196.25,
+        "hasta": 300.33
+      }
+    ],
+    "melodia": true
   },
   "deneb.m4a": {
     "bytes": 713530,
@@ -32,12 +48,25 @@
     "lufs": -16
   },
   "hogar-estancia.m4a": {
-    "bytes": 655431,
-    "duracion": 40.24,
-    "origen": "no_vocals.wav",
-    "desde": 120.465,
-    "hasta": 160.705,
-    "lufs": -20
+    "bytes": 1137882,
+    "duracion": 69.95,
+    "origen": "Galaxia-Analizar3",
+    "desde": 51.195,
+    "hasta": 170.41,
+    "lufs": -20,
+    "tramos": [
+      {
+        "modo": "mezcla",
+        "desde": 51.195,
+        "hasta": 102.609
+      },
+      {
+        "modo": "mezcla",
+        "desde": 147.4,
+        "hasta": 170.41
+      }
+    ],
+    "melodia": true
   },
   "hogar.m4a": {
     "bytes": 507102,
@@ -56,12 +85,30 @@
     "lufs": -16
   },
   "pulsar-estancia.m4a": {
-    "bytes": 1269582,
-    "duracion": 77.694,
-    "origen": "no_vocals.wav",
-    "desde": 0,
-    "hasta": 77.694,
-    "lufs": -20
+    "bytes": 801157,
+    "duracion": 49.3,
+    "origen": "Galaxia-Analizar1",
+    "desde": 126.289,
+    "hasta": 166.91,
+    "lufs": -20,
+    "tramos": [
+      {
+        "modo": "mezcla",
+        "desde": 126.289,
+        "hasta": 156.201
+      },
+      {
+        "modo": "mezcla",
+        "desde": 64.232,
+        "hasta": 73.213
+      },
+      {
+        "modo": "mezcla",
+        "desde": 156.213,
+        "hasta": 166.91
+      }
+    ],
+    "melodia": true
   },
   "pulsar.m4a": {
     "bytes": 549032,
@@ -72,12 +119,30 @@
     "lufs": -16
   },
   "sagitario-estancia.m4a": {
-    "bytes": 807263,
-    "duracion": 49.528,
-    "origen": "no_vocals.wav",
-    "desde": 0,
-    "hasta": 49.528,
-    "lufs": -20
+    "bytes": 885155,
+    "duracion": 54.4,
+    "origen": "Galaxia-Analizar2",
+    "desde": 180.345,
+    "hasta": 209.26,
+    "lufs": -20,
+    "tramos": [
+      {
+        "modo": "mezcla",
+        "desde": 180.345,
+        "hasta": 183.345
+      },
+      {
+        "modo": "mezcla",
+        "desde": 102.319,
+        "hasta": 133.515
+      },
+      {
+        "modo": "mezcla",
+        "desde": 185.707,
+        "hasta": 209.26
+      }
+    ],
+    "melodia": true
   },
   "sagitario.m4a": {
     "bytes": 619916,
@@ -88,12 +153,20 @@
     "lufs": -16
   },
   "supernova-estancia.m4a": {
-    "bytes": 1202081,
-    "duracion": 73.236,
-    "origen": "no_vocals.wav",
-    "desde": 0,
-    "hasta": 73.236,
-    "lufs": -20
+    "bytes": 835961,
+    "duracion": 51.28,
+    "origen": "Supernova-Galaxia",
+    "desde": 174.3,
+    "hasta": 225.58,
+    "lufs": -20,
+    "tramos": [
+      {
+        "modo": "mezcla",
+        "desde": 174.3,
+        "hasta": 225.58
+      }
+    ],
+    "melodia": true
   },
   "supernova.m4a": {
     "bytes": 1022724,
@@ -104,12 +177,30 @@
     "lufs": -16
   },
   "ton618-estancia.m4a": {
-    "bytes": 938435,
-    "duracion": 57.168,
-    "origen": "no_vocals.wav",
-    "desde": 0,
-    "hasta": 57.168,
-    "lufs": -20
+    "bytes": 833781,
+    "duracion": 51.25,
+    "origen": "Galaxia-Analizar4",
+    "desde": 135.971,
+    "hasta": 183.96,
+    "lufs": -20,
+    "tramos": [
+      {
+        "modo": "mezcla",
+        "desde": 135.971,
+        "hasta": 163.863
+      },
+      {
+        "modo": "original",
+        "desde": 3.855,
+        "hasta": 10.96
+      },
+      {
+        "modo": "mezcla",
+        "desde": 163.857,
+        "hasta": 183.96
+      }
+    ],
+    "melodia": true
   },
   "ton618.m4a": {
     "bytes": 607215,

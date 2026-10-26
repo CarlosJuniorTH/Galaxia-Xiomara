@@ -176,14 +176,22 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
       p.previo = t;
       // El fragmento ya trae su fundido de salida: el reposo entra a la vez, sin hueco de silencio. (La de los viajes no:
       // su final es la llegada, y al llegar se funde con lo que toque.)
-      if (!p.conf.bucle && !p.conf.hastaLlegar && dur && objetivo === p.nombre && t >= dur - fundidoTras(p)) despues(p);
+      if (!p.conf.bucle && !p.conf.hastaLlegar && dur && objetivo === p.nombre && t >= dur - fundidoTras(p)) despues(p, t);
     }
     if (!alguna) { clearInterval(vigia); vigia = 0; }
   }
   // Al acabar un fragmento: su estancia, si la tiene (fundido de 3 s), y si no (o al acabar la estancia), el reposo.
+  // La estancia es la continuación de la canción: su segundo 0 es el segundo «duración − 3» del fragmento (los dos suenan
+  // a la vez durante el fundido, en el mismo compás). Como este aviso llega hasta 0,1 s tarde, la estancia arranca en lo
+  // que ya lleva de retraso (t − (duración − 3)), para que sus golpes caigan encima de los del fragmento.
   const estanciaDe = p => pistas.get(`${p.nombre}-estancia`);
   const fundidoTras = p => estanciaDe(p) && estanciaDe(p).estado !== 'fallo' ? FUNDIDO_ESTANCIA : FUNDIDO;
-  function despues(p) { const e = estanciaDe(p); if (e && e.estado !== 'fallo') ir(e.nombre, { desde: 0, fundido: FUNDIDO_ESTANCIA }); else ir('reposo'); }
+  function despues(p, t = duracionDe(p)) {
+    const e = estanciaDe(p);
+    if (!e || e.estado === 'fallo') return ir('reposo');
+    const retraso = Math.max(0, Math.min(FUNDIDO_ESTANCIA, t - (duracionDe(p) - FUNDIDO_ESTANCIA)));
+    ir(e.nombre, { desde: Number.isFinite(retraso) ? +retraso.toFixed(3) : 0, fundido: FUNDIDO_ESTANCIA });
+  }
   function emitir(aviso) { for (const f of oyentes) { try { f(aviso); } catch (e) { console.error(e); } } }
 
   function ir(nombre, { desde, fundido = FUNDIDO } = {}) {
