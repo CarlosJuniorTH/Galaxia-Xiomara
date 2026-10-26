@@ -83,6 +83,9 @@ function dentro(x, y, poligono) {
 }
 
 // De un tirón; la carga usa construirMundos, el mismo código como generador (yield entre pasos: ver porTramos).
+// Las seis grandes (sus videoclips y su cielo propio): desde ellas no se ve la constelación de casa.
+const GRANDES = new Set(['supernova', 'cuasar', 'pulsar', 'ton618', 'sagitario', 'deneb']);
+
 export const crearMundos = (...a) => deUnTiron(construirMundos(...a));
 export function* construirMundos({ scene, uScale, uPR }, { alConstelar = () => {}, consteladas = [] } = {}) {
   const raiz = new THREE.Group(); scene.add(raiz);
@@ -585,6 +588,9 @@ export function* construirMundos({ scene, uScale, uPR }, { alConstelar = () => {
     },
     actualizar(t, dt, { tiempoDentro, camera }) {
       // Lejos de casa (desde los gigantes) los lugares no se ven: solo sigue el cometa, que tiene su propio recorrido.
+      // La constelación de casa (el corazón, el infinito… de CONSTELACIONES) no se ve desde las seis grandes: allí no hay
+      // figuras de corazón ni de infinito hechas con estrellas (cada una tiene su propio cielo: universoLocal.js).
+      constelacion.visible = !GRANDES.has(foco);
       if (!raiz.visible) { cometa.actualizar(t, dt, { tiempoDentro, foco, camera }); return; }
       // La figura sigue siendo espacial, pero no desaparece de canto cuando
       // la cámara orbita. Igual que el corazón central, mira a quien la visita.
