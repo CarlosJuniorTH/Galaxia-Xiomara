@@ -308,7 +308,8 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     const arriba = 12, top = el.offsetTop, izq = el.offsetLeft;
     const rArriba = Math.min((top - arriba - 14) / 2, ancho / 2 - 16), rIzq = Math.min(izq / 2 - 14, alto / 2 - 16);
     const tope = m * (vertical ? 0.2 : 0.16);
-    if (rArriba >= rIzq) { Sf = Math.max(0, Math.min(tope, rArriba)); Fx = ancho / 2; Fy = arriba + (top - arriba) / 2; }
+    // (encima y centrado si cabe a su tamaño o casi; si no, el hueco mayor)
+    if (rArriba >= Math.min(rIzq, tope * 0.8)) { Sf = Math.max(0, Math.min(tope, rArriba)); Fx = ancho / 2; Fy = arriba + (top - arriba) / 2; }
     else { Sf = Math.max(0, Math.min(tope, rIzq)); Fx = izq / 2; Fy = alto / 2; }
   }
   medir();
@@ -818,7 +819,7 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
         lon0 = M_LON - 14 * suave(tramo(t, 25.2, H.salto)); lat0 = 8 * morf; alfa = vivo; quedan = 1 - 0.85 * lejos;
       } else {
         const llega = calma ? suave(tramo(t, H.tarjeta, H.tarjeta + 1.2)) : rebote(tramo(t, H.tarjeta, H.tarjeta + 1));
-        gx = Fx; gy = Fy; R = Sf * llega; lon0 = M_LON - 6 + 22 * Math.sin((t - H.tarjeta) * 0.16); lat0 = 14; alfa = sat(llega * 1.5); quedan = 0.4;
+        gx = Fx; gy = Fy; R = Sf * llega; lon0 = M_LON - 6 + 22 * Math.sin((t - H.tarjeta) * 0.16); lat0 = 14; alfa = sat(llega * 1.5); quedan = 0.75;   // (más motas: sobre el cielo del universo, que es claro, se lee mejor)
       }
       dibujarGlobo(t, gx, gy, R, lon0, lat0, alfa, quedan, final ? 1 : morf, final);
     }
