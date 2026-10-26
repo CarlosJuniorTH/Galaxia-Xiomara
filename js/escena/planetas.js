@@ -434,13 +434,35 @@ function* crearGigante(scene, { uScale, uPR }) {
   polvo.rotation.x = -Math.PI / 2; plano.add(polvo);
   const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: texBrillo(), color: 0xffd2a0, transparent: true, opacity: 0.08, blending: THREE.AdditiveBlending, depthWrite: false }));
   halo.scale.setScalar(RADIO_GIGANTE * 3.2); grupo.add(halo);
+  yield;
+  // Sus cuatro lunas grandes (como las de Júpiter), fuera del cinturón, y dos lunitas que comparten una misma órbita, una
+  // rosada y otra azulada, siempre a la misma distancia una de otra: dan vueltas juntas alrededor del gigante del corazón.
+  const lunasGigante = [];
+  for (const [r, dist, vel, incl, tipo] of [[9, 560, 0.16, 0.06, 'roca'], [8, 680, 0.11, -0.04, 'hielo'], [12, 820, 0.08, 0.05, 'roca'], [11, 990, 0.055, 0.1, 'hielo']]) {
+    const orbita = new THREE.Group(); orbita.rotation.set(0.32 + incl, Math.random() * Math.PI * 2, 0.18); grupo.add(orbita);
+    const luna = new THREE.Mesh(new THREE.SphereGeometry(r, 40, 28), tipo === 'hielo' ? materialLunaHielo() : materialLunaRoca()); luna.position.set(dist, 0, 0); orbita.add(luna);
+    lunasGigante.push([orbita, vel]);
+  }
+  const pareja = new THREE.Group(); pareja.rotation.set(0.5, 0, -0.25); grupo.add(pareja);
+  for (const [color, fase] of [['#ffb3d4', 0], ['#a9c8ff', 0.5]]) {
+    const m = materialPlaneta(texLuna(['#5a4a55', '#b9a8b6', '#f6eef4'], 97, 30, 0.3, 256, 1), color, { atmosfera: 0.35, especular: 0, terminador: 0.35, lunar: true });
+    m.uniforms.uBorde.value.set(color);
+    const l = new THREE.Mesh(new THREE.SphereGeometry(4.5, 28, 20), m); l.position.set(Math.cos(fase) * 740, 0, Math.sin(fase) * 740); pareja.add(l);
+  }
+  lunasGigante.push([pareja, 0.07]);
   return {
     actualizar(t, dt) {
+      for (const [o, v] of lunasGigante) o.rotation.y += dt * v;
       esfera.rotation.y += dt * 0.05; esfera.material.uniforms.uTime.value = t;
       asteroides.material.uniforms.uT.value = t; grandes.material.uniforms.uT.value = t; polvo.material.uniforms.uTime.value = t;
     }
   };
 }
+
+// Materiales de las lunas pequeñas, compartidos (dos texturas para todas: roca con cráteres y hielo claro).
+let lunaRoca = null, lunaHielo = null;
+const materialLunaRoca = () => lunaRoca ??= materialPlaneta(texLuna(['#3e3a3a', '#8d8580', '#d8d0c8'], 71, 60, 0.5, 256, 1), 0xffe6d0, { atmosfera: 0.02, especular: 0, terminador: 0.3, lunar: true });
+const materialLunaHielo = () => lunaHielo ??= materialPlaneta(texLuna(['#8f97a6', '#c9d2dc', '#f4f7fb'], 83, 25, 0.2, 256, 2), 0xe8f4ff, { atmosfera: 0.03, especular: 0.02, terminador: 0.3, lunar: true });
 
 // El resto del sistema solar, para que se sienta completo: Mercurio, Venus, Marte, Saturno con
 // sus anillos, Urano y Neptuno, cada uno con su aspecto real, y las órbitas dibujadas muy
@@ -449,13 +471,13 @@ const a = (r, grados, y = 0) => new THREE.Vector3(Math.cos(grados * Math.PI / 18
 export const OTROS_PLANETAS = [
   { nombre: 'Mercurio', centro: a(650, 160, 20), radio: 9, tex: () => texCrateres(['#4a4440', '#8f857c', '#cfc6bc'], 31, 70, 0.3, 512), giro: 0.02 },
   { nombre: 'Venus', centro: a(1050, 100, -30), radio: 24, tex: () => texGaseosa(['#f3e2b8', '#e9cf98', '#f6e8c6', '#dcc08a', '#f1ddb0'], 41), giro: 0.004, atmosfera: 0.6, borde: 0xffe2a8 },
-  { nombre: 'Marte', centro: a(2900, 200, 60), radio: 15, tex: () => texCrateres(['#5c2a1a', '#b5552e', '#e08a5a'], 47, 60, 0.8, 512), giro: 0.05, atmosfera: 0.15, borde: 0xff9a70 },
-  { nombre: 'Saturno', centro: a(5800, 140, 200), radio: 105, tex: () => texGaseosa(['#efe0bd', '#dcc497', '#c9a874', '#f0dfba', '#d8bd8c', '#bfa171'], 53), giro: 0.06, anillos: true, borde: 0xffe6b8 },
-  { nombre: 'Urano', centro: a(7200, 250, -150), radio: 52, tex: () => texGaseosa(['#c9f1f2', '#b5e6ea', '#d6f6f5', '#a9dde3'], 61), giro: 0.03, inclinacion: 1.7, borde: 0xb8f4ff },
-  { nombre: 'Neptuno', centro: a(8400, 20, 100), radio: 50, tex: () => texGaseosa(['#3d63d6', '#2e4fb8', '#5a7fe8', '#3456c4', '#7b98f0'], 67), giro: 0.035, borde: 0x8fb0ff }
+  { nombre: 'Marte', centro: a(2900, 200, 60), radio: 15, tex: () => texCrateres(['#5c2a1a', '#b5552e', '#e08a5a'], 47, 60, 0.8, 512), giro: 0.05, atmosfera: 0.15, borde: 0xff9a70, lunas: [[2.4, 30, 0.9, 0.1, 'roca'], [1.8, 46, 0.5, -0.2, 'roca']] },
+  { nombre: 'Saturno', centro: a(5800, 140, 200), radio: 105, tex: () => texGaseosa(['#efe0bd', '#dcc497', '#c9a874', '#f0dfba', '#d8bd8c', '#bfa171'], 53), giro: 0.06, anillos: true, borde: 0xffe6b8, lunas: [[10, 330, 0.12, 0.35, 'hielo'], [4.5, 270, 0.2, 0.3, 'hielo'], [3.5, 400, 0.09, 0.4, 'roca']] },
+  { nombre: 'Urano', centro: a(7200, 250, -150), radio: 52, tex: () => texGaseosa(['#c9f1f2', '#b5e6ea', '#d6f6f5', '#a9dde3'], 61), giro: 0.03, inclinacion: 1.7, borde: 0xb8f4ff, anillosFinos: true, lunas: [[5, 120, 0.25, 0, 'hielo'], [4.6, 160, 0.17, 0, 'hielo']] },
+  { nombre: 'Neptuno', centro: a(8400, 20, 100), radio: 50, tex: () => texGaseosa(['#3d63d6', '#2e4fb8', '#5a7fe8', '#3456c4', '#7b98f0'], 67), giro: 0.035, borde: 0x8fb0ff, lunas: [[6, 110, -0.2, 0.5, 'hielo']] }
 ];
 function* crearOtrosPlanetas(scene, radiosOrbita) {
-  const planetas = [];
+  const planetas = [], lunas = [];
   for (const p of OTROS_PLANETAS) {
     yield;
     const g = new THREE.Group(); g.position.copy(p.centro); g.rotation.z = p.inclinacion ?? 0.2; scene.add(g);
@@ -481,6 +503,25 @@ function* crearOtrosPlanetas(scene, radiosOrbita) {
       }));
       anillo.rotation.x = Math.PI / 2 - 0.35; anillo.renderOrder = 1; g.add(anillo);
     }
+    if (p.anillosFinos) {
+      // Anillos de Urano: unos pocos anillos estrechos y oscuros, trazos nítidos (no un disco difuso).
+      const anillo = new THREE.Mesh(new THREE.RingGeometry(p.radio * 1.6, p.radio * 2.05, 256, 1), new THREE.ShaderMaterial({
+        uniforms: { uRadio: { value: p.radio } },
+        vertexShader: 'varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+        fragmentShader: `uniform float uRadio; varying vec2 vP;
+          void main(){ float r = length(vP) / uRadio, a = 0.0;
+            for (int i = 0; i < 5; i++) { float c = 1.65 + float(i) * 0.085 + (i == 4 ? 0.06 : 0.0), w = i == 4 ? 0.012 : 0.006; a = max(a, step(abs(r - c), w)); }
+            gl_FragColor = vec4(vec3(0.62, 0.72, 0.78) * a * 0.55, a * 0.6); }`,
+        transparent: true, depthWrite: false, side: THREE.DoubleSide
+      }));
+      anillo.rotation.x = Math.PI / 2; g.add(anillo);
+    }
+    // Lunas: pequeñas, con cráteres (roca) o lisas y claras (hielo), cada una en su órbita (giran en actualizar).
+    for (const [r, dist, vel, incl, tipo] of p.lunas ?? []) {
+      const orbita = new THREE.Group(); orbita.rotation.set(incl, Math.random() * Math.PI * 2, 0); orbita.position.copy(p.centro); scene.add(orbita);
+      const luna = new THREE.Mesh(new THREE.SphereGeometry(r, 32, 24), tipo === 'hielo' ? materialLunaHielo() : materialLunaRoca());
+      luna.position.set(dist, 0, 0); orbita.add(luna); lunas.push([orbita, vel, luna]);
+    }
     radiosOrbita.push(Math.hypot(p.centro.x, p.centro.z));
   }
   // Órbitas: círculos muy tenues alrededor del Sol.
@@ -489,7 +530,7 @@ function* crearOtrosPlanetas(scene, radiosOrbita) {
     const pts = Array.from({ length: 256 }, (_, i) => { const t = i / 256 * Math.PI * 2; return new THREE.Vector3(Math.cos(t) * r, 0, Math.sin(t) * r); });
     scene.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), material));
   }
-  return { actualizar(t, dt) { for (const [e, giro] of planetas) { e.rotation.y += dt * giro; e.material.uniforms.uTime.value = t; } } };
+  return { actualizar(t, dt) { for (const [e, giro] of planetas) { e.rotation.y += dt * giro; e.material.uniforms.uTime.value = t; } for (const [o, v, l] of lunas) { o.rotation.y += dt * v; l.rotation.y += dt * 0.1; } } };
 }
 
 // De un tirón; la carga usa construirPlanetas, el mismo código como generador (yield entre pasos: ver porTramos).

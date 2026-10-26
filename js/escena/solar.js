@@ -4,7 +4,7 @@
 // motas nítidas y un leve rastro del disco. El resto del universo no se ve desde aquí.
 import * as THREE from 'three';
 import { deUnTiron } from '../util/azarSemilla.js';
-import { texBrillo, texDestello, texEstrellaGigante, texTexto } from './texturas.js';
+import { texTexto } from './texturas.js';
 import { enBrazo } from './galaxia.js';
 
 const RUIDO = /* glsl */`
@@ -70,13 +70,15 @@ export function* construirSolar({ haciaCentroGalactico, uPR = { value: 1 } }) {
         rel.set(P.x - sol.x, P.y, P.z - sol.z); const d = rel.length(); if (d < 6) continue;
         const l = Math.atan2(rel.dot(lado), rel.dot(centro)) / GRADO, b = Math.asin(THREE.MathUtils.clamp(rel.y / d, -1, 1)) / GRADO;
         const nt = rad / 1050, joven = azar() < 0.07;
-        // Los colores de la galaxia 3D: centro dorado, brazos rosas que se vuelven magenta y lila hacia fuera, algunas jóvenes azules.
-        if (joven) cB.setHSL(0.6 + azar() * 0.05, 0.75, 0.72);
+        // Los colores de la galaxia 3D: centro dorado, brazos rosas que se vuelven magenta y lila hacia fuera, algunas jóvenes
+        // azules. Con el color fuerte: a 1–2 px y tan tenues, los tonos suaves se veían grises.
+        let realce = 1;
+        if (joven) cB.setHSL(0.6 + azar() * 0.05, 0.85, 0.66);
         else if (nt < 0.14) cB.copy(crema).lerp(oro, azar());
-        else if (nt < 0.36) cB.setHSL(0.93 + azar() * 0.04, 1.0, 0.68);
-        else if (nt < 0.66) cB.setHSL(0.95 + azar() * 0.04, 1.0, 0.6);
-        else cB.copy(violeta).lerp(rosa, azar() * 0.6);
-        const luz = THREE.MathUtils.clamp(0.07 * Math.pow(420 / d, 1.15), 0.03, 0.34) * (0.55 + 0.45 * azar());
+        else if (nt < 0.4) { cB.setHSL(0.92 + azar() * 0.05, 1.0, 0.62); realce = 1.25; }
+        else if (nt < 0.7) { cB.setHSL(0.94 + azar() * 0.05, 1.0, 0.56); realce = 1.3; }
+        else { cB.copy(violeta).lerp(rosa, azar() * 0.5); realce = 1.3; }
+        const luz = THREE.MathUtils.clamp(0.07 * Math.pow(420 / d, 1.15), 0.03, 0.34) * (0.55 + 0.45 * azar()) * realce;
         mota(l, b, cB, luz, d < 140 ? 1.6 + azar() * 0.6 : 1 + azar() * 0.7);
       }
     }
@@ -106,6 +108,23 @@ export function* construirSolar({ haciaCentroGalactico, uPR = { value: 1 } }) {
       fragmentShader: 'varying vec3 vC; varying float vT; void main(){ vec2 q = gl_PointCoord - 0.5; if (vT >= 2.5 && dot(q, q) > 0.25) discard; gl_FragColor = vec4(vC, 1.0); }',
       transparent: false, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending }));
     nucleoGalactico.frustumCulled = false; nucleoGalactico.renderOrder = -900; nucleoGalactico.name = 'Centro galáctico'; escena.add(nucleoGalactico);
+    // El polvo oscuro de sus brazos, como en la galaxia 3D (galaxia.js: filamentos finos en el borde interior de cada brazo),
+    // visto desde el Sol: motas oscuras nítidas que se dibujan encima de la banda y la parten en grietas, como la Gran Grieta
+    // de nuestro cielo. Opacas (sin degradado): tapan las motas de luz que quedan detrás.
+    {
+      const sol = enBrazo(1, 0.62, 0), pos = [], tam = [], v = new THREE.Vector3();
+      for (let i = 0; i < 9000; i++) {
+        const b = i % 5, t = 0.12 + azar() * 0.83, c = enBrazo(b, t, -0.13 + gauss() * 0.035);
+        v.set(c.x - sol.x, gauss() * 5, c.z - sol.z); const d = v.length(); if (d < 160) continue;
+        v.normalize(); pos.push(v.x, v.y, v.z); tam.push(d < 450 ? 2.6 + azar() : 1.6 + azar() * 0.8);
+      }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('aTam', new THREE.Float32BufferAttribute(tam, 1));
+      const polvo = new THREE.Points(g, new THREE.ShaderMaterial({ uniforms: { uPR },
+        vertexShader: 'uniform float uPR; attribute float aTam; varying float vT; void main(){ vec4 p = projectionMatrix * vec4(mat3(modelViewMatrix) * position, 1.0); gl_Position = vec4(p.xy, p.w * 0.9999, p.w); vT = aTam * uPR; gl_PointSize = vT; }',
+        fragmentShader: 'varying float vT; void main(){ vec2 q = gl_PointCoord - 0.5; if (vT >= 2.5 && dot(q, q) > 0.25) discard; gl_FragColor = vec4(0.012, 0.004, 0.014, 1.0); }',
+        depthTest: false, depthWrite: false }));
+      polvo.frustumCulled = false; polvo.renderOrder = -899.5; polvo.name = 'Polvo de la galaxia'; escena.add(polvo);
+    }
   }
 
   yield;
@@ -138,44 +157,71 @@ export function* construirSolar({ haciaCentroGalactico, uPR = { value: 1 } }) {
   cinturon(2600, 9000, 11600, 320, ['#c8d6ff', '#e4dcff', '#b9c9f0', '#f2e6ff'], 0.3, 1215);
   // Un rótulo tenue en el cielo, junto al centro de la galaxia y siguiendo su banda: lo que se ve desde aquí es ella. Vivimos
   // dentro de Xiomara. Letras nítidas (sin sombra difusa), a distancia infinita y de tamaño fijo en pantalla.
-  const rotulo = new THREE.Sprite(new THREE.SpriteMaterial({ map: texTexto('la galaxia de Xiomara', { fuente: "500 58px 'Quicksand', sans-serif", color: '#f3d2e4', sombra: 'rgba(0,0,0,0)' }), transparent: true, opacity: 0.42, depthTest: false, depthWrite: false, sizeAttenuation: false }));
-  rotulo.scale.set(0.3, 0.047, 1); rotulo.renderOrder = -899; rotulo.frustumCulled = false; escena.add(rotulo);
-  const dirRotulo = centro.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), 0).add(new THREE.Vector3(0, -0.075, 0)).normalize();   // un poco por debajo del núcleo
+  const rotulo = new THREE.Sprite(new THREE.SpriteMaterial({ map: texTexto('la galaxia de Xiomara', { fuente: "italic 500 60px 'Cormorant Garamond', Georgia, serif", color: '#f6d9e8', sombra: 'rgba(0,0,0,0)' }), transparent: true, opacity: 0.5, depthTest: false, depthWrite: false, sizeAttenuation: false }));
+  rotulo.scale.set(0.2, 0.031, 1); rotulo.renderOrder = -899; rotulo.frustumCulled = false; escena.add(rotulo);
+  const dirRotulo = centro.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), 0).add(new THREE.Vector3(0, -0.06, 0)).normalize();   // un poco por debajo del núcleo
 
   yield;
-  // ── El Sol: superficie hirviendo, corona y destellos; ilumina a los planetas ──
+  // ── El Sol: superficie hirviendo, corona de filamentos y motas, rayos cortos; ilumina a los planetas ──
+  // Todo nítido, sin halos ni brillos difusos (antes: tres sprites de brillo de hasta 24 radios y una cruz de rayos que
+  // cruzaba la pantalla). La superficie no pasa del umbral del resplandor (0,78) para que el compositor no la difumine:
+  // brilla por su detalle (granulación en celdas, manchas con penumbra, fáculas y limbo oscurecido).
   const sol = new THREE.Group(); escena.add(sol);
   const superficie = new THREE.Mesh(new THREE.SphereGeometry(RADIO_SOL, 96, 64), new THREE.ShaderMaterial({
     uniforms: { uT: { value: 0 } },
     vertexShader: 'varying vec3 vN, vP; void main(){ vP = position; vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
     fragmentShader: RUIDO + /* glsl */`
       uniform float uT; varying vec3 vN, vP;
+      // Granulación: celdas de convección (Voronoi): centros brillantes y bordes oscuros finos.
+      float celdas(vec3 p){ vec3 i = floor(p), f = fract(p); float d1 = 8.0, d2 = 8.0;
+        for (int x = -1; x <= 1; x++) for (int y = -1; y <= 1; y++) for (int z = -1; z <= 1; z++) { vec3 g = vec3(x, y, z), o = vec3(h3(i + g), h3(i + g + 7.1), h3(i + g + 13.7));
+          o = 0.5 + 0.4 * sin(uT * 0.25 + 6.2831 * o); float d = length(g + o - f); if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d; }
+        return d2 - d1; }
       void main(){
         vec3 q = normalize(vP);
-        float gran = fbm3(q * 14.0 + uT * 0.04), manchas = smoothstep(0.7, 0.78, fbm3(q * 3.0 + 11.0));
-        float fac = smoothstep(0.62, 0.8, fbm3(q * 6.0 - uT * 0.02));
-        float mu = max(dot(normalize(vN), vec3(0.0, 0.0, 1.0)), 0.0), limbo = pow(mu, 0.5);
-        vec3 col = mix(vec3(1.0, 0.55, 0.2), vec3(1.0, 0.92, 0.75), limbo) * (0.7 + 0.5 * gran) * (1.0 - manchas * 0.6) + vec3(1.0, 0.9, 0.7) * fac * 0.25;
-        gl_FragColor = vec4(col * (0.5 + 0.9 * limbo) * 0.85, 1.0); }`
+        float g = smoothstep(0.0, 0.5, celdas(q * 75.0)), fina = rn3(q * 220.0 + uT * 0.05);
+        float mancha = fbm3(q * 3.2 + 11.0), umbra = smoothstep(0.73, 0.76, mancha), penumbra = smoothstep(0.69, 0.72, mancha) - umbra;
+        float fac = smoothstep(0.64, 0.7, fbm3(q * 7.0 - uT * 0.01));
+        float mu = max(dot(normalize(vN), vec3(0.0, 0.0, 1.0)), 0.0), limbo = 0.42 + 0.58 * pow(mu, 0.55);
+        // Dorado intenso en el centro y naranja rojizo en el borde: luminancia ≤ ~0,65 (bajo el umbral) con el color saturado.
+        vec3 col = mix(vec3(0.95, 0.3, 0.05), vec3(1.0, 0.6, 0.18), pow(mu, 0.45)) * (0.68 + 0.32 * g) * (0.9 + 0.1 * fina);
+        col *= 1.0 - penumbra * 0.45 - umbra * 0.85; col += vec3(1.0, 0.75, 0.4) * fac * (1.0 - mu) * 0.3;
+        gl_FragColor = vec4(min(col * limbo * 0.95, vec3(0.98, 0.66, 0.3)), 1.0); }`
   }));
   sol.add(superficie);
-  const brillo = texBrillo();
-  const capa = (mapa, color, tam, op) => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: mapa, color, transparent: true, opacity: op, depthWrite: false, blending: THREE.AdditiveBlending })); s.scale.setScalar(tam); sol.add(s); return s; };
-  const halos = [[capa(brillo, '#ffd9a0', RADIO_SOL * 3.2, 0.32), 3.2], [capa(brillo, '#ffb070', RADIO_SOL * 9, 0.24), 9], [capa(brillo, '#ff9a5a', RADIO_SOL * 24, 0.07), 24]];
-  const rayos = capa(texEstrellaGigante(), '#fff1d8', RADIO_SOL * 12, 0.35), destello = capa(texDestello(), '#ffffff', RADIO_SOL * 7, 0.5);
   yield;
-  // Corona: filamentos que salen del borde y ondulan.
-  const corona = new THREE.Mesh(new THREE.RingGeometry(RADIO_SOL * 0.98, RADIO_SOL * 2.6, 180, 4), new THREE.ShaderMaterial({
+  // Corona: filamentos finos que salen del borde (líneas de campo), nítidos, con un poco de movimiento.
+  const corona = new THREE.Mesh(new THREE.RingGeometry(RADIO_SOL * 0.99, RADIO_SOL * 1.9, 360, 6), new THREE.ShaderMaterial({
     uniforms: { uT: { value: 0 } },
     vertexShader: 'varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
     fragmentShader: RUIDO + /* glsl */`uniform float uT; varying vec2 vP;
       void main(){ float r = length(vP) / ${RADIO_SOL.toFixed(1)}, a = atan(vP.y, vP.x);
-        float rayo = pow(fbm3(vec3(cos(a) * 6.0, sin(a) * 6.0, r * 0.8 - uT * 0.05)), 2.0);
-        float k = exp(-(r - 1.0) * 2.2) * smoothstep(0.98, 1.03, r) * (0.35 + 1.4 * rayo);
-        gl_FragColor = vec4(vec3(1.0, 0.82, 0.6) * k, k); }`,
+        // Cada filamento es una franja angular estrecha (borde nítido) que se curva un poco con la altura y se corta a su largo.
+        float u = a * 34.0 + sin(a * 5.0 + r * 3.0 + uT * 0.1) * 1.2, id = floor(u), f = fract(u);
+        float largo = 1.05 + 0.42 * h3(vec3(id, 3.0, 1.0)), ancho = 0.04 + 0.05 * h3(vec3(id, 5.0, 2.0));
+        float hilo = step(abs(f - 0.5), ancho) * step(r, largo) * step(1.0, r) * step(0.55, h3(vec3(id, 9.0, 4.0)));
+        float k = hilo * (0.5 - 0.35 * (r - 1.0) / (largo - 1.0 + 1e-3));
+        gl_FragColor = vec4(vec3(1.0, 0.8, 0.55) * k, k); }`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide
   }));
   sol.add(corona);
+  // Motas de la corona: chispas de 1–2 px que suben despacio desde la superficie y se apagan al alejarse.
+  const motasCorona = (() => {
+    const n = 600, pos = new Float32Array(n * 3), dat = new Float32Array(n * 2); let k = 31337; const az = () => (k = (k * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < n; i++) { const v = new THREE.Vector3(az() - 0.5, az() - 0.5, az() - 0.5); if (v.lengthSq() > 0.25 || v.lengthSq() < 1e-4) { i--; continue; } v.normalize(); pos.set([v.x, v.y, v.z], i * 3); dat.set([az(), 0.4 + az() * 0.8], i * 2); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aDat', new THREE.BufferAttribute(dat, 2));
+    const m = new THREE.Points(g, new THREE.ShaderMaterial({ uniforms: { uT: superficie.material.uniforms.uT, uPR },
+      vertexShader: /* glsl */`attribute vec2 aDat; uniform float uT, uPR; varying float vA;
+        void main(){ float f = fract(aDat.x + uT * 0.03 * aDat.y); vec3 p = position * ${RADIO_SOL.toFixed(1)} * (1.02 + f * 0.6);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); gl_PointSize = (1.0 + aDat.y) * uPR; vA = (1.0 - f) * 0.4; }`,
+      fragmentShader: 'varying float vA; void main(){ gl_FragColor = vec4(vec3(1.0, 0.82, 0.55) * vA, 1.0); }',
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    m.frustumCulled = false; sol.add(m); return m;
+  })();
+  // Rayos cortos y finos (1 px), de cara a la cámara: ocho, del borde a ~1,6 radios. Una pista de lucero, no una cruz.
+  const rayos = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(Array.from({ length: 8 }, (_, i) => { const a = i / 8 * Math.PI * 2 + 0.2, l = i % 2 ? 1.45 : 1.75; return [new THREE.Vector3(Math.cos(a) * 1.12, Math.sin(a) * 1.12, 0), new THREE.Vector3(Math.cos(a) * l, Math.sin(a) * l, 0)]; }).flat().map(v => v.multiplyScalar(RADIO_SOL))),
+    new THREE.LineBasicMaterial({ color: '#ffe2b8', transparent: true, opacity: 0.45, depthWrite: false, blending: THREE.AdditiveBlending }));
+  rayos.frustumCulled = false; sol.add(rayos);
   yield;
   // Protuberancias: arcos de plasma que salen de la superficie siguiendo el campo magnético.
   const materialArco = new THREE.ShaderMaterial({
@@ -201,11 +247,9 @@ export function* construirSolar({ haciaCentroGalactico, uPR = { value: 1 } }) {
       superficie.material.uniforms.uT.value = t; corona.material.uniforms.uT.value = t; materialArco.uniforms.uT.value = t; uT.value = t;
       rotulo.position.copy(camera.position).addScaledVector(dirRotulo, 4000);
       for (const [i, a] of arcos.entries()) a.scale.setScalar(1 + Math.sin(t * 0.3 + i * 1.7) * 0.12);
-      superficie.rotation.y = t * 0.01; corona.lookAt(camera.position);
-      // Los brillos ópticos conservan su tamaño en el cielo al alejarse o acercarse.
-      const k = Math.min(1.6, Math.max(0.12, camera.position.length() / 2200));
-      rayos.scale.setScalar(RADIO_SOL * 12 * k); destello.scale.setScalar(RADIO_SOL * 7 * k);
-      for (const [h, base] of halos) h.scale.setScalar(RADIO_SOL * Math.max(base * k, base > 4 ? 3 : 2.6));
+      superficie.rotation.y = t * 0.01; corona.lookAt(camera.position); rayos.quaternion.copy(camera.quaternion);
+      // De lejos el Sol no puede quedarse en un punto de 1 px: la corona y los rayos crecen lo justo para que se reconozca.
+      const k = Math.max(1, camera.position.length() / 5200); rayos.scale.setScalar(k); motasCorona.scale.setScalar(Math.min(1.6, k));
     }
   };
 }
