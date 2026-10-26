@@ -35,14 +35,9 @@ const FIGURAS = {
 // Constelaciones de cada destino: figura, ángulo respecto a la mirada de llegada (grados), giro
 // alrededor de ella y tamaño angular (grados). Las primeras se ven al llegar, en los bordes.
 const CIELOS = {
-  // Sin corazones ni infinitos de estrellas junto a los gigantes (Carlos no los quiere): cada uno, figuras de su cielo.
-  // La supernova, sin figuras: su único corazón es el que nace de sus chispas.
-  supernova: [],
-  cuasar: [['faro', 23, 140, 4.5], ['estrella', 24, 330, 4.5]],
-  ton618: [['corona', 24, 320, 4.5], ['luna', 24, 140, 4.5]],
-  pulsar: [['toro', 23, 135, 4.5], ['estrella', 24, 315, 4.5]],
-  sagitario: [['tetera', 23, 45, 4.5], ['flecha', 24, 225, 4.5]],   // la Tetera de Sagitario y la flecha del arquero
-  deneb: []   // sin figuras de estrellas: su historia la cuenta la estrella que nace (deneb.js)
+  // Ninguna figura de estrellas junto a los gigantes (Carlos no quiere ninguna: ni corazones, ni infinitos, ni coronas,
+  // lunas, flechas…): cada uno tiene su cielo de estrellas y su velo, sin dibujos.
+  supernova: [], cuasar: [], ton618: [], pulsar: [], sagitario: [], deneb: []
 };
 
 function azarSemilla(semilla) { let s = semilla >>> 0; return () => { s = (s + 0x6d2b79f5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }

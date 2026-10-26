@@ -247,7 +247,7 @@ export function* construirSagitario({ uScale, uPR, RS, grupo }) {
   for (const [o, orden] of [[gas, 0], [sombra, 1], [flujo, 2], [grumos, 2], [trazas, 3], [anillo, 4]]) o.renderOrder = orden;
 
   // ── Por cuadro (sin memoria nueva) ──
-  const g = reposoSagitario(), u = trazas.material.uniforms, uf = flujo.material.uniforms;
+  const g = reposoSagitario(), u = trazas.material.uniforms, uf = flujo.material.uniforms, conLente = [flujo, trazas, grumos];
   const tmp = new THREE.Vector3(), centro = new THREE.Vector3(), qa = new THREE.Quaternion(), qb = new THREE.Quaternion();
   // Anomalía media de cada estrella. S2 sin envolver (las vueltas cuentan para la roseta).
   const marcas = marcasSagitario(), spa = segundosPorAno(marcas), ritmo = estrellas.map(s => DOS_PI / (s.anos * spa));
@@ -269,7 +269,7 @@ export function* construirSagitario({ uScale, uPR, RS, grupo }) {
       }
       const unidad = RS * grupo.matrixWorld.getMaxScaleOnAxis(); comunes.uUnidad.value = unidad; comunes.uSombra.value = unidad;
       const d = camera.position.distanceTo(grupo.getWorldPosition(centro)), px = unidad / Math.max(1, d) * 900;
-      for (const m of [flujo, trazas, grumos]) m.geometry.instanceCount = px > 5 ? 3 : 1;
+      for (const m of conLente) m.geometry.instanceCount = px > 5 ? 3 : 1;
       planoFlujo.updateMatrixWorld(); planoFlujo.worldToLocal(uf.uCamLocal.value.copy(camera.position));
       giro += dt; comunes.uGiro.value = giro; gas.material.uniforms.uT.value = t;
       // Órbitas: todas a su ritmo real. S2, en la escena, sigue el reloj de la canción (pericentro en el primer «sí»); al

@@ -120,34 +120,25 @@ export function posicionPista([az, el, d]) {
   return [Math.sin(a) * Math.cos(e) * d, Math.sin(e) * d, Math.cos(a) * Math.cos(e) * d];
 }
 const M0 = MARCAS_SAGITARIO;
+// Movimientos LENTOS y suaves (Carlos no quiere giros bruscos): un único arco continuo de ~45° alrededor del cúmulo que
+// respira con la canción (se acerca al agujero mientras cae el hilo y se aleja despacio con cada «sí»). Planos intermedios
+// 'lineal' para que la curva no se pare en cada uno (Catmull-Rom); solo el primero y el último se posan ('suave').
 export const CAMARA_SAGITARIO = Object.freeze([
-  // Llegada: el centro de la galaxia de frente, entero; el agujero aún hambriento (las elipses cortas).
-  { t: 0, pos: [8, 12, 1.05], mira: [0, 0, 0], fov: 50, curva: 'suave' },
-  // 1.ª frase («nada importa más»): se suelta el primer grumo; un travelling lento y constante rodea el cúmulo y enseña
-  // las órbitas en 3D mientras se dibujan.
-  { t: M0.primera, pos: [-6, 16, 1.0], mira: [0, 0, 0], fov: 50, curva: 'suave' },
-  { t: 7.03, pos: [-30, 22, 0.92], mira: [0, 0, 0], fov: 48, curva: 'lineal' },
-  { t: 11.2, pos: [-55, 16, 0.82], mira: [0, 0, 0], fov: 47, curva: 'lineal' },
-  // «Lo tengo»: el grumo, ya un hilo, y S2 caen hacia el agujero; la cámara baja y se acerca con ellos.
-  { t: 14.07, pos: [-45, 8, 0.68], mira: [0, 0, 0], fov: 44, curva: 'suave' },
-  { t: 16.41, pos: [-28, 4, 0.64], mira: [0, 0, 0], fov: 41, curva: 'suave' },
-  // «Say…»: contiene el aliento, casi quieta, pegada al agujero (el hilo se enrosca en la sombra).
-  { t: M0.si1 - 1.0, pos: [-18, 2, 0.6], mira: [0, 0, 0], fov: 40, curva: 'suave' },
-  // «…yes»: el agujero se lo traga y estalla la llamarada; S2 lo roza. Un barrido rápido, con un leve alabeo.
-  { t: M0.si1 + 0.35, pos: [4, 6, 0.56], mira: [0, 0, 0], fov: 38, curva: 'rapida', giro: 5 },
-  // «…to heaven»: se calma; la mancha caliente gira junto a la sombra.
-  { t: M0.cielo + 1.0, pos: [20, 12, 0.6], mira: [0, 0, 0], fov: 40, curva: 'suave', giro: 0 },
-  { t: M0.si2 - 1.0, pos: [28, 15, 0.64], mira: [0, 0, 0], fov: 42, curva: 'suave' },
-  // «…yes to me»: el segundo grumo, la llamarada mayor: la cámara se aparta deprisa para ver salir el eco por el gas.
-  { t: M0.si2 + 0.5, pos: [38, 22, 0.78], mira: [0, 0, 0], fov: 46, curva: 'rapida' },
-  { t: 26.5, pos: [56, 28, 0.9], mira: [0, 0, 0], fov: 48, curva: 'suave' },
-  // Estribillo otra vez: corte seco en el compás al otro lado, a contraluz (la lente curva el flujo por detrás).
-  { t: 28.14, pos: [150, 18, 0.62], mira: [0, 0, 0], fov: 44, curva: 'corte' },
-  { t: 31.9, pos: [176, 26, 0.66], mira: [0, 0, 0], fov: 45, curva: 'lineal' },
-  // El último «sí» (a ella), el mayor: se eleva y abre para ver el centro entero encendido y la roseta de S2.
-  { t: M0.si4 + 0.6, pos: [196, 46, 0.92], mira: [0, 0, 0], fov: 48, curva: 'rapida' },
-  // Fundido: se posa en un encuadre tranquilo, de frente al cúmulo, donde se devuelve el control.
-  { t: 38.1, pos: [210, 32, 1.0], mira: [0, 0, 0], fov: 50, curva: 'suave' }
+  // Llegada: el centro de la galaxia de frente, entero; el agujero aún hambriento.
+  { t: 0, pos: [6, 12, 1.0], mira: [0, 0, 0], fov: 50, curva: 'suave' },
+  // 1.ª frase («nada importa más»): deriva lenta hacia la izquierda mientras se dibujan las elipses y cae el grumo.
+  { t: 7.03, pos: [0, 14, 0.94], mira: [0, 0, 0], fov: 49, curva: 'lineal' },
+  // «Lo tengo»: baja y se acerca muy despacio con el hilo y con S2.
+  { t: M0.tengo + 1.4, pos: [-8, 10, 0.8], mira: [0, 0, 0], fov: 46, curva: 'lineal' },
+  // «Say… yes»: lo más cerca del clip, casi quieta, para ver cómo el agujero se lo traga y S2 lo roza.
+  { t: M0.si1, pos: [-10, 7, 0.64], mira: [0, 0, 0], fov: 43, curva: 'lineal' },
+  // «…to heaven» y «yes to me»: se retira poco a poco para ver salir el eco por el gas.
+  { t: M0.si2, pos: [-2, 9, 0.7], mira: [0, 0, 0], fov: 44, curva: 'lineal' },
+  { t: M0.si3, pos: [10, 13, 0.8], mira: [0, 0, 0], fov: 46, curva: 'lineal' },
+  // El último «sí»: sube un poco para ver el centro entero encendido y la roseta de S2.
+  { t: M0.si4, pos: [20, 18, 0.9], mira: [0, 0, 0], fov: 48, curva: 'lineal' },
+  // Fundido: se posa en un encuadre tranquilo, donde se devuelve el control.
+  { t: 38.1, pos: [28, 20, 1.0], mira: [0, 0, 0], fov: 50, curva: 'suave' }
 ]);
 
 export const ESCENA_SAGITARIO = Object.freeze({ id: 'sagitario', duracion: 38.1, pulso: PULSO_SAGITARIO.periodo, compas: 4, marcas: MARCAS_SAGITARIO, camara: CAMARA_SAGITARIO });

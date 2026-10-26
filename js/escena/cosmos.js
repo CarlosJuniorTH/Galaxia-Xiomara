@@ -350,6 +350,7 @@ export function* construirCosmos({ uScale, uPR }) {
   const sagitario = new THREE.Group(); sagitario.position.copy(direccionCielo(...SITIO.sagitario)); sagitario.scale.setScalar(0.7 * ESCALA_SGR); raiz.add(sagitario);
   const RS = 170;
   const piezasSgr = yield* construirSagitario({ uScale, uPR, RS, grupo: sagitario });
+  const tmpSgr = new THREE.Vector3();
   yield;
   // ── La estrella que va a estallar (supernova.js), en una zona libre del cielo ──
   const sn = yield* construirSupernova({ uScale, uPR, escala: ESCALA_CIELO * ESCALA_SUPERNOVA });
@@ -600,6 +601,11 @@ export function* construirCosmos({ uScale, uPR }) {
         (escenaG.id === 'ton618' ? guionTon618 : guionSagitario)(escenaG.t, escenaG.marcas, escenaG, escenaG.guion);
         if (!escenaG.viva && escenaG.presencia <= 0) escenaG = null;
       }
+      // Desde la zona de Sagitario A* (a menos de 12 encuadres), TON 618 no se dibuja: allí se veía como una galaxia
+      // diminuta pero muy brillante que quemaba el brillo (un «cuadrito» incómodo al alejar la cámara) y costaba dibujarla.
+      sagitario.getWorldPosition(tmpSgr);
+      const rSgr = RS * sagitario.matrixWorld.getMaxScaleOnAxis() * (1500 / 119);
+      gigantesco.visible = camera.position.distanceToSquared(tmpSgr) > (12 * rSgr) ** 2;
       piezasTon.actualizar(t, dt, camera, escenaG?.id === 'ton618' ? escenaG : null);
       piezasSgr.actualizar(t, dt, camera, escenaG?.id === 'sagitario' ? escenaG : null);
     }

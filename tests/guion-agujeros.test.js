@@ -47,6 +47,11 @@ test('Sagitario A*: la pista de cámara sigue el contrato del director', () => {
     assert.ok(p.pos[2] >= 0.45 && p.pos[2] <= 1.1, `distancia ${i}`);
     if (i) assert.ok(p.t > C[i - 1].t, `orden ${i}`);
   }
+  // Movimientos lentos: sin cortes ni golpes, sin alabeo y nunca más de 4° de azimut por segundo.
+  for (let i = 1; i < C.length; i++) {
+    assert.ok(['suave', 'lineal'].includes(C[i].curva) && !C[i].giro, `plano ${i} sin cortes ni golpes`);
+    assert.ok(Math.abs(C[i].pos[0] - C[i - 1].pos[0]) / (C[i].t - C[i - 1].t) <= 4, `plano ${i}: giro lento`);
+  }
   // En el primer «sí» la cámara está pegada al agujero (S2 lo roza).
   const cerca = C.filter(p => Math.abs(p.t - MARCAS_SAGITARIO.si1) < 1.2);
   assert.ok(cerca.length && cerca.every(p => p.pos[2] < 0.65));
