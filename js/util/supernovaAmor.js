@@ -133,14 +133,14 @@ export const CAMARA_SUPERNOVA = Object.freeze([
   { t: 31.25,  pos: [0, 4, 0.157],    mira: [0, -0.007, 0],     fov: 44, curva: 'lineal' },   // la nota sostenida; empieza el colapso
   { t: 34.746, pos: [-6, 14, 0.172],  mira: [0, -0.007, 0],     fov: 46, curva: 'suave' },    // la envoltura suelta capas a compás
   { t: 37.96,  pos: [4, 8, 0.114],    mira: [0, -0.004, 0],     fov: 42, curva: 'suave' },    // se apaga al callar la voz: entramos
-  { t: 38.606, pos: [0, 14, 0.143],   mira: [0, 0, 0],          fov: 46, curva: 'corte' },    // las dos estrellitas, en la caja
-  { t: 41.213, pos: [0, 10, 0.071],   mira: [0, 0, 0],          fov: 38, curva: 'lineal', giro: 8 },  // espiral: más cerca a cada vuelta (caja)
-  { t: 41.665, pos: [0, 9, 0.067],    mira: [0, 0, 0],          fov: 38, curva: 'lineal', giro: 9 },  // silencio: quieta sobre la mota
-  { t: 41.665, pos: [0, 9, 0.067],    mira: [0, 0, 0],          fov: 38, curva: 'lineal', giro: 9 },  // (el mismo plano otra vez: rompe la curva y el golpe no se nota antes)
-  { t: 42.46,  pos: [6, 12, 0.343],   mira: [0, 0, 0],          fov: 56, curva: 'rapida', giro: -2 }, // ¡pum! salimos despedidos hasta el salto de la voz
-  { t: 44.74,  pos: [16, 8, 0.4],     mira: [0, 0, 0],          fov: 56, curva: 'suave', giro: 0 },   // el grito sostenido: vuelan las chispas
-  { t: 47.07,  pos: [12, 5, 0.529],   mira: [0, 0.014, 0],      fov: 54, curva: 'suave' },    // la voz baja: las chispas vuelven
-  { t: 48.974, pos: [-4, 6, 0.772],   mira: [0, 0.021, 0],      fov: 54, curva: 'suave' },    // a golpes, el corazón se dibuja
+  { t: 38.606, pos: [0, 14, 0.2],     mira: [0, 0, 0],          fov: 46, curva: 'corte' },    // las dos estrellitas, en la caja
+  { t: 41.213, pos: [0, 10, 0.18],    mira: [0, 0, 0],          fov: 44, curva: 'lineal', giro: 6 },  // espiral: más cerca a cada vuelta (caja)
+  { t: 41.665, pos: [0, 9, 0.175],    mira: [0, 0, 0],          fov: 44, curva: 'lineal', giro: 6 },  // silencio: quieta sobre la mota
+  { t: 41.665, pos: [0, 9, 0.175],    mira: [0, 0, 0],          fov: 44, curva: 'lineal', giro: 6 },  // (el mismo plano otra vez: rompe la curva y el golpe no se nota antes)
+  { t: 42.46,  pos: [6, 12, 0.26],    mira: [0, 0, 0],          fov: 50, curva: 'rapida', giro: -2 }, // ¡pum! salimos despedidos hasta el salto de la voz
+  { t: 44.74,  pos: [16, 8, 0.42],    mira: [0, 0, 0],          fov: 56, curva: 'suave', giro: 0 },   // el grito sostenido: vuelan las chispas
+  { t: 47.07,  pos: [12, 5, 0.56],    mira: [0, 0.014, 0],      fov: 54, curva: 'suave' },    // la voz baja: las chispas vuelven
+  { t: 48.974, pos: [-4, 6, 0.78],    mira: [0, 0.021, 0],      fov: 54, curva: 'suave' },    // a golpes, el corazón se dibuja
   { t: 52.06,  pos: [-10, 4, 0.92],   mira: [0, -0.04, 0],      fov: 60, curva: 'suave' },    // la promesa vuelve: el corazón entero
   { t: 56.8,   pos: [-2, 1, 0.8],     mira: [0, -0.04, 0],      fov: 60, curva: 'lineal' },   // la nota más alta, sostenida: nos acercamos
   { t: 58.26,  pos: [0, 0, 0.77],     mira: [0, -0.04, 0],      fov: 60, curva: 'suave' }     // la afirmación final, de frente y grande
