@@ -22,7 +22,7 @@ const f = x => x.toFixed(4);
 // Color por temperatura (x: 0 borde interior → 1 exterior): blanco, oro, naranja, rosa y magenta oscuro. Doppler: el lado
 // que se acerca, más blanco y brillante (g > 1); el que se aleja, más rojo y apagado.
 const GLSL_DISCO = /* glsl */`
-  uniform float uR, uUnidad, uGiro, uEnc, uRevelar, uOla, uOlaR0, uOlaF, uBombo;
+  uniform float uR, uUnidad, uGiro, uEnc, uRevelar, uOla, uOlaR0, uOlaF, uBombo, uAvivar;
   uniform vec3 uCamLocal;
   vec3 temperatura(float x){
     x = clamp(x, 0.0, 1.0);
@@ -45,10 +45,10 @@ const GLSL_DISCO = /* glsl */`
   // Sin pow() de negativos (puntos negros con MSAA): los cuadrados, a mano.
   float dormido(float r){ float rEnc = ${R_DENTRO.toFixed(2)} + 5.6 * uEnc; return smoothstep(rEnc - 0.22, rEnc + 0.22, r); }
   float luzEscena(float r){
-    float d = dormido(r), rw = mix(uOlaR0, ${R_DENTRO.toFixed(2)}, uOla * uOla), x = (r - rw) / mix(0.34, 0.1, clamp(uOla, 0.0, 1.0));
+    float d = dormido(r), rw = mix(uOlaR0, ${R_DENTRO.toFixed(2)}, uOla * uOla), x = (r - rw) / mix(0.4, 0.14, clamp(uOla, 0.0, 1.0));
     float ola = (uOla >= 0.0 ? exp(-x * x) : 0.0) * uOlaF * (0.6 + 1.1 * clamp(uOla, 0.0, 1.0)) * (1.0 - smoothstep(0.95, 1.15, uOla));
     // (El de dentro ya está a tope: el bombo y la onda avivan sobre todo el de fuera; no se quema sobre la sombra.)
-    return mix(1.0, 0.13, d) * (1.0 + uBombo * smoothstep(1.8, 5.0, r)) * (1.0 + 1.6 * ola * (1.0 - d) * (0.45 + 0.55 * smoothstep(1.4, 2.2, r)));
+    return mix(1.0, 0.13, d) * mix(1.0, uAvivar, smoothstep(1.6, 3.5, r)) * (1.0 + uBombo * smoothstep(1.8, 5.0, r)) * (1.0 + 2.4 * ola * (1.0 - d) * (0.45 + 0.55 * smoothstep(1.4, 2.2, r)));
   }
   // De canto se ve mucho más disco en la misma línea de visión: la luz se compensa con la inclinación (brillo de
   // superficie constante), así el disco no se quema en blanco ni enciende el resplandor sobre la sombra.
@@ -72,7 +72,7 @@ const GLSL_FINAL = /* glsl */`
 export function* construirTon618({ uScale, uPR, R, grupo, encuadre = R * 9.3 }) {
   const planoDisco = new THREE.Group(), galaxia = new THREE.Group(); grupo.add(planoDisco, galaxia);
   const comunes = { uScale, uPR, uMaximo: { value: 3 }, uSombra: { value: R }, uR: { value: R }, uUnidad: { value: R }, uGiro: { value: 0 },
-    uEnc: { value: 1 }, uRevelar: { value: 1 }, uOla: { value: -1 }, uOlaR0: { value: 6.8 }, uOlaF: { value: 0 }, uBombo: { value: 0 }, uCamLocal: { value: new THREE.Vector3(0, 0, 1e6) } };
+    uEnc: { value: 1 }, uRevelar: { value: 1 }, uOla: { value: -1 }, uOlaR0: { value: 6.8 }, uOlaF: { value: 0 }, uBombo: { value: 0 }, uAvivar: { value: 1 }, uCamLocal: { value: new THREE.Vector3(0, 0, 1e6) } };
   const al = azar(618);
 
   // ── Sombra: negra, con el borde suavizado en su último píxel; escribe su profundidad (tapa lo que hay detrás). ──
@@ -140,7 +140,8 @@ export function* construirTon618({ uScale, uPR, R, grupo, encuadre = R * 9.3 }) 
         if (uCaida <= 0.0) { ${GLSL_OCULTA} }
         float tau = uT - ${f(MARCAS_TON618.tuyo)} + aK.x * uE, r, plano;
         vec3 pl = camino(tau, aK.y, r, plano);
-        // Compacta hasta que la marea la estira; ya en hilo, un grosor fino que se ensancha al enroscarse.
+        // Compacta hasta que la marea la estira; ya en hilo, un grosor fino que se ensancha al enroscarse. (Por detrás del
+        // agujero, su imagen ya se ve estirada a lo ancho: la lente la alarga alrededor de la sombra.)
         float estira = clamp(uE / 0.3, 0.0, 1.0);
         pl += aOff * (0.16 * (1.0 - estira) + 0.03 + 0.07 * smoothstep(0.0, 4.0, tau)) * vec3(1.0, mix(1.0, 0.25, 1.0 - plano), 1.0);
         r = length(pl.xz);
@@ -150,7 +151,7 @@ export function* construirTon618({ uScale, uPR, R, grupo, encuadre = R * 9.3 }) 
         c = mix(c, temperatura((r - ${R_DENTRO.toFixed(2)}) / ${(R_FUERA - R_DENTRO).toFixed(2)}), 1.0 - plano);
         float th = atan(pl.z, pl.x), g = doppler(r, th, pl, c);
         float nucleo = 1.0 + (1.0 - estira) * (0.8 * uLatidoE + 0.6 * (1.0 - length(aOff)));
-        float brillo = mix(0.42, 0.5, estira) * nucleo * (1.0 - 0.35 * abs(aK.x)) * mix(1.0, clamp(pow(g, 0.75), 0.35, 1.35) * inclinacion(pl * uR), 1.0 - plano)
+        float brillo = mix(0.3, 0.5, estira) * nucleo * (1.0 - 0.35 * abs(aK.x)) * mix(1.0, clamp(pow(g, 0.75), 0.35, 1.35) * inclinacion(pl * uR), 1.0 - plano)
           * mix(1.0, luzEscena(r), 0.4 * (1.0 - plano)) * smoothstep(1.02, 1.3, length(pl)) * uCaida;
         ${GLSL_FINAL}
       }`));
@@ -244,7 +245,7 @@ export function* construirTon618({ uScale, uPR, R, grupo, encuadre = R * 9.3 }) 
       for (const m of [motasDisco, motasCaida]) m.geometry.instanceCount = px > 5 ? 3 : 1;
       giro += dt; flujo += dt * 0.012 * s.flujo;
       comunes.uGiro.value = giro; mDisco.uFlujo.value = flujo;
-      comunes.uEnc.value = s.encendido; comunes.uRevelar.value = s.revelar; comunes.uBombo.value = s.bombo;
+      comunes.uEnc.value = s.encendido; comunes.uRevelar.value = s.revelar; comunes.uBombo.value = s.bombo; comunes.uAvivar.value = s.avivar;
       comunes.uOla.value = escena && w > 0 ? escena.guion.ola : -1; comunes.uOlaR0.value = escena ? escena.guion.olaR0 : 6.8; comunes.uOlaF.value = s.olaF;
       // La estrella: su reloj es el de la canción; estiramiento de la marea (guionTon618.estiramiento).
       const tE = escena ? escena.guion.t : 0;

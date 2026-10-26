@@ -65,6 +65,7 @@ export const estrella = (t, o) => caminoCaida(t - MARCAS_TON618.tuyo, 4, o);
 //  bombo      el golpe del bombo en el disco de fuera
 //  caida      presencia de la estrella y su hilo (0 fuera de la escena; se funde en el disco al final)
 //  latidoEstrella   el destello de la estrella en «my heart»
+//  avivar     el disco que come brilla más (1 en reposo; sube con el mantra hasta la cumbre y vuelve a 1)
 //  flujo      velocidad con la que el disco cae en espiral hacia el centro (1 = la de siempre)
 //  deriva     cuánto manda la pista de cámara (entra al llegar y se va al final)
 //  calma      0 → 1 en el fundido
@@ -89,12 +90,13 @@ export function guionTon618(t, M = MARCAS_TON618, { reducido = false } = {}, o =
   o.bombo *= (t < M.tuyo ? 0.12 : 0.3) * k * (1 - suave(t, M.fundido, M.fundido + 2));
   o.latidoEstrella = golpe(t - M.corazon, 0.45) * k;
   o.caida = 1 - muySuave(t, 30, 36.5);
+  o.avivar = 1 + 0.45 * suave(t, M.tuyo, M.mantra) + 0.35 * suave(t, 28.95, M.cumbre) - 0.8 * suave(t, M.cumbre + 0.5, M.fundido + 2);
   o.flujo = 1 + 4 * suave(t, M.tuyo, M.mantra) * (1 - suave(t, M.cumbre, M.fundido + 2));
   o.calma = muySuave(t, M.fundido, M.fundido + 2.3);
   o.deriva = 1 - suave(t, DURACION_TON618 - 0.4, DURACION_TON618 + 0.4);
   return o;
 }
-export const REPOSO_TON618 = Object.freeze({ t: 0, encendido: 1, revelar: 1, destello: 0, ola: -1, olaR0: 6.8, olaF: 0, bombo: 0, latidoEstrella: 0, caida: 0, flujo: 1, calma: 0, deriva: 0 });
+export const REPOSO_TON618 = Object.freeze({ t: 0, encendido: 1, avivar: 1, revelar: 1, destello: 0, ola: -1, olaR0: 6.8, olaF: 0, bombo: 0, latidoEstrella: 0, caida: 0, flujo: 1, calma: 0, deriva: 0 });
 
 // ── Pista de cámara (contrato del director, js/util/directorCamara.js): segundos del fragmento; pos = [azimut°, elevación°,
 // distancia] respecto al centro, en el marco del disco (azimut 0 = el lado por el que se llega, hacia casa; elevación sobre
@@ -118,20 +120,20 @@ export const CAMARA_TON618 = Object.freeze([
   // El gancho (dos «yours»): sigue rodeando mientras el hilo se enrosca y su cabeza cae dentro; cruza el disco hacia abajo.
   { t: 12.98, pos: [-152, -9, 0.63], mira: [0, 0, 0], fov: 50, curva: 'lineal' },
   { t: 14.74, pos: [-172, -3, 0.65], mira: [0, 0, 0], fov: 50, curva: 'lineal' },
-  // El mantra: en cada «yours» la cámara atraviesa el plano del disco (de canto, la imagen curvada entera) y entre uno y
-  // otro sube o baja; cada vuelta, un poco más cerca del horizonte.
-  { t: 16.5, pos: [-188, 12, 0.66], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
-  { t: 18.3, pos: [-204, 0, 0.62], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
-  { t: 20.1, pos: [-220, -13, 0.6], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
-  { t: 21.82, pos: [-236, 0, 0.57], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
-  { t: 23.6, pos: [-252, 14, 0.55], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
-  { t: 25.39, pos: [-268, 0, 0.53], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
-  { t: 27.2, pos: [-284, -14, 0.51], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
-  { t: 28.95, pos: [-300, 0, 0.49], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
-  { t: 30.7, pos: [-316, 12, 0.47], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
-  // La cumbre: el último «yours» entero, lo más cerca, de canto: la sombra grande con el disco ya completo.
-  { t: 32.51, pos: [-332, 1.5, 0.44], mira: [0, 0, 0], fov: 50, curva: 'suave' },
-  { t: 34.2, pos: [-344, 6, 0.55], mira: [0, 0, 0], fov: 54, curva: 'suave' },
+  // El mantra: entre un «yours» y otro la cámara atraviesa el plano del disco (de canto, la imagen curvada entera) y en
+  // cada «yours» está arriba o abajo del todo, para ver la onda que cae hasta el horizonte; cada vuelta, más cerca.
+  { t: 16.5, pos: [-188, 0, 0.66], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
+  { t: 18.3, pos: [-204, 14, 0.62], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
+  { t: 20.1, pos: [-220, 0, 0.6], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
+  { t: 21.82, pos: [-236, -14, 0.57], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
+  { t: 23.6, pos: [-252, 0, 0.55], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
+  { t: 25.39, pos: [-268, 14, 0.53], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
+  { t: 27.2, pos: [-284, 0, 0.51], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
+  { t: 28.95, pos: [-300, -14, 0.49], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
+  { t: 30.7, pos: [-316, 0, 0.47], mira: [0, 0, 0], fov: 52, curva: 'lineal' },
+  // La cumbre: el último «yours» entero, lo más cerca y desde arriba: el disco ya completo, encendido hasta el borde.
+  { t: 32.51, pos: [-332, 16, 0.48], mira: [0, 0, 0], fov: 50, curva: 'suave' },
+  { t: 34.2, pos: [-344, 12, 0.6], mira: [0, 0, 0], fov: 54, curva: 'suave' },
   // Fundido: se aleja despacio hasta el encuadre de llegada (una vuelta entera; algo más alta, para verlo entero) y
   // devuelve el control.
   { t: 37.3, pos: [-360, 14, 0.95], mira: [0, 0, 0], fov: 60, curva: 'suave' }

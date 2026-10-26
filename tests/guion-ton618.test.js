@@ -28,7 +28,7 @@ test('TON 618: el disco empieza dormido, se enciende a saltos en cada «yours» 
   for (let i = 1; i < TUYOS.length - 1; i++) assert.ok(g(TUYOS[i] + 1).encendido > g(TUYOS[i] - 0.3).encendido + 0.05, `enciende en el «yours» ${i + 1}`);
   assert.ok(g(M.cumbre + 1).encendido > 0.99, 'entero en la cumbre');
   const fin = g(finEscena('ton618') + 1);
-  for (const k of ['encendido', 'revelar', 'flujo', 'caida', 'bombo', 'olaF']) assert.ok(Math.abs(fin[k] - REPOSO_TON618[k]) < 0.02, `${k} acaba como en reposo (${fin[k]})`);
+  for (const k of ['encendido', 'avivar', 'revelar', 'flujo', 'caida', 'bombo', 'olaF']) assert.ok(Math.abs(fin[k] - REPOSO_TON618[k]) < 0.02, `${k} acaba como en reposo (${fin[k]})`);
   assert.deepEqual(Object.keys(REPOSO_TON618).sort(), Object.keys(g(3)).sort(), 'el reposo tiene los mismos campos');
   // Sin saltos en lo que se mueve despacio (el reloj puede ir a trompicones: la imagen no).
   for (const k of ['encendido', 'revelar', 'caida', 'flujo', 'calma']) { let a = g(0)[k]; for (let t = 0; t < 45; t += 0.02) { const b = g(t)[k]; assert.ok(Math.abs(b - a) < 0.06, `${k} a ${t.toFixed(2)} s`); a = b; } }
@@ -45,8 +45,9 @@ test('TON 618: la pista de cámara sigue la canción y devuelve el control en el
   const fin = muestrearPista(CAMARA_TON618, 50), ini = muestrearPista(CAMARA_TON618, 0);
   assert.ok(fin.pos[2] > 0.8 && fin.pos[2] < 1.2 && fin.fov === 60 && fin.mira.every(v => v === 0), 'acaba cerca del encuadre normal, mirando al centro');
   assert.ok(ini.pos[2] === 1 && ini.fov === 60);
-  // En cada «yours» del mantra la cámara cruza el plano del disco; nunca se acerca más que el tope de zoom (0,3).
-  for (const y of TUYOS.slice(3, 8)) assert.ok(Math.abs(muestrearPista(CAMARA_TON618, y).pos[1]) < 2, `de canto en ${y} s`);
+  // En cada «yours» del mantra la cámara está arriba o abajo (se ve la onda) y entre medias cruza el plano del disco;
+  // nunca se acerca más que el tope de zoom (0,3).
+  for (let i = 3; i < 8; i++) { assert.ok(Math.abs(muestrearPista(CAMARA_TON618, TUYOS[i]).pos[1]) > 12, `desde arriba o abajo en ${TUYOS[i]} s`); assert.ok(Math.abs(muestrearPista(CAMARA_TON618, (TUYOS[i] + TUYOS[i - 1]) / 2).pos[1]) < 2, 'de canto entre medias'); }
   let ant = muestrearPista(CAMARA_TON618, 0).pos.slice();
   for (let t = 0; t <= DURACION_TON618; t += 0.02) {
     const m = muestrearPista(CAMARA_TON618, t);
