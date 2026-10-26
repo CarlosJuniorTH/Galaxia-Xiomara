@@ -1189,7 +1189,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // Del estallido a la revelación de la supernova, el fondo se atenúa: las chispas que forman el corazón no se pierden
     // contra la telaraña ni las nebulosas de esa zona (vuelve a su luz antes de devolver el control).
     const sSN = document.body.classList.contains('supernova-en-escena') ? cosmos.supernova.segundoCancion : null;
-    const focoSN = sSN === null ? 0 : 0.7 * THREE.MathUtils.smoothstep(sSN, 40.5, 42.2) * (1 - THREE.MathUtils.smoothstep(sSN, 52.2, 58));
+    const focoSN = sSN === null ? 0 : (0.55 + 0.2 * THREE.MathUtils.smoothstep(sSN, 40.5, 42.2)) * THREE.MathUtils.smoothstep(sSN, -0.5, 2.5) * (1 - THREE.MathUtils.smoothstep(sSN, 52.2, 58));
+    maravillas.atenuacion = 1 - focoSN; capaVolumen.atenuacion = 1 - focoSN * 0.8;   // (el gas volumétrico de alrededor, también)
     const centroFoco = lejano && !vuelo ? lejano.centro : null, metaFoco = (centroFoco ? (cosmos.enEscenaAgujero ? 0.5 : 0.78) * (1 - (cosmos.escenas.focoNubes ?? 0)) : 1) * (1 - focoSN);   // en la escena de un gigante, aún más (y lo que pida la suya: Deneb, que nace de la nada)
     focoNubes += (metaFoco - focoNubes) * Math.min(1, dtInterfaz * 1.2);
     if (Math.abs(focoNubes - 1) > 0.001 || focoAplicado) {
@@ -1197,7 +1198,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       focoAplicado = Math.abs(focoNubes - 1) > 0.001;
     }
     // El cielo profundo (sus paredes de polvo) también se apaga en la escena que lo pide (Deneb nace de la nada).
-    const kCielo = 1 - (cosmos.escenas.focoNubes ?? 0); if (!mirada && Math.abs(kCielo - cieloEscena) > 0.002) { cieloEscena = kCielo; cieloProfundo.ampliar(kCielo); }
+    const kCielo = (1 - (cosmos.escenas.focoNubes ?? 0)) * (1 - focoSN * 0.85); /* (y en la ceremonia de la supernova) */ if (!mirada && Math.abs(kCielo - cieloEscena) > 0.002) { cieloEscena = kCielo; cieloProfundo.ampliar(kCielo); }
     const u = velo.material.uniforms.uVelo; u.value += (veloMeta - u.value) * Math.min(1, dt * 2.2);
     // Corriente: su fuerza sigue la velocidad de la cámara durante el vuelo.
     const rapidez = dt > 0 ? camera.position.distanceTo(camaraAntes) / dt : 0;

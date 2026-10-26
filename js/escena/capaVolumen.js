@@ -13,11 +13,11 @@ const CAPA_VOLUMEN = 2, CAPA_OPACOS = 3;
 export function crearCapaVolumen({ scene, renderer, uPR, prTope = 2, hdr }) {
   const rt = new THREE.WebGLRenderTarget(1, 1, { type: hdr ? THREE.HalfFloatType : THREE.UnsignedByteType, depthBuffer: true });
   const soloProfundidad = new THREE.MeshBasicMaterial({ colorWrite: false });
-  const uZona = { value: new THREE.Vector4(1, 1, 1, 1) };
-  const compuesto = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ uniforms: { uCapa: { value: rt.texture }, uZona },
+  const uZona = { value: new THREE.Vector4(1, 1, 1, 1) }, uAtenuar = { value: 1 };
+  const compuesto = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ uniforms: { uCapa: { value: rt.texture }, uZona, uAtenuar },
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
     // El gas ya viene con su alfa multiplicado (como lo pintaba cada nebulosa): se compone igual que antes.
-    fragmentShader: `uniform sampler2D uCapa; uniform vec4 uZona; varying vec2 vUv; ${GLSL_ZONA} void main(){ gl_FragColor = texture2D(uCapa, enZona(vUv, uZona)); }`,
+    fragmentShader: `uniform sampler2D uCapa; uniform vec4 uZona; uniform float uAtenuar; varying vec2 vUv; ${GLSL_ZONA} void main(){ gl_FragColor = texture2D(uCapa, enZona(vUv, uZona)) * uAtenuar; }`,
     transparent: true, depthTest: false, depthWrite: false, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendEquation: THREE.AddEquation }));
   compuesto.frustumCulled = false; compuesto.renderOrder = -3; compuesto.name = 'Gas volumétrico (media resolución)'; scene.add(compuesto);
 
@@ -50,6 +50,8 @@ export function crearCapaVolumen({ scene, renderer, uPR, prTope = 2, hdr }) {
   const color = new THREE.Color();
   return {
     compuesto,
+    // Todo el gas a la vez más tenue (k ≤ 1; premultiplicado: también más transparente). La ceremonia de la supernova.
+    set atenuacion(k) { uAtenuar.value = k; },
     // lado: tamaño forzado (calentamiento en la carga: una imagen diminuta, sin un cuadro enorme).
     dibujar(camera, lado = 0) {
       if (cuenta++ % 120 === 0) marcar();

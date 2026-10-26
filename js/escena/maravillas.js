@@ -218,8 +218,10 @@ export function* construirMaravillas({ scene, uScale, uPR, centros }) {
     g.userData.id = m.id; raiz.add(g); creadas.push({ ...m, pos, grupo: g });
   }
   const materiales = []; raiz.traverse(x => { if (x.material?.uniforms?.uVis) materiales.push([x.material, x.material.uniforms.uVis.value]); });
-  let anterior = -1;
+  let anterior = -1, atenuacion = 1;
   return { raiz, maravillas: creadas,
+    // (index.js las atenúa durante la ceremonia de la supernova: la estrella y el corazón son los protagonistas.)
+    set atenuacion(v) { atenuacion = v; }, get atenuacion() { return atenuacion; },
     // En casa, más discretas (la protagonista es Xiomara); lejos de ella, con todo su brillo.
     // Lejísimos de casa: desde Xiomara no se ven; aparecen poco a poco al alejarse de ella.
     // Cada maravilla solo se ve desde la zona de su gigante (nunca desde casa): aparece diminuta a lo lejos y
@@ -227,7 +229,7 @@ export function* construirMaravillas({ scene, uScale, uPR, centros }) {
     actualizar(t, dt, { camera }) {
       let vis = false;
       for (const m of creadas) { const L = centros[m.destino].length(), d = camera.position.distanceTo(centros[m.destino]);
-        const k = 1 - THREE.MathUtils.smoothstep(d, L * 0.55, L * 0.8); m.grupo.visible = k > 0.002; vis ||= m.grupo.visible;
+        const k = (1 - THREE.MathUtils.smoothstep(d, L * 0.55, L * 0.8)) * (m.destino === 'supernova' ? atenuacion : 1); m.grupo.visible = k > 0.002; vis ||= m.grupo.visible;
         m.grupo.traverse(x => { const u = x.material?.uniforms; if (u?.uVis) u.uVis.value = (x.userData.visBase ??= u.uVis.value) * k; if (u?.uBrillo && x.userData.volumen3D) u.uOpacidad.value = k; }); }
       // Las nebulosas (el Ojo, el fuego) miran siempre a la cámara: desde cualquier camino se ven de frente, sin voltearse.
       for (const m of creadas) if (m.grupo.visible && (m.id === 'ojo' || m.id === 'fuego')) { m.grupo.lookAt(camera.position); if (m.id === 'fuego') m.grupo.rotateZ(0.3); }

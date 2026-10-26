@@ -239,7 +239,7 @@ export function* construirSupernova({ uScale, uPR, escala }) {
         gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);
         gl_PointSize=vA<0.004 ? 0.0 : (1.5+1.5*aDato.y)*uPR;
       }`,
-      `varying vec3 vC; varying float vA; void main(){ float d=length(gl_PointCoord-0.5)*2.0; if(d>1.0) discard; float a=vA*(1.0-smoothstep(0.6,1.0,d)); gl_FragColor=vec4(vC*a*1.8,a); }`));
+      `varying vec3 vC; varying float vA; void main(){ float d=length(gl_PointCoord-0.5)*2.0; if(d>1.0) discard; float a=vA*(1.0-smoothstep(0.6,1.0,d)); gl_FragColor=vec4(vC*a*2.8,a); }`));
     m.visible = false; m.userData.f = 1; progenitora.add(m); return m;
   });
   let fasePulso = 0, faseLatido = 0, faseGiro = 0;
