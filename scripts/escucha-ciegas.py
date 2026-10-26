@@ -23,14 +23,26 @@ secciones, solucion = [], {}
 
 for lugar, r in res.items():
     c = ruta_cancion(r['cancion'])
-    elegidos = list(dict.fromkeys(r['ranking'][:A.top] + ([r['actual']] if r['actual'] in r['candidatos'] else [])))
+    # ens-actual es la misma media que el actual «ensamble» (rehecha sobre la canción entera): no se escucha dos veces
+    ranking = [k for k in r['ranking'] if not (r['actual'] == 'ensamble' and k == 'ens-actual') and k != r['actual']]
+    # bs_roformer_vocals_gabox es un ajuste fino de viperx 1297: sus instrumentales coinciden a 50-54 dB (inaudible):
+    # solo se escucha el primero de los dos que aparezca
+    gemelos = {'bsrof1297', 'gabox-bs-voc'}
+    visto, filtrado = r['actual'] in gemelos, []
+    for k in ranking:
+        if k in gemelos:
+            if visto: continue
+            visto = True
+        filtrado.append(k)
+    ranking = filtrado
+    elegidos = list(dict.fromkeys(ranking[:A.top] + ([r['actual']] if r['actual'] in r['candidatos'] else [])))
     rnd.shuffle(elegidos)
     # el fragmento empieza un poco antes del primer momento difícil y dura A.segundos
     # (en tramos largos los momentos pueden estar a más de A.segundos: se elige la ventana que abarca más)
     opciones = [max(r['tramo'][0], t - 3) for t in (r['momentos'] or [r['tramo'][0]])]
     ini = max(opciones, key=lambda o: (sum(0 <= t - o < A.segundos for t in r['momentos']), -o))
     ini = max(r['tramo'][0], min(ini, r['tramo'][1] - A.segundos))
-    marcas = [round(t - ini, 1) for t in r['momentos'] if 0 <= t - ini < A.segundos]
+    marcas = [max(0.0, round(t - ini, 1)) for t in r['momentos'] if -3 <= t - ini < A.segundos]   # (un momento justo al empezar el tramo cuenta desde 0)
     # el original con voz, como referencia de cómo debe sonar el instrumental
     filas = []
     ref = DEST / 'audio' / f'{lugar}-original.m4a'

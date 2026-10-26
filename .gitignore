@@ -10,3 +10,6 @@ audios-originales/
 # Audios de prueba de la banda sonora (los genera tests/navegador/banda.mjs con ffmpeg)
 assets/musica/prueba/
 
+
+# Escucha a ciegas de las estancias (scripts/escucha-ciegas.py --destino assets/escucha-ciegas): solo en local / LAN
+assets/escucha-ciegas/

@@ -118,20 +118,42 @@ def fuga(inst, voz_ref, activos, ventana):
 
 
 _whisper = {}
+def _precargar_cuda12():
+    """CTranslate2 (faster-whisper) busca libcublas.so.12 en el sistema; el venv la trae en nvidia/*/lib (de torch)."""
+    import ctypes, glob, site
+    for sp in site.getsitepackages():
+        for patron in ('nvidia/cublas/lib/libcublasLt.so.12', 'nvidia/cublas/lib/libcublas.so.12', 'nvidia/cudnn/lib/libcudnn*.so.9'):
+            for lib in sorted(glob.glob(str(Path(sp) / patron))):
+                try: ctypes.CDLL(lib, mode=ctypes.RTLD_GLOBAL)
+                except OSError: pass
+
+
 def palabras_whisper(wav_tramo: np.ndarray, idioma=None):
     from faster_whisper import WhisperModel
-    import tempfile, soundfile as sf
     if 'm' not in _whisper:
-        try: _whisper['m'] = WhisperModel('large-v3', device='cuda', compute_type='float16')
+        _precargar_cuda12()
+        try: _whisper['m'] = WhisperModel('large-v3', device='cuda', compute_type='int8_float16')   # (cabe en la GPU compartida)
         except Exception: _whisper['m'] = WhisperModel('large-v3', device='cpu', compute_type='int8')
-    with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f: ruta = f.name
-    sf.write(ruta, wav_tramo.mean(1).astype(np.float32), SR)
-    segs, _ = _whisper['m'].transcribe(ruta, language=idioma, vad_filter=True, word_timestamps=True,
+    # ya decodificado a 16 kHz mono (el lector propio de faster-whisper choca con algunas versiones de PyAV)
+    from scipy.signal import resample_poly
+    y16 = resample_poly(wav_tramo.mean(1), 160, 441).astype(np.float32)
+    # SIN filtro VAD: el VAD (Silero) descarta el canto sobre música; con él, Whisper solo oye 1 de ~19 palabras en la
+    # mezcla original de «Sparks» y 0 en instrumentales con restos claros (sin él: 19 y 8-10).
+    # temperature=0: determinista (con las temperaturas de respaldo, dos pasadas del mismo audio daban 14 y 32 palabras)
+    segs, _ = _whisper['m'].transcribe(y16, language=idioma, vad_filter=False, word_timestamps=True, temperature=0.0,
                                        condition_on_previous_text=False, no_speech_threshold=0.6)
     # solo los segundos (del tramo) de cada palabra reconocida, nunca el texto: las letras tienen derechos de autor
-    pal = [round(w.start, 1) for s in segs for w in (s.words or []) if w.probability > 0.5]
-    Path(ruta).unlink(missing_ok=True)
-    return pal
+    # por palabra: [segundo, probabilidad, compresión, logprob y no_speech de su segmento] (para filtrar alucinaciones)
+    return [[round(w.start, 2), round(w.probability, 3), round(s.compression_ratio, 2), round(s.avg_logprob, 3),
+             round(s.no_speech_prob, 3)] for s in segs for w in (s.words or [])]
+
+
+def palabras_fiables(pal):
+    """Las palabras que Whisper reconoce con confianza: probabilidad > 0,5 en un segmento con compresión ≤ 2,4 (los
+    bucles repetitivos de las alucinaciones la superan: sin este filtro, las instrumentales de «Sparks» daban 51-114
+    «palabras» y el original con voz 32). No se usan logprob/no_speech: en el canto descartan también las palabras
+    reales (el original de «I Saw Your Face Today» pasaba de 91 a 0)."""
+    return [t for t, pr, cr, lp, ns in pal if pr > 0.5 and cr <= 2.4]
 
 
 def momentos_dificiles(rv, a, n=3, separacion=8):
@@ -157,6 +179,7 @@ def medir(A):
         a = int(p['desde'] * SR); b = int(p['hasta'] * SR) if p.get('hasta') else len(m)
         mt = m[a:b]; vr, refs = voz_referencia(c, a, b)
         rm, rv = igualar(suave(rms_frames(mt, HOP), 0.3), suave(rms_frames(vr, HOP), 0.3))
+        cantado = rv > np.percentile(rv, 95) - 25   # dónde se canta (para filtrar las palabras de Whisper)
         activos = rv > rm - 15; quietos = ((rv < rm - 30) | (rv < np.percentile(rv, 95) - 30)) & (rm > np.median(rm) - 20)
         ventana = int(HOP * SR)
         quietas_muestras = np.repeat(quietos, ventana)[:len(mt)]
@@ -182,9 +205,13 @@ def medir(A):
             if A.whisper:
                 # caché por candidato y tramo (la separación no cambia: se puede volver a medir tras añadir candidatos)
                 wav = ruta_candidato(c, cand) / 'instrumental.wav'
-                clave = f'{wav}|{wav.stat().st_mtime_ns}|{a}|{b}|{A.idioma}'
+                clave = f'{wav}|{wav.stat().st_mtime_ns}|{a}|{b}|{A.idioma}|t0b'
                 if clave not in cache_whisper: cache_whisper[clave] = palabras_whisper(inst, A.idioma)
-                pal = cache_whisper[clave]; fila['whisper'] = len(pal); fila['whisper_segundos'] = pal[:20]
+                pal = palabras_fiables(cache_whisper[clave])
+                # cuenta solo las palabras donde de verdad se cantaba (voz de referencia activa ±1 s): las de los pasajes
+                # instrumentales son alucinaciones de Whisper, no restos de voz
+                fila['whisper'] = sum(bool(cantado[max(0, int(t / HOP) - 10):int(t / HOP) + 11].any()) for t in pal)
+                fila['whisper_total'] = len(pal); fila['whisper_segundos'] = [round(a / SR + t, 1) for t in pal][:20]
             if fila['fuga_db'] is not None: fila['fuga_db'] = round(fila['fuga_db'], 1)
             filas[cand] = fila
         # ranking: 0 palabras (si se midió) → SDR → menos fuga
@@ -192,7 +219,11 @@ def medir(A):
             f = filas[k]
             return (f.get('whisper', 0) > 0, -(f.get('sdr') if f.get('sdr') is not None else -99), f['fuga_db'] if f['fuga_db'] is not None else 0)
         ranking = sorted(filas, key=clave)
+        if A.whisper:   # control: lo que oye Whisper en el mismo tramo CON voz (sensibilidad del detector)
+            clave = f'original|{c}|{a}|{b}|{A.idioma}|t0b'
+            if clave not in cache_whisper: cache_whisper[clave] = palabras_whisper(mt, A.idioma)
         res[lugar] = dict(cancion=p['cancion'], tramo=[p['desde'], round(b / SR, 2)], referencias_voz=refs,
+                          whisper_original=len(palabras_fiables(cache_whisper[clave])) if A.whisper else None,
                           momentos=momentos_dificiles(rv, a), candidatos=filas, ranking=ranking,
                           actual=p.get('separacion', 'ensamble'))
         print(f'● {lugar}: mejor → {ranking[:3]}', flush=True)
@@ -204,15 +235,17 @@ def medir(A):
 
 def tabla_md(res):
     L = ['# Comparación de separaciones', '',
-         'SDR: más es mejor · pérdida/sobrante y fuga: más negativo es mejor · integridad (graves/medios/agudos): cerca de 0 · whisper: 0', '']
+         'SDR: más es mejor · pérdida/sobrante y fuga: más negativo es mejor · integridad (graves/medios/agudos): cerca de 0 · whisper: palabras donde se cantaba (total), objetivo 0', '']
     for lugar, r in res.items():
         L += [f'## {lugar} — {r["cancion"]} ({r["tramo"][0]}–{r["tramo"][1]} s) · actual: `{r["actual"]}`', '',
               '| # | candidato | SDR | pérdida | sobrante | fuga voz | integridad | whisper |', '|---|---|---|---|---|---|---|---|']
         for i, k in enumerate(r['ranking'], 1):
             f = r['candidatos'][k]; g = lambda x: '—' if f.get(x) is None else f[x]
             integ = '/'.join(f'{v:+.1f}' for v in f['integridad_db']) if 'integridad_db' in f else '—'
-            L.append(f'| {i} | `{k}` | {g("sdr")} | {g("perdida_db")} | {g("sobrante_db")} | {g("fuga_db")} | {integ} | {g("whisper")} |')
-        L += ['', f'Momentos con más voz (s): {r["momentos"]}', '']
+            w = '—' if f.get('whisper') is None else f'{f["whisper"]} ({f["whisper_total"]})'
+            L.append(f'| {i} | `{k}` | {g("sdr")} | {g("perdida_db")} | {g("sobrante_db")} | {g("fuga_db")} | {integ} | {w} |')
+        L += ['', f'Momentos con más voz (s): {r["momentos"]}' + (f' · Whisper en el original con voz: {r["whisper_original"]} palabras'
+                                                                     if r.get('whisper_original') is not None else ''), '']
     return '\n'.join(L)
 
 
