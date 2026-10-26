@@ -120,14 +120,16 @@ async function medirRuta(pagina, cdp, ruta, cpu, diag) {
   const dt = r.cuadros.map(c => c.dt);
   const { mediana, tirones } = contarTirones(dt);
   const detalle = r.cuadros.filter(c => c.dt > UMBRAL_MS && c.dt > VECES_MEDIANA * mediana);
+  // Diagnóstico: TIRONES_PEORES=n atribuye además los n cuadros más largos aunque no lleguen a tirón.
+  const peores = Number(process.env.TIRONES_PEORES || 0) ? r.cuadros.slice().sort((a, b) => b.dt - a.dt).slice(0, Number(process.env.TIRONES_PEORES)).filter(c => !detalle.includes(c)).map(c => ({ ...c, peor: true })) : [];
   if (perfil) {
     // Fin de la marca = última muestra dentro de __marcaTirones.
     const ids = new Set(perfil.nodes.filter(n => n.callFrame.functionName === '__marcaTirones').map(n => n.id)), hijos = new Map(perfil.nodes.map(n => [n.id, n.children || []]));
     for (const id of [...ids]) { const pila = [...hijos.get(id)]; while (pila.length) { const h = pila.pop(); ids.add(h); pila.push(...hijos.get(h)); } }
     let t = perfil.startTime, fin = null; for (let i = 0; i < perfil.samples.length; i++) { t += perfil.timeDeltas[i]; if (ids.has(perfil.samples[i])) fin = t; }
-    if (fin !== null) atribuir(perfil, fin, detalle);
+    if (fin !== null) atribuir(perfil, fin, [...detalle, ...peores]);
   }
-  return { ruta, destinoFinal: r.destino, llegada: r.llegada, cambio: r.cambio, cuadros: dt.length, mediana: +mediana.toFixed(1), max: Math.round(Math.max(0, ...dt)), tirones: tirones.length, detalle, loaf: r.loaf.filter(l => l.dur > UMBRAL_MS) };
+  return { ruta, destinoFinal: r.destino, llegada: r.llegada, cambio: r.cambio, cuadros: dt.length, mediana: +mediana.toFixed(1), max: Math.round(Math.max(0, ...dt)), tirones: tirones.length, detalle, peores, loaf: r.loaf.filter(l => l.dur > UMBRAL_MS) };
 }
 
 // Abre una página nueva (reintenta si la GPU compartida no da contexto WebGL o la carga falla).
