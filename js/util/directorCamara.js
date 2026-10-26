@@ -65,6 +65,14 @@ export const SUAVIDAD = Object.freeze({
 });
 // Lo que el filtro va por detrás en un movimiento sostenido (2/ω = tiempo): la pista se muestrea así de adelantada.
 export const ADELANTO = SUAVIDAD.tiempo;
+// Entrada en el clip desde donde dejó la cámara el viaje: durante ENTRADA_LARGA segundos el filtro va CALMA_ENTRADA veces más
+// blando y lento al principio y recupera su suavidad normal poco a poco (sin desvíos ni saltos).
+export const ENTRADA_LARGA = 4, CALMA_ENTRADA = 2.4;
+// Pantallas estrechas (móvil en vertical): la distancia se escala para que a lo ancho quepa lo mismo que en el PC (de
+// aspecto ASPECTO_PC): dist × tan(fovH_pc/2) / tan(fovH/2) = dist × ASPECTO_PC / aspecto (el fov vertical es el mismo),
+// como mucho TOPE_MOVIL veces.
+export const ASPECTO_PC = 1.6, TOPE_MOVIL = 2.5;
+export const escalaMovil = aspecto => Math.min(TOPE_MOVIL, Math.max(1, ASPECTO_PC / Math.max(0.2, aspecto)));
 
 const GRADOS = Math.PI / 180;
 const fin = (v, d) => Number.isFinite(v) ? v : d;
@@ -204,7 +212,8 @@ export function crearSuavizador(opciones = SUAVIDAD) {
   return {
     get listo() { return listo; },
     fijar(muestra) { leer(muestra, x); v.fill(0); listo = true; },
-    paso(objetivo, dt, salida = crearMuestra()) {
+    // calma ≥ 1: más lento y blando (tiempo × calma, velocidad y aceleración ÷ calma), p. ej. al entrar en el clip.
+    paso(objetivo, dt, salida = crearMuestra(), calma = 1) {
       if (!listo) { this.fijar(objetivo); return escribirSalida(salida); }
       leer(objetivo, meta);
       meta[0] = x[0] + (((meta[0] - x[0]) % 360 + 540) % 360 - 180);   // azimut por el camino corto
@@ -213,7 +222,7 @@ export function crearSuavizador(opciones = SUAVIDAD) {
       for (let i = 0; i < n; i++) {
         const coseno = Math.max(0.35, Math.cos(x[1] * GRADOS));
         for (let k = 0; k < N; k++) {
-          const w = 2 / (k === 7 ? o.tiempoGiro : o.tiempo), lim = limites(k), escala = k === 0 ? 1 / coseno : 1;
+          const w = 2 / ((k === 7 ? o.tiempoGiro : o.tiempo) * calma), lim = limites(k), escala = (k === 0 ? 1 / coseno : 1) / calma;
           // Muelle críticamente amortiguado; la velocidad que pide se recorta a la máxima y a la de frenada (nunca más
           // deprisa de lo que se puede frenar antes de llegar: v² ≤ 2·a·distancia, sin pasarse) y la velocidad cambia
           // como mucho a la aceleración máxima (también al recortarse: sin frenazos de un cuadro).

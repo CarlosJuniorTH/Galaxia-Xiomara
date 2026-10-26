@@ -45,7 +45,7 @@ import { nivelSeguro } from '../util/dispositivo.js';
 import { esquivar, sinRepetidos } from '../util/ruta.js';
 import { planificarVuelo } from '../util/vuelo.js';
 import { TIEMPOS_AMOR, faltaReal, desdeAnimacion } from '../util/supernovaAmor.js';
-import { pistaDe, muestrearCamara, mezclarMuestras, crearMuestra, crearSuavizador, segundoAdelantado, siguienteCorte, esfericasACartesianas, cartesianasAEsfericas, ENTRADA, SALIDA, LIMITES } from '../util/directorCamara.js';
+import { pistaDe, normalizarPista, muestrearCamara, mezclarMuestras, crearMuestra, crearSuavizador, segundoAdelantado, siguienteCorte, esfericasACartesianas, cartesianasAEsfericas, ENTRADA, SALIDA, LIMITES, ENTRADA_LARGA, CALMA_ENTRADA, escalaMovil } from '../util/directorCamara.js';
 import { finEscena } from '../util/guionAgujeros.js';
 import { aMal, SEMIEJES_CORAZON, ESCALA_SUPERNOVA, PROGENITORA_RELATIVA, LLEGADA_GIGANTE } from '../data/escalaCosmica.js';
 const RADIO_ESTRELLA = 110 * ESCALA_SUPERNOVA * PROGENITORA_RELATIVA;
@@ -355,6 +355,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   let desplazamiento = 0, desplazamientoMeta = 0, fraccionZona = 1;
   // Videoclip de un gigante en curso (director de cámara, más abajo): sin tarjeta ni panel, la proyección no se desplaza.
   let enClip = false;
+  // Gigante al que se viaja y que abrirá su clip al llegar: la vista se va centrando durante el vuelo (sin deslizarse al empezar).
+  let clipEsperado = null;
   const cajas = selectores => selectores.flatMap(s => [...document.querySelectorAll(s)])
     // offsetParent es null en elementos fijos: getClientRects() vacío indica display:none.
     .filter(el => !el.hidden && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden')
@@ -365,7 +367,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     const arriba = Math.max(0, ...cajas(['#titulo', '#btn-tour', '.marca-universo', '.horarios']).map(r => r.bottom));
     const abajo = Math.min(vista.alto, ...cajas(['#ruta', '#lugar', '#cometa-aviso']).map(r => r.top));
     // Durante un videoclip la tarjeta no está: el gigante, centrado (o donde diga su pista con `mira`).
-    desplazamientoMeta = enClip ? 0 : -desplazamientoZonaLibre(arriba, abajo, vista.alto);
+    desplazamientoMeta = enClip || (clipEsperado && clipEsperado === destinoActual) ? 0 : -desplazamientoZonaLibre(arriba, abajo, vista.alto);
     // En casa, la galaxia algo más abajo: encima asoma la franja de cielo con los destinos.
     if (destinoActual === 'hogar') desplazamientoMeta -= vista.alto * 0.13;
     fraccionZona = Math.max(0, abajo - arriba) / vista.alto;
@@ -687,6 +689,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     if (!o) return Promise.resolve(false);
     if (profundo) { o.centro.multiplyScalar(ESCALA_CIELO); o.distancia *= ESCALA_CIELO; }
     destinoActual = id; mundos.enfocar(id); alViajar(id);
+    if (GIGANTES_CLIP.has(id)) { clipEsperado = id; desplazamientoMeta = 0; }   // llegará centrado para su videoclip
     // La cámara gira despacio hacia el destino, sale recta hacia él (ya enfocado) y se detiene
     // delante, a la distancia a la que se ve entero: sin rodeos, subidas ni giros al llegar.
     const desde = camera.position.clone(), dir = desde.clone().sub(o.centro).normalize();
@@ -924,6 +927,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // se suelta en el acto. Marco de cada gigante: centro, radio R (su distancia de encuadre) y ejes x (derecha), y (arriba),
   // z (hacia casa).
   let clip = null;
+  const GIGANTES_CLIP = new Set(['supernova', 'cuasar', 'pulsar', 'deneb', 'ton618', 'sagitario']);
   // muestraClip: lo que se coloca (ya filtrado); crudaClip: la pista adelantada; suaveClip: la capa global de suavidad.
   const muestraClip = crearMuestra(), crudaClip = crearMuestra(), suaveClip = crearSuavizador(), cartClip = [0, 0, 0], matrizClip = new THREE.Matrix4(), arribaClip = new THREE.Vector3(), relClip = new THREE.Vector3();
   function marcoClip(id) {
@@ -931,8 +935,11 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     const arriba = id === 'cuasar' ? cosmos.ejeCuasar() : id === 'ton618' ? new THREE.Vector3(0, 1, 0).applyQuaternion(cosmos.agujeros.ton618.planoDisco.getWorldQuaternion(new THREE.Quaternion())) : EJE_Y.clone();
     arriba.normalize(); if (arriba.dot(casa) < 0) arriba.negate();   // elevación positiva: del lado de casa
     const z = casa.clone().projectOnPlane(arriba); if (z.lengthSq() < 1e-8) z.set(1, 0, 0).projectOnPlane(arriba); z.normalize();
-    const R = id === 'supernova' ? encuadreCorazon('lugar').distancia : lejano.dist;
-    return { centro, R, x: new THREE.Vector3().crossVectors(arriba, z).normalize(), y: arriba, z };
+    // R: la distancia de encuadre del PC, escalada en pantallas estrechas para que a lo ancho quepa lo mismo (la supernova
+    // ya mide su corazón con el ancho de la pantalla). Rnormal: el encuadre de llegada, al que se vuelve al terminar.
+    const pc = id === 'gigante' ? 680 : (cosmos.objetivo(id)?.distancia ?? 0) * ESCALA_CIELO;
+    const R = id === 'supernova' ? encuadreCorazon('lugar').distancia : pc > 0 ? pc * escalaMovil(vista.ancho / vista.alto) : lejano.dist;
+    return { centro, R, Rnormal: id === 'supernova' ? R : lejano.dist, x: new THREE.Vector3().crossVectors(arriba, z).normalize(), y: arriba, z };
   }
   const aMundo = (v, m, salida) => salida.copy(m.centro).addScaledVector(m.x, v[0] * m.R).addScaledVector(m.y, v[1] * m.R).addScaledVector(m.z, v[2] * m.R);
   const aMarco = (p, m, salida) => { relClip.subVectors(p, m.centro); salida[0] = relClip.dot(m.x) / m.R; salida[1] = relClip.dot(m.y) / m.R; salida[2] = relClip.dot(m.z) / m.R; return salida; };
@@ -967,7 +974,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     const c = clip, m = c.marco, desde = poseActual(m), hasta = crearMuestra();
     if (c.pista) desde.giro = muestraClip.giro;
     if (c.id === 'supernova') { const e = encuadreCorazon('lugar'); cartesianasAEsfericas(aMarco(e.posicion, m, cartClip), hasta.pos); aMarco(e.objetivo, m, hasta.mira); }
-    else { hasta.pos[0] = desde.pos[0]; hasta.pos[1] = THREE.MathUtils.clamp(desde.pos[1], -30, 30); hasta.pos[2] = 1; }
+    else { hasta.pos[0] = desde.pos[0]; hasta.pos[1] = THREE.MathUtils.clamp(desde.pos[1], -30, 30); hasta.pos[2] = m.Rnormal / m.R; }
     c.fase = 'salida'; c.salida = { t: 0, dur: movimientoReducido ? 1 : SALIDA, desde, hasta };
     canvas.dataset.clipFase = 'salida';
   }
@@ -985,10 +992,12 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
         if (siguienteCorte(c.pista, c.t) <= s) suaveClip.fijar(muestrearCamara(c.pista, s, crudaClip));
         muestrearCamara(c.pista, segundoAdelantado(c.pista, s), crudaClip); c.t = s;
       }
-      suaveClip.paso(crudaClip, dt, muestraClip);
+      // Entrada larga y amortiguada desde donde dejó la cámara el viaje: el filtro empieza más blando y lento.
+      const calma = c.entrada ? 1 + (CALMA_ENTRADA - 1) * (1 - THREE.MathUtils.smootherstep(c.entrada.t, 0, ENTRADA_LARGA)) : 1;
+      suaveClip.paso(crudaClip, dt, muestraClip, calma);
       if (c.entrada) {
         c.entrada.t += dt; muestraClip.giro *= THREE.MathUtils.smootherstep(c.entrada.t, 0, c.entrada.dur);
-        if (c.entrada.t >= c.entrada.dur) c.entrada = null;
+        if (c.entrada.t >= Math.max(c.entrada.dur, ENTRADA_LARGA)) c.entrada = null;
       }
       colocarClip(muestraClip, c.marco, c.arriba, 0);
       return;
@@ -1001,15 +1010,15 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // completo: el clip terminó (encuadre normal y límites del zoom); si no, solo se devuelve lo bloqueado.
   function soltarClip(completo) {
     const c = clip; clip = null; if (!c) return;
-    enClip = false; medirZonaLibre();   // la tarjeta vuelve: la franja libre manda otra vez
+    enClip = false; clipEsperado = null; medirZonaLibre();   // la tarjeta vuelve: la franja libre manda otra vez
     delete canvas.dataset.clip; delete canvas.dataset.clipFase;
     camera.up.copy(EJE_Y);
     if (camera.fov !== FOV_BASE) { camera.fov = FOV_BASE; camera.updateProjectionMatrix(); }
     if (vuelo) return;   // un viaje se ha llevado la cámara: él devuelve el control al llegar
     controls.enabled = true; controls.autoRotate = false;
     if (!completo || !lejano || lejano.id !== c.id) return;
-    lejano.dist = c.marco.R;
-    controls.minDistance = c.marco.R * LIMITES.min; controls.maxDistance = c.marco.R * LIMITES.max;
+    lejano.dist = c.marco.Rnormal;
+    controls.minDistance = c.marco.Rnormal * LIMITES.min; controls.maxDistance = c.marco.Rnormal * LIMITES.max;
     camera.lookAt(controls.target); controls.update();
     fijarEncuadre(); ajuste = null;
     canvas.dataset.clipFin = c.id;
@@ -1133,6 +1142,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
         // Fin del viaje (en un viaje que cruza al sistema solar, solo el del último tramo): la música del destino empieza
         // en este mismo cuadro, a la vez que su animación.
         if (!compuesto || fin.continuacion) alLlegar(destinoActual);
+        // Si el gigante al que se llegó no abre su clip (la supernova ya nacida), la franja libre vuelve a mandar.
+        if (clipEsperado) setTimeout(() => { if (!clip && clipEsperado) { clipEsperado = null; medirZonaLibre(); } }, 4000);
         controls.update(); fin.resolver(true); fin.alLlegar?.(); entradaResuelta = true; medirZonaLibre();
         marcarActividad();   // llegar es actividad: el lugar recién llegado se mira a 60 (no a 30 por llevar rato sin tocar)
         fijarEncuadre(); ajuste = null;
@@ -1532,7 +1543,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     get escenaGiganteEnCurso() { return cosmos.escenas.enCurso; },
     // El videoclip en curso (director de cámara): gigante, fase ('clip' o 'salida'), si sigue una pista y su segundo; y los
     // límites del zoom y la distancia de la cámara al punto mirado (pruebas y diagnóstico).
-    get clip() { return clip ? { id: clip.id, fase: clip.fase, pista: !!clip.pista, segundo: clip.segundo() } : null; },
+    get clip() { return clip ? { id: clip.id, fase: clip.fase, pista: !!clip.pista, segundo: clip.segundo(), centro: clip.marco.centro.toArray(), R: clip.marco.R, Rnormal: clip.marco.Rnormal } : null; },
     get camaraZoom() { return { distancia: camera.position.distanceTo(controls.target), min: controls.minDistance, max: controls.maxDistance, encuadre: lejano?.dist ?? null, bloqueada: !controls.enabled, fov: camera.fov }; },
     posicionCometa: () => mundos.posicionCometa(),
     besar() { pulso = 1; planificador.pedirCuadro(); },
@@ -1558,10 +1569,19 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     accion(id) {
       if (vuelo || id !== destinoActual) return Promise.resolve(false);
       if (lejano && lejano.id === id) {
-        // Una vuelta lenta alrededor del objeto lejano, subiendo y bajando un poco.
-        const c = lejano.centro, desdeC = camera.position.clone().sub(c), r = desdeC.length();
-        const paso = [1, 2, 3, 4, 5, 6, 7, 8].map(k => c.clone().add(desdeC.clone().applyAxisAngle(EJE_Y, k * Math.PI / 4)).add(new THREE.Vector3(0, Math.sin(k * Math.PI / 4) * r * 0.22, 0)));
-        return desplazar(paso.pop(), c, 14, undefined, { paso, mirarAntes: 1, corriente: 0 });
+        // Una vuelta lenta alrededor del objeto lejano (el gigante del corazón), subiendo y bajando un poco: un clip del
+        // director (suave, a la distancia del móvil, con los controles bloqueados y el fundido final al encuadre normal).
+        if (clip) return Promise.resolve(false);
+        const marco = marcoClip(id), p0 = poseActual(marco), az = p0.pos[0], DURA = 22;
+        const pista = [0, 1, 2, 3, 4, 5, 6, 7, 8].map(k => ({ t: k * DURA / 8, pos: [az + k * 45, 12 + 10 * Math.sin(k * Math.PI / 4), 1], mira: [0, 0, 0], fov: 60, curva: k === 0 ? 'suave' : 'lineal' }));
+        pista[8].curva = 'suave';
+        const t0 = performance.now(), propio = () => (performance.now() - t0) / 1000;
+        return new Promise(resolve => {
+          empezarClip(id, { segundo: propio, vivo: () => propio() < DURA, pista: normalizarPista(pista) });
+          if (!clip) { resolve(false); return; }
+          const mio = clip;
+          (function mirar() { if (clip === mio) requestAnimationFrame(mirar); else resolve(destinoActual === id); })();
+        });
       }
       const d = DESTINOS.find(x => x.id === id); if (!d) return Promise.resolve(false);
       const centro = v3(d.posicion), aqui = camera.position.clone(), dir = aqui.clone().sub(centro).normalize();
