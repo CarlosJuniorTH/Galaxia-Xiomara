@@ -115,8 +115,8 @@ export const CAMARA_SUPERNOVA = Object.freeze([
   { t: 44.74, pos: [16, 8, 0.4],     mira: [0, 0, 0],          fov: 56, curva: 'suave', giro: 0 },   // el grito sostenido: vuelan las chispas
   { t: 47.0,  pos: [12, 5, 0.529],   mira: [0, 0.014, 0],      fov: 54, curva: 'suave' },    // la voz baja: las chispas vuelven
   { t: 49.03, pos: [-4, 6, 0.772],   mira: [0, 0.021, 0],      fov: 54, curva: 'suave' },    // a golpes, el corazón se dibuja
-  { t: 52.2,  pos: [-10, 4, 0.82],   mira: [0, -0.04, 0],      fov: 60, curva: 'suave' },    // la nota más alta: el corazón, cerca
-  { t: 58.0,  pos: [0, 0, 0.7],      mira: [0, -0.04, 0],      fov: 60, curva: 'suave' }     // la afirmación final, de frente y grande
+  { t: 52.2,  pos: [-10, 4, 0.85],   mira: [0, -0.04, 0],      fov: 60, curva: 'suave' },    // la nota más alta: el corazón, cerca
+  { t: 58.0,  pos: [0, 0, 0.77],     mira: [0, -0.04, 0],      fov: 60, curva: 'suave' }     // la afirmación final, de frente y grande
 ]);
 
 export const FRASE_SUPERNOVA = 'De toda esta luz, mi lugar favorito sigue siendo contigo.';
