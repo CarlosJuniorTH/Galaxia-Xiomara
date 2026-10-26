@@ -1,7 +1,8 @@
 // Cero tirones en los viajes, como en un móvil: iPhone (390×844, DPR 3) con la CPU limitada ×4 (TIRONES_CPU), muchas rutas
 // (casa ↔ cada destino, gigante ↔ gigante, entrar y salir del sistema solar, los lugares de casa, el cometa y viajes
-// cambiados a mitad). Cada ruta se mide del clic a 2,5 s después de llegar (el arranque de la escena del gigante, su
-// tarjeta y su canción incluidos). Tirón: un cuadro de más de 60 ms que además pasa de 2,2 veces la mediana del tramo.
+// cambiados a mitad). Cada ruta se mide del clic a 4 s después de llegar (TIRONES_TRAS: el arranque del videoclip del
+// gigante, su tarjeta y, con TIRONES_MUSICA=1, su canción incluidos). Tirón: un cuadro DIBUJADO de más de 60 ms que además
+// pasa de 2,2 veces la mediana del tramo; TIRONES_DISPOSITIVO=pc mide en el PC (1440×900, CPU ×1, umbral 34 ms).
 // La máquina de pruebas está cargada (y la GPU compartida): se hacen varias pasadas, cada una en una página nueva (todo
 // por primera vez, como quien abre la web), y de cada ruta cuenta su mejor pasada.
 // Lánzala con la GPU reservada: flock /tmp/claude-1000/gpu.lock node tests/navegador/ejecutar.mjs tironesViajes
@@ -9,17 +10,8 @@
 // cambia de destino a esa fracción del viaje), TIRONES_DIAG=1 (atribución por cuadro: llamadas GL, programas, LoAF) y
 // TIRONES_SALIDA (JSON con todo; por defecto .pruebas/tirones.json).
 import { writeFileSync, mkdirSync } from 'fs';
-import { createRequire } from 'module';
 import path from 'path';
-import { abrir, PERFILES } from './arnes.mjs';
-
-// El perfil del móvil de referencia (el del agente de fluidez): iPhone 13 a pantalla completa.
-const require = createRequire(import.meta.url);
-if (!PERFILES.iphone) {
-  const pw = process.env.PLAYWRIGHT_CORE ? require(process.env.PLAYWRIGHT_CORE) : null;
-  const iPhone13 = pw?.devices?.['iPhone 13'] ?? { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1', isMobile: true, hasTouch: true };
-  PERFILES.iphone = { ...iPhone13, viewport: { width: 390, height: 844 }, screen: { width: 390, height: 844 }, deviceScaleFactor: 3 };
-}
+import { abrir } from './arnes.mjs';
 
 export const RUTAS = [
   // Casa ↔ las seis grandes (y entre ellas).
@@ -34,7 +26,9 @@ export const RUTAS = [
   'hogar>pulsar~sagitario@0.4', 'sagitario>hogar~deneb@0.5', 'hogar>rosa~cuasar@0.3', 'cuasar>hogar~azul@0.6'
 ];
 
-const UMBRAL_MS = 60, VECES_MEDIANA = 2.2;
+// En el PC (TIRONES_DISPOSITIVO=pc: 1440×900 sin limitar la CPU) el umbral es más fino: dos cuadros perdidos (34 ms).
+const DISPOSITIVO = process.env.TIRONES_DISPOSITIVO || 'iphone', EN_PC = DISPOSITIVO === 'pc';
+const UMBRAL_MS = Number(process.env.TIRONES_UMBRAL || (EN_PC ? 34 : 60)), VECES_MEDIANA = 2.2, TRAS_LLEGAR = Number(process.env.TIRONES_TRAS || 4000);
 export const contarTirones = dt => {
   const o = dt.slice().sort((a, b) => a - b), mediana = o[Math.floor(o.length / 2)] || 16.7;
   return { mediana, tirones: dt.filter(x => x > UMBRAL_MS && x > VECES_MEDIANA * mediana) };
@@ -52,17 +46,43 @@ function instrumentar(diag) {
     }
     try { new PerformanceObserver(l => { for (const x of l.getEntries()) M.loaf.push({ t: x.startTime, dur: Math.round(x.duration), bloq: Math.round(x.blockingDuration), render: Math.round(x.startTime + x.duration - x.renderStart), estilo: x.styleAndLayoutStart ? Math.round(x.startTime + x.duration - x.styleAndLayoutStart) : 0, scripts: x.scripts.map(s => ({ dur: Math.round(s.duration), inv: s.invoker, f: s.sourceFunctionName, src: (s.sourceURL || '').split('/').slice(-2).join('/') + ':' + s.sourceCharPosition, tipo: s.invokerType, forzado: Math.round(s.forcedStyleAndLayoutDuration) })) }); }).observe({ type: 'long-animation-frame', buffered: false }); } catch {}
   }
-  let previo = 0;
+  // Solo cuentan los cuadros DIBUJADOS (el planificador puede saltarse avisos de la pantalla a propósito).
+  let previo = 0, n0 = -1;
   const f = t => {
-    if (previo) {
-      const c = e.interno, info = c.renderer.info, d = c.renderer.domElement.dataset;
-      const r = { t: Math.round(t - M.marca), dt: +(t - previo).toFixed(1), fase: d.fase || (e.viajando ? 'viaje' : 'llegado'), prog: info.programs?.length ?? 0, geo: info.memory.geometries, tex: info.memory.textures, res: d.resolucion3d, esc: c.escenaActiva, obj: 0 };
-      if (diag) { r.gl = actual; actual = {}; }
-      M.cuadros.push(r);
+    const n = e.cuadrosDibujados;
+    if (n !== n0) {
+      if (previo) {
+        const c = e.interno, info = c.renderer.info, d = c.renderer.domElement.dataset;
+        const r = { t: Math.round(t - M.marca), dt: +(t - previo).toFixed(1), fase: d.fase || (e.viajando ? 'viaje' : 'llegado'), prog: info.programs?.length ?? 0, geo: info.memory.geometries, tex: info.memory.textures, res: d.resolucion3d, esc: c.escenaActiva };
+        if (diag) { r.gl = actual; actual = {}; }
+        M.cuadros.push(r);
+      }
+      previo = t; n0 = n;
     }
-    previo = t; requestAnimationFrame(f);
+    requestAnimationFrame(f);
   };
   requestAnimationFrame(f);
+}
+
+// Con TIRONES_PERFIL=1, perfil de CPU de cada ruta: de cada tirón, las funciones que más tiempo propio gastaron en él.
+function atribuir(perfil, marcaUs, detalle) {
+  const nodos = new Map(perfil.nodes.map(n => [n.id, n])), padre = new Map();
+  for (const n of perfil.nodes) for (const h of n.children || []) padre.set(h, n.id);
+  const nombre = n => `${n.callFrame.functionName || '(anónima)'}@${n.callFrame.url.split('/').slice(-2).join('/')}:${n.callFrame.lineNumber + 1}`;
+  const tiempos = []; let t = perfil.startTime; for (const d of perfil.timeDeltas) { t += d; tiempos.push(t); }
+  for (const c of detalle) {
+    const fin = marcaUs + c.t * 1000, ini = fin - c.dt * 1000, propio = new Map(), pila = new Map();
+    for (let i = 0; i < perfil.samples.length; i++) {
+      if (tiempos[i] < ini || tiempos[i] > fin) continue;
+      const dt = (perfil.timeDeltas[i + 1] ?? 0) / 1000, n = nodos.get(perfil.samples[i]);
+      propio.set(nombre(n), (propio.get(nombre(n)) || 0) + dt);
+      // y su cadena (tiempo total de cada función en el cuadro)
+      const vistos = new Set(); for (let id = n.id; id !== undefined; id = padre.get(id)) { const k = nombre(nodos.get(id)); if (vistos.has(k)) continue; vistos.add(k); pila.set(k, (pila.get(k) || 0) + dt); }
+    }
+    const top = m => [...m].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([k, v]) => `${v.toFixed(1)} ${k}`);
+    c.ocupado = Math.round([...propio].filter(([k]) => !/^\((idle|program)\)/.test(k)).reduce((a, [, v]) => a + v, 0));
+    c.propio = top(propio); c.total = top(pila).filter(x => !/\(root\)|\(program\)/.test(x));
+  }
 }
 
 async function medirRuta(pagina, cdp, ruta, cpu, diag) {
@@ -74,9 +94,13 @@ async function medirRuta(pagina, cdp, ruta, cpu, diag) {
   await pagina.evaluate(() => window.__galaxia.interfaz.terminarEscena());
   await pagina.waitForTimeout(1200);
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: cpu }); await pagina.waitForTimeout(600);
-  const r = await pagina.evaluate(async ({ hacia, cambio, fraccion }) => {
+  const perfilar = process.env.TIRONES_PERFIL === '1';
+  if (perfilar) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: Number(process.env.TIRONES_MUESTREO || 1000) }); await cdp.send('Profiler.start'); }
+  const r = await pagina.evaluate(async ({ hacia, cambio, fraccion, tras }) => {
     const M = window.__tirones, g = window.__galaxia, e = g.escena;
-    M.cuadros = []; M.loaf = []; M.marca = performance.now();
+    // Marca para alinear el perfil de CPU: 15 ms en una función con nombre propio justo antes del clic.
+    const __marcaTirones = () => { const t = performance.now(); while (performance.now() - t < 15); return performance.now(); };
+    M.cuadros = []; M.loaf = []; M.marca = __marcaTirones();
     const p = g.interfaz.visitar(hacia);
     if (cambio) {
       await new Promise(r => setTimeout(r, 300)); const total = (e.restanteViaje || 10) + 0.3;
@@ -85,13 +109,24 @@ async function medirRuta(pagina, cdp, ruta, cpu, diag) {
     } else await p;
     while (e.viajando) await new Promise(r => setTimeout(r, 50));
     M.llegada = Math.round(performance.now() - M.marca);
-    await new Promise(r => setTimeout(r, 2500));
+    await new Promise(r => setTimeout(r, tras));
     return { cuadros: M.cuadros, loaf: M.loaf, llegada: M.llegada, cambio: M.cambio ?? null, destino: e.destino };
-  }, { hacia, cambio, fraccion });
+  }, { hacia, cambio, fraccion, tras: TRAS_LLEGAR });
+  let perfil = null; if (perfilar) { perfil = (await cdp.send('Profiler.stop')).profile; await cdp.send('Profiler.disable'); }
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
-  const dt = r.cuadros.map(c => c.dt).filter(x => x < 2000);
+  // Solo lo que pasa desde el clic (antes, en reposo, el planificador puede no dibujar: no es un tirón).
+  // El primero cuenta desde el clic (lo que se tarda en ver la respuesta).
+  r.cuadros = r.cuadros.filter(c => c.t > 0); if (r.cuadros[0] && r.cuadros[0].t - r.cuadros[0].dt < 0) r.cuadros[0].dt = r.cuadros[0].t;
+  const dt = r.cuadros.map(c => c.dt);
   const { mediana, tirones } = contarTirones(dt);
   const detalle = r.cuadros.filter(c => c.dt > UMBRAL_MS && c.dt > VECES_MEDIANA * mediana);
+  if (perfil) {
+    // Fin de la marca = última muestra dentro de __marcaTirones.
+    const ids = new Set(perfil.nodes.filter(n => n.callFrame.functionName === '__marcaTirones').map(n => n.id)), hijos = new Map(perfil.nodes.map(n => [n.id, n.children || []]));
+    for (const id of [...ids]) { const pila = [...hijos.get(id)]; while (pila.length) { const h = pila.pop(); ids.add(h); pila.push(...hijos.get(h)); } }
+    let t = perfil.startTime, fin = null; for (let i = 0; i < perfil.samples.length; i++) { t += perfil.timeDeltas[i]; if (ids.has(perfil.samples[i])) fin = t; }
+    if (fin !== null) atribuir(perfil, fin, detalle);
+  }
   return { ruta, destinoFinal: r.destino, llegada: r.llegada, cambio: r.cambio, cuadros: dt.length, mediana: +mediana.toFixed(1), max: Math.round(Math.max(0, ...dt)), tirones: tirones.length, detalle, loaf: r.loaf.filter(l => l.dur > UMBRAL_MS) };
 }
 
@@ -99,7 +134,7 @@ async function medirRuta(pagina, cdp, ruta, cpu, diag) {
 async function abrirConGpu(base) {
   for (let intento = 1; ; intento++) {
     try {
-      const a = await abrir(base, 'iphone', { espera: 2500 });
+      const a = await abrir(base, DISPOSITIVO, { espera: 2500, musica: process.env.TIRONES_MUSICA === '1' });
       const webgl = await a.pagina.evaluate(() => document.getElementById('galaxia').dataset.webgl || '');
       if (webgl && webgl !== 'ninguno') return a;
       await a.navegador.close(); throw new Error('sin contexto WebGL');
@@ -108,7 +143,7 @@ async function abrirConGpu(base) {
 }
 
 export default async function ({ base, informe }) {
-  const pasadas = Number(process.env.TIRONES_PASADAS || 3), cpu = Number(process.env.TIRONES_CPU || 4), diag = process.env.TIRONES_DIAG === '1';
+  const pasadas = Number(process.env.TIRONES_PASADAS || 3), cpu = Number(process.env.TIRONES_CPU || (EN_PC ? 1 : 4)), diag = process.env.TIRONES_DIAG === '1';
   const rutas = process.env.TIRONES_RUTAS ? process.env.TIRONES_RUTAS.split(',') : RUTAS;
   const salida = process.env.TIRONES_SALIDA || '.pruebas/tirones.json';
   const todas = [];
@@ -120,7 +155,7 @@ export default async function ({ base, informe }) {
       for (const ruta of rutas) {
         let m; try { m = await medirRuta(pagina, cdp, ruta, cpu, diag); } catch (err) { m = { ruta, error: err.message.split('\n')[0], tirones: 99 }; await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 }).catch(() => {}); }
         m.pasada = p; todas.push(m);
-        console.log(`  · [${p + 1}/${pasadas}] ${ruta.padEnd(28)} tirones ${m.tirones}${m.error ? ' ERROR ' + m.error : `  (mediana ${m.mediana} ms, máx ${m.max} ms, ${m.cuadros} cuadros) ${m.detalle.map(d => `${d.dt}@${d.t}/${d.fase}`).join(' ')}`}`);
+        console.log(`  · [${p + 1}/${pasadas}] ${ruta.padEnd(28)} tirones ${m.tirones}${m.error ? ' ERROR ' + m.error : `  (mediana ${m.mediana} ms, máx ${m.max} ms, ${m.cuadros} cuadros) ${m.detalle.map(d => `${d.dt}@${d.t}/${d.fase}${d.ocupado !== undefined ? '/cpu' + d.ocupado : ''}`).join(' ')}`}`);
       }
       if (errores.length) todas.push({ pasada: p, errores: errores.slice(0, 5) });
     } finally { await navegador.close(); }
@@ -128,7 +163,7 @@ export default async function ({ base, informe }) {
   }
   for (const ruta of rutas) {
     const de = todas.filter(m => m.ruta === ruta), mejor = de.reduce((a, b) => (b.tirones < a.tirones || (b.tirones === a.tirones && b.max < a.max) ? b : a));
-    informe.comprobar(mejor.tirones === 0 && mejor.destinoFinal === (ruta.match(/~(\w+)/)?.[1] ?? ruta.split('>')[1]), `${ruta}: sin tirones (CPU ×${cpu}; mejor de ${de.length})`, { tirones: de.map(m => m.tirones), max: mejor.max, mediana: mejor.mediana });
+    informe.comprobar(mejor.tirones === 0 && mejor.destinoFinal === (ruta.match(/~(\w+)/)?.[1] ?? ruta.split('>')[1]), `${ruta}: sin tirones (${DISPOSITIVO}, CPU ×${cpu}; mejor de ${de.length})`, { tirones: de.map(m => m.tirones), max: mejor.max, mediana: mejor.mediana });
   }
   const errores = todas.filter(m => m.errores).flatMap(m => m.errores);
   informe.comprobar(errores.length === 0, 'sin errores en la consola', errores.slice(0, 5));
