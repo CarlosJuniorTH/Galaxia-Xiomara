@@ -31,7 +31,7 @@ huellas['./'] = huellas['./index.html'];
 const version = huella.digest('hex').slice(0, 12);
 await writeFile(path.join(destino, 'sw.js'), `// Generado por scripts/preparar-pages.mjs. No editar a mano.
 // Paquetes como en un videojuego: lo que la página descarga se guarda en el dispositivo desde la PRIMERA visita (la primera
-// instalación se activa en el acto y guarda cada archivo según pasa; tras la intro, la página pide «completar» lo que
+// instalación se activa en el acto y guarda cada archivo según pasa; tras entrar, la página pide «completar» lo que
 // falte). Después el universo se abre desde ahí (también sin conexión) y una recarga no vuelve a descargar nada.
 // Una versión nueva descarga en segundo plano SOLO los archivos que cambiaron (el resto se copia de la versión guardada) y
 // espera: se aplica en la próxima visita o cuando quien mira pulsa «Actualizar» (nunca recarga la página por sí sola).
@@ -61,15 +61,15 @@ self.addEventListener('activate', e => { e.waitUntil((async () => {
   for (const k of await caches.keys()) if (k.startsWith('universo-') && k !== VERSION) await caches.delete(k);
   await self.clients.claim();
 })()); });
-// Completar (tras la intro): lo que aún no esté guardado se descarga (de dos en dos) y todo se comprueba con su huella (un
-// archivo de otra versión no se queda guardado como de esta).
+// Completar (tras entrar, sin prisa): lo que aún no esté guardado se descarga de dos en dos y se comprueba con su huella
+// (un archivo de otra versión no se queda guardado como de esta). Lo ya guardado no se vuelve a leer: comprobar las
+// huellas de todo eran decenas de MB en memoria a la vez en el teléfono.
 let completando = null;
 async function completar() {
   const c = await caches.open(VERSION), pendientes = Object.entries(HUELLAS);
   const uno = async ([url, h]) => {
-    let r = await c.match(url);
-    if (r && await huellaDe(r) === h) return;
-    r = await fetch(url, { cache: 'no-cache' }).catch(() => null);
+    if (await c.match(url)) return;
+    const r = await fetch(url, { cache: 'no-cache' }).catch(() => null);
     if (r && r.ok && await huellaDe(r) === h) await c.put(url, r); else await c.delete(url);
   };
   await Promise.all(Array.from({ length: 2 }, async () => { while (pendientes.length) { try { await uno(pendientes.shift()); } catch {} } }));

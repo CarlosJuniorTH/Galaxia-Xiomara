@@ -24,7 +24,7 @@ export function crearEntrada(config, { viaje, banda } = {}) {
   foto.src = config.foto;
 
   const entrada = $('#entrada'), boton = $('#btn-entrar'), continuar = $('#btn-continuar'), frase = $('#portada-frase'), toque = $('#toque');
-  let alEntrar = () => {}, trasIntro = [], introAcabada = false, preparado = false, tocado = false, empezado = false, conCancion = false;
+  let alEntrar = () => {}, alEntrarMas = [], trasIntro = [], introAcabada = false, preparado = false, tocado = false, empezado = false, conCancion = false;
   const reducido = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const yaVista = !!viaje?.portadaVista;
   // cancion: hay canción de intro Y su archivo está (se sabe en cuanto responde el servidor; si falta, por ejemplo en
@@ -135,6 +135,7 @@ export function crearEntrada(config, { viaje, banda } = {}) {
     document.getElementById('hud').inert = false;
     setTimeout(() => document.getElementById('btn-tour')?.focus({ preventScroll: true }), 1700);
     alEntrar(opciones);
+    for (const fn of alEntrarMas.splice(0)) fn(opciones);
   }
   boton.addEventListener('click', () => entrar({}));
   continuar.addEventListener('click', () => entrar({ continuar: { destino: destino?.id ?? null, paso: paso ?? null } }));
@@ -146,7 +147,31 @@ export function crearEntrada(config, { viaje, banda } = {}) {
   // Megas descargados de los previstos (la canción, texturas horneadas y cielo): con una conexión lenta se ve que avanza
   // y cuánto falta.
   const textoInicial = textoCarga.textContent, mb = b => (b / 1048576).toFixed(1).replace('.', ',');
-  descargas.escuchar(({ total, hechos }) => { if (!total || preparado) return; const t = hechos >= total ? textoInicial : `Descargando el universo · ${mb(hechos)} de ${mb(total)} MB`; if (textoCarga.textContent !== t) textoCarga.textContent = t; });
+  // Al llegar al total (siempre llega: lo que no se descarga se descuenta) dice «Preparando…» hasta que todo está listo.
+  let textoFinal = false;
+  descargas.escuchar(({ total, hechos }) => { if (!total || preparado || textoFinal) return; const t = hechos >= total ? `Universo descargado · ${mb(total)} MB · preparándolo…` : `Descargando el universo · ${mb(hechos)} de ${mb(total)} MB`; if (textoCarga.textContent !== t) textoCarga.textContent = t; });
+  // Cuadros parejos: 15 seguidos sin ninguno largo (≤ 1,6 veces el intervalo normal de la pantalla), como mucho 2,5 s.
+  const asentar = () => new Promise(fin => {
+    const t0 = performance.now(); let antes = 0, seguidos = 0; const lista = [];
+    const paso = ahora => {
+      if (antes) { const d = ahora - antes; lista.push(d); const o = lista.slice(-30).sort((a, b) => a - b), normal = o[Math.floor(o.length * 0.3)] || d; seguidos = d <= Math.max(normal * 1.6, 12) ? seguidos + 1 : 0; }
+      antes = ahora;
+      if (seguidos >= 15 || ahora - t0 > 2500) fin(); else requestAnimationFrame(paso);
+    };
+    requestAnimationFrame(paso);
+  });
+  // Todo descargado: lo contado en los MB (texturas, cielo, cálculos horneados y las canciones de la carga) ha llegado
+  // entero. Si en 20 s no avanza nada (una descarga atascada), se sigue igual (lo que falte se calcula aquí).
+  const todoDescargado = () => new Promise(fin => {
+    let ultimo = -1, desde = performance.now();
+    const mirar = () => {
+      if (!descargas.total || descargas.hechos >= descargas.total) return fin(true);
+      if (descargas.hechos !== ultimo) { ultimo = descargas.hechos; desde = performance.now(); }
+      if (performance.now() - desde > 20000) return fin(false);
+      setTimeout(mirar, 100);
+    };
+    mirar();
+  });
   let meta = 0, techo = 0, mostrado = 0, animando = false, anterior = 0, alCompletar = null;
   const pintar = () => { const pc = Math.floor(mostrado * 100 + 1e-6); barraCarga.style.transform = `scaleX(${mostrado.toFixed(4)})`; if (pcCarga.textContent !== pc + ' %') pcCarga.textContent = pc + ' %'; };
   const avanzar = ahora => {
@@ -166,15 +191,28 @@ export function crearEntrada(config, { viaje, banda } = {}) {
     if (!cancion || tocado) cuandoCancion(empezarClip);
   }
   // Para las pruebas (#debug): fijar el clip en un instante (captura cuadro a cuadro) o soltarlo.
+  if (location.hash === '#debug') window.__descargas = descargas;
   if (location.hash === '#debug') window.__intro = { fijar: t => { fijo = t; }, soltar: () => { fijo = null; }, get tiempo() { return ultimo; }, get empezado() { return empezado; }, get conCancion() { return conCancion; }, get mundo() { return portada.mundo; } };
   return {
     progreso(f, hasta = f) {
       f = Math.max(0, Math.min(1, f)); meta = Math.max(meta, f); techo = Math.max(meta, Math.min(1, hasta));
       if (!animando) { animando = true; anterior = performance.now(); requestAnimationFrame(avanzar); }
     },
-    // Todo cargado: el número termina de subir hasta 100 (rápido, sin saltar) y entonces empieza el clip.
-    listo() { alCompletar = completar; this.progreso(1); },
+    // La escena está preparada (texturas subidas, programas compilados, calentamiento hecho): se espera además a que todo
+    // lo contado esté descargado y la canción lista para sonar; entonces el número termina de subir hasta 100 (rápido, sin
+    // saltar), el texto dice los MB completos y empieza el clip. Antes el clip podía empezar con «18,0 de 18,1 MB».
+    async listo() {
+      await Promise.all([decidido, todoDescargado()]);
+      if (cancion && !sinIntro) await banda.preparada('inicio');
+      // Y que la página se asiente (la recolección de lo que dejó la carga, el trabajo pendiente de la GPU): el clip empieza
+      // con cuadros parejos desde el primero, no a tirones en su primer segundo.
+      if (!sinIntro) await asentar();
+      textoFinal = true;
+      textoCarga.textContent = descargas.total ? `Universo listo · ${mb(descargas.total)} de ${mb(descargas.total)} MB` : textoInicial;
+      alCompletar = completar; this.progreso(1);
+    },
     alEntrar(fn) { alEntrar = fn; },
+    alEntrarTambien(fn) { alEntrarMas.push(fn); },
     trasIntro(fn) { if (introAcabada) fn(); else trasIntro.push(fn); }
   };
 }

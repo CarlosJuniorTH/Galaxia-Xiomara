@@ -14,10 +14,11 @@ const enNavegador = typeof window !== 'undefined' && typeof fetch === 'function'
 // El índice dice qué imágenes descarga este tipo de aparato (y cuánto pesa el cielo): el total de la descarga se conoce y se
 // muestra desde el principio («0 de 11,9 MB»), no sumando por partes.
 const grupoAparato = `${esMovil ? 'movil' : 'pc'}-${texturasLigeras ? 1 : 0}`, sufijoCielo = texturasLigeras || Q.cielo < 1024 ? 'media' : 'alta';
-const contadas = new Set();
+const contadas = new Set(), pedidas = new Set();
+let bytesIndice = {};
 const indiceHorneadas = !enNavegador ? Promise.resolve({}) : fetch('assets/texturas/indice.json').then(r => (r.ok ? r.json() : {})).catch(() => ({})).then(j => {
   const archivos = j.archivos || {}, propias = j.grupos?.[grupoAparato] || [];
-  for (const n of propias) contadas.add(n);
+  for (const n of propias) contadas.add(n); bytesIndice = archivos;
   descargas.horno = j.horno || 0;
   descargas.previsto(propias.reduce((a, n) => a + (archivos[n] || 0), 0) + (j.cielo?.[sufijoCielo] || 0) + (j.horno || 0));
   return archivos;
@@ -63,6 +64,7 @@ async function decodificarFuera(nombre, ancho, alto) {
 }
 let lienzoLectura = null;
 async function bajarImagen(nombre, ancho, alto, bytes) {
+  pedidas.add(nombre);
   await turnoDescarga();
   try {
     const fuera = await decodificarFuera(nombre, ancho, alto);
@@ -216,5 +218,12 @@ function soltarObreros() {
 // nada se genera ni se sube a la GPU durante un viaje. alAvance(hechas, total) informa del progreso.
 export function texturasTodas(alAvance = () => {}) {
   let hechas = 0; const total = todas.length;
-  return Promise.all(todas.map(p => p.then(() => alAvance(++hechas, total)))).then(r => { soltarObreros(); return r; });
+  return Promise.all(todas.map(p => p.then(() => alAvance(++hechas, total)))).then(r => {
+    soltarObreros();
+    // Lo que el índice contaba para este aparato y nadie ha pedido (una textura que ya no se usa) se descuenta del total:
+    // si no, el contador de la pantalla de carga se quedaba en «18,0 de 18,1 MB» para siempre.
+    let sobra = 0; for (const n of contadas) if (!pedidas.has(n)) { sobra += bytesIndice[n] || 0; pedidas.add(n); }
+    if (sobra) descargas.previsto(-sobra);
+    return r;
+  });
 }

@@ -27,15 +27,13 @@ const problema = texto => { document.getElementById('problema-texto').textConten
 document.getElementById('reintentar-3d').addEventListener('click', () => location.reload());
 document.getElementById('compatible-3d').addEventListener('click', () => { const url = new URL(location.href); url.searchParams.set('calidad', 'compatible'); location.href = url.href; });
 window.addEventListener('unhandledrejection', e => { console.error('Universo:', e.reason); });
-// Paquetes guardados en el dispositivo y actualizaciones (desde el principio: si hay una versión nueva, se aplica en la carga).
-// En la primera visita (aún sin nada guardado) espera a que el universo esté listo: descargar todos los paquetes a la vez
-// que la propia carga competía por la conexión y lo bajaba todo dos veces en el peor momento.
 // Banda sonora (js/data/bandaSonora.js): sus canciones de la carga empiezan a descargarse ya, antes que nada (sin archivos
 // configurados no hace nada). CONFIG.volumen se lee al sonar (el contenido puede cambiarlo).
 const banda = crearBandaSonora({ volumen: () => CONFIG.volumen });
 if (location.hash === '#debug' || new URLSearchParams(location.search).has('pruebaAudio')) window.__bandaSonora = banda;
-const paquetesDesdeElPrincipio = !!navigator.serviceWorker?.controller;
-if (paquetesDesdeElPrincipio) vigilarPaquetes();
+// Paquetes guardados en el dispositivo desde el primer momento (también en la primera visita: lo que se descarga se
+// guarda mientras llega, sin descargas de más que compitan con la carga). Nunca recarga la página por sí solo.
+const paquetes = vigilarPaquetes();
 try {
   await cargarContenido();
   if (location.hash === '#borrador') { const borrador = localStorage.getItem('xiomara:contenido-borrador'); if (borrador) aplicarContenido(JSON.parse(borrador)); }
@@ -140,11 +138,18 @@ try {
   }
   etapa = 'preparación de shaders y texturas';
   await escena.listo;
+  escena.esperarGPU();
   etapa = 'listo';
-  cargaTerminada();   // la carga llegó al final: no hubo cierre
-  // Las canciones de los destinos y los paquetes, en segundo plano cuando termina el videoclip de la intro (no le
-  // quitan cuadros mientras suena).
-  entrada.trasIntro(() => { banda.cargaTerminada(); if (!paquetesDesdeElPrincipio) setTimeout(vigilarPaquetes, 4000); });
+  // Tras entrar, cuando el vuelo de entrada ha terminado (nada compite con él: ni descargas, ni el guardado de paquetes):
+  //  · la carga se da por buena (sin cierre por memoria): si iOS cierra la página en el clip o en la entrada (el pico de
+  //    memoria llega ahí, con todo ya en la GPU), la siguiente carga arranca en el modo ligero (dispositivo.js) en lugar de
+  //    cerrarse otra vez igual;
+  //  · las canciones de los destinos se descargan despacio y el service worker completa los paquetes guardados.
+  //    (Antes empezaban al acabar el clip y caían en pleno vuelo de entrada: tirones mientras la cámara se acercaba.)
+  entrada.alEntrarTambien(() => {
+    const mirar = () => { if (escena.viajando) { setTimeout(mirar, 500); return; } setTimeout(() => { cargaTerminada(); banda.cargaTerminada(); }, 3000); setTimeout(() => paquetes.completar(), 8000); };
+    setTimeout(mirar, 1500);
+  });
   entrada.listo();
   crearMedidor(escena);
   if (location.hash === '#debug') window.__galaxia = { escena, recuerdos, interfaz, progreso, estrellas };

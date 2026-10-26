@@ -252,6 +252,18 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
     get activa() { return activa; },
     get objetivo() { return objetivo; },
     tiene: nombre => pistas.has(nombre) && pistas.get(nombre).estado !== 'fallo',
+    // Promesa: la canción de ese momento descargada y, si ya tiene su <audio>, con datos para sonar sin esperar (como mucho
+    // `plazo` ms). La intro no empieza su clip hasta tenerla así (todo preparado antes: sin arranques a trompicones).
+    preparada(nombre, plazo = 4000) {
+      const p = pistas.get(nombre); if (!p) return Promise.resolve(false);
+      const t0 = performance.now();
+      return new Promise(fin => { const mirar = () => {
+        if (p.estado === 'fallo') return fin(false);
+        if (p.estado === 'lista' && (!p.el || p.conSilencio || p.el.readyState >= 3)) return fin(true);
+        if (performance.now() - t0 > plazo && p.estado === 'lista') return fin(true);
+        setTimeout(mirar, 80);
+      }; mirar(); });
+    },
     marcas: nombre => ({ ...(pistas.get(nombre)?.conf.marcas || {}) }),
     config: nombre => ({ ...(pistas.get(nombre)?.conf || {}) }),
     // Lo que dura el fragmento de ese momento (0 si no tiene canción o su archivo falta): la escena de un gigante dura eso.

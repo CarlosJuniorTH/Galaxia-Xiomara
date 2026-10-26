@@ -1467,6 +1467,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   requestAnimationFrame(animar);
   return {
     listo,
+    // Espera a que la GPU termine lo pendiente de la carga (subidas, calentamiento): el clip de la intro no lo hereda.
+    esperarGPU() { try { renderer.getContext().finish(); } catch {} },
     iniciar(destino = 'hogar', { duracion = 7 } = {}) { if (tEntrada !== null) return; tEntrada = tiempo; return viajar(destino, { duracion }); },
     actividad: marcarActividad,
     pedirCuadro: () => planificador.pedirCuadro(),

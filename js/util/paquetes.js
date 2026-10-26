@@ -1,6 +1,6 @@
 // Paquetes del universo (como un videojuego): el service worker (sw.js, generado por scripts/preparar-pages.mjs) guarda en
 // el dispositivo todo lo que la página descarga desde la PRIMERA visita (se registra al abrir la página y empieza a guardar
-// en cuanto se activa); al terminar la intro completa en segundo plano lo que faltara. Así, si la página se recarga (o iOS
+// en cuanto se activa); tras entrar (con el vuelo de entrada ya terminado) completa en segundo plano lo que faltara. Así, si la página se recarga (o iOS
 // la cierra y la vuelve a abrir) no se vuelve a descargar lo que ya está guardado.
 // Versiones nuevas: se descargan en segundo plano y se aplican en la PRÓXIMA visita (cuando no queda ninguna pestaña con la
 // versión vieja), o antes si quien mira pulsa «Actualizar» ya dentro del universo. Nunca se recarga sola (antes lo hacía si
@@ -35,7 +35,7 @@ export function vigilarPaquetes({ dentro = () => document.body.classList.contain
     setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
   }).catch(e => console.warn('Sin paquetes guardados:', e.message));
   return {
-    // Terminada la intro: que el service worker guarde lo que aún no tenga (en segundo plano, sin prisa).
+    // Tras entrar: que el service worker guarde lo que aún no tenga (en segundo plano, sin prisa).
     completar() { completarPedido = true; pedirCompletar(); }
   };
 }
