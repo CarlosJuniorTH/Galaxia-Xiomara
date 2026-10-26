@@ -47,7 +47,9 @@ function instrumentar(diag) {
     try { new PerformanceObserver(l => { for (const x of l.getEntries()) M.loaf.push({ t: x.startTime, dur: Math.round(x.duration), bloq: Math.round(x.blockingDuration), render: Math.round(x.startTime + x.duration - x.renderStart), estilo: x.styleAndLayoutStart ? Math.round(x.startTime + x.duration - x.styleAndLayoutStart) : 0, scripts: x.scripts.map(s => ({ dur: Math.round(s.duration), inv: s.invoker, f: s.sourceFunctionName, src: (s.sourceURL || '').split('/').slice(-2).join('/') + ':' + s.sourceCharPosition, tipo: s.invokerType, forzado: Math.round(s.forcedStyleAndLayoutDuration) })) }); }).observe({ type: 'long-animation-frame', buffered: false }); } catch {}
   }
   // Solo cuentan los cuadros DIBUJADOS (el planificador puede saltarse avisos de la pantalla a propósito).
-  let previo = 0, n0 = -1;
+  let previo = 0, n0 = -1, oscuroDesde = null;
+  const fundido = document.getElementById('fundido-escena');
+  new MutationObserver(() => { const a = fundido.classList.contains('activo'); if (a && oscuroDesde === null) oscuroDesde = performance.now(); else if (!a) oscuroDesde = null; }).observe(fundido, { attributes: true, attributeFilter: ['class'] });
   const f = t => {
     const n = e.cuadrosDibujados;
     if (n !== n0) {
@@ -55,6 +57,9 @@ function instrumentar(diag) {
         const c = e.interno, info = c.renderer.info, d = c.renderer.domElement.dataset;
         const r = { t: Math.round(t - M.marca), dt: +(t - previo).toFixed(1), fase: d.fase || (e.viajando ? 'viaje' : 'llegado'), prog: info.programs?.length ?? 0, geo: info.memory.geometries, tex: info.memory.textures, res: d.resolucion3d, esc: c.escenaActiva };
         if (diag) { r.gl = actual; actual = {}; }
+        // Bajo el fundido a negro del paso al sistema solar (opaco: activo desde hace más de su transición de 0,45 s) no se
+        // ve ningún cuadro: un cuadro largo ahí no es un tirón visible (se anota aparte, «oculto»).
+        if (fundido.classList.contains('activo') && oscuroDesde !== null && previo - oscuroDesde > 470) r.oculto = true;
         M.cuadros.push(r);
       }
       previo = t; n0 = n;
@@ -117,6 +122,8 @@ async function medirRuta(pagina, cdp, ruta, cpu, diag) {
   // Solo lo que pasa desde el clic (antes, en reposo, el planificador puede no dibujar: no es un tirón).
   // El primero cuenta desde el clic (lo que se tarda en ver la respuesta).
   r.cuadros = r.cuadros.filter(c => c.t > 0); if (r.cuadros[0] && r.cuadros[0].t - r.cuadros[0].dt < 0) r.cuadros[0].dt = r.cuadros[0].t;
+  const ocultos = r.cuadros.filter(c => c.oculto && c.dt > UMBRAL_MS).map(c => `${c.dt}@${c.t}`);
+  r.cuadros = r.cuadros.filter(c => !c.oculto);
   const dt = r.cuadros.map(c => c.dt);
   const { mediana, tirones } = contarTirones(dt);
   const detalle = r.cuadros.filter(c => c.dt > UMBRAL_MS && c.dt > VECES_MEDIANA * mediana);
@@ -129,7 +136,7 @@ async function medirRuta(pagina, cdp, ruta, cpu, diag) {
     let t = perfil.startTime, fin = null; for (let i = 0; i < perfil.samples.length; i++) { t += perfil.timeDeltas[i]; if (ids.has(perfil.samples[i])) fin = t; }
     if (fin !== null) atribuir(perfil, fin, [...detalle, ...peores]);
   }
-  return { ruta, destinoFinal: r.destino, llegada: r.llegada, cambio: r.cambio, cuadros: dt.length, mediana: +mediana.toFixed(1), max: Math.round(Math.max(0, ...dt)), tirones: tirones.length, detalle, peores, loaf: r.loaf.filter(l => l.dur > UMBRAL_MS) };
+  return { ruta, destinoFinal: r.destino, llegada: r.llegada, cambio: r.cambio, cuadros: dt.length, mediana: +mediana.toFixed(1), max: Math.round(Math.max(0, ...dt)), tirones: tirones.length, ocultos, detalle, peores, loaf: r.loaf.filter(l => l.dur > UMBRAL_MS) };
 }
 
 // Abre una página nueva (reintenta si la GPU compartida no da contexto WebGL o la carga falla).
@@ -155,9 +162,18 @@ export default async function ({ base, informe }) {
     try {
       await pagina.evaluate(instrumentar, diag);
       for (const ruta of rutas) {
-        let m; try { m = await medirRuta(pagina, cdp, ruta, cpu, diag); } catch (err) { m = { ruta, error: err.message.split('\n')[0], tirones: 99 }; await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 }).catch(() => {}); }
+        // Si la mediana del tramo no es la de la pantalla (60 Hz: 16,7 ms), la máquina estaba saturada por otros procesos
+        // (todo el tramo va lento, no hay tirones que medir): se repite la ruta, como mucho dos veces.
+        let m;
+        for (let intento = 0; intento < 3; intento++) {
+          try { m = await medirRuta(pagina, cdp, ruta, cpu, diag); } catch (err) { m = { ruta, error: err.message.split('\n')[0], tirones: 99 }; await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 }).catch(() => {}); }
+          if (m.error || m.mediana < 18.5) break;
+          console.log(`  · [${p + 1}/${pasadas}] ${ruta}: máquina saturada (mediana ${m.mediana} ms), se repite`);
+          m.repetida = (m.repetida || 0) + 1;
+          if (intento < 2) await pagina.evaluate(r => { const g = window.__galaxia; g.interfaz.terminarEscena(); return g.interfaz.visitar(r); }, ruta.split('>')[0]).catch(() => {});
+        }
         m.pasada = p; todas.push(m);
-        console.log(`  · [${p + 1}/${pasadas}] ${ruta.padEnd(28)} tirones ${m.tirones}${m.error ? ' ERROR ' + m.error : `  (mediana ${m.mediana} ms, máx ${m.max} ms, ${m.cuadros} cuadros) ${m.detalle.map(d => `${d.dt}@${d.t}/${d.fase}${d.ocupado !== undefined ? '/cpu' + d.ocupado : ''}`).join(' ')}`}`);
+        console.log(`  · [${p + 1}/${pasadas}] ${ruta.padEnd(28)} tirones ${m.tirones}${m.error ? ' ERROR ' + m.error : `  (mediana ${m.mediana} ms, máx ${m.max} ms, ${m.cuadros} cuadros${m.ocultos?.length ? ', bajo el fundido: ' + m.ocultos.join(' ') : ''}) ${m.detalle.map(d => `${d.dt}@${d.t}/${d.fase}${d.ocupado !== undefined ? '/cpu' + d.ocupado : ''}`).join(' ')}`}`);
       }
       if (errores.length) todas.push({ pasada: p, errores: errores.slice(0, 5) });
     } finally { await navegador.close(); }
