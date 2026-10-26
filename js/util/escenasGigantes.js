@@ -51,36 +51,40 @@ export const ESCENA_PULSAR = { id: 'pulsar', duracion: 33.6, pulso: 60 / 108, co
 //  ideal 27,58 «es mi mujer…»: la luz de la galaxia se recoge en el núcleo; cima 28,64 «…ideal»: los chorros se disparan
 //             hasta su punta; estalla 29,4 (la música crece): en las puntas florecen los lóbulos y una onda de motas sale del
 //             disco. Queda el cuásar de siempre, entero, para explorarlo.
-// camara: la pista del videoclip para el director de cámara (js/util/directorCamara.js), en el sistema del cuásar (Y: eje de
-// los chorros; el disco en XZ): pos [azimut°, elevación° sobre el disco, distancia en radios de encuadre (5200 unidades del
-// cuásar: el disco mide 0,21, la galaxia 0,92 y cada chorro 1,46)], mira [x, y, z] en radios, fov y curva de llegada.
+// camara: la pista del videoclip para el director de cámara (js/util/directorCamara.js): azimut 0 hacia casa (por donde se
+// llega: [≈4°, 44°, 1,0]), elevación sobre el disco (+90 = el chorro del lado de casa), distancia en radios de encuadre
+// (lejano.dist; en el cuásar el disco mide ~0,21, la galaxia ~0,92 y cada chorro ~1,46). Ningún plano más cerca de ~0,62 R
+// con fov ≥ 44: más cerca la imagen horneada del remolino (4096 px; 2048 en el móvil) se amplía y se ve borrosa. giro: el
+// director pone «arriba» en el eje de los chorros (se verían siempre verticales); con −135° la imagen es la de la llegada
+// (chorros en diagonal, como el diseño) y el clip juega alrededor (−160…−120) para que los chorros cambien de diagonal. El
+// último (−136) es el del encuadre en el que el director devuelve el control: así el fundido de salida no gira la imagen.
 export const ESCENA_CUASAR = {
   id: 'cuasar', duracion: 31,
   marcas: { inicio: 0, recogido: 1.3, vi: 3.18, salir: 4.9, excusa: 5.74, pedir: 8, novios: 9.3, increible: 10.58, simple: 12.1, wow: 13.32,
     otras: 14.52, bellas: 18.6, pero: 21.02, golpe1: 21.85, golpe2: 23.13, golpe3: 24.43, reir: 25.06, disfrutar: 25.98, ideal: 27.58, cima: 28.64,
     estalla: 29.4, fin: 31 },
   camara: [
-    { t: 0, pos: [30, 25, 1.0], mira: [0, 0, 0], fov: 50, curva: 'suave' },             // el encuadre de llegada
-    { t: 1.3, pos: [40, 24, 0.85], mira: [0, 0, 0], fov: 48, curva: 'suave' },           // los chorros se recogen
-    { t: 3.0, pos: [55, 20, 0.62], mira: [0, 0, 0], fov: 44, curva: 'suave' },          // «desde la primera vez…»: hacia el núcleo dormido
-    { t: 3.18, pos: [70, 6, 0.7], mira: [0, 0.04, 0], fov: 46, curva: 'corte' },       // «…la vi»: corte a ras del disco: la chispa
-    { t: 4.8, pos: [82, 9, 0.72], mira: [0, 0.05, 0], fov: 46, curva: 'lineal' },
-    { t: 5.8, pos: [95, 15, 0.85], mira: [0, 0.1, 0], fov: 46, curva: 'rapida' },      // salir: sigue el estirón de los chorros
-    { t: 7.7, pos: [150, 40, 0.68], mira: [0, 0, 0], fov: 44, curva: 'suave' },         // las excusas: desde arriba, la caída en espiral
-    { t: 8.0, pos: [200, 4, 1.15], mira: [0, 0, 0], fov: 48, curva: 'corte' },          // «y le pedí…» (golpe de la música): de lado, los dos chorros
-    { t: 10.2, pos: [212, 6, 1.28], mira: [0, 0, 0], fov: 48, curva: 'suave' },         // novios: se lanzan juntos
-    { t: 13.32, pos: [235, 28, 0.6], mira: [0, 0, 0], fov: 40, curva: 'suave' },       // «simplemente increíble»: acercamiento al núcleo
-    { t: 14.3, pos: [240, 30, 0.62], mira: [0, 0, 0], fov: 40, curva: 'lineal' },
-    { t: 17.9, pos: [270, 58, 1.7], mira: [0, 0, 0], fov: 55, curva: 'suave' },         // las otras: la galaxia entera, desde arriba
-    { t: 20.9, pos: [300, 52, 1.65], mira: [0, 0, 0], fov: 55, curva: 'lineal' },
-    { t: 22.0, pos: [320, 18, 0.8], mira: [0, 0.05, 0], fov: 46, curva: 'rapida' },    // «pero ella»: de vuelta al centro, rápido
-    { t: 24.9, pos: [345, 10, 0.9], mira: [0, 0.15, 0], fov: 46, curva: 'lineal' },    // los tres golpes: travelling junto a los chorros
-    { t: 25.5, pos: [352, 22, 0.7], mira: [0, 0, 0], fov: 44, curva: 'rapida', giro: 5 },   // «me hace reír»: un vaivén
-    { t: 26.0, pos: [356, 24, 0.68], mira: [0, 0, 0], fov: 43, curva: 'suave', giro: -3 },
-    { t: 27.4, pos: [370, 26, 0.64], mira: [0, 0, 0], fov: 42, curva: 'suave' },        // disfrutar con ella: órbita lenta y cálida
-    { t: 28.6, pos: [380, 20, 0.55], mira: [0, 0, 0], fov: 42, curva: 'suave' },        // «es mi mujer…»: muy cerca del núcleo
-    { t: 29.9, pos: [395, 12, 1.6], mira: [0, 0, 0], fov: 52, curva: 'rapida' },       // «…ideal»: hacia atrás con los chorros disparados
-    { t: 31, pos: [400, 22, 1.1], mira: [0, 0, 0], fov: 50, curva: 'suave' }            // se queda: el cuásar entero
+    { t: 0, pos: [0, 44, 1.0], mira: [0, 0, 0], fov: 50, curva: 'suave', giro: -135 },              // el encuadre de llegada (desde casa)
+    { t: 1.3, pos: [10, 30, 0.88], mira: [0, 0, 0], fov: 48, curva: 'suave', giro: -140 },          // los chorros se recogen
+    { t: 3.0, pos: [25, 20, 0.66], mira: [0, 0, 0], fov: 46, curva: 'suave', giro: -148 },          // «desde la primera vez…»: hacia el núcleo dormido
+    { t: 3.18, pos: [40, 6, 0.72], mira: [0, 0.04, 0], fov: 46, curva: 'corte', giro: -160 },       // «…la vi»: corte a ras del disco: la chispa
+    { t: 4.8, pos: [52, 9, 0.74], mira: [0, 0.05, 0], fov: 46, curva: 'lineal', giro: -158 },
+    { t: 5.8, pos: [65, 15, 0.86], mira: [0, 0.1, 0], fov: 46, curva: 'rapida', giro: -150 },       // salir: sigue el estirón de los chorros
+    { t: 7.7, pos: [120, 40, 0.7], mira: [0, 0, 0], fov: 46, curva: 'suave', giro: -140 },          // las excusas: desde arriba, la caída en espiral
+    { t: 8.0, pos: [170, 4, 1.15], mira: [0, 0, 0], fov: 48, curva: 'corte', giro: -120 },          // «y le pedí…» (golpe de la música): de lado, los dos chorros
+    { t: 10.2, pos: [182, 6, 1.28], mira: [0, 0, 0], fov: 48, curva: 'suave', giro: -125 },         // novios: se lanzan juntos
+    { t: 13.32, pos: [205, 28, 0.64], mira: [0, 0, 0], fov: 44, curva: 'suave', giro: -140 },       // «simplemente increíble»: acercamiento al núcleo
+    { t: 14.3, pos: [210, 30, 0.66], mira: [0, 0, 0], fov: 44, curva: 'lineal', giro: -142 },
+    { t: 17.9, pos: [240, 58, 1.7], mira: [0, 0, 0], fov: 55, curva: 'suave', giro: -150 },         // las otras: la galaxia entera, desde arriba
+    { t: 20.9, pos: [270, 52, 1.65], mira: [0, 0, 0], fov: 55, curva: 'lineal', giro: -160 },
+    { t: 22.0, pos: [290, 18, 0.82], mira: [0, 0.05, 0], fov: 46, curva: 'rapida', giro: -130 },    // «pero ella»: de vuelta al centro, rápido
+    { t: 24.9, pos: [315, 10, 0.9], mira: [0, 0.15, 0], fov: 46, curva: 'lineal', giro: -125 },     // los tres golpes: travelling junto a los chorros
+    { t: 25.5, pos: [322, 22, 0.72], mira: [0, 0, 0], fov: 46, curva: 'rapida', giro: -128 },   // «me hace reír»: un vaivén
+    { t: 26.0, pos: [326, 24, 0.7], mira: [0, 0, 0], fov: 45, curva: 'suave', giro: -137 },
+    { t: 27.4, pos: [340, 26, 0.66], mira: [0, 0, 0], fov: 44, curva: 'suave', giro: -132 },    // disfrutar con ella: órbita lenta y cálida
+    { t: 28.6, pos: [350, 20, 0.66], mira: [0, 0, 0], fov: 45, curva: 'suave', giro: -135 },        // «es mi mujer…»: lo más cerca del núcleo
+    { t: 29.9, pos: [365, 12, 1.6], mira: [0, 0, 0], fov: 52, curva: 'rapida', giro: -128 },        // «…ideal»: hacia atrás con los chorros disparados
+    { t: 31, pos: [370, 24, 1.1], mira: [0, 0, 0], fov: 50, curva: 'suave', giro: -136 }            // se queda: el cuásar entero
   ]
 };
 

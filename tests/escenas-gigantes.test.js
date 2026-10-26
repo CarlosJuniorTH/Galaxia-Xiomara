@@ -68,6 +68,17 @@ test('la pista de cámara del cuásar: en orden, dentro de la canción y sin met
   }
 });
 
+test('el clip del cuásar con el director real: sin primeros planos borrosos ni meterse en el disco o los chorros', async () => {
+  const { muestrearCamara } = await import('../js/util/directorCamara.js');
+  const g = Math.PI / 180;
+  for (let t = 0; t <= ESCENA_CUASAR.duracion; t += 1 / 30) {
+    const m = muestrearCamara(ESCENA_CUASAR.camara, t), [, el, d] = m.pos;
+    // Lo que abarca la pantalla (alto) en radios: por debajo de ~0,5 la imagen horneada del remolino se amplía (borrosa).
+    assert.ok(2 * d * Math.tan(m.fov * g / 2) > 0.48, `plano demasiado cerrado en ${t.toFixed(2)}: d ${d.toFixed(2)}, fov ${m.fov.toFixed(0)}`);
+    assert.ok(Math.cos(el * g) * d > 0.22 && (Math.abs(Math.sin(el * g) * d) > 0.03 || Math.cos(el * g) * d > 0.95), `dentro del gigante en ${t.toFixed(2)}`);
+  }
+});
+
 test('las marcas de las canciones son las de las escenas', async () => {
   const { MOMENTOS } = await import('../js/data/bandaSonora.js');
   assert.equal(MOMENTOS.pulsar.archivo, 'pulsar.m4a'); assert.equal(MOMENTOS.cuasar.archivo, 'cuasar.m4a');
