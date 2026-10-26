@@ -143,7 +143,7 @@ async function medirRuta(pagina, cdp, ruta, cpu, diag) {
 async function abrirConGpu(base) {
   for (let intento = 1; ; intento++) {
     try {
-      const a = await abrir(base, DISPOSITIVO, { espera: 2500, musica: process.env.TIRONES_MUSICA === '1' });
+      const a = await abrir(base, DISPOSITIVO, { espera: 2500, musica: process.env.TIRONES_MUSICA === '1', consulta: process.env.TIRONES_CONSULTA || '' });
       const webgl = await a.pagina.evaluate(() => document.getElementById('galaxia').dataset.webgl || '');
       if (webgl && webgl !== 'ninguno') return a;
       await a.navegador.close(); throw new Error('sin contexto WebGL');
