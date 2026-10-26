@@ -158,7 +158,7 @@ function rgba(c, a) {
   return v;
 }
 const cacheFuente = new Map();
-const fuente = (tam, familia) => { const k = familia + tam; let v = cacheFuente.get(k); if (!v) cacheFuente.set(k, v = familia === 'v' ? `${tam}px 'Great Vibes', cursive` : familia === 'c' ? `italic ${tam}px 'Cormorant Garamond', serif` : `600 ${tam}px Quicksand, sans-serif`); return v; };
+const fuente = (tam, familia) => { const k = familia + tam; let v = cacheFuente.get(k); if (!v) cacheFuente.set(k, v = familia === 'v' ? `${tam}px 'Great Vibes', cursive` : familia === 'c' ? `italic ${tam}px 'Cormorant Garamond', serif` : familia === 'r' ? `400 ${tam}px 'Cormorant Garamond', serif` : `600 ${tam}px Quicksand, sans-serif`); return v; };
 // Tonos de las motas del mapa (rosa, lila, blanco) y el de las que enciende una onda al pasar.
 const TONOS = ['rgb(242,184,222)', 'rgb(214,186,255)', 'rgb(255,222,240)', 'rgb(255,246,252)'];
 const COL = [rgba(VIOLETA, 1), rgba(ROSA, 1), rgba(BLANCO, 1)];
@@ -216,9 +216,9 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
   // ── Motas del mapa, en tres niveles de detalle (se rehacen al cambiar el tamaño: su paso depende de la escala) ──
   // Nivel 0 en todo el mundo (cada ~5,4 px en el plano general); el 1, a la mitad de paso, en todo lo que la cámara ve
   // desde z ≈ 1,3; el 2 y el 3, a un cuarto y a un octavo, alrededor de las dos ciudades (los primeros planos: z ≥ 2,7 y
-  // z ≥ 5,3 solo se usan ahí, así no se ve dónde acaba cada nivel). Cada nivel, ordenado en celdas de 8° para recorrer solo
+  // z ≥ 5,3 solo se usan ahí, así no se ve dónde acaba cada nivel). Cada nivel, ordenado en celdas de 4° para recorrer solo
   // lo que se ve.
-  const CEL = 8, NCX = Math.ceil(360 / CEL), Y0C = -172, NCY = Math.ceil((172 + 142) / CEL);
+  const CEL = 4, NCX = Math.ceil(360 / CEL), Y0C = -172, NCY = Math.ceil((172 + 142) / CEL);
   let niveles = [], pasoBase = 5.4;
   // Las rejillas están anidadas: todas parten del mismo origen y la de cada nivel, con la mitad de paso, solo guarda las
   // motas que la anterior no tiene; así, con dos niveles a la vez, la densidad es justo la del fino (sin dobles).
@@ -246,7 +246,7 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
   // más meridianos y paralelos en motas muy tenues.
   let globo = { n: 0 }, rejillaGlobo = { n: 0 };
   function construirGlobo(R) {
-    const N = Math.round(Math.max(6000, Math.min(26000, 4 * Math.PI * R * R / 19))), r = sembrado(77), gx = [], gy = [], gz = [], gt = [], gr = [];
+    const N = Math.round(Math.max(6000, Math.min(26000, 4 * Math.PI * R * R / 30))), r = sembrado(77), gx = [], gy = [], gz = [], gt = [], gr = [];
     const oro = Math.PI * (3 - Math.sqrt(5));
     for (let i = 0; i < N; i++) {
       const z = 1 - 2 * (i + 0.5) / N, rr = Math.sqrt(1 - z * z), a = i * oro, lat = Math.asin(z) / RAD, lon = ((a / RAD + 180) % 360 + 360) % 360 - 180;
@@ -267,8 +267,8 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     lienzo.width = Math.round(ancho * dpr); lienzo.height = Math.round(alto * dpr);
     // Escala base (zoom 1): las dos orillas ocupan ~60 % de la pantalla (en horizontal, la altura manda).
     k0 = Math.min(ancho * (vertical ? 0.62 : 0.42) / (CX - XX), alto * (vertical ? 0.54 : 0.62) / (XY - CY));
-    // Paso de las motas en el plano general: ~5,4 px (algo más en pantallas grandes, que no se llenen de motas).
-    pasoBase = Math.max(5.4, m / 125); const p0 = pasoBase / k0;
+    // Paso de las motas en el plano general: ~6 px (algo más en pantallas grandes, que no se llenen de motas).
+    pasoBase = Math.max(6, m / 115); const p0 = pasoBase / k0;
     niveles = [
       nivel(p0, 0, -180, 180, -150, 100, true),
       nivel(p0, 1, -125, 80, -125, 100),
@@ -279,7 +279,9 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     ];
     construirGlobo(m * 0.4);
     // Al final, el mundo pequeño arriba y la tarjeta debajo.
-    Fx = ancho / 2; Fy = alto * (vertical ? 0.16 : 0.18); Sf = m * (vertical ? 0.13 : 0.11);
+    Fx = ancho / 2; Fy = alto * (vertical ? 0.17 : 0.18); Sf = vertical ? Math.min(m * 0.19, alto * 0.115) : m * 0.11;
+    // En el móvil apaisado la tarjeta ocupa toda la altura: el mundo va a su izquierda, en el hueco libre.
+    if (!vertical && alto < 560) { const hueco = (ancho - Math.min(430, ancho - 32)) / 2; Fx = hueco / 2; Fy = alto * 0.5; Sf = Math.max(0, Math.min(m * 0.22, hueco / 2 - 14)); }
     x.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
   medir();
@@ -370,6 +372,7 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
   // Zonas de los rótulos del cuadro (las motas del mapa que caen dentro se apagan).
   const ZX0 = new Float32Array(4), ZX1 = new Float32Array(4), ZY0 = new Float32Array(4), ZY1 = new Float32Array(4);
   let nZ = 0;
+  const enZona = (px, py) => { for (let z = 0; z < nZ; z++) { const ex = (px - ZX0[z]) / ZX1[z], ey = (py - ZY0[z]) / ZY1[z]; if (ex * ex + ey * ey < 1) return true; } return false; };
   const zona = (x0, y0, x1, y1) => { if (nZ < 4) { ZX0[nZ] = (x0 + x1) / 2; ZY0[nZ] = (y0 + y1) / 2; ZX1[nZ] = (x1 - x0) * 0.62; ZY1[nZ] = (y1 - y0) * 0.75; nZ++; } };
 
   // ── Piezas de dibujo ──
@@ -402,16 +405,30 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     luz(QX, QY, color, tam * Math.min(1.35, Math.max(0.7, f)), t, alfa);
     return true;
   }
-  // Una onda sobre el plano: anillo de motas (línea de puntos redondos) que se abre; en perspectiva, una elipse.
+  // Líneas de puntos: motas cuadradas colocadas a mano cada «paso» px sobre una polilínea, en el camino actual (se pintan
+  // con un fill). Nada de setLineDash: los trazos discontinuos, con miles de motas, hacían que Chrome dejara de acelerar el
+  // lienzo y el clip caía a 10 FPS con la CPU ×4. pIni empieza una polilínea; pA le añade un tramo hasta (px, py).
+  let dPX = 0, dPY = 0, dResto = 0, dPaso = 6, dLado = 1.2;
+  function pIni(px, py, paso, lado) { dPX = px; dPY = py; dResto = 0; dPaso = paso; dLado = lado; }
+  function pA(px, py) {
+    const dx = px - dPX, dy = py - dPY, L = Math.hypot(dx, dy);
+    // (si el tramo no toca la pantalla, se salta entero)
+    if (Math.max(dPX, px) < -4 || Math.min(dPX, px) > ancho + 4 || Math.max(dPY, py) < -4 || Math.min(dPY, py) > alto + 4) { dResto = (dResto - L) % dPaso; if (dResto < 0) dResto += dPaso; dPX = px; dPY = py; return; }
+    const h = dLado / 2;
+    let s = dResto;
+    for (; s <= L; s += dPaso) { const k = L > 0 ? s / L : 0, qx = dPX + dx * k, qy = dPY + dy * k; if (qx > -4 && qx < ancho + 4 && qy > -4 && qy < alto + 4) x.rect(qx - h, qy - h, dLado, dLado); }
+    dResto = s - L; dPX = px; dPY = py;
+  }
+  // Una onda sobre el plano: anillo de motas que se abre; en perspectiva, una elipse.
   function ondaPlano(wx, wy, r, color, alfa) {
     if (alfa <= 0.01) return;
-    x.globalAlpha = alfa; x.strokeStyle = rgba(color, 1); x.lineWidth = 1.7; x.setLineDash([0, 5.5]); x.lineCap = 'round';
+    x.globalAlpha = alfa; x.fillStyle = rgba(color, 1);
     x.beginPath(); let abierto = false;
     for (let i = 0; i <= 72; i++) {
       const a = i / 72 * TAU;
-      if (proyectar(wx + Math.cos(a) * r, wy + Math.sin(a) * r)) { if (abierto) x.lineTo(QX, QY); else x.moveTo(QX, QY); abierto = true; } else abierto = false;
+      if (proyectar(wx + Math.cos(a) * r, wy + Math.sin(a) * r)) { if (abierto) pA(QX, QY); else pIni(QX, QY, 5.5, 1.7); abierto = true; } else abierto = false;
     }
-    x.stroke(); x.setLineDash([]); x.lineCap = 'butt'; x.globalAlpha = 1;
+    x.fill(); x.globalAlpha = 1;
   }
   // Chispas de un golpe: trazos cortos que salen disparados y se apagan.
   function chispas(px, py, edad, color, R, dur = 0.9) {
@@ -435,20 +452,20 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     if (dato) { x.fillStyle = 'rgb(232,200,224)'; x.font = fuente(tp, 'q'); espaciar('3px'); x.fillText(dato, qx + 1.5, qy + tp + 9); espaciar('0px'); }
     x.globalAlpha = 1; x.globalCompositeOperation = 'lighter';
   }
-  // «Carlos & Xiomara»: los nombres en Great Vibes y el «&» en Cormorant Garamond cursiva (el de Great Vibes parece
-  // una «E»), un poco más grande y alzado, con su aire a cada lado. Anchos medidos una vez por tamaño.
+  // «Carlos & Xiomara»: los nombres en Great Vibes y el «&» en Cormorant Garamond redonda (el de Great Vibes y el de
+  // la cursiva parecen una «E»; es el mismo de la cabecera del universo), un poco más pequeño y alzado, con su aire a cada lado. Anchos medidos una vez por tamaño.
   const anchosPareja = new Map();
   // (las fuentes del lienzo se piden ya: si no, el primer texto saldría con la de respaldo y su ancho medido, mal)
-  if (document.fonts?.load) Promise.all(["40px 'Great Vibes'", "italic 40px 'Cormorant Garamond'", "600 12px Quicksand"].map(f => document.fonts.load(f))).then(() => anchosPareja.clear(), () => {});
+  if (document.fonts?.load) Promise.all(["40px 'Great Vibes'", "italic 40px 'Cormorant Garamond'", "40px 'Cormorant Garamond'", "600 12px Quicksand"].map(f => document.fonts.load(f))).then(() => anchosPareja.clear(), () => {});
   function pareja(cx, py, tam, alfa) {
     if (alfa <= 0.01) return;
     const tn = Math.round(tam), ta = Math.round(tam * 0.92);
     let w = anchosPareja.get(tn);
-    if (!w) { x.font = fuente(tn, 'v'); const a = x.measureText('Carlos').width, c = x.measureText('Xiomara').width; x.font = fuente(ta, 'c'); const y = x.measureText('&').width; w = [a, y, c, tn * 0.2]; anchosPareja.set(tn, w); }
+    if (!w) { x.font = fuente(tn, 'v'); const a = x.measureText('Carlos').width, c = x.measureText('Xiomara').width; x.font = fuente(ta, 'r'); const y = x.measureText('&').width; w = [a, y, c, tn * 0.2]; anchosPareja.set(tn, w); }
     const [a, y, c, aire] = w, x0 = cx - (a + y + c + 2 * aire) / 2;
     x.globalCompositeOperation = 'source-over'; x.globalAlpha = alfa; x.textBaseline = 'alphabetic'; x.textAlign = 'left'; x.fillStyle = 'rgb(255,209,230)';
     x.font = fuente(tn, 'v'); x.fillText('Carlos', x0, py); x.fillText('Xiomara', x0 + a + y + 2 * aire, py);
-    x.fillStyle = 'rgb(255,226,240)'; x.font = fuente(ta, 'c'); x.fillText('&', x0 + a + aire, py - tn * 0.04);
+    x.fillStyle = 'rgb(255,226,240)'; x.font = fuente(ta, 'r'); x.fillText('&', x0 + a + aire, py - tn * 0.04);
     x.textAlign = 'center'; x.globalAlpha = 1; x.globalCompositeOperation = 'lighter';
   }
   function texto(px, py, cadena, tam, familia, color, alfa, espacio = '0px') {
@@ -531,18 +548,17 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     const rejilla = mapaVis * (calma ? tramo(t, H.mapa, H.espera) : Math.max(sat(Math.max(revC, revX) / 30), tramo(t, H.juntos, H.espera)));
     if (rejilla > 0.01) {
       cajaVisible();
-      x.lineCap = 'round'; x.setLineDash([0, 6]); x.lineWidth = 1.1; x.strokeStyle = 'rgb(190,170,255)';
-      x.globalAlpha = 0.2 * rejilla; x.beginPath();
+      x.fillStyle = 'rgb(190,170,255)';
+      x.globalAlpha = 0.2 * rejilla; x.beginPath(); dPaso = 6; dLado = 1.1;
       for (let lon = Math.ceil(bx0 / 10) * 10; lon <= bx1; lon += 10) segmento(lon, Math.max(by0, -150), lon, Math.min(by1, 142));
       for (let lat = -70; lat <= 70; lat += 10) { if (lat === 0) continue; const y = -merc(lat); if (y < by0 || y > by1) continue; segmento(Math.max(bx0, -180), y, Math.min(bx1, 180), y); }
-      x.stroke();
+      x.fill();
       // El ecuador: más claro; desde el encuentro, una luz que corre por él hacia los dos lados.
       if (by0 < 0 && by1 > 0) {
         const corre = t > H.encuentro ? salida(tramo(t, H.encuentro, H.encuentro + 2.2)) * 200 : 0;
-        x.globalAlpha = 0.34 * rejilla; x.beginPath(); segmento(Math.max(bx0, -180), 0, Math.min(bx1, 180), 0); x.stroke();
-        if (corre > 0) { x.globalAlpha = 0.9 * rejilla * (1 - 0.5 * tramo(t, H.encuentro + 2.2, H.cielo)); x.strokeStyle = 'rgb(255,226,244)'; x.lineWidth = 1.6; x.setLineDash([0, 4.5]); x.beginPath(); segmento(MX - corre, 0, MX + corre, 0); x.stroke(); }
+        x.globalAlpha = 0.34 * rejilla; x.beginPath(); segmento(Math.max(bx0, -180), 0, Math.min(bx1, 180), 0); x.fill();
+        if (corre > 0) { x.globalAlpha = 0.9 * rejilla * (1 - 0.5 * tramo(t, H.encuentro + 2.2, H.cielo)); x.fillStyle = 'rgb(255,226,244)'; dPaso = 4.5; dLado = 1.6; x.beginPath(); segmento(MX - corre, 0, MX + corre, 0); x.fill(); }
       }
-      x.setLineDash([]); x.lineCap = 'butt';
     }
 
     // 3. El mapa: motas de tierra en tres niveles de detalle, con perspectiva; aparecen donde llegan las llamadas y las
@@ -563,7 +579,7 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
         const N = niveles[nvl], esp = N.paso * S;
         // Cada nivel fino entra cuando sus motas quedan a más de ~3,6 px (y del todo a ~5,2); el 0, si se aleja mucho,
         // se aclara para no amontonarse.
-        const e0 = pasoBase * 0.9, e1 = pasoBase * 1.3;
+        const e0 = pasoBase * 0.95, e1 = pasoBase * 1.35;
         if (nvl > 0 && esp < e0) continue;
         const queda0 = nvl === 0 && esp < e1 * 0.8 ? (esp / (e1 * 0.8)) ** 2 : 1;
         for (let cy = cy0; cy <= cy1; cy++) {
@@ -574,7 +590,8 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
               if (!todo) {
                 // (borde irregular: cada mota tiene su umbral, así lo descubierto no es un disco)
                 const h = 0.86 + 0.28 * ((N.A[i] * 7.31) % 1);
-                dC = Math.hypot(wx - CX, wy - CY) - revC * h; dX = Math.hypot(wx - XX, wy - XY) - revX * h;
+                const ac = wx - CX, bc = wy - CY, ax2 = wx - XX, bx2 = wy - XY;   // (sqrt a mano: Math.hypot es lento en el bucle caliente)
+                dC = Math.sqrt(ac * ac + bc * bc) - revC * h; dX = Math.sqrt(ax2 * ax2 + bx2 * bx2) - revX * h;
                 oscura = dC > 0 && dX > 0 && dC + revC * h > revCalma && dX + revX * h > revCalma;
                 // (la penumbra, con la mitad de motas: se lee igual y cuesta la mitad)
                 if (oscura && (penumbra <= 0.01 || h > 1.0)) continue;
@@ -595,7 +612,7 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
               // Frente de cada llamada: motas recién descubiertas, más claras.
               if (oscura) b = 8;
               // (el frente de cada onda: una banda de ~2 px en pantalla, también cerca de la cámara)
-              if (!oscura) for (let o = 0; o < nO; o++) { const d = Math.abs(Math.hypot(wx - OX[o], wy - OY[o]) - OR[o]) * S * f; if (d < 2.4 + OR[o] * 0.02 * S) { b = 6; lado += 0.4; break; } }
+              if (!oscura) for (let o = 0; o < nO; o++) { const ox = wx - OX[o], oy = wy - OY[o], d = Math.abs(Math.sqrt(ox * ox + oy * oy) - OR[o]) * S * f; if (d < 2.4 + OR[o] * 0.02 * S) { b = 6; lado += 0.4; break; } }
               // Detrás de los rótulos (una elipse), las motas quedan en penumbra: el texto se lee limpio.
               if (nZ) for (let z = 0; z < nZ; z++) { const ex = (qx - ZX0[z]) / ZX1[z], ey = (qy - ZY0[z]) / ZY1[z]; if (ex * ex + ey * ey < 1) { b = 8; break; } }
               if (nL < MAXP) { LX[nL] = qx; LY[nL] = qy; LS[nL] = lado; LB[nL] = b; nL++; }
@@ -632,15 +649,16 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     if (antes && t > H.espera && mapaVis > 0.01) {
       const traza = calma ? tramo(t, H.espera, H.espera + 1.5) : salida(tramo(t, H.espera, H.espera + 1.1)), apaga = 1 - tramo(t, H.encuentro, H.encuentro + 1);
       if (apaga > 0) {
-        x.globalAlpha = 0.6 * apaga * mapaVis; x.strokeStyle = 'rgb(236,214,255)'; x.lineWidth = 1.4; x.setLineDash([0, 7]); x.lineCap = 'round';
+        x.globalAlpha = 0.6 * apaga * mapaVis; x.fillStyle = 'rgb(236,214,255)';
         x.beginPath(); const a = Math.round(traza * RUTA_N); let abierto = false;
-        for (let j = 0; j <= a; j++) { if (proyectar(RX[j], RY[j])) { if (abierto) x.lineTo(QX, QY); else x.moveTo(QX, QY); abierto = true; } else abierto = false; }
-        x.stroke(); x.setLineDash([]); x.lineCap = 'butt';
+        for (let j = 0; j <= a; j++) { if (proyectar(RX[j], RY[j])) { if (abierto) pA(QX, QY); else pIni(QX, QY, 7, 1.5); abierto = true; } else abierto = false; }
+        x.fill();
       }
       if (t > H.encuentro) {
         x.globalAlpha = 0.4 * tramo(t, H.encuentro + 0.3, H.encuentro + 1.6) * mapaVis; x.strokeStyle = 'rgb(244,220,255)'; x.lineWidth = 0.9;
         x.beginPath(); let abierto = false;
-        for (let j = 0; j <= RUTA_N; j++) { if (proyectar(RX[j], RY[j])) { if (abierto) x.lineTo(QX, QY); else x.moveTo(QX, QY); abierto = true; } else abierto = false; }
+        // (se corta detrás de los rótulos: no tacha los nombres)
+        for (let j = 0; j <= RUTA_N; j++) { if (proyectar(RX[j], RY[j]) && !enZona(QX, QY)) { if (abierto) x.lineTo(QX, QY); else x.moveTo(QX, QY); abierto = true; } else abierto = false; }
         x.stroke();
       }
       for (let lado = 0; lado < 2; lado++) {
@@ -715,7 +733,7 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
         lon0 = M_LON - 14 * suave(tramo(t, 25.2, H.salto)); lat0 = 8 * morf; alfa = vivo; quedan = 1 - 0.85 * lejos;
       } else {
         const llega = calma ? suave(tramo(t, H.tarjeta, H.tarjeta + 1.2)) : rebote(tramo(t, H.tarjeta, H.tarjeta + 1));
-        gx = Fx; gy = Fy; R = Sf * llega; lon0 = M_LON - 6 + 22 * Math.sin((t - H.tarjeta) * 0.16); lat0 = 14; alfa = sat(llega * 1.5); quedan = 0.16;
+        gx = Fx; gy = Fy; R = Sf * llega; lon0 = M_LON - 6 + 22 * Math.sin((t - H.tarjeta) * 0.16); lat0 = 14; alfa = sat(llega * 1.5); quedan = 0.4;
       }
       dibujarGlobo(t, gx, gy, R, lon0, lat0, alfa, quedan, final ? 1 : morf, final);
     }
@@ -743,7 +761,7 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     if (pa < lim) a = (lim - pa) / (pb - pa); else if (pb < lim) b = (pa - lim) / (pa - pb);
     proyectar(x1 + (x2 - x1) * a, y1 + (y2 - y1) * a); const sx = QX, sy = QY;
     proyectar(x1 + (x2 - x1) * b, y1 + (y2 - y1) * b);
-    x.moveTo(sx, sy); x.lineTo(QX, QY);
+    pIni(sx, sy, dPaso, dLado); pA(QX, QY);
   }
   // (el denominador de la perspectiva de un punto del plano)
   function proyectarV(wx, wy) { const dx = (wx - cX) * S, dy = (wy - cY) * S; return D - (dx * sg + dy * cg) * si; }
@@ -790,8 +808,10 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
         x.rect(gx + xa * R - rr / 2, gy - yb * R - rr / 2, rr, rr);
       }
       x.fill();
-      x.globalAlpha = 0.45 * g; x.strokeStyle = 'rgb(214,190,255)'; x.lineWidth = 1.2; x.setLineDash([0, 5]); x.lineCap = 'round';
-      x.beginPath(); x.arc(gx, gy, R + 2, 0, TAU); x.stroke(); x.setLineDash([]); x.lineCap = 'butt';
+      x.globalAlpha = 0.45 * g; x.fillStyle = 'rgb(214,190,255)'; x.beginPath();
+      const nb = Math.max(24, Math.round(TAU * (R + 2) / 5)), lb = R > 60 ? 1.3 : 1.1;
+      for (let i = 0; i < nb; i++) { const a = i / nb * TAU; x.rect(gx + Math.cos(a) * (R + 2) - lb / 2, gy + Math.sin(a) * (R + 2) - lb / 2, lb, lb); }
+      x.fill();
     }
     // El camino de los dos sobre el globo y su luz en el ecuador.
     const enGlobo = (wx, wy) => { const lon = wx * RAD, lat = desmerc(-wy) * RAD, X0 = Math.cos(lat) * Math.cos(lon), Z0 = Math.cos(lat) * Math.sin(lon), Y0 = Math.sin(lat), xa = Z0 * cl - X0 * sl, za = X0 * cl + Z0 * sl; QX = gx + xa * R; QY = gy - (Y0 * cp - za * sp) * R; QF = Y0 * sp + za * cp; };

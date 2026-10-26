@@ -13,7 +13,8 @@ button{touch-action:manipulation;}
 #contador{font-size:.58rem;letter-spacing:1.8px;font-weight:500;margin-top:8px;color:#edcfe0;}
 #contador-sub{font-size:.52rem;color:#b3a0bd;letter-spacing:1.2px;}
 .marca-universo{position:fixed;left:32px;top:calc(var(--arriba) + 30px);z-index:12;display:flex;gap:12px;align-items:center;font-family:'Cormorant Garamond',serif;font-size:1.25rem;color:var(--crema);}
-.marca-universo i{font-size:1rem;font-weight:300;color:var(--oro);}.marca-universo small{display:block;font-family:'Quicksand',sans-serif;font-size:.48rem;letter-spacing:3px;color:var(--tenue);margin-top:5px;}.marca-simbolo{font-size:2.3rem;color:var(--oro);}
+/* El «&», en Cormorant Garamond redonda (la cursiva fina se leía como una «E»); el mismo glifo que en la intro. */
+.marca-universo .marca-y{font-style:normal;font-weight:400;color:var(--oro);}.marca-universo small{display:block;font-family:'Quicksand',sans-serif;font-size:.48rem;letter-spacing:3px;color:var(--tenue);margin-top:5px;}.marca-simbolo{font-size:2.3rem;color:var(--oro);}
 .horarios{position:fixed;right:32px;top:calc(var(--arriba) + 31px);display:flex;gap:20px;z-index:12;}
 .horarios span{font-size:.62rem;line-height:1.9;color:#ded0e7;text-align:right;white-space:pre-line;}.horarios small{display:block;letter-spacing:2px;font-size:.45rem;color:var(--tenue);}
 .boton-tour{z-index:20;position:fixed;top:calc(var(--arriba) + 113px);right:32px;border:1px solid #e8c6a043;border-radius:30px;background:#1e132c99;backdrop-filter:blur(12px);padding:11px 17px;display:flex;gap:16px;align-items:center;font-size:.64rem;letter-spacing:.6px;color:#f0decc;cursor:pointer;transition:background .3s;}.boton-tour:hover{background:#59374b99;}
