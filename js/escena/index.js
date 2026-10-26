@@ -1244,7 +1244,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // En el clip de TON 618, igual: las paredes de gas de detrás llenaban medio encuadre (y su lente las agrandaba) y
     // tapaban la historia; se apagan en ~1,5 s al empezar y vuelven al terminar.
     focoTon += ((clip?.id === 'ton618' && clip.fase === 'clip' ? 0.85 : 0) - focoTon) * Math.min(1, dtInterfaz * 1.5);
-    const focoSN = Math.max(focoTon, sSN === null ? 0 : (0.55 + 0.2 * THREE.MathUtils.smoothstep(sSN, 40.5, 42.2)) * THREE.MathUtils.smoothstep(sSN, -0.5, 2.5) * (1 - THREE.MathUtils.smoothstep(sSN, 52.2, 58)));
+    const focoSN = Math.max(focoTon, sSN === null ? 0 : (0.55 + 0.2 * THREE.MathUtils.smoothstep(sSN, 40.5, 42.2)) * THREE.MathUtils.smoothstep(sSN, -0.5, 2.5) * (1 - THREE.MathUtils.smoothstep(sSN, 57.5, 60.6)));   // (vuelve mientras el director devuelve el control)
     maravillas.atenuacion = 1 - focoSN; capaVolumen.atenuacion = 1 - focoSN * 0.8;   // (el gas volumétrico de alrededor, también)
     const centroFoco = lejano && !vuelo ? lejano.centro : null, metaFoco = (centroFoco ? (cosmos.enEscenaAgujero ? 0.5 : 0.78) * (1 - (cosmos.escenas.focoNubes ?? 0)) : 1) * (1 - focoSN);   // en la escena de un gigante, aún más (y lo que pida la suya: Deneb, que nace de la nada)
     focoNubes += (metaFoco - focoNubes) * Math.min(1, dtInterfaz * 1.2);

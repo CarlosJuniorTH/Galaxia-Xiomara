@@ -124,8 +124,8 @@ export const CAMARA_SUPERNOVA = Object.freeze([
   { t: 7.134,  pos: [-6, 4, 0.136],   mira: [0, 0, 0],          fov: 46, curva: 'suave' },    // ella es a quien se agarra
   { t: 11.256, pos: [28, 11, 0.128],  mira: [0, -0.004, 0],     fov: 44, curva: 'lineal' },   // travelling lento con la nota larga
   { t: 12.542, pos: [34, 12, 0.124],  mira: [0, -0.004, 0],     fov: 44, curva: 'lineal' },
-  { t: 15.157, pos: [48, 16, 0.114],  mira: [0.007, -0.003, 0], fov: 40, curva: 'suave' },    // primer plano del borde vivo (caja)
-  { t: 17.731, pos: [56, 18, 0.12],   mira: [0.007, -0.003, 0], fov: 40, curva: 'lineal' },   // sus dos notas largas
+  { t: 15.157, pos: [48, 16, 0.114],  mira: [0.002, -0.003, 0], fov: 40, curva: 'suave' },    // primer plano del borde vivo (caja)
+  { t: 17.731, pos: [56, 18, 0.12],   mira: [0.002, -0.003, 0], fov: 40, curva: 'lineal' },   // sus dos notas largas
   { t: 21.687, pos: [62, 24, 0.186],  mira: [0, 0, 0],          fov: 48, curva: 'suave' },    // la música respira: subimos y miramos
   { t: 23.02,  pos: [44, 6, 0.164],   mira: [0, -0.006, 0],     fov: 46, curva: 'rapida', giro: -4 },  // se equivoca: la estrella se agita (caja)
   { t: 27.95,  pos: [22, -6, 0.15],   mira: [0, -0.006, 0],     fov: 44, curva: 'suave', giro: 3 },    // la nota de 3 s: se acerca despacio
