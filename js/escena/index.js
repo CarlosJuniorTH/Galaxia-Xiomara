@@ -778,10 +778,16 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       primero = desplazar(fuera, ORIGEN, THREE.MathUtils.clamp(total * 0.3, 3, 4.5), undefined, { paso: recta(camera.position, fuera), corriente: 1, avance: 'acercarse' });
     }
     // El fundido a oscuro empieza medio segundo antes del final del primer tramo (la cámara sigue avanzando debajo).
-    clearTimeout(esperaFundido); esperaFundido = setTimeout(() => fundido.classList.add('activo'), Math.max(0, (vuelo.duracion - 0.5) * 1000));
+    let oscuroDesde = null; const oscurecer = () => { if (oscuroDesde === null) oscuroDesde = performance.now(); fundido.classList.add('activo'); };
+    clearTimeout(esperaFundido); esperaFundido = setTimeout(oscurecer, Math.max(0, (vuelo.duracion - 0.5) * 1000));
     const ok = await primero;
     if (!ok || destinoActual !== id || compuesto !== mio) { if (compuesto === mio) { compuesto = null; quitarFundido(); } return false; }
-    clearTimeout(esperaFundido); fundido.classList.add('activo');
+    clearTimeout(esperaFundido); oscurecer();
+    // El cambio de escena (el búfer con suavizado de bordes del sistema solar se crea o se suelta, y su primer cuadro) es
+    // un cuadro largo: se hace con la pantalla ya negra del todo (la transición del fundido dura 0,45 s). Si el aviso llegó
+    // tarde (cuadros lentos), se espera lo que falta; antes, ese cuadro largo caía con la imagen aún a medio oscurecer.
+    const falta = 470 - (performance.now() - oscuroDesde);
+    if (falta > 0) { await new Promise(r => setTimeout(r, falta)); if (destinoActual !== id || compuesto !== mio) return false; }
     if (haciaSolar) {
       // Al otro lado, en la dirección en que se llegaba al punto del brazo (la cámara mira al Sol).
       const dir = galaxia.puntoBrazo().sub(camera.position).normalize();
@@ -799,8 +805,10 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     trasFundido = true; tramoRestante = Math.max(3, (mio.fin - performance.now()) / 1000);
     const viaje = viajar(id, { ...opciones, continuacion: true });
     trasFundido = false; tramoRestante = null; entradaSolar = false; salidaSolar = null;
-    // La imagen vuelve en el cuadro siguiente (ya con la escena nueva dibujada).
-    requestAnimationFrame(() => requestAnimationFrame(() => { if (compuesto === mio) fundido.classList.remove('activo'); }));
+    // La imagen vuelve tras unos cuadros (ya con la escena nueva dibujada): los primeros de la escena nueva (su búfer, su
+    // primer dibujo) son los largos y quedan bajo el negro.
+    const volver = n => requestAnimationFrame(() => { if (n > 1) volver(n - 1); else if (compuesto === mio) fundido.classList.remove('activo'); });
+    volver(4);
     viaje.then(() => { if (compuesto === mio) compuesto = null; });
     return viaje;
   }
