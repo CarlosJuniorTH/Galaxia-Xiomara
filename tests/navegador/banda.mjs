@@ -40,7 +40,9 @@ export default async function ({ base, informe }) {
     const pedidosAudio = [];
     pagina.on('request', r => { if (r.url().includes('/assets/musica/')) pedidosAudio.push({ url: r.url(), t: Date.now() }); });
     await pagina.goto(`${base}/?calidad=alta#debug`);
-    await pagina.waitForTimeout(2500);
+    // La carga entra con un fundido en cuanto se sabe que la canción no está (404): se espera a que empiece a verse (con
+    // la máquina cargada tarda más de 2,5 s) y luego se mira que no haya pantalla de toque.
+    await pagina.waitForFunction(() => Number(getComputedStyle(document.getElementById('carga')).opacity) > 0.05, null, { timeout: 15000, polling: 100 }).catch(() => {});
     const sinArchivos = await pagina.evaluate(() => ({ toque: document.getElementById('toque').hidden, clases: document.getElementById('entrada').className, carga: getComputedStyle(document.getElementById('carga')).opacity }));
     informe.comprobar(sinArchivos.toque && !/con-toque/.test(sinArchivos.clases) && sinArchivos.carga !== '0', 'si faltan las canciones (404), no hay pantalla de toque y la carga se ve', sinArchivos);
     await pagina.waitForFunction(() => window.__intro?.empezado, null, { timeout: 120000, polling: 100 });
