@@ -39,25 +39,25 @@ test('el púlsar nunca se para: su giro solo cambia con la música y es continuo
   assert.ok(c.camara.every(p => p.curva === 'suave' || p.curva === 'lineal'), 'solo planos suaves o travellings');
 });
 
-test('el púlsar despierta con la canción: haces, latido, viento y nebulosa, y queda despierto', () => {
+test('el púlsar despierta con la canción: toro de plasma, haces, latido en los golpes y barrido del faro, y queda despierto', async () => {
   const c = ESCENA_PULSAR, m = c.marcas, h = s => ({ ...estadoPulsar(s, c) });
   const dormido = h(0), final = h(c.duracion), despues = h(c.duracion + 50);
-  assert.ok(dormido.largo === 0 && dormido.luzHaz === 0 && dormido.casquetes === 0 && dormido.fuerza === 0 && dormido.viento === 0 && dormido.frente === 0, 'dormido: sin haces, sin latido');
-  assert.ok(h(m.quererte + 2).largo > 0.99 && h(m.quererte - 0.2).largo === 0, 'los haces nacen con «quererte»');
+  assert.ok(dormido.largo === 0 && dormido.luzHaz === 0 && dormido.casquetes === 0 && dormido.fuerza === 0 && dormido.toro === 0 && dormido.barrido === 0, 'dormido: sin haces, sin latido, toro apagado');
+  assert.ok(h(m.quererte - 0.3).toro === 0 && h(m.caliente + 1).toro > 1.1, 'el toro se enciende con «quererte», de dentro afuera');
+  assert.ok(h(2.0).largo === 0 && h(3.7).largo > 0.99, 'los haces nacen con el primer bombo (2,19)');
   assert.ok(h(m.caliente - 0.5).fuerza === 0 && h(m.caliente + 1).fuerza > 0.35, 'empieza a latir con «caliente»');
-  assert.ok(h(m.previa - 0.5).viento === 0 && h(m.previa + 2.5).viento > 0.99, 'el viento nace en el pre-estribillo');
-  assert.ok(h(m.grave - 0.3).frente === 0 && h(m.grave + 3).frente > 1.1 && h(m.grave + 1).barrido > 0.9, 'la nebulosa se enciende con el grave');
+  assert.ok(h(m.previa - 0.5).ondas === 0 && h(m.previa + 1).ondas > 0.5, 'las ondas del ecuador salen desde el pre-estribillo');
+  assert.ok(h(m.amor - 0.4).barrido === 0 && h(m.grave + 1).barrido > 0.95, 'el faro enciende el polvo desde «de tu amor» y del todo con el grave');
   assert.ok(h(m.segunda + 1.5).tibio > 0.95, 'rosa y oro en la segunda vuelta');
-  for (const k of ['largo', 'luzHaz', 'casquetes', 'viento', 'frente', 'brillo', 'tibio', 'ritmo']) assert.ok(cerca(final[k], despues[k]), `persiste: ${k}`);
-  assert.ok(final.largo > 0.99 && final.luzHaz > 0.8 && final.viento > 0.99 && final.brillo > 0.6, 'su diseño final, despierto');
-  // Late en cada pulso (107,7 BPM: cada 0,557 s desde el 0), con el primero de cada compás más fuerte.
-  const P = c.pulso, k0 = Math.ceil(m.estribillo / P) + 4;
-  const enPulso = h(k0 * P + 0.01).pulso, entre = h(k0 * P + P * 0.6).pulso;
-  assert.ok(enPulso > 0.4 && entre < enPulso * 0.3, `pulso ${enPulso} / entre pulsos ${entre}`);
-  const compas = Math.ceil(m.estribillo / (4 * P)) * 4;
-  assert.ok(h(compas * P + 0.01).pulso > h((compas + 1) * P + 0.01).pulso, 'el primer pulso del compás, más fuerte');
+  for (const k of ['largo', 'luzHaz', 'casquetes', 'toro', 'luzToro', 'barrido', 'tibio', 'ritmo']) assert.ok(cerca(final[k], despues[k]), `persiste: ${k}`);
+  assert.ok(final.largo > 0.99 && final.luzHaz > 0.8 && final.toro > 1.1 && final.luzToro > 0.7 && final.barrido > 0.6, 'su diseño final, despierto');
+  // Late en los golpes medidos de la canción (bombo y 808), no en un metrónomo: fuerte justo en el golpe y casi nada entre golpes.
+  const { GOLPES_PULSAR } = await import('../js/util/escenaPulsar.js');
+  const g808 = GOLPES_PULSAR.find(([t]) => t > m.estribillo + 0.3)[0];
+  assert.ok(h(g808 + 0.01).pulso > 0.4 && h(g808 + 0.4).pulso < h(g808 + 0.01).pulso * 0.3, 'late en el golpe');
+  for (let i = 1; i < GOLPES_PULSAR.length; i++) assert.ok(GOLPES_PULSAR[i][0] > GOLPES_PULSAR[i - 1][0], 'golpes en orden');
   // Sin saltos en lo que no es el latido: ninguna curva cambia más de un 8 % en 1/60 s (el grave enciende en 0,3 s).
-  for (let s = 0; s < c.duracion; s += 1 / 60) { const a = h(s), b = h(s + 1 / 60); for (const k of ['largo', 'luzHaz', 'casquetes', 'calor', 'fuerza', 'viento', 'barrido', 'brillo', 'tibio', 'foco']) assert.ok(Math.abs(a[k] - b[k]) < 0.08, `${k} en ${s.toFixed(2)}`); }
+  for (let s = 0; s < c.duracion; s += 1 / 60) { const a = h(s), b = h(s + 1 / 60); for (const k of ['largo', 'luzHaz', 'casquetes', 'calor', 'fuerza', 'toro', 'luzToro', 'ondas', 'barrido', 'tibio', 'foco']) assert.ok(Math.abs(a[k] - b[k]) < 0.08, `${k} en ${s.toFixed(2)}`); }
 });
 
 test('la pista de cámara del púlsar: ordenada, dentro de la canción y sin atravesar la estrella ni el viento', () => {

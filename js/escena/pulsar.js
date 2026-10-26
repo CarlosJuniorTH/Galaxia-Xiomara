@@ -1,17 +1,16 @@
-// El púlsar del Cangrejo («El corazón que late por ti»): una estrella de neutrones que GIRA y EMITE. Todo nítido (nada de
-// halos, humo ni degradados que tapen): la estrella es una esfera pequeña y opaca; los haces, líneas finas de 1 px y motas
-// de 1,5–2,8 px; el viento ecuatorial, anillos de motas finas. Presupuesto pequeño (≈ 100 hilos, ≈ 7000 motas) para ir a 60 FPS en un móvil de gama media; geometrías y materiales se crean en la carga y en cada cuadro solo cambian
-// uniformes.
+// El púlsar del Cangrejo («El corazón que late por ti»): una estrella de neutrones que GIRA y EMITE, como una joya. Todo
+// nítido (nada de halos ni humo): la estrella, pequeña, opaca y cegadora; su magnetosfera, un toro de plasma de hebras finas
+// (detalle horneado en una imagen en la carga y solo muestreado en cada cuadro, como el remolino del cuásar); el faro, dos
+// haces finos que al barrer encienden el polvo que atraviesan. Ligero: ~6 mallas, ~5600 motas y ~200 hilos, 60 FPS en móvil.
 //
-// Física (y coherencia, que antes fallaba: había un haz quieto y otro que giraba):
+// Física (y coherencia):
 //  · `giro`: su eje de giro (y local). `rotor` gira alrededor de él y lleva `magnetico`, el eje magnético, inclinado
 //    `inclinacion` grados; la estrella (con sus casquetes polares calientes) y los DOS haces opuestos van en `magnetico`,
-//    así que giran juntos, como un faro: cada haz barre un cono alrededor del eje de giro.
-//  · El viento del púlsar sale por el ecuador del giro (anillos de motas y ondas que se alejan, como los «wisps» del
-//    Cangrejo). Sin nebulosa de filamentos ni motas sueltas alrededor (Carlos: «ya tenemos la telaraña»): lo bello es la
-//    estrella cegadora y el barrido de su faro.
-//  · Dormido (su estado de siempre, fuera de su escena): estrella tibia, sin haces ni viento. En su escena despierta con
-//    la canción (js/util/escenaPulsar.js) y queda despierto mientras se le mira.
+//    así que giran juntos, como un faro: cada haz barre un cono alrededor del eje de giro. Nada quieto en los polos.
+//  · El toro de plasma y las ondas que se alejan por el ecuador del giro (el anillo interior, el toro y los «wisps» de las
+//    imágenes de rayos X del Cangrejo); el polvo de alrededor solo se ve cuando el faro lo barre.
+//  · Dormido (su estado de siempre, fuera de su escena): estrella tibia, toro casi apagado, sin haces. En su escena despierta
+//    con la canción (js/util/escenaPulsar.js) y queda despierto mientras se le mira.
 // Ejes: `giro` coincide con el marco del director de cámara (js/util/directorCamara.js): y = eje Y del universo (el eje de
 // giro), z = hacia casa (en horizontal), x = derecha; azimut 0 hacia casa, creciendo hacia la derecha (x = sen az,
 // z = cos az). Fase: ψ es el azimut del haz de arriba. Al empezar la escena, mientras la estrella aún no se ve girar (sin
@@ -19,9 +18,10 @@
 // 360°·vueltas(s) en cada visita, el mismo que usa la pista de cámara (ESCENA_PULSAR.camara).
 import * as THREE from 'three';
 import { EXPOSICION } from './exposicion.js';
+import { nivelSeguro, esMovil } from '../util/dispositivo.js';
 import { ESCENA_PULSAR, vueltasPulsar } from '../util/escenaPulsar.js';
 
-export const PULSAR = Object.freeze({ estrella: 34, haz: 4400, viento: 650, nebulosa: [3000, 2300, 2400] });
+export const PULSAR = Object.freeze({ estrella: 34, haz: 4400, toro: 880, nebulosa: [3000, 2300, 2400] });
 const DORMIDO = ESCENA_PULSAR.giros[0][1];   // vueltas por pulso dormido
 
 function azarCon(semilla) { let s = semilla >>> 0; return () => { s = (Math.imul(1664525, s) + 1013904223) >>> 0; return s / 4294967296; }; }
@@ -45,7 +45,7 @@ const ESPACIO = /* glsl */`
   float junto(float tam){ float c = -(modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0)).z; return clamp(tam * length(modelViewMatrix[0].xyz) * uScale / max(1.0, c) / 420.0, 0.12, 1.0); }`;
 
 export function* construirPulsar({ uScale, uPR, config = ESCENA_PULSAR }) {
-  const azar = azarCon(1054), R = PULSAR.estrella, L = PULSAR.haz, RV = PULSAR.viento, [NX, NY, NZ] = PULSAR.nebulosa;
+  const azar = azarCon(1054), R = PULSAR.estrella, L = PULSAR.haz, [NX, NY, NZ] = PULSAR.nebulosa;
   const alfa = THREE.MathUtils.degToRad(config.inclinacion);
   const grupo = new THREE.Group(); grupo.name = 'Púlsar';
   const giro = new THREE.Group(), rotor = new THREE.Group(), magnetico = new THREE.Group();
@@ -110,7 +110,7 @@ export function* construirPulsar({ uScale, uPR, config = ESCENA_PULSAR }) {
     hilosHaz.frustumCulled = false; hilosHaz.name = 'hacesPulsar'; magnetico.add(hilosHaz);
   }
   {
-    const N = 3000, dato = new Float32Array(N * 3);
+    const N = 1400, dato = new Float32Array(N * 3);
     for (let i = 0; i < N; i++) dato.set([azar(), azar(), i % 2 ? 1 : -1], i * 3);
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(dato, 3));
     var motasHaz = new THREE.Points(g, material({ ...uH, uSilueta: { value: 0 } }, /* glsl */`${HAZ_VS} uniform float uSilueta; varying vec3 vC; varying float vA; ${ESPACIO} ${luzHaz}
@@ -122,40 +122,113 @@ export function* construirPulsar({ uScale, uPR, config = ESCENA_PULSAR }) {
   }
   yield;
 
-  // ── Viento del púlsar, en el ecuador del giro: seis anillos de motas (≈ 3900) con grumos que giran despacio (más rápido dentro)
-  // y nacen de dentro afuera; y ondas de motas que se alejan en cada compás (en cada pulso con el grave). ──
-  const uV = { uScale, uPR, uExpo: EXPOSICION, uT: { value: 0 }, uViento: { value: 0 }, uOnda: { value: 0 }, uOndas: { value: 0 }, uPulso: { value: 0 }, uTibio: { value: 0 }, uSilueta: { value: R * 1.6 } };
-  let viento, radioViento = 0;
+  // ── Magnetosfera: el toro de plasma del ecuador (como en las imágenes de Chandra del Cangrejo y de Vela): un anillo interior
+  // fino y brillante y un toro de HEBRAS finas (circunferencias onduladas, con nudos) que giran. El detalle
+  // se HORNEA una vez en la carga en una imagen (hornear, desde cosmos.js → index.js, como el remolino del cuásar) y en cada
+  // cuadro solo se muestrea: siete láminas a distintas alturas dan el grosor del toro (las de fuera, solo su núcleo) con
+  // paralaje. En los golpes de la canción una onda de luz recorre el toro de dentro afuera y salen ondas finas del ecuador
+  // (los «wisps» del Cangrejo, que de verdad se alejan del púlsar). Nada de humo: hebras de un píxel con huecos oscuros. ──
+  const RT = PULSAR.toro, LADO = nivelSeguro ? 1024 : esMovil ? 1536 : 2048;
+  const rtToro = new THREE.WebGLRenderTarget(LADO, LADO, { generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter });
+  const texToro = rtToro.texture; texToro.colorSpace = THREE.NoColorSpace; texToro.anisotropy = 8;
+  const RUIDO = /* glsl */`
+    float h3(vec3 p){ p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
+    float rn3(vec3 p){ vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(mix(h3(i), h3(i + vec3(1,0,0)), f.x), mix(h3(i + vec3(0,1,0)), h3(i + vec3(1,1,0)), f.x), f.y),
+                 mix(mix(h3(i + vec3(0,0,1)), h3(i + vec3(1,0,1)), f.x), mix(h3(i + vec3(0,1,1)), h3(i + vec3(1,1,1)), f.x), f.y), f.z); }
+    float fbm3(vec3 p){ return rn3(p) * 0.55 + rn3(p * 2.03 + 7.1) * 0.3 + rn3(p * 4.1 + 3.7) * 0.15; }`;
+  // La imagen horneada, en coordenadas polares dentro del cuadrado: rgb = color × luz de las hebras, a = densidad (0–1).
+  const FRAG_TORO = /* glsl */`varying vec2 vP; ${RUIDO}
+    void main(){ float r = length(vP), a = atan(vP.y, vP.x); vec2 c = vec2(cos(a), sin(a));
+      // Las hebras: muchas circunferencias finas, onduladas por un ruido suave (sin costura: el ángulo entra como cos/sin).
+      float w = fbm3(vec3(c * 2.0, r * 2.5));
+      // Hebras de dos grosores (34 y 61 por radio), sin relleno entre ellas: huecos oscuros de verdad.
+      float h1 = pow(0.5 + 0.5 * cos((r * 34.0 + w * 3.0) * 6.2832), 8.0);
+      float h2 = pow(0.5 + 0.5 * cos((r * 61.0 + w * 5.0) * 6.2832), 14.0) * 0.5;
+      // Tramos brillantes y oscuros a lo largo del anillo (el toro del Cangrejo está roto en arcos) y nudos blancos.
+      float arcos = smoothstep(0.28, 0.78, fbm3(vec3(c * 3.0, r * 4.0 + 1.0)));
+      float nudos = pow(smoothstep(0.55, 0.95, fbm3(vec3(c * 9.0, r * 14.0 + 5.0))), 2.0);
+      // Perfil: anillo interior nítido (0,2), toro (0,35–0,7) y un borde exterior de hebras sueltas (0,85).
+      float interior = exp(-pow((r - 0.2) / 0.011, 2.0)) * (1.1 + 0.6 * arcos);
+      float toro = exp(-pow((r - 0.5) / 0.15, 2.0)), borde = 0.35 * exp(-pow((r - 0.85) / 0.05, 2.0));
+      float luz = interior + (toro + borde) * ((h1 * (0.3 + 1.2 * arcos) + h2 * arcos) + nudos * 1.4 * arcos * toro);
+      luz *= (1.0 - smoothstep(0.9, 0.98, r)) * smoothstep(0.17, 0.19, r);
+      vec3 col = mix(vec3(0.85, 0.95, 1.0), mix(vec3(0.3, 0.62, 1.0), vec3(0.66, 0.42, 1.0), smoothstep(0.4, 0.85, r)), smoothstep(0.22, 0.3, r));
+      col = mix(col, vec3(1.0), nudos * 0.7);
+      gl_FragColor = vec4(col * luz, clamp(toro + interior * 0.5, 0.0, 1.0)); }`;
+  function hornear(renderer) {
+    const m = new THREE.ShaderMaterial({ vertexShader: 'varying vec2 vP; void main(){ vP = position.xy; gl_Position = vec4(position.xy, 0.0, 1.0); }', fragmentShader: FRAG_TORO, depthTest: false, depthWrite: false });
+    const sc = new THREE.Scene(), malla = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m); sc.add(malla);
+    const previo = renderer.getRenderTarget(), ac = renderer.autoClear;
+    renderer.setRenderTarget(rtToro); renderer.setClearColor(0x000000, 0); renderer.autoClear = true; renderer.render(sc, new THREE.Camera());
+    renderer.setRenderTarget(previo); renderer.autoClear = ac;
+    malla.geometry.dispose(); m.dispose();
+  }
+  const uT = { uTex: { value: texToro }, uT: { value: 0 }, uEnc: { value: 0 }, uLuz: { value: 0.3 }, uGolpe: { value: 9 }, uGolpeF: { value: 0 }, uTibio: { value: 0 }, uExpo: EXPOSICION,
+    uOndaR: { value: new THREE.Vector3(9, 9, 9) }, uOndaA: { value: new THREE.Vector3() } };
+  const laminas = [];
+  for (let k = 0; k < 7; k++) {
+    const h = (k - 3) / 3, lam = new THREE.Mesh(new THREE.RingGeometry(RT * 0.16, RT, 192, 6), new THREE.ShaderMaterial({
+      uniforms: { ...uT, uH: { value: h } },
+      vertexShader: 'varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: /* glsl */`uniform sampler2D uTex; uniform float uT, uEnc, uLuz, uGolpe, uGolpeF, uTibio, uExpo, uH; uniform vec3 uOndaR, uOndaA; varying vec2 vP;
+        void main(){ float r = length(vP) / ${RT.toFixed(1)};
+          // Gira entero (un giro que dependiera del radio enrosca la imagen con el tiempo y se rompe en granos); cada lámina,
+          // a su paso y algo girada: entre ellas se ve el plasma moverse.
+          float a = atan(vP.y, vP.x) - uT * (0.35 + 0.08 * uH) - uH * 0.9;
+          vec4 t = texture2D(uTex, vec2(cos(a), sin(a)) * r * 0.5 + 0.5);
+          // Grosor del toro: las láminas de arriba y abajo solo tienen el núcleo del toro (sección redonda).
+          float grosor = uH == 0.0 ? 1.0 : smoothstep(0.35 + 0.55 * abs(uH), 1.0, t.a) * (1.0 - abs(uH) * 0.4);
+          // Se enciende de dentro afuera; dormido, solo un susurro del anillo interior.
+          float enc = mix(0.12, 1.0, smoothstep(r - 0.12, r, uEnc));
+          // Cada golpe de la canción: una onda de luz que sale del anillo interior y recorre el toro.
+          float onda = exp(-pow((r - 0.2 - uGolpe * 1.1) / 0.07, 2.0)) * uGolpeF;
+          vec3 c = t.rgb * grosor * enc * uLuz * (1.0 + 1.6 * onda);
+          // Ondas finas del ecuador («wisps»): hebras que se alejan, moduladas por los nudos de la imagen.
+          if (uH == 0.0) { vec3 d = abs(vec3(r) - uOndaR); vec3 w = exp(-d * d / 0.00004) * uOndaA; c += vec3(0.75, 0.88, 1.0) * (w.x + w.y + w.z) * (0.45 + 0.8 * t.a); }
+          c = mix(c, c * vec3(1.25, 0.86, 0.95), uTibio * 0.6);
+          gl_FragColor = vec4(c * uExpo, 1.0); }`,
+      transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+    lam.rotation.x = -Math.PI / 2; lam.position.y = h * RT * 0.15; lam.renderOrder = 1; giro.add(lam); laminas.push(lam);
+  }
+  const anilloToro = laminas[3];
+  yield;
+
+  // ── Polvo que el faro enciende al barrerlo: motas finas, invisibles salvo cuando un haz las atraviesa; quedan un instante
+  // encendidas detrás del haz (un barrido de luz, como un faro en la niebla). Repartidas cerca de los dos conos que barren los
+  // haces (±30° sobre el ecuador del giro), entre 1,3 y 9 radios del toro. ──
+  const uB = { uScale, uPR, uExpo: EXPOSICION, uPsi: { value: 0 }, uLuz: { value: 0 }, uTibio: { value: 0 }, uGolpeF: { value: 0 }, uSilueta: { value: R * 2 } };
+  let barrido;
   {
-    const anillos = [[200, 420, 6], [270, 700, 9], [350, 520, 12], [440, 900, 14], [530, 620, 16], [620, 700, 20]], NO = 700, N = anillos.reduce((s, a) => s + a[1], 0) + NO;
-    const dato = new Float32Array(N * 3), extra = new Float32Array(N * 2); let i = 0;
-    for (const [r, n, grosor] of anillos) for (let k = 0; k < n; k++, i++) {
-      // Grumos: más motas en unos ángulos que en otros (como los nudos del anillo del Cangrejo).
-      let a; do { a = azar() * Math.PI * 2; } while (azar() > 0.55 + 0.45 * Math.sin(a * 7 + r) * Math.sin(a * 3 - r * 0.01));
-      const rr = r + (azar() - 0.5) * grosor * 2; radioViento = Math.max(radioViento, rr);
-      dato.set([rr, a, (azar() - 0.5) * grosor], i * 3); extra.set([0, azar()], i * 2);
+    const N = esMovil ? 4500 : 6000, pos = new Float32Array(N * 3), dato = new Float32Array(N * 2), el = Math.PI / 2 - alfa;
+    for (let i = 0; i < N; i++) {
+      const lado = i % 2 ? 1 : -1, e = lado * el + (azar() + azar() + azar() - 1.5) * 0.13, az = azar() * Math.PI * 2, r = RT * (1.3 + Math.pow(azar(), 0.8) * 7.7);
+      pos.set([Math.cos(e) * Math.sin(az) * r, Math.sin(e) * r, Math.cos(e) * Math.cos(az) * r], i * 3); dato.set([azar(), lado], i * 2);
     }
-    for (let k = 0; k < NO; k++, i++) { dato.set([1, azar() * Math.PI * 2, (azar() - 0.5) * 14], i * 3); extra.set([1, azar()], i * 2); }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(dato, 3)); g.setAttribute('aExtra', new THREE.BufferAttribute(extra, 2));
-    viento = new THREE.Points(g, material(uV, /* glsl */`uniform float uScale, uPR, uExpo, uT, uViento, uOnda, uOndas, uPulso, uTibio, uSilueta; attribute vec2 aExtra; varying vec3 vC; varying float vA; ${ESPACIO}
-      void main(){ float onda = aExtra.x, r = mix(position.x, mix(${(R * 2.2).toFixed(1)}, ${(RV * 1.5).toFixed(1)}, sqrt(uOnda)), onda);
-        float a = position.y + uT * 0.22 * (260.0 / r) * (1.0 - onda);
-        vec4 mv = modelViewMatrix * vec4(cos(a) * r, position.z, sin(a) * r, 1.0); gl_Position = projectionMatrix * mv;
-        float nace = smoothstep(r - 60.0, r, uViento * ${(RV * 1.08).toFixed(1)});
-        float luz = mix(nace * (0.75 + 0.55 * aExtra.y) * (1.0 + 0.6 * uPulso), pow(1.0 - uOnda, 1.6) * uOndas * 1.3, onda);
-        vC = mix(mix(vec3(0.62, 0.8, 1.0), vec3(0.85, 0.92, 1.0), aExtra.y), vec3(1.0, 0.78, 0.88), uTibio * 0.5);
-        vA = luz * tamMota(7.0 + aExtra.y * 5.0, mv, 2.0) * fueraSilueta(mv) * uExpo; }`, FRAG_MOTA));
-    viento.frustumCulled = false; viento.name = 'vientoPulsar'; giro.add(viento);
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aDato', new THREE.BufferAttribute(dato, 2));
+    barrido = new THREE.Points(g, material(uB, /* glsl */`uniform float uScale, uPR, uExpo, uPsi, uLuz, uTibio, uGolpeF, uSilueta; attribute vec2 aDato; varying vec3 vC; varying float vA; ${ESPACIO}
+      void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv;
+        vec3 d = normalize(position); float e = asin(clamp(d.y, -1.0, 1.0)), az = atan(d.x, d.z);
+        // El haz de este lado: azimut ψ (arriba) o ψ + π (abajo), elevación ±(90° − α). Cuánto ha pasado ya el haz por la mota
+        // (en el sentido del giro) y lo lejos que queda de su cono.
+        float azHaz = uPsi + (aDato.y > 0.0 ? 0.0 : 3.14159265), paso = mod(azHaz - az, 6.2831853);
+        float lejos = abs(e - aDato.y * ${(Math.PI / 2 - alfa).toFixed(5)});
+        float estela = exp(-paso / 0.9) + exp(-pow((6.2831853 - paso) / 0.02, 2.0));
+        float luz = estela * (1.0 - smoothstep(0.03, 0.14, lejos)) * (1.0 + 0.8 * uGolpeF);
+        vC = mix(vec3(0.8, 0.9, 1.0), vec3(1.0, 0.8, 0.88), uTibio * aDato.x);
+        vA = luz * uLuz * (0.5 + 0.5 * aDato.x) * tamMota(22.0 + aDato.x * 20.0, mv, 2.8) * fueraSilueta(mv) * uExpo; }`, FRAG_MOTA));
+    barrido.frustumCulled = false; barrido.name = 'barridoPulsar'; giro.add(barrido);
   }
   yield;
 
   // ── Fase ──
   const P = config.pulso, DOS_PI = Math.PI * 2, vista = new THREE.Vector3(), haz = new THREE.Vector3();
-  let psi = 0, psi0 = 0, delta = 0, flujo = 0, tViento = 0;
-  const ajuste = config.marcas.quererte;   // la fase se lleva a la de la canción antes de que se le vea girar
+  let psi = 0, psi0 = 0, delta = 0, flujo = 0, tToro = 0, ondaN = -1, ondaK = 0;
+  const ondaT = [9, 9, 9], ondaF = [0, 0, 0];
+  const ajuste = 1.9;   // la fase se lleva a la de la canción antes de que se le vea girar (casquetes y haces nacen en el 1,9–2,2)
   return {
-    grupo, giro, magnetico, estrella, viento, hilosHaz,
-    medidas: { estrella: R, haz: L, viento: radioViento, nebulosa: Math.max(NX, NY, NZ) },   // nebulosa: la extensión de su región (tabla de escalas)
+    grupo, giro, magnetico, estrella, toro: anilloToro, barrido, hilosHaz, hornear,
+    medidas: { estrella: R, haz: L, viento: RT, nebulosa: Math.max(NX, NY, NZ) },   // nebulosa: la extensión de su región (tabla de escalas)
     // Ejes del giro en el espacio del grupo (los del marco de la cámara: x derecha, y arriba = eje de giro, z hacia casa).
     orientar(x, y, z) { giro.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z)); },
     // Al empezar su escena: la fase que falta para ir con la canción (se recorre en `ajuste` segundos, sin verse).
@@ -179,8 +252,15 @@ export function* construirPulsar({ uScale, uPR, config = ESCENA_PULSAR }) {
       flujo += dt * (0.05 + 0.12 * v('luzHaz'));
       uH.uLuz.value = v('luzHaz'); uH.uLargo.value = largo; uH.uPaquete.value = reducido ? 0 : 0.9 * v('fuerza'); uH.uEdad.value = e.edad; uH.uFlujo.value = flujo; uH.uTibio.value = v('tibio');
       motasHaz.material.uniforms.uFlujo.value = flujo;
-      tViento += dt * (0.4 + 0.6 * v('viento'));
-      uV.uT.value = tViento; uV.uViento.value = v('viento'); uV.uOnda.value = Math.min(1, e.ondaEdad / Math.min(e.ondaPeriodo, 1.3)); uV.uOndas.value = v('ondas'); uV.uPulso.value = pulso; uV.uTibio.value = v('tibio');
+      // Toro de plasma: gira (más deprisa cuanto más despierto), se enciende de dentro afuera y destella con cada golpe.
+      tToro += dt * (0.25 + 0.75 * v('luzToro'));
+      const golpe = e.golpeEdad < 5 ? e.golpeEdad : 9, fG = w * e.golpeFuerza * Math.min(1, e.fuerza * 1.6) * (reducido ? 0.4 : 1);
+      uT.uT.value = tToro; uT.uEnc.value = v('toro'); uT.uLuz.value = v('luzToro'); uT.uGolpe.value = golpe; uT.uGolpeF.value = fG; uT.uTibio.value = v('tibio');
+      // Ondas del ecuador: en cada golpe fuerte (≥ 0,5) sale una nueva (hasta tres a la vez) que se aleja en 1,8 s.
+      if (e.golpeN !== ondaN) { if (ondaN >= 0 && e.golpeN === ondaN + 1 && e.golpeFuerza >= 0.5 && v('ondas') > 0.05) { ondaT[ondaK] = 0; ondaF[ondaK] = e.golpeFuerza * v('ondas'); ondaK = (ondaK + 1) % 3; } ondaN = e.golpeN; }
+      for (let i = 0; i < 3; i++) { ondaT[i] += dt; const q = Math.min(1, ondaT[i] / 1.8); uT.uOndaR.value.setComponent(i, 0.22 + 0.75 * Math.sqrt(q)); uT.uOndaA.value.setComponent(i, ondaT[i] < 1.8 ? ondaF[i] * (1 - q) * (1 - q) * 1.6 : 0); }
+      // El barrido del faro en el polvo.
+      uB.uPsi.value = psi; uB.uLuz.value = v('barrido') * 2.2; uB.uTibio.value = v('tibio'); uB.uGolpeF.value = fG;
       return alineado;
     }
   };

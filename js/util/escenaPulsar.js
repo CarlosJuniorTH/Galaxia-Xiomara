@@ -3,22 +3,25 @@
 //
 // Lo que hace un púlsar es GIRAR y EMITIR: dos haces opuestos que salen de sus polos magnéticos (inclinados respecto al
 // eje de giro) y barren el cielo como un faro; quien está en su camino lo ve latir. Esa es la historia: el púlsar está
-// dormido (una estrella de neutrones tibia, sin haces) y, con la canción, despierta por ella: se le encienden los haces,
-// late, acelera con la música y al final queda latiendo a su ritmo, con la nebulosa iluminada por su faro.
+// dormido (una estrella de neutrones tibia, sin haces, su toro de plasma casi apagado) y, con la canción, despierta por
+// ella: se enciende su toro, nacen los haces, late en cada golpe, acelera con la música, en el estribillo su faro enciende
+// todo lo que barre y al final queda latiendo sereno.
 //
-// La canción (análisis de audio: 107,7 BPM, un pulso cada 0,557 s y un compás cada 2,23 s desde el 0; el grave entra en
-// el 16,71 y el estribillo pleno en el compás del 17,83). La letra, resumida con nuestras palabras:
-//   1,38  «quererte…»        quererla hasta bailar       → se encienden los haces (el faro nace)
-//   4,86  «…caliente»        todo su corazón, caliente   → la estrella se calienta, empieza a latir y acelera (×2)
-//   8,06  «…sirve»           (pre-estribillo, 8,91)      → nace el viento del púlsar: anillos y ondas en cada compás
+// La canción (análisis de audio: 107,7 BPM, un pulso cada 0,557 s y un compás cada 2,23 s desde el 0; estrofa y
+// pre-estribillo con batería ligera —bombo medido en la instrumental separada— y, desde el 16,79, el estribillo con la
+// batería callada y golpes de 808 sincopados: GOLPES_PULSAR). La letra, resumida con nuestras palabras:
+//   1,38  «quererte…»        quererla hasta bailar       → se enciende el toro de plasma, del anillo interior afuera
+//   2,19  (primer bombo)                                 → nacen los dos haces: el faro
+//   4,86  «…caliente»        todo su corazón, caliente   → la estrella se calienta, late en cada bombo y acelera (×2)
+//   8,91  pre-estribillo      «…sirve»                    → ondas finas salen del ecuador en cada golpe
 //  10,20  «…fallado»         nunca le ha fallado         → el haz pasa por la cámara en cada compás: nunca falla
 //  12,48  «…quererte»        siempre sirve para quererla → los haces se avivan
-//  14,98  «de tu amor…»      su amor (gancho)            → el faro empieza a iluminar los filamentos de la nebulosa
-//  16,71  (entra el grave)                               → el giro se dobla: un haz por la cámara cada dos pulsos
-//  17,83  estribillo          «…amor / no sé…»            → la nebulosa se enciende del centro hacia fuera y late
-//  24,51  instrumental        golpes de grave             → la nebulosa entera, iluminada por los haces
+//  14,98  «de tu amor…»      su amor (gancho)            → el faro empieza a encender el polvo que barre
+//  16,79  (808)                                          → el giro se dobla; cada golpe de 808 hace latir la estrella y el toro
+//  17,83  estribillo          «…amor / no sé…»            → el faro enciende todo lo que barre, a compás
+//  24,51  instrumental        golpes de grave             → plano abierto: el barrido entero
 //  28,03  segunda vuelta      «…amor»                     → luz rosa y dorada
-//  31,75  se apaga la música                              → queda su diseño final: despierto, latiendo a su ritmo
+//  31,75  se apaga la música                              → queda su diseño final: despierto, latiendo sereno
 //
 // GIRO: siempre gira (nunca se para) y solo cambia con la música, en tramos de un compás: `giros` son [pulso, vueltas por
 // pulso]; entre dos puntos la velocidad cambia en línea recta. Dormido da 1/8 de vuelta por pulso; con «caliente», 1/4
@@ -98,36 +101,56 @@ export const azimutHaz = (s, config) => ((vueltasPulsar(s, config) % 1) + 1) % 1
 // Elevación (grados) del cono que barre el haz de arriba.
 export const elevacionHaz = config => 90 - config.inclinacion;
 
+// GOLPES de la canción medidos sobre el audio (segundos del fragmento, fuerza 0–1): el bombo de la estrofa y del
+// pre-estribillo (sobre la instrumental separada con MelBand-RoFormer) y, desde el 16,79, los golpes de 808 del estribillo
+// (sobre la mezcla, banda 25–90 Hz; la batería calla y queda el grave sincopado). Con ellos late la estrella, destella el toro
+// de plasma y salen las ondas del ecuador: el corazón late con la canción de verdad, no con un metrónomo.
+export const GOLPES_PULSAR = Object.freeze([
+  ...[2.19, 2.51, 2.76, 3.34, 4.14, 4.99, 5.57, 6.42, 7.23, 7.81, 8.63, 8.95, 9.51, 10.04, 10.87, 11.19, 11.74, 12.28, 13.11, 13.41, 14.0, 14.55, 15.38, 15.67, 16.25].map(t => [t, 0.55]),
+  [16.79, 0.8], [17.57, 0.65], [17.86, 0.5], [18.43, 1], [19.01, 0.8], [19.85, 0.45], [20.17, 0.65], [20.69, 0.87], [21.27, 0.86], [22.06, 0.93], [22.93, 0.6],
+  [23.5, 0.76], [24.33, 0.78], [25.16, 0.81], [25.74, 0.5], [26.55, 0.77], [26.88, 0.67], [27.43, 0.7], [28.79, 0.75], [29.13, 0.76], [29.66, 0.79], [30.21, 0.55],
+  [31.03, 0.55], [31.34, 0.58], [31.92, 0.57], [32.47, 0.4]
+]);
+// Último golpe en el segundo s: escribe en e golpeEdad (s desde él; 99 si no hay), golpeFuerza y golpeN (cuántos van).
+function ultimoGolpe(s, golpes, e) {
+  let lo = 0, hi = golpes.length;   // búsqueda binaria: el primer golpe posterior a s
+  while (lo < hi) { const m = (lo + hi) >> 1; if (golpes[m][0] <= s) lo = m + 1; else hi = m; }
+  e.golpeN = lo;
+  if (lo === 0) { e.golpeEdad = 99; e.golpeFuerza = 0; } else { e.golpeEdad = s - golpes[lo - 1][0]; e.golpeFuerza = golpes[lo - 1][1]; }
+}
+
 // Estado del púlsar en el segundo `s` de su canción (escribe en `e`, sin memoria nueva). En s = 0 es el púlsar dormido (su
 // estado de siempre fuera de la escena); en s ≥ fin, su diseño final (se queda así mientras se mira: persiste).
 //  ritmo      vueltas por pulso (el giro);  vueltas  vueltas desde el 0 (la fase la lleva cosmos con esto)
 //  largo      hasta dónde han nacido los haces (0–1);  luzHaz  su luz (0 dormido, ~1 estribillo)
 //  casquetes  los polos magnéticos encendidos (0–1);  calor  la luz de la estrella (0,45 dormida → 1)
-//  fuerza     cuánto late (0–1,1);  pulso  el latido en este instante (ya por su fuerza);  edad  s desde el último pulso
-//  viento     los anillos del viento del púlsar formados (0–1);  ondas  luz de las ondas que salen del ecuador (0–1);
-//             ondaEdad / ondaPeriodo: segundos desde la última onda y cada cuánto sale una (un compás; un pulso con el grave)
-//  barrido    cuánto iluminan los haces los filamentos que barren (0–1);  frente  luz de la nebulosa del centro hacia fuera
-//             (0 → 1,15);  brillo  luz de la nebulosa encendida (0–1);  tibio  rosa y oro de la segunda vuelta (0–1)
+//  fuerza     cuánto late (0–1,1);  pulso  el latido en este instante (golpe de la canción × fuerza);  edad  s desde el
+//             último pulso (paquetes de luz por los haces);  golpeEdad / golpeFuerza / golpeN: el último golpe (GOLPES_PULSAR)
+//  toro       hasta dónde se ha encendido el toro de plasma, de dentro afuera (0 → 1,15);  luzToro  su luz (0,3 dormido → 1)
+//  ondas      luz de las ondas que salen del ecuador en los golpes (0–1)
+//  barrido    luz del barrido del faro en el polvo que atraviesa (0–1);  tibio  rosa y oro de la segunda vuelta (0–1)
 //  foco       penumbra del resto del cielo (0–0,85: la telaraña; también apaga el polvo del fondo, cosmos.js)
 export function estadoPulsar(s, config, e = {}, reducido = false) {
   const m = config.marcas, P = config.pulso, f = Math.min(Math.max(s, 0), m.fin);
   e.ritmo = ritmoGiro(f / P, config); e.vueltas = vueltasPulsar(s, config);
-  e.largo = suave(f, m.quererte - 0.1, m.quererte + 1.8);
-  e.casquetes = suave(f, m.quererte - 0.3, m.quererte + 0.6);
+  // Los haces nacen con el primer bombo (2,19), justo después de la primera palabra.
+  e.largo = suave(f, 2.1, 3.6);
+  e.casquetes = suave(f, 1.9, 2.6);   // los polos calientes, con los haces (antes la fase se ajusta sin verse)
   e.luzHaz = 0.45 * e.largo + 0.2 * suave(f, m.previa - 0.4, m.siempre) + 0.15 * suave(f, m.siempre, m.amor) + 0.25 * suave(f, m.grave - 0.15, m.grave + 0.15) + 0.1 * suave(f, m.segunda - 0.2, m.segunda + 0.6) - 0.1 * suave(f, m.fundido, m.fin);
   e.calor = 0.45 + 0.35 * suave(f, m.caliente - 0.3, m.caliente + 1.6) + 0.2 * suave(f, m.grave - 0.15, m.grave + 0.3);
-  // Late desde «caliente»; más con el pre-estribillo y del todo con el grave; al final, un latido tranquilo que se queda.
+  // Late desde «caliente»; más con el pre-estribillo y del todo con el grave; al final, sereno.
   e.fuerza = 0.4 * suave(f, m.caliente - 0.2, m.caliente + 0.8) + 0.2 * suave(f, m.previa - 0.3, m.previa + 0.6) + 0.4 * suave(f, m.grave - 0.15, m.grave + 0.15)
     + 0.1 * suave(f, m.segunda - 0.3, m.segunda + 0.6) - 0.55 * suave(f, m.fundido, m.fin);
-  e.pulso = latido(f, config, e, reducido) * e.fuerza * (reducido ? 0.4 : 1);
-  e.viento = suave(f, m.previa - 0.2, m.previa + 2.2);
-  e.ondas = (0.6 * suave(f, m.previa, m.previa + 1) + 0.4 * suave(f, m.grave - 0.15, m.grave + 0.15) - 0.45 * suave(f, m.fundido, m.fin)) * (reducido ? 0.4 : 1);
-  // Una onda por compás en el pre-estribillo; con el grave, una por pulso (desde los golpes de la canción).
-  e.ondaPeriodo = f >= m.grave ? P : 4 * P;
-  e.ondaEdad = (((f - config.desfase) % e.ondaPeriodo) + e.ondaPeriodo) % e.ondaPeriodo;
-  e.barrido = 0.45 * suave(f, m.amor - 0.3, m.amor + 1.2) + 0.55 * suave(f, m.grave - 0.15, m.grave + 0.4);
-  e.frente = 1.15 * suave(f, m.grave, m.grave + (reducido ? 4 : 2.8));
-  e.brillo = suave(f, m.grave - 0.2, m.grave + 0.8) * (1 - 0.3 * suave(f, m.fundido, m.fin));
+  latido(f, config, e, reducido);   // e.edad: s desde el último pulso de la rejilla (paquetes de luz por los haces)
+  ultimoGolpe(f, config.golpes || GOLPES_PULSAR, e);
+  const g = e.golpeEdad, golpe = (Math.exp(-g / (reducido ? 0.3 : 0.12)) + (!reducido && g > 0.16 ? 0.4 * Math.exp(-(g - 0.16) / 0.09) : 0)) * e.golpeFuerza;
+  e.pulso = golpe * e.fuerza * (reducido ? 0.4 : 1);
+  // El toro de plasma se enciende con la voz («quererte»), del anillo interior hacia fuera, y crece con la canción.
+  e.toro = 1.15 * suave(f, m.quererte - 0.2, m.caliente + 1);
+  e.luzToro = 0.3 + 0.3 * suave(f, m.quererte, m.caliente) + 0.2 * suave(f, m.previa - 0.3, m.previa + 1) + 0.2 * suave(f, m.grave - 0.15, m.grave + 0.3) - 0.15 * suave(f, m.fundido, m.fin);
+  e.ondas = (0.55 * suave(f, m.previa - 0.3, m.previa + 0.6) + 0.45 * suave(f, m.grave - 0.15, m.grave + 0.15) - 0.5 * suave(f, m.fundido, m.fin)) * (reducido ? 0.4 : 1);
+  // El faro empieza a encender lo que barre con «de tu amor» y del todo con el grave.
+  e.barrido = 0.4 * suave(f, m.amor - 0.3, m.amor + 1.2) + 0.6 * suave(f, m.grave - 0.15, m.grave + 0.4) - 0.3 * suave(f, m.fundido, m.fin);
   e.tibio = suave(f, m.segunda - 0.4, m.segunda + 1.2) * (1 - 0.5 * suave(f, m.fundido, m.fin));
   e.foco = 0.85 * suave(f, 0, m.quererte) - 0.4 * suave(f, m.fundido, m.fin);
   return e;
