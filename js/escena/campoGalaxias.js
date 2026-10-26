@@ -200,17 +200,34 @@ export function crearCampoGalaxias({ lista, texturas, descriptores, uPR }) {
     transparent: true, premultipliedAlpha: true, depthWrite: false, blending: THREE.AdditiveBlending }));
   puntosLuz.frustumCulled = false; puntosLuz.renderOrder = -2; puntosLuz.userData.luzNoResuelta = true; grupo.add(puntosLuz);
   // Color medio REAL de cada imagen para su luz no resuelta (la misma galaxia, el mismo color).
+  // Se calcula en la carga (prepararLuz, por tramos, cediendo entre imágenes): antes se hacía en el primer cuadro dentro del
+  // universo y recorría de golpe los píxeles de todas las imágenes (~25 ms en un móvil, ~100 con la CPU ×4): el primer
+  // tirón de la entrada tras la intro. Si en la carga aún faltaba alguna imagen, se completa como antes en actualizar().
   let calibrado = false;
-  function calibrar() {
-    const colores = new Map();
-    for (const g of lista) {
-      const t = g.instancia.textura; if (colores.has(t)) continue;
-      const d = t.image?.data; if (!d || mediaLuz(t) === null) return;
-      let r = 0, gg = 0, b = 0; for (let j = 0; j < d.length; j += 4) { r += d[j]; gg += d[j + 1]; b += d[j + 2]; } const n = d.length / 4 * 255; colores.set(t, [r / n, gg / n, b / n]);
-    }
+  const colorMedio = (t, colores) => {
+    const d = t.image?.data; if (!d || mediaLuz(t) === null) return false;
+    let r = 0, gg = 0, b = 0; for (let j = 0; j < d.length; j += 4) { r += d[j]; gg += d[j + 1]; b += d[j + 2]; } const n = d.length / 4 * 255; colores.set(t, [r / n, gg / n, b / n]);
+    return true;
+  };
+  const aplicarColores = colores => {
     const ac = puntosLuz.geometry.attributes.aColor;
     lista.forEach((g, k) => { const m = colores.get(g.instancia.textura); ac.array.set([m[0] * g.op, m[1] * g.op, m[2] * g.op], k * 3); }); ac.needsUpdate = true;
     calibrado = true;
+  };
+  function calibrar() {
+    const colores = new Map();
+    for (const g of lista) { const t = g.instancia.textura; if (!colores.has(t) && !colorMedio(t, colores)) return; }
+    aplicarColores(colores);
+  }
+  async function prepararLuz() {
+    if (calibrado) return true;
+    const colores = new Map(); let t0 = performance.now();
+    for (const g of lista) {
+      const t = g.instancia.textura; if (colores.has(t)) continue;
+      if (performance.now() - t0 > 20) { await new Promise(r => setTimeout(r, 0)); t0 = performance.now(); }
+      if (!colorMedio(t, colores)) return false;
+    }
+    aplicarColores(colores); return true;
   }
   // Diagnóstico (pruebas de luz): un grupo con SOLO esa galaxia, con los mismos materiales.
   function soloGalaxia(g) {
@@ -229,6 +246,7 @@ export function crearCampoGalaxias({ lista, texturas, descriptores, uPR }) {
     grupo,
     razonLuz: () => lista.map(g => g.instancia.im.geometry.attributes.aBeta.array[g.instancia.i]),
     crearEstrellas,
+    prepararLuz,
     activas: () => [...activas].map(g => g.estrellas),
     actualizar(camera) {
       if (!calibrado) calibrar();

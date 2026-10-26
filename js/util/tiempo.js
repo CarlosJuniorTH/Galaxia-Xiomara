@@ -43,6 +43,7 @@ export function saludoMomento(ahora = new Date()) {
   if (hora < 20) return 'Buenas tardes, mi amor. Este ratito de universo es para ti.';
   return 'Buenas noches, mi Xio. Quédate un ratito entre nuestras estrellas.';
 }
+// (El contador la pedía cada segundo y creaba un formateador nuevo en cada llamada: ~1–5 ms en un móvil.)
 export function fechaBonita(fecha) {
-  return new Intl.DateTimeFormat('es', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${fecha}T12:00:00Z`));
+  return formato('bonita', () => new Intl.DateTimeFormat('es', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })).format(new Date(`${fecha}T12:00:00Z`));
 }

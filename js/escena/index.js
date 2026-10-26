@@ -26,6 +26,7 @@ import { EXPOSICION } from './exposicion.js';
 import { crearTelaranaCosmica, pedirDatosTelarana } from './telarana.js';
 import { crearCieloProfundo } from './cieloProfundo.js';
 import { crearPreparacion } from './carga/preparacion.js';
+import { matricesSoloVisibles, actualizarVisibles } from './matrices.js';
 import { crearGestorCalidad } from './calidad/gestor.js';
 import { crearRutas } from './camara/rutas.js';
 import { construirMaravillas } from './maravillas.js';
@@ -235,7 +236,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // El fondo infinito se aleja con el plano cercano (lejos de casa, millones de unidades): mismo
   // tamaño en el cielo, nunca recortado ni delante de lo que se visita.
   let escalaFondo = 1;
-  const acompanar = () => { for (const o of cieloLejano) if (o !== cosmos.raiz && !o.userData.fijo) { o.position.copy(camera.position); o.scale.setScalar(o.userData.escalaBase * escalaFondo); o.updateMatrixWorld(); } };
+  const acompanar = () => { for (const o of cieloLejano) if (o !== cosmos.raiz && !o.userData.fijo) { o.position.copy(camera.position); o.scale.setScalar(o.userData.escalaBase * escalaFondo); actualizarVisibles(o); } };
   // Esas raíces ya se actualizan aquí (con todo lo que llevan dentro) en cada cuadro: three.js no las recorre otra vez al
   // dibujar (antes se calculaban dos veces por cuadro, tres en algunos; las galaxias lejanas son casi 300 objetos).
   for (const o of cieloLejano) if (o !== cosmos.raiz && !o.userData.fijo) o.matrixWorldAutoUpdate = false;
@@ -282,6 +283,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // con la mitad de llamadas y sin generar memoria temporal en cada cuadro (menos pausas del recolector en el móvil).
   const unaPasada = esc => esc.traverse(o => { for (const m of [].concat(o.material || [])) if (m.transparent && m.side === THREE.DoubleSide && m.blending === THREE.AdditiveBlending) m.forceSinglePass = true; });
   unaPasada(scene); unaPasada(solar.escena);
+  // Matrices del mundo solo de lo visible y solo si algo cambió (matrices.js): el mismo dibujo con menos CPU por cuadro.
+  matricesSoloVisibles(scene); matricesSoloVisibles(solar.escena);
   // Luces siempre presentes: three.js compila cada material con el número de luces visibles, y una luz que se oculta con
   // su grupo (la casa vista desde un gigante) haría recompilar todos los materiales al llegar (un tirón la primera vez).
   // Las luces puntuales pasan a la raíz de la escena y siguen a su ancla; tienen alcance limitado, así que lejos de su
@@ -298,7 +301,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     window.__pasoCarga = 'cielo'; avance(0.84, 0.86); await cieloProfundo.listo;
     window.__pasoCarga = 'cuasar'; avance(0.86, 0.88); cosmos.hornear(renderer); await new Promise(r => setTimeout(r, 0));
     avance(0.88, 0.96);
-    window.__pasoCarga = 'compilar'; await texturasListas(); await compilarTodo(scene); await compilarTodo(solar.escena);
+    window.__pasoCarga = 'compilar'; await texturasListas(); await lejanas.campo.prepararLuz(); await compilarTodo(scene); await compilarTodo(solar.escena);
     avance(0.96, 0.99);
     window.__pasoCarga = 'subir'; await subirTexturas(); await subirTexturas(solar.escena); solarPreparado = true;
     await new Promise(r => setTimeout(r, 0));
@@ -323,11 +326,14 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   const giroBase = controls.autoRotateSpeed;
   let giroSuave = 0, respira = 0;
   const camaraGuardada = { pos: new THREE.Vector3(), rot: new THREE.Quaternion() }, haciaObjetivo = new THREE.Vector3();
-  // En pantallas táctiles, sin tocar (tras 4 s) se dibuja a 30 FPS y al tocar vuelve a 60: medido en un iPhone, a 60
+  // En pantallas táctiles, tras un rato largo sin tocar se dibuja a 30 FPS y al tocar vuelve a 60: medido en un iPhone, a 60
   // continuos el teléfono se calentaba y a los pocos minutos bajaba su GPU a la mitad (28 FPS con TODO). ?ritmo=fluido: siempre 60.
+  // El rato era de 4 s: al mirar un gigante (su disco, sus chorros, sus haces), la galaxia de Xiomara o el sistema solar sin
+  // tocar, a los 4 s todo pasaba a 30 y las animaciones se veían pesadas, a saltitos (Carlos, en su iPhone: «se sienten
+  // lentas»). Ahora, 30 s: mientras se mira y se explora, 60; solo con el teléfono olvidado en la mano o en la mesa, 30.
   const ritmoAhorro = tactil && new URLSearchParams(location.search).get('ritmo') !== 'fluido';
   // En el PC con pantalla rápida, ~120 por segundo (planificador.js); en el móvil, 60 (calor y batería).
-  const planificador = crearPlanificador({ interaccion: 60, contemplacion: ritmoAhorro ? 30 : 60, alto: esMovil ? 0 : 120, esperaMs: 4000 });
+  const planificador = crearPlanificador({ interaccion: 60, contemplacion: ritmoAhorro ? 30 : 60, alto: esMovil ? 0 : 120, esperaMs: ritmoAhorro ? 30000 : 4000 });
   let gesto = false, modoAnterior = null, cuadrosDibujados = 0, finGesto = -Infinity;
   const AMORTIGUACION = controls.dampingFactor;   // la de 60 FPS (nucleo.js)
   const marcarActividad = () => planificador.actividad(performance.now());
@@ -1100,6 +1106,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
         // en este mismo cuadro, a la vez que su animación.
         if (!compuesto || fin.continuacion) alLlegar(destinoActual);
         controls.update(); fin.resolver(true); fin.alLlegar?.(); entradaResuelta = true; medirZonaLibre();
+        marcarActividad();   // llegar es actividad: el lugar recién llegado se mira a 60 (no a 30 por llevar rato sin tocar)
         fijarEncuadre(); ajuste = null;
         // Si la pantalla giró o cambió la interfaz DURANTE el vuelo, la curva llevó la cámara al
         // punto bueno para la situación anterior: se corrige con el mismo ajuste suave del giro en

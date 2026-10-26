@@ -127,7 +127,10 @@ export function crearEntrada(config, { viaje, banda } = {}) {
     if (!preparado || boton.disabled) return;
     boton.disabled = continuar.disabled = true;
     entrada.classList.add('oculto');
-    setTimeout(() => { entrada.style.display = 'none'; portada.parar(); }, 1600);
+    // La animación de la portada se para ya (su último cuadro se queda en el fundido de 1,5 s): seguía dibujando a pantalla
+    // completa encima de los primeros cuadros del vuelo de entrada, los más cargados.
+    portada.parar();
+    setTimeout(() => { entrada.style.display = 'none'; }, 1600);
     document.body.classList.add('dentro');
     document.getElementById('hud').inert = false;
     setTimeout(() => document.getElementById('btn-tour')?.focus({ preventScroll: true }), 1700);

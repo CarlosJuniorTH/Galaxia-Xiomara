@@ -57,7 +57,11 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
         // Sin entrada en el índice, al menos lo que diga el servidor (el total crece un poco al empezar).
         if (p.contar && !p.previsto) { p.previsto = Number(r.headers.get('content-length')) || 0; if (p.previsto) descargas.previsto(p.previsto); }
         const trozos = [];
-        if (r.body?.getReader) {
+        // Las que no cuentan en la barra de carga (las de los destinos, que bajan en segundo plano justo cuando empieza la
+        // entrada tras la intro) se reciben enteras, sin leerlas a trozos: cada trozo despertaba al hilo principal
+        // (10–40 ms con la CPU ×4, encima de los cuadros del vuelo de entrada) y además se copiaba a la memoria de la página.
+        if (!p.contar) { trozos.push(await r.blob()); }
+        else if (r.body?.getReader) {
           const lector = r.body.getReader();
           for (;;) { const { done, value } = await lector.read(); if (done) break; trozos.push(value); const k = Math.min(value.byteLength, p.previsto - contados); if (k > 0) { contados += k; descargas.hecho(k); } }
         } else { trozos.push(await r.arrayBuffer()); if (p.previsto) { descargas.hecho(p.previsto); contados = p.previsto; } }
