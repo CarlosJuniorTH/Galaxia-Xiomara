@@ -117,5 +117,20 @@ test('la pista de cámara del clip: ordenada, sin saltos salvo los cortes, quiet
   }
   // En el silencio la cámara casi no se mueve; con el grito sale despedida.
   const d = s => muestrearCamara(P, s).pos[2];
-  assert.ok(Math.abs(d(41.68) - d(41.3)) / d(41.3) < 0.06 && d(42.3) > 4 * d(41.7));
+  assert.ok(Math.abs(d(41.6) - d(41.3)) / d(41.3) < 0.06 && d(42.46) > 1.4 * d(41.665));
+  // Con el filtro del director (velocidades máximas), la cámara llega a sus planos y va siempre bien fuera de la bola de
+  // fuego (en el móvil, desde dentro solo se veía una mancha blanca).
+  const { crearSuavizador, crearMuestra, segundoAdelantado, siguienteCorte } = await import('../js/util/directorCamara.js');
+  const { desdeAnimacion } = await import('../js/util/supernovaAmor.js');
+  const f = crearSuavizador(), cruda = crearMuestra(), sal = crearMuestra(); muestrearCamara(P, 0, cruda); f.fijar(cruda);
+  const bola = s => s < T.espera ? 0 : (110 * 0.45 * 0.9 + 720 * (1 - Math.exp(-desdeAnimacion(s - T.espera) / 2.2))) * 1170 / 4.24e6;
+  let margen = Infinity, desfase = 0;
+  for (let t = 0, dt = 1 / 60; t <= ultimo.t; t += dt) {
+    muestrearCamara(P, segundoAdelantado(P, t), cruda);
+    const c = siguienteCorte(P, t - dt); if (c <= t && c > t - dt) { muestrearCamara(P, t, cruda); f.fijar(cruda); }
+    f.paso(cruda, dt, sal);
+    if (bola(t) > 0) margen = Math.min(margen, sal.pos[2] / bola(t));
+    if (t > 1) desfase = Math.max(desfase, Math.abs(Math.log(sal.pos[2] / muestrearCamara(P, t).pos[2])));
+  }
+  assert.ok(margen > 2, `margen ${margen}`); assert.ok(desfase < 0.25, `desfase ${desfase}`);
 });
