@@ -60,7 +60,9 @@ function* perfilViaje({ camino, longitud, cercania, interes, desde, salidaCentro
     // Lo más cercano (con un suelo: dentro de una nebulosa se va más despacio, pero no se para) y el
     // arranque y la frenada. Raíz cuadrada: la velocidad acompaña al paisaje sin detenerse en él.
     const cerca = Math.max(cercania ? cercania(p) : Infinity, Math.min(4000, dLlegada * 0.5));
-    dist[i] = Math.sqrt(Math.max(40, Math.min(cerca, dSalida, dDestino)));
+    // (Exponente 0,42; antes 0,5: con la raíz el último tramo hacia el destino se llevaba casi la mitad del viaje —volver a
+    // casa: 6,6 s para el último 10 % del camino— y el viaje se sentía lento; así se va más rápido cerca y frena igual.)
+    dist[i] = Math.pow(Math.max(40, Math.min(cerca, dSalida, dDestino)), 0.42);
     if (i % 64 === 63) yield;
   }
   // Suavizado en escala logarítmica (sin esquinas en la velocidad al pasar de un objeto a otro).
@@ -207,7 +209,8 @@ export function planificarVuelo({ desde, miraDesde, hasta, mira, centro = mira, 
   const q = finRecta(salida), recta = new THREE.LineCurve3(salida.clone(), q), arco = arcoLlegada(q, hasta, centro);
   // Tiempo del arco de llegada según cuánto rodea el destino (≈ 30°/s de media: un rodeo tranquilo; nada si llega de frente). También con
   // movimiento reducido: rodear deprisa es justo el movimiento que marea.
-  const giroArco = q.clone().sub(centro).angleTo(hasta.clone().sub(centro)), tArco = giroArco < 0.02 ? 0 : THREE.MathUtils.clamp(giroArco * 2, 0.8, 6);
+  // (≈ 45°/s de media; antes 30°/s: el rodeo final se hacía largo y el viaje se sentía lento al llegar.)
+  const giroArco = q.clone().sub(centro).angleTo(hasta.clone().sub(centro)), tArco = giroArco < 0.02 ? 0 : THREE.MathUtils.clamp(giroArco * 1.3, 0.7, 4.5);
   // Recorrido por distancia real (la recta y el arco muestreado denso): con getPointAt de three el paso variaba hasta un 35 %
   // en el arco de llegada, justo mientras se frena (pequeños acelerones al llegar). Ahora el mismo avance es la misma distancia.
   const camino = new CurvaPorDistancia([salida, ...arco.getPoints(1500)]);
@@ -219,15 +222,17 @@ export function planificarVuelo({ desde, miraDesde, hasta, mira, centro = mira, 
   // El viaje entero dura lo que dice la regla: las fases previas (selección, salida del gigante y giro hacia el destino)
   // se acortan a la vez si pasarían del 40 % (saliendo de un gigante podían sumar 8–10 s) y el resto es el vuelo.
   const totalViaje = duracionTotal ?? duracionViaje(desde.distanceTo(hasta)) * (breve ? 0.7 : 1);
-  let tSeleccion = reducido ? 0.2 : 0.55;
+  let tSeleccion = reducido ? 0.2 : 0.35;
   // Sentido en que gira la mirada mientras rodea el gigante (la vuelta hacia el destino sigue en ese mismo sentido).
   let sentidoGiro = 0;
   if (arcoSalida) { const gu = v => Math.atan2(-v.x, -v.z); let d = gu(arcoSalida.d1) - gu(arcoSalida.d0); d -= Math.PI * 2 * Math.round(d / (Math.PI * 2)); sentidoGiro = Math.sign(d) || 1; }
   // Cuánto tiene que acercarse o alejarse al salir de un gigante (0: ya está a su distancia).
   const radial = arcoSalida ? Math.min(1, Math.abs(Math.log2(arcoSalida.r0 / Math.max(1e-6, arcoSalida.r1)))) : 0;
   let tManiobra = (lSalida > 1 || arcoSalida) ? (arcoSalida ? THREE.MathUtils.clamp(2.0 + arcoSalida.d0.angleTo(arcoSalida.d1) * 1.4 + Math.abs(Math.log2(arcoSalida.r0 / arcoSalida.r1)) * 1.0, 2.0, 7.0) : THREE.MathUtils.clamp(1.3 + Math.log10(1 + lSalida / 500) * 0.8, 1.3, 2.6)) * (reducido ? 0.6 : 1) : 0;
-  let tAlinear = THREE.MathUtils.clamp(1.0 + anguloAlinear / Math.PI * 2.2, 1.0, 3.0) * (reducido ? 0.6 : 1);   // giro suave hacia el destino
-  { const previo = Math.max(tSeleccion, tManiobra > 0 ? tManiobra + 0.25 : 0) + tAlinear, tope = totalViaje * 0.4;
+  let tAlinear = THREE.MathUtils.clamp(0.8 + anguloAlinear / Math.PI * 1.6, 0.8, 2.4) * (reducido ? 0.6 : 1);   // giro suave hacia el destino
+  // Las fases previas (salir del gigante y girar hacia el destino) como mucho el 28 % del viaje (antes el 40 %: hasta 6 s
+  // de un viaje de 15 s antes de salir disparado; Carlos: «los viajes se hacen lentos»). El vuelo dura más y va más rápido.
+  { const previo = Math.max(tSeleccion, tManiobra > 0 ? tManiobra + 0.25 : 0) + tAlinear, tope = totalViaje * 0.28;
     if (previo > tope) { const f = tope / previo; tSeleccion *= f; tManiobra *= f; tAlinear *= f; } }
   const tRuptura = 0;   // sin salto: del giro hacia el destino se pasa al vuelo sin destello
   const inicioManiobra = Math.min(tSeleccion * 0.4, 0.25), finManiobra = inicioManiobra + tManiobra;
@@ -243,7 +248,8 @@ export function planificarVuelo({ desde, miraDesde, hasta, mira, centro = mira, 
   let perfil = null, nT = 0, desvio = null, sAprox = 0, tAprox = 0, tLlegada = 0, listo = false;
   const preparacion = (function* () {
     perfil = yield* perfilViaje({ camino, longitud: total, cercania, interes, desde: salida, salidaCentro, centro, dLlegada,
-      duracion: duracionObjetivo, tRampa: reducido ? 1.4 : 1.6, tFrenada: reducido ? 1.6 : 2.4, lRecta: L, tArco });
+      // Arranque en 1,1 s y frenada en 1,9 s (antes 1,6 y 2,4): sale lanzado y llega con decisión, sin frenazo.
+      duracion: duracionObjetivo, tRampa: reducido ? 1.4 : 1.1, tFrenada: reducido ? 1.6 : 1.9, lRecta: L, tArco });
     nT = perfil.tabla.length; desvio = new Float32Array(nT * 3);
     yield* calcularDesvio();
     // Instantes de cada fase del viaje (para la interfaz, las pruebas y saltar el viaje).
