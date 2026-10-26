@@ -3,9 +3,9 @@
 //  · Núcleo: un punto blanco pequeño y nítido, con una cruz fina.
 //  · Coma: motas finas que salen del núcleo en tres chorros que giran con él (el núcleo rota) y otras en todas las
 //    direcciones; la luz las frena y las dobla hacia atrás, como fuentes: dibujan arcos y espirales que se van a la cola.
-//  · Cola de polvo: ancha, curvada, de blanco a dorado. Cada grano conserva el recorrido del cometa en el instante en que
-//    salió, la luz lo empuja hacia fuera (más a los granos finos) y se va quedando atrás en la órbita: la cola es la
-//    historia de por dónde ha pasado, se abre en abanico y se curva sola. Los «golpes» de actividad del núcleo dejan
+//  · Cola de polvo: ancha, curvada, de blanco a dorado. La luz empuja cada grano hacia fuera (más a los granos finos) y
+//    el grano se va quedando atrás de la órbita: la cola nace en el núcleo pegada a la de iones, se abre en abanico y se
+//    curva sola hacia la estela. Los «golpes» de actividad del núcleo dejan
 //    estrías (bandas de granos que salieron a la vez) y la cola se riza despacio.
 //  · Cola de iones: recta, fina, azulada, en contra de la luz en todo momento; hecha de filamentos que ondulan como una
 //    bandera al viento y se aceleran al alejarse.
@@ -26,8 +26,8 @@ const DU = 0.88 / VISIBLE;
 // Más allá de esta distancia de casa se está en el universo a gran escala (como escena.lejosDeCasa): ahí no hay cometa.
 const LEJOS = 15000;
 // Medidas (unidades de la escena), vidas (s) y número de motas de cada parte.
-const COMA = { motas: 1400, vida: 2.6, chorro: 38, empuje: 12 };
-const POLVO = { motas: 11000, vida: 15, largo: 1900, atras: 1000 };
+const COMA = { motas: 1400, vida: 2.2, chorro: 20, empuje: 18 };
+const POLVO = { motas: 11000, vida: 15, largo: 1900, atras: 380 };
 const IONES = { motas: 6000, vida: 3.6, largo: 2700, hebras: 9 };
 
 const D01 = new THREE.Vector3().subVectors(P1, P0), D12 = new THREE.Vector3().subVectors(P2, P1), FINAL = new THREE.Vector3().copy(D12).multiplyScalar(2);
@@ -96,20 +96,13 @@ function crearMotas({ uScale, uPR }) {
   g.setAttribute('position', new THREE.BufferAttribute(dir, 3)); g.setAttribute('aSemilla', new THREE.BufferAttribute(semilla, 4)); g.setAttribute('aTipo', new THREE.BufferAttribute(tipo, 1));
   const m = new THREE.ShaderMaterial({
     uniforms: {
-      uTime: { value: 0 }, uScale, uPR, uI: { value: 0 }, uU: { value: 0.06 },
-      uAnti: { value: new THREE.Vector3(1, 0, 0) }, uAtras: { value: new THREE.Vector3(0, 1, 0) }, uCabeza: { value: new THREE.Vector3() },
-      uP0: { value: P0 }, uP1: { value: P1 }, uP2: { value: P2 }
+      uTime: { value: 0 }, uScale, uPR, uI: { value: 0 },
+      uAnti: { value: new THREE.Vector3(1, 0, 0) }, uAtras: { value: new THREE.Vector3(0, 1, 0) }
     },
     vertexShader: /* glsl */`
       attribute vec4 aSemilla; attribute float aTipo;
-      uniform float uTime, uScale, uPR, uI, uU; uniform vec3 uAnti, uAtras, uCabeza, uP0, uP1, uP2;
+      uniform float uTime, uScale, uPR, uI; uniform vec3 uAnti, uAtras;
       varying vec3 vC; varying float vA, vTipo, vTam;
-      vec3 derivada(float u){ u = min(u, 1.0); return 2.0 * (1.0 - u) * (uP1 - uP0) + 2.0 * u * (uP2 - uP1); }
-      vec3 punto(float u){
-        float v = min(u, 1.0);
-        vec3 p = (1.0 - v) * (1.0 - v) * uP0 + 2.0 * (1.0 - v) * v * uP1 + v * v * uP2;
-        return p + derivada(1.0) * max(0.0, u - 1.0);
-      }
       // Giro de v alrededor del eje unitario k (Rodrigues).
       vec3 girar(vec3 v, vec3 k, float a){ float c = cos(a), s = sin(a); return v * c + cross(k, v) * s + k * dot(k, v) * (1.0 - c); }
       void main(){
@@ -122,8 +115,8 @@ function crearMotas({ uScale, uPR }) {
           float edad = fract(aSemilla.x + uTime / ${f1(COMA.vida)}) * ${f1(COMA.vida)}, tau = edad / ${f1(COMA.vida)};
           float sale = uTime - edad;   // instante en que salió
           vec3 d; float v;
-          if (aSemilla.y < 0.72) {
-            float j = floor(aSemilla.y / 0.24);
+          if (aSemilla.y < 0.45) {
+            float j = floor(aSemilla.y / 0.15);
             vec3 base = j < 0.5 ? vec3(0.9, 0.3, 0.3) : (j < 1.5 ? vec3(-0.5, 0.6, -0.6) : vec3(-0.2, -0.8, 0.55));
             d = normalize(girar(normalize(base), normalize(vec3(0.25, 1.0, 0.15)), sale * 0.78 + j * 2.1) + position * 0.1);
             v = ${f1(COMA.chorro)} * (0.75 + 0.5 * aSemilla.z);
@@ -133,15 +126,14 @@ function crearMotas({ uScale, uPR }) {
           vC = mix(vec3(1.0, 1.0, 0.97), vec3(0.72, 0.95, 0.9), smoothstep(0.1, 0.8, tau));
           tam = 1.8;
         } else if (aTipo < 2.5) {
-          // Polvo: el grano sigue el movimiento que tenía el cometa al soltarlo, la luz lo aleja (más cuanto más fino) y
-          // se queda atrás en la órbita. Todo en el mundo, relativo a la cabeza: la cola guarda la forma del recorrido.
+          // Polvo: la luz aleja cada grano en contra del centro (más cuanto más fino) y el grano se va quedando atrás de la
+          // órbita: la cola nace en el núcleo junto a la de iones y se curva poco a poco hacia la estela. Con la contraluz y
+          // la estela de AHORA (no las del instante en que salió cada grano): el cometa gira deprisa alrededor del centro y
+          // con las de entonces la cola de polvo se iba por la órbita y se veía partida, separada de la de iones.
           float edad = fract(aSemilla.x + uTime / ${f1(POLVO.vida)}) * ${f1(POLVO.vida)}, tau = edad / ${f1(POLVO.vida)};
-          float ue = uU - edad * ${f4(DU)}, fino = aSemilla.y;
-          vec3 pe = punto(ue), ve = derivada(ue) * ${f4(DU)};
-          vec3 an = normalize(pe), ta = normalize(ve), lado = normalize(cross(an, ta));
-          p = pe + ve * edad - uCabeza
-            + an * (${f1(POLVO.largo)} * fino * tau * tau)
-            - ta * (${f1(POLVO.atras)} * fino * tau * tau * tau);
+          float fino = aSemilla.y;
+          vec3 lado = e3;
+          p = e1 * (${f1(POLVO.largo)} * fino * tau * tau) + e2 * (${f1(POLVO.atras)} * fino * tau * tau * tau);
           // Dispersión de la salida (la cola gana grosor al alejarse) y un rizo lento que recorre la cola.
           p += position * (3.0 + 38.0 * tau) + lado * sin(tau * 9.0 - uTime * 0.55 + fino * 4.0) * tau * 38.0;
           // Estrías: los golpes de actividad del núcleo sueltan más polvo a la vez (bandas nítidas a lo ancho).
@@ -158,10 +150,10 @@ function crearMotas({ uScale, uPR }) {
           float edad = fract(aSemilla.x + uTime / ${f1(IONES.vida)}) * ${f1(IONES.vida)}, tau = edad / ${f1(IONES.vida)};
           float h = aSemilla.y, lejos = ${f1(IONES.largo)} * (0.22 * tau + 0.78 * tau * tau);
           float ang = h * 2.39996 + 0.4, abre = h < 0.5 ? 0.0 : (0.35 + 0.65 * fract(h * 0.618));
-          vec2 o = vec2(cos(ang), sin(ang)) * (lejos * 0.034 * abre);
+          vec2 o = vec2(cos(ang), sin(ang)) * (lejos * 0.022 * abre);
           // Ondas que viajan hacia fuera a lo largo de la cola (más amplias lejos del núcleo) y un pliegue lento.
-          o.x += sin(lejos * 0.0065 - uTime * 1.9 + h * 0.9) * lejos * 0.028;
-          o.y += sin(lejos * 0.0041 - uTime * 1.1 + h * 2.3) * lejos * 0.016;
+          o.x += sin(lejos * 0.0045 - uTime * 1.2 + h * 0.9) * lejos * 0.010;
+          o.y += sin(lejos * 0.0031 - uTime * 0.8 + h * 2.3) * lejos * 0.006;
           o += position.xy * (0.4 + tau * 4.0);
           p = e1 * lejos + e2 * o.x + e3 * o.y;
           a = pow(1.0 - tau, 1.1) * smoothstep(0.0, 0.12, tau) * aSemilla.w * (h < 0.5 ? 1.0 : 0.62);
@@ -209,7 +201,6 @@ export function crearCometa({ uScale, uPR }) {
   const tangente = new THREE.Vector3(), atras = new THREE.Vector3(), cola = new THREE.Vector3();
   function situar(avance) {
     punto(avance, grupo.position); derivada(avance, tangente).normalize();
-    u.uU.value = avance; u.uCabeza.value.copy(grupo.position);
   }
   // Base de la cola de iones y de la coma: contraluz (lejos del centro de la galaxia) y estela (lo que queda atrás del
   // movimiento, sin la parte que va en la dirección de la luz). Cambian poco a poco con el recorrido: nunca hay saltos.

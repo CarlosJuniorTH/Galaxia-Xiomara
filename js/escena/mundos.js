@@ -589,11 +589,11 @@ export function* construirMundos({ scene, uScale, uPR }, { alConstelar = () => {
       return hit ? (hit.object.userData.nodo !== undefined ? { tipo: 'nodo', id: hit.object.userData.nodo } : { tipo: 'destino', id: hit.object.userData.destino }) : null;
     },
     actualizar(t, dt, { tiempoDentro, camera }) {
-      // Lejos de casa (desde los gigantes) los lugares no se ven: solo sigue el cometa, que tiene su propio recorrido.
+      // Lejos de casa (desde los gigantes) los lugares no se ven (el cometa va aparte: moverCometa).
       // La constelación de casa (el corazón, el infinito… de CONSTELACIONES) no se ve desde las seis grandes: allí no hay
       // figuras de corazón ni de infinito hechas con estrellas (cada una tiene su propio cielo: universoLocal.js).
       constelacion.visible = !GRANDES.has(foco);
-      if (!raiz.visible) { cometa.actualizar(t, dt, { tiempoDentro, foco, camera }); return; }
+      if (!raiz.visible) return;
       // La figura sigue siendo espacial, pero no desaparece de canto cuando
       // la cámara orbita. Igual que el corazón central, mira a quien la visita.
       constelacion.quaternion.copy(camera.quaternion);
@@ -706,7 +706,9 @@ export function* construirMundos({ scene, uScale, uPR }, { alConstelar = () => {
       }
       luces.forEach((s, i) => { s.material.color.set(i < unidos ? '#fff0c9' : i === unidos ? '#ffffff' : '#d6a870'); s.scale.setScalar(i === unidos ? 30 + Math.sin(t * 3) * 3 : completada ? 21 + Math.sin(t * 2 + i) * 1.2 : 23); });
       if (tejiendo) { tejidoT += dt; if (tejidoT > 0.55) { tejidoT = 0; unirNodo(unidos); } }
-      cometa.actualizar(t, dt, { tiempoDentro, foco, camera });
-    }
+    },
+    // El cometa se mueve al principio de cada cuadro, antes que la cámara que lo sigue (index.js): si se movía después,
+    // la cámara iba un cuadro por detrás y, con cuadros de duración desigual, el cometa daba tirones en pantalla.
+    moverCometa(t, dt, { tiempoDentro, camera }) { cometa.actualizar(t, dt, { tiempoDentro, foco, camera }); }
   };
 }

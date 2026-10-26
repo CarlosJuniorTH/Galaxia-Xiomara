@@ -1113,6 +1113,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     cuadrosDibujados++;
     const inicioCuadro = medir ? performance.now() : 0;
     tiempo += dt;
+    mundos.moverCometa(tiempo, dt, { tiempoDentro: tEntrada === null ? null : tiempo - tEntrada, camera });
     if (tEntrada === null) {
       camera.position.x = Math.sin(tiempo * 0.025) * 400 - 2400;
       camera.lookAt(OBJETIVO);
