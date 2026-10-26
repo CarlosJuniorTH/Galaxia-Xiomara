@@ -50,7 +50,11 @@ const PISTA = [
   { t: 43.4, pos: [38, 8, 1.15], curva: 'suave' }                            // se posa como al llegar
 ];
 export const CAMARA_DENEB = PISTA;
-ESCENA_DENEB.camara = PISTA;
+// En vertical (móvil): más cerca (la nube llena el alto) y mirando algo más arriba (el director deja el centro del gigante
+// por encima del de la pantalla: así queda centrada).
+export const CAMARA_DENEB_VERTICAL = PISTA.map(p => ({ ...p, pos: [p.pos[0], p.pos[1], +(p.pos[2] * 0.82).toFixed(3)], ...(p.mira ? { mira: [0, 0.05, 0] } : {}) }));
+const vertical = () => typeof window !== 'undefined' && window.innerWidth < window.innerHeight * 0.9;
+Object.defineProperty(ESCENA_DENEB, 'camara', { get: () => vertical() ? CAMARA_DENEB_VERTICAL : CAMARA_DENEB, enumerable: true });
 
 // Curva monótona por claves [[s, v], …] (Fritsch–Carlson): pasa por cada clave sin pasarse ni rebotar, con velocidad
 // continua (el rebobinado acelera y frena sin tirones).

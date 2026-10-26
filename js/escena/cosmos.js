@@ -325,7 +325,7 @@ export function* construirCosmos({ uScale, uPR }) {
     sobreGas: [],
     raiz, decor,
     acentoCuasar: v => piezasCuasar.acento(v),
-    hornear: renderer => piezasCuasar.hornearRemolino(renderer),
+    hornear: renderer => { piezasCuasar.hornearRemolino(renderer); denebCerca.hornear(renderer); },   // remolino del cuásar y nebulosa de Deneb
     ejeCuasar: () => new THREE.Vector3(0, 1, 0).applyQuaternion(rotacionCuasar),   // eje de sus chorros (orientación fija)
     soles: Object.values(gruposEstrella),
     supernova: sn,

@@ -5,11 +5,11 @@
 //    diferencial, oscurecimiento al limbo continuo del blanco cegador del centro al azul del borde (la luz se comprime:
 //    el núcleo no quema la textura) y un ribete cromosférico rosado y fino en el borde; con la formación pasa de nada a
 //    una chispa blanca azulada y, al encenderse, a la estrella entera.
-//  · nube: lo que su luz esculpe (como Deneb con la nebulosa Norteamérica/Pelícano): una cavidad abierta hacia casa con
-//    paredes de filamentos, pilares con la punta hacia ella y el gas de delante que la luz se lleva; antes de nacer, una
-//    nube oscura y llena cuyo núcleo cae para formarla. Cada mota tiene su sitio en la nube oscura y en la tallada; su
-//    posición es función de la formación `tau` (al rebobinar recorre el mismo camino hacia atrás, con dos copias
-//    «fantasma» detrás que dibujan su estela mientras se mueve). Unas 11 400 motas en un solo dibujo.
+//  · nebulosa: la nube que su luz esculpe, horneada en textura (nebulosaDeneb.js): cavidad con frente de ionización,
+//    pared con hebras y polvo recortado, pilares con el filo encendido; tres láminas con paralaje. Su luz llega con un
+//    frente que sale de la estrella (el «tallado»); delante de él, la nube está oscura y apretada hacia el centro.
+//  · motas de acento: estrellas recién nacidas en el borde de la cavidad, el gas de delante que la luz se lleva y el
+//    núcleo de la nube que cae para formarla (unas 2 600, con dos copias «fantasma» de estela mientras se mueven).
 //  · viento y corona: motas que salen de la superficie (más en unos chorros, las serpentinas de la corona), un borde de
 //    espículas finísimas y, al encenderse, el frente de motas que sale de ella.
 //  · eyecciones: chorros de motas que la estrella lanza (en el drop, con el bombo; fuera de la escena, de vez en cuando).
@@ -18,6 +18,7 @@
 import * as THREE from 'three';
 import { EXPOSICION } from './exposicion.js';
 import { RUIDO_TABLA, texturaRuido } from './nube.js';
+import { crearNebulosaDeneb } from './nebulosaDeneb.js';
 
 export const RADIO_DENEB = 100;   // radio de la supergigante en el espacio de Deneb (la cámara llega a 450: 0,22 del encuadre)
 const R = RADIO_DENEB;
@@ -93,7 +94,7 @@ export function crearDeneb({ uScale, uPR }) {
         vec3 col = tono * limbo * textura * 0.86;
         col += vec3(0.35, 0.55, 1.0) * smoothstep(0.6, 0.8, red) * pow(1.0 - mu, 2.0) * 0.12;   // fáculas
         // Núcleo muy brillante sin quemar la textura: por encima de ~0,7 la luz se comprime en vez de recortarse.
-        col = mix(col, 0.7 + 0.16 * (1.0 - exp(-(col - 0.7) * 6.0)), step(0.7, col));
+        col = mix(col, 0.72 + 0.3 * (1.0 - exp(-(col - 0.72) * 4.0)), step(0.72, col));
         // Ribete cromosférico: una franja finísima rosada y nítida justo en el borde (el anillo de las espículas).
         col += vec3(1.0, 0.45, 0.62) * (1.0 - smoothstep(0.0, 0.07, mu)) * 0.5;
         vec3 brasa = vec3(0.86, 0.93, 1.0) * (0.55 + 0.45 * limbo);   // la chispa de la que nace (y a la que vuelve): un punto blanco azulado
@@ -108,7 +109,7 @@ export function crearDeneb({ uScale, uPR }) {
   // tipo (aLinea.w): 0 pared y filamentos (aLinea.x = radio final en R; nube.xyz = su sitio en la nube oscura, más
   // adentro: el gas que la luz empuja), 1 pilar (aLinea.x = radio; aLinea.y = 1 en la punta), 2 el gas de la abertura que
   // la luz se lleva hacia fuera, 3 el núcleo de la nube que cae y forma la estrella.
-  const NF = 11000, NPi = 3600, NAb = 1200, NC = 1200, N = NF + NPi + NAb + NC, F = 3;
+  const NF = 520, NPi = 0, NAb = 900, NC = 1200, N = NF + NPi + NAb + NC, F = 3;
   const nube = new Float32Array(N * 3), destino = new Float32Array(N * 3), linea = new Float32Array(N * 4), dato = new Float32Array(N * 4);
   // Radio interior de la cavidad según la dirección: irregular (no un círculo) y algo más profunda por un lado.
   const ruido3 = (x, y, z) => Math.sin(x * 2.1 + 1.3) * Math.sin(y * 2.7 + 0.4) * Math.sin(z * 1.9 + 2.2) + 0.5 * Math.sin(x * 4.3 - y * 3.1 + z * 2.3);
@@ -119,20 +120,11 @@ export function crearDeneb({ uScale, uPR }) {
   const dirAzar = (fuera = true) => { for (;;) { const z = azar() * 2 - 1, f = azar() * Math.PI * 2, q = Math.sqrt(1 - z * z), v = [Math.cos(f) * q, z, Math.sin(f) * q], j = (azar() - 0.5) * 0.15; if (!fuera || !abierta(v[0] + j, v[1], v[2] + j)) return v; } };
   let i = 0;
   const poner = (fin, ini, tipo, a, b, d0, d1, d2) => { destino.set(fin.map(c => c * R), i * 3); nube.set(ini.map(c => c * R), i * 3); linea.set([Math.hypot(...fin), a, b, tipo], i * 4); dato.set([d0, d1, d2, azar()], i * 4); i++; };
-  // Filamentos de la pared: caminos que serpentean por la superficie de la cavidad (motas en hilos nítidos), unos en el
-  // mismo borde (el frente iluminado) y otros algo más hondos en la pared.
+  // La estructura de la nube es la textura horneada (nebulosaDeneb.js); aquí solo los acentos: estrellas recién nacidas
+  // en el borde de la cavidad y en las puntas de los pilares (se encienden cuando las alcanza la luz).
   while (i < NF) {
-    let u = dirAzar(), hondo = azar() < 0.65 ? azar() * 0.06 : 0.25 + Math.pow(azar(), 1.4) * 1.4;
-    const d = [azar() - 0.5, azar() - 0.5, azar() - 0.5], largo = 90 + Math.floor(azar() * 110), grosor = 0.005 + azar() * 0.01, encoge = 0.25 + azar() * 0.45;
-    for (let k = 0; k < largo && i < NF; k++) {
-      for (let e = 0; e < 3; e++) d[e] += (azar() - 0.5) * 0.22;
-      const dd = Math.hypot(...d) || 1; u = u.map((c, e) => c + d[e] / dd * 0.009); const L = Math.hypot(...u); u = u.map(c => c / L);
-      if (abierta(...u)) break;
-      const rc = radioCavidad(...u), r = rc + hondo + (azar() - 0.5) * grosor * 4, j = () => (azar() - 0.5) * grosor;
-      // En la nube oscura el mismo hilo está más adentro (encogido hacia el centro): la luz lo empuja entero hasta la pared.
-      const fin = [u[0] * r + j(), u[1] * r + j(), u[2] * r + j()];
-      poner(fin, fin.map(c => c * encoge), 0, 0, 0, (r - 1) / 4.5, azar(), hondo < 0.1 ? 1 : 0);
-    }
+    const f = 2.0 + azar() * 3.6, r = (1.55 + Math.pow(azar(), 1.5) * 1.3) * (1 + 0.1 * Math.sin(f * 3)), fin = [Math.cos(f) * r, Math.sin(f) * r, -1.2 + azar() * 1.5];
+    poner(fin, fin.map(c => c * 0.55), 0, 0, 0, (Math.hypot(...fin) - 1) / 4.5, azar(), 1);
   }
   // Pilares: 12 columnas de gas denso en el contorno de la abertura (vistas desde casa, alrededor de ella), con la punta
   // hacia la estrella: las talla la luz y se quedan; todas señalan al centro.
@@ -221,6 +213,7 @@ export function crearDeneb({ uScale, uPR }) {
       float tam = (2.0 + aDato.w * 1.6) * (1.0 + 0.3 * borde + 0.4 * punta);
       vA = a * estela * titila * tamMota(tam, mv, 2.8) * fueraSilueta(mv, R * max(uEstrella, 0.09)) * sqrt(uExpo); }`));
   materia.frustumCulled = false; materia.renderOrder = 2; marco.add(materia);
+  const nebulosa = crearNebulosaDeneb({ radio: R }); marco.add(nebulosa.grupo);
 
   // ── Viento, corona y espículas ──
   const NV = 3000, NE = 2400, NB = NV + NE, dirV = new Float32Array(NB * 3), datoV = new Float32Array(NB * 4);
@@ -287,7 +280,8 @@ export function crearDeneb({ uScale, uPR }) {
   const inversa = new THREE.Matrix4();
   const mezcla = (n, e, w) => n + (e - n) * w;
   return {
-    marco, superficie, materia, viento, eyecciones,
+    marco, superficie, materia, viento, eyecciones, nebulosa,
+    hornear: renderer => nebulosa.hornear(renderer),
     // e: estado de la escena (estadoDeneb); n: el estado normal; w: peso de la escena (0–1); camMundo: la cámara.
     actualizar(e, n, w, dt, t, reducido, camMundo = null) {
       if (camMundo) uV.uCam.value.copy(camMundo).applyMatrix4(inversa.copy(marco.matrixWorld).invert());   // la cámara en el espacio del marco
@@ -321,6 +315,11 @@ export function crearDeneb({ uScale, uPR }) {
         } else if (t - ultimaEy > 2.6) { ultimaEy = t; lanzar(); }
       }
       eyecciones.visible = estrella > 0.002 && edades.some(x => x >= 0); uE.uEstrella.value = estrella;
+      // La nebulosa: su frente de luz sale de la estrella al encenderse (τ 0,52) y llega al borde hacia τ 0,97 (en radios
+      // de la lámina); las ondas del drop (una por golpe, hacia fuera) y la luz que corre hacia ella «en el medio».
+      const x = Math.min(1, Math.max(0, (tau - 0.5) / 0.47)), fuerza = (e.fuerza ?? 0) * w;
+      nebulosa.actualizar({ frente: tau >= 0.999 ? 1.3 : 0.04 + 1.16 * x * (2 - x) * (tau > 0.5 ? 1 : 0), onda: fuerza > 0.02 ? (e.edad ?? 9) / 0.55 * 1.1 : -1, ondaF: fuerza * Math.exp(-(e.edad ?? 9) / 0.6),
+        medio: w > 0.5 && e.medioT >= 0 && e.medioT < 1.4 ? 1.15 - e.medioT / 1.1 : -1, luz: 0.85 + 0.25 * gloria, rebobina: uM.uRebobina.value, calido: uM.uCalido.value, estrella: tam, t });
     }
   };
 }
