@@ -26,7 +26,30 @@ class AppHandler(SimpleHTTPRequestHandler):
             return True
         return (len(relativa.parts) == 1 and relativa.name in ARCHIVOS) or bool(relativa.parts and relativa.parts[0] in CARPETAS)
 
+    def paquetes(self):
+        # Todos los archivos públicos con sus bytes (como el paquetes.json de dist/): la precarga de la pantalla de carga
+        # (js/util/precarga.js) descarga lo que la web pueda pedir después. Se calcula al vuelo: siempre al día.
+        todos = {}
+        for nombre in sorted(ARCHIVOS - {'sw.js', 'app-shell.json', 'editor.html'}):
+            f = ROOT / nombre
+            if f.is_file():
+                todos[nombre] = f.stat().st_size
+        for carpeta in sorted(CARPETAS):
+            for f in sorted((ROOT / carpeta).rglob('*')):
+                rel = f.relative_to(ROOT)
+                if f.is_file() and not any(p.startswith('.') for p in rel.parts):
+                    todos[rel.as_posix()] = f.stat().st_size
+        cuerpo = json.dumps(todos).encode()
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(cuerpo)))
+        self.end_headers()
+        self.wfile.write(cuerpo)
+
     def do_GET(self):
+        if urlsplit(self.path).path == '/paquetes.json' and not (ROOT / 'paquetes.json').exists():
+            self.paquetes()
+            return
         if not self.recurso_permitido():
             self.send_error(404)
             return

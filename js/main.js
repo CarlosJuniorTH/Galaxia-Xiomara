@@ -19,8 +19,9 @@ import { cargarContenido, aplicarContenido } from './data/contenido.js';
 import { crearContemplacion } from './ui/contemplacion.js';
 import { crearViaje } from './util/viaje.js';
 import { vigilarPaquetes } from './util/paquetes.js';
+import { precargarTodo } from './util/precarga.js';
 import { crearMedidor } from './ui/medidor.js';
-import { cargaTerminada } from './util/dispositivo.js';
+import { cargaTerminada, esMovil } from './util/dispositivo.js';
 
 let interfaz, escena, contemplacion, etapa = 'fuentes';
 const problema = texto => { document.getElementById('problema-texto').textContent = texto; document.getElementById('problema-3d').hidden = false; if (interfaz?.enRuta) interfaz.pausarRuta(true); };
@@ -34,6 +35,11 @@ if (location.hash === '#debug' || new URLSearchParams(location.search).has('prue
 // Paquetes guardados en el dispositivo desde el primer momento (también en la primera visita: lo que se descarga se
 // guarda mientras llega, sin descargas de más que compitan con la carga). Nunca recarga la página por sí solo.
 const paquetes = vigilarPaquetes();
+// Y TODO lo demás que la web pueda pedir ya dentro (las canciones de los destinos y sus estancias, fuentes, módulos…) se
+// descarga ya, durante la carga, y cuenta en sus MB: el clip de la intro no empieza hasta tenerlo, y después nada sale a
+// la red (con service worker se guarda en su caché, sin pasar por la memoria de la página).
+let escenaCreada; const trasEscena = new Promise(r => { escenaCreada = r; }); setTimeout(escenaCreada, 30000);
+precargarTodo({ movil: esMovil, servicio: paquetes.servicio, tras: trasEscena });
 try {
   await cargarContenido();
   if (location.hash === '#borrador') { const borrador = localStorage.getItem('xiomara:contenido-borrador'); if (borrador) aplicarContenido(JSON.parse(borrador)); }
@@ -87,6 +93,7 @@ try {
     alLlegar: id => { banda.llegada(id); interfaz?.llegada(id); }, alProblema: problema,
     alProgreso: (f, techo) => entrada.progreso(0.08 + 0.92 * f, 0.08 + 0.92 * techo)
   });
+  escenaCreada();   // (sus módulos ya están pedidos: la precarga sigue con lo que no son canciones)
   etapa = 'recuerdos e interfaz';
   const recuerdos = crearRecuerdos(CONFIG, estrellas, progreso, {
     alEncontrar: i => { escena.marcarEstrella(i); navigator.vibrate?.(40); },
@@ -146,10 +153,10 @@ try {
   //  · la carga se da por buena (sin cierre por memoria): si iOS cierra la página en el clip o en la entrada (el pico de
   //    memoria llega ahí, con todo ya en la GPU), la siguiente carga arranca en el modo ligero (dispositivo.js) en lugar de
   //    cerrarse otra vez igual;
-  //  · las canciones de los destinos se descargan despacio y el service worker completa los paquetes guardados.
-  //    (Antes empezaban al acabar el clip y caían en pleno vuelo de entrada: tirones mientras la cámara se acercaba.)
+  //  · (nada más que descargar: la precarga ya lo bajó todo durante la carga; antes las canciones de los destinos y el
+  //    resto de paquetes se descargaban aquí, ya dentro, y un viaje podía toparse con su canción aún en camino.)
   entrada.alEntrarTambien(() => {
-    const mirar = () => { if (escena.viajando) { setTimeout(mirar, 500); return; } setTimeout(() => { cargaTerminada(); banda.cargaTerminada(); }, 3000); setTimeout(() => paquetes.completar(), 8000); };
+    const mirar = () => { if (escena.viajando) { setTimeout(mirar, 500); return; } setTimeout(cargaTerminada, 3000); };
     setTimeout(mirar, 1500);
   });
   entrada.listo();

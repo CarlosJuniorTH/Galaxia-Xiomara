@@ -20,7 +20,9 @@ const SILENCIO = (() => {
   let s = ''; for (const x of new Uint8Array(b.buffer)) s += String.fromCharCode(x);
   return 'data:audio/wav;base64,' + btoa(s);
 })();
-// Se cuentan en la pantalla de carga (se descargan con ella); los demás, al viajar hacia su destino o en segundo plano.
+// Se cuentan en la pantalla de carga (se descargan con ella y se dejan como blob, listos para sonar); los demás también
+// se descargan en la carga, pero sin pasar por aquí (js/util/precarga.js: al caché, sin blob ni <audio>) y se leen de
+// ahí (sin red) al viajar hacia su destino.
 const CON_LA_CARGA = new Set(['inicio', 'viajes']);
 const FUNDIDO_ESTANCIA = 3;   // de la canción de un lugar a su versión instrumental (estancia): más lento, sin que se note
 
@@ -360,14 +362,6 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
     },
     // El viaje terminó en este cuadro (la escena lo avisa): la canción del destino empieza a la vez que su animación.
     llegada(id) { if (viajeEnCurso && viajeEnCurso.id === id && vigiaViaje) viajeEnCurso.fin(); },
-    // La carga terminó: el resto de canciones (la del mes, primero) se descarga despacio, de una en una.
-    cargaTerminada() {
-      const mes = `mes-${partesEnZona().mes}`;
-      // (Las estancias no: cada una se pide al terminar de bajar su canción.)
-      const cola = [...pistas.values()].filter(p => !p.conf.esEstancia && (!p.nombre.startsWith('mes-') || p.nombre === mes)).sort((a, b) => (b.nombre === mes) - (a.nombre === mes));
-      const siguiente = () => { const p = cola.shift(); if (p) descargar(p).then(() => setTimeout(siguiente, 1500)); };
-      setTimeout(siguiente, 3000);
-    },
     // Para las pruebas (?pruebaAudio) y el diagnóstico.
     estado() {
       const pistasEstado = {};
