@@ -30,8 +30,9 @@ const FIGURAS = {
 // Constelaciones de cada destino: figura, ángulo respecto a la mirada de llegada (grados), giro
 // alrededor de ella y tamaño angular (grados). Las primeras se ven al llegar, en los bordes.
 const CIELOS = {
-  // Detrás de la supernova (vista desde casa, más allá de ella): a ambos lados del corazón, arriba.
-  supernova: [['corazon', 26, 38, 4.5], ['infinito', 26, 322, 4.5]],
+  // La supernova, sin constelaciones con figura: su único corazón es el que nace de sus chispas (Carlos no quiere
+  // corazones ni infinitos hechos con estrellas en el cielo de los gigantes).
+  supernova: [],
   cuasar: [['corazon', 23, 140, 4.5], ['infinito', 24, 330, 4.5]],
   ton618: [['corazon', 24, 320, 4.5], ['infinito', 24, 140, 4.5]],
   pulsar: [['corazon', 23, 135, 4.5], ['infinito', 24, 315, 4.5]],

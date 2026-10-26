@@ -12,6 +12,18 @@ export function crearSupernovaAmor({ escena, progreso, musica, banda = null, alD
   const ceja = raiz.querySelector('.sn-ceja'), titulo = raiz.querySelector('h2'), frase = raiz.querySelector('.sn-dedicatoria');
   let activa = false, revision = 0, sonido = null, vigilancia = null, descubierta = progreso.tiene('visitas', RECUERDO_SUPERNOVA);
   if (descubierta) escena.recordarSupernova();
+  // Dentro del encuentro, unas pocas palabras propias que acompañan el sentido de cada frase de la canción (no la citan):
+  // el latido entregado, la duda, la promesa que aprieta, el silencio, las dos luces. [segundo, ceja, título]
+  const ENCUENTRO = [[0, 'UNA ESTRELLA. UN ÚLTIMO LATIDO.', 'Hay encuentros que lo cambian todo.'], [7, 'CADA LATIDO LLEVA TU NOMBRE', 'Late más fuerte cuando estás.'],
+    [22.7, 'TAMBIÉN LAS ESTRELLAS TIEMBLAN', 'Y aun así, sigue ardiendo por ti.'], [31.3, 'TODO SE APRIETA EN UN PUNTO', ''], [38, '', ''], [38.62, 'DOS LUCES', 'Tú y yo.']];
+  let tramoEncuentro = -1;
+  function textoEncuentro() {
+    if (raiz.dataset.fase !== 'encuentro') return;
+    const s = escena.segundoSupernova; if (s === null || s === undefined) return;
+    let i = 0; while (i + 1 < ENCUENTRO.length && s >= ENCUENTRO[i + 1][0]) i++;
+    if (i === tramoEncuentro) return;
+    tramoEncuentro = i; ceja.textContent = ENCUENTRO[i][1]; titulo.textContent = ENCUENTRO[i][2];
+  }
   function mostrarFase(fase) {
     raiz.dataset.fase = fase; sonido?.fase(fase);
     const textos = {
@@ -21,7 +33,8 @@ export function crearSupernovaAmor({ escena, progreso, musica, banda = null, alD
       revelacion: ['DONDE NUESTRA LUZ SE ENCONTRÓ', 'De tanta luz, nacimos nosotros'],
       recuerdo: ['DONDE NUESTRA LUZ SE ENCONTRÓ', 'De tanta luz, nacimos nosotros']
     };
-    const [c, t] = textos[fase] || ['', '']; ceja.textContent = c; titulo.textContent = t;
+    const [c, t] = textos[fase] || ['', '']; ceja.textContent = c; titulo.textContent = t; tramoEncuentro = -1;
+    if (fase === 'encuentro') textoEncuentro();
     frase.textContent = fase === 'recuerdo' || fase === 'revelacion' ? FRASE_SUPERNOVA : '';
     if (fase === 'recuerdo' && !descubierta) { descubierta = true; progreso.anotar('visitas', RECUERDO_SUPERNOVA); alDescubrir(); }
   }
@@ -40,7 +53,7 @@ export function crearSupernovaAmor({ escena, progreso, musica, banda = null, alD
     if (!repetir && (descubierta || escena.estadoSupernova === 'remanente')) return;
     activa = true; const mia = ++revision;
     raiz.hidden = false; document.body.classList.add('supernova-en-escena'); escena.detenerGiro(true);
-    vigilancia = setInterval(() => { if (escena.destino !== 'supernova') cerrar(); }, 250);
+    vigilancia = setInterval(() => { if (escena.destino !== 'supernova') cerrar(); else textoEncuentro(); }, 100);
     mostrarFase('encuentro');
     try {
       // El sonido (la canción de la supernova, o los tonos sintéticos sin ella) empieza con la cuenta atrás de la escena:

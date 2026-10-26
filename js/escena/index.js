@@ -1174,7 +1174,11 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // brillo con suavidad; siguen ahí, con su forma y su color, pero no compiten con el protagonista.
     // Las nebulosas del catálogo se crean al acercarse: la lista se rehace de vez en cuando.
     if (!nubesFoco || cuadrosDibujados % 90 === 0) { nubesFoco = []; scene.traverse(o => { if (o.userData.volumen3D && !o.userData.brilloPropio && o.material.uniforms?.uBrillo) { o.userData.brilloBase ??= o.material.uniforms.uBrillo.value; nubesFoco.push({ o, base: o.userData.brilloBase }); } }); }
-    const centroFoco = lejano && !vuelo ? lejano.centro : null, metaFoco = centroFoco ? (cosmos.enEscenaAgujero ? 0.5 : 0.78) * (1 - (cosmos.escenas.focoNubes ?? 0)) : 1;   // en la escena de un gigante, aún más (y lo que pida la suya: Deneb, que nace de la nada)
+    // Del estallido a la revelación de la supernova, el fondo se atenúa: las chispas que forman el corazón no se pierden
+    // contra la telaraña ni las nebulosas de esa zona (vuelve a su luz antes de devolver el control).
+    const sSN = document.body.classList.contains('supernova-en-escena') ? cosmos.supernova.segundoCancion : null;
+    const focoSN = sSN === null ? 0 : 0.7 * THREE.MathUtils.smoothstep(sSN, 40.5, 42.2) * (1 - THREE.MathUtils.smoothstep(sSN, 52.2, 58));
+    const centroFoco = lejano && !vuelo ? lejano.centro : null, metaFoco = (centroFoco ? (cosmos.enEscenaAgujero ? 0.5 : 0.78) * (1 - (cosmos.escenas.focoNubes ?? 0)) : 1) * (1 - focoSN);   // en la escena de un gigante, aún más (y lo que pida la suya: Deneb, que nace de la nada)
     focoNubes += (metaFoco - focoNubes) * Math.min(1, dtInterfaz * 1.2);
     if (Math.abs(focoNubes - 1) > 0.001 || focoAplicado) {
       for (const n of nubesFoco) { const propia = centroFoco && n.o.getWorldPosition(tmpFoco).distanceTo(centroFoco) < 6000; n.o.material.uniforms.uBrillo.value = n.base * (propia ? 1 : focoNubes); }
@@ -1209,7 +1213,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     if (destinoActual !== 'pulsar') cosmos.escenas.cancelar('pulsar');
     if (destinoActual !== 'deneb') cosmos.escenas.cancelar('deneb');
     if (destinoActual !== 'cuasar') cosmos.escenas.cancelar('cuasar');
-    telarana.penumbra = 1 - cosmos.escenas.foco;
+    telarana.penumbra = (1 - cosmos.escenas.foco) * (1 - focoSN);
     // Exposición automática (como en los juegos): la luz que se suma (telaraña, polvo) tiene puntos de tamaño fijo en
     // pantalla; al alejar la cámara de un gigante más allá de su encuadre normal (el del PC), se amontonan y se
     // quemaban en blanco, sobre todo en el móvil (pantalla vertical: la cámara ya está más lejos). Más allá de esa
@@ -1409,6 +1413,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     get cometaVisible() { return mundos.cometaVisible; },
     get supernovaActiva() { return cosmos.supernovaActiva; },
     get estadoSupernova() { return cosmos.supernova.estado; },
+    get segundoSupernova() { return cosmos.supernova.segundoCancion; },   // segundo de «Sparks» en la ceremonia (o null)
     get supernovaQuiereEstallar() { return cosmos.supernova.quiereEstallar; },
     aplazarSupernova: s => cosmos.supernova.aplazar(s),
     // El remanente es un lugar duradero, no un evento que desaparece al volver a casa.
@@ -1448,7 +1453,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       let ultima = '', retrayendo = !!pista, acabada = false; const t0Estallido = performance.now();
       // El clip de la supernova: su segundo es el de la canción (o el de la ceremonia: la canción entra por TIEMPOS_AMOR.espera − espera).
       const propio = () => TIEMPOS_AMOR.espera - espera + (performance.now() - t0Estallido) / 1000;
-      empezarClip('supernova', { segundo: () => { const r = reloj?.(); return Number.isFinite(r) && r > 0 ? r : propio(); }, vivo: () => !acabada, pista });
+      // (El reloj de la ceremonia ya sigue al de la canción mientras suena: sn.sincronizar; así cámara y estrella van juntas.)
+      empezarClip('supernova', { segundo: () => sn.segundoCancion ?? propio(), vivo: () => !acabada, pista });
       return new Promise(fin => {
         const resolve = v => { acabada = true; fin(v); };
         const seguir = () => {
@@ -1456,6 +1462,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
           if (!document.hidden) {
             const fase = sn.fase;
             if (fase !== ultima) { ultima = fase; alFase(fase); }
+            const cancion = reloj?.(); if (Number.isFinite(cancion) && cancion > 0) sn.sincronizar(cancion);
             // Se aleja durante el infinito (a 7 s del estallido en el reloj de la animación): la bola de fuego se ve crecer desde fuera.
             if (!retrayendo && (sn.desdeEstallido !== null || fase === 'silencio' || performance.now() - t0Estallido > (espera - faltaReal(7)) * 1000)) {
               retrayendo = true;

@@ -7,7 +7,7 @@ import { EXPOSICION } from './exposicion.js';
 import { crearNube } from './nube.js';
 import { RADIO_REMANENTE_SUPERNOVA, PROGENITORA_RELATIVA as P } from '../data/escalaCosmica.js';
 import { crearRuido } from '../util/ruido.js';
-import { puntoCorazon, puntoCorazonVolumen, faseSupernova, TIEMPOS_AMOR, faltaAnimacion, desdeAnimacion } from '../util/supernovaAmor.js';
+import { puntoCorazon, puntoCorazonVolumen, faseSupernova, TIEMPOS_AMOR, faltaAnimacion, desdeAnimacion, latidoCancion, respiracionCancion, colapsoCancion, edadCapa } from '../util/supernovaAmor.js';
 import { texBrillo, texDestello, texEstrellaGigante } from './texturas.js';
 
 const RUIDO = /* glsl */`
@@ -133,9 +133,9 @@ export function* construirSupernova({ uScale, uPR, escala }) {
         vec3 caliente = mix(vec3(0.78, 0.86, 1.0), vec3(1.0, 0.9, 0.68), smoothstep(0.2, 1.4, uE));
         caliente = mix(caliente, vec3(1.0, 0.5, 0.2), smoothstep(1.4, 3.5, uE));
         vColor = mix(caliente * (1.0 + grumo * 0.6), vColor, smoothstep(3.0, 9.0, uE));
-        vA = smoothstep(0.0, 1.0, uE) * (0.48 + 0.09 * sin(uT * 0.22 + aDato.z * 6.283)) * (1.0 + 2.2 * (1.0 - forma) * smoothstep(1.5, 4.0, uE));
+        vA = smoothstep(0.0, 1.0, uE) * (0.48 + 0.09 * sin(uT * 0.22 + aDato.z * 6.283)) * (1.0 + 4.5 * (1.0 - forma) * smoothstep(1.0, 3.5, uE));   // en vuelo, chispas vivas que se ven contra el fondo
         float px = (12.0 + aDato.z * 14.0) * ${escala.toFixed(3)} * uScale / max(1.0, -mv.z);
-        gl_PointSize = clamp(px, 1.0, 3.2 * uPR);
+        gl_PointSize = clamp(px, 1.5 * uPR * (1.0 - forma) + 1.0 * forma, 3.2 * uPR);
         vA *= min(1.0, px * px);
       }`, /* glsl */`
       varying vec3 vColor; varying float vA;
@@ -281,13 +281,13 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
       float T=clamp(1.0-uE/7.0,0.0,1.0)*(0.8+0.3*materia);
       vec3 c=mix(vec3(0.95,0.25,0.08),vec3(1.0,0.62,0.22),smoothstep(0.1,0.45,T));
       c=mix(c,vec3(1.0,0.86,0.55),smoothstep(0.5,0.8,T)); c=mix(c,vec3(1.0,0.97,0.9),smoothstep(0.78,0.9,T)); c=mix(c,vec3(0.8,0.88,1.0),smoothstep(0.85,1.0,T));
-      float luz=smoothstep(0.0,0.1,uE)*exp(-uE/3.2)*(1.0-smoothstep(6.0,9.0,uE));
+      float luz=smoothstep(0.0,0.1,uE)*exp(-uE/3.2)*(1.0-smoothstep(0.8,2.4,uE));   // se deshace pronto (mientras se sostiene el grito): quedan las chispas
       // Más brillante en el centro (se ve a través del gas caliente) y filamentos en el borde.
       float cuerpo=mix(pow(mu,1.6)*(0.7+0.8*pow(mu,6.0)),(0.1+1.1*pow(1.0-mu,2.0)*cresta)*pow(mu,0.35),smoothstep(0.8,3.5,uE));   // gas luminoso de borde suave → cáscara de filamentos
       float hervor=0.35+1.1*pow(materia,1.6)+0.35*fino;   // plasma que hierve: zonas más y menos calientes
       c=mix(vec3(1.0,0.3,0.08)*1.2,c,smoothstep(0.35,0.8,materia+0.25*(1.0-smoothstep(0.0,2.0,uE))));   // lo más frío, rojo anaranjado
       float a=luz*grumos*cuerpo*hervor*0.6*(1.0+0.9*cresta*smoothstep(1.0,4.0,uE)); if(a<0.002)discard;
-      gl_FragColor=vec4(c*a*1.9,a); }`, { side: THREE.FrontSide }));
+      gl_FragColor=vec4(c*a*1.4,a); }`, { side: THREE.FrontSide }));
   bola.visible = false; explosion.add(bola);
   yield;
   // Fragmentos: miles de grumos de materia incandescente que salen disparados (unos más rápidos que
@@ -309,11 +309,12 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
       float T = clamp(1.0 - uE / (2.2 + aDato.y * 2.5), 0.0, 1.0);
       vC = mix(vec3(0.9, 0.18, 0.08), vec3(1.0, 0.6, 0.18), smoothstep(0.0, 0.35, T));
       vC = mix(vC, vec3(1.0, 0.95, 0.75), smoothstep(0.35, 0.7, T)); vC = mix(vC, vec3(0.8, 0.88, 1.0), smoothstep(0.75, 1.0, T));
-      vA = smoothstep(0.0, 0.12, uE) * (1.0 - smoothstep(6.0 + aDato.z * 3.0, 11.0 + aDato.z * 3.0, uE)) * (1.2 + T * 2.5);
+      // Al principio están todas juntas: se encienden a medida que se separan (sin una nube blanca en el primer instante).
+      vA = smoothstep(0.0, 0.12, uE) * mix(0.22, 1.0, smoothstep(0.15, 1.1, uE)) * (1.0 - smoothstep(6.0 + aDato.z * 3.0, 11.0 + aDato.z * 3.0, uE)) * (1.0 + T * 1.3);
       float px = (10.0 + aDato.z * 18.0 + T * 14.0) * ${escala.toFixed(3)} * uScale / max(1.0, -mv.z);
-      gl_PointSize = clamp(px, 1.5, 9.0 * uPR); vA *= min(1.0, px * px * 0.5) * uExpo;   // exposición automática: en el móvil no se amontonan en manchas blancas
+      gl_PointSize = clamp(px, 1.5, 3.0 * uPR); vA *= min(1.0, px * px * 0.5) * uExpo;   // chispas nítidas de 1,5–3 px; exposición automática: en el móvil no se amontonan en manchas blancas
     }`, /* glsl */`varying vec3 vC; varying float vA;
-    void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; if (d > 1.0) discard; float a = (exp(-d * d * 4.0) + exp(-d * 10.0) * 0.4) * vA; gl_FragColor = vec4(vC * a * 1.5, a); }`));
+    void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; if (d > 1.0) discard; float a = (exp(-d * d * 4.0) + exp(-d * 10.0) * 0.4) * vA; gl_FragColor = vec4(vC * a * 2.6, a); }`));
   fragmentos.frustumCulled = false; fragmentos.visible = false; explosion.add(fragmentos);
   yield;
   // Destello del choque: núcleo blanco azulado cegador y una raya horizontal (como en las fotos).
@@ -359,6 +360,15 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
     get radioEyecta() { return explosion.visible ? Math.max(bola.visible ? bola.scale.x : 0, onda.visible ? onda.scale.x : 0) : 0; },
     get fase() { return faseSupernova(estado, tActual - inicio, inicio - tActual); },
     get desdeEstallido() { return estado === 'estallido' || estado === 'remanente' ? tActual - inicio : null; },
+    // Segundo de su canción en la ceremonia (null fuera de ella): el reloj del videoclip.
+    get segundoCancion() { return estado === 'inestable' ? TIEMPOS_AMOR.espera - (inicio - tActual) : estado === 'estallido' ? TIEMPOS_AMOR.espera + (tActual - inicio) : null; },
+    // La canción manda: si su reloj (bandaSonora.tiempo) se separa del de la ceremonia (el audio tardó en arrancar, un
+    // cuadro largo…), la ceremonia se corrige poco a poco hacia él, sin saltos visibles.
+    sincronizar(segundo) {
+      if (!Number.isFinite(segundo) || (estado !== 'inestable' && estado !== 'estallido')) return;
+      const propio = estado === 'inestable' ? TIEMPOS_AMOR.espera - (inicio - tActual) : TIEMPOS_AMOR.espera + (tActual - inicio), d = segundo - propio;
+      if (Math.abs(d) > 1.5) inicio -= d; else if (Math.abs(d) > 0.03) inicio -= d * 0.25;
+    },
     // Destello único y contenido: nunca una pantalla blanca sostenida.
     get destello() { return estado === 'estallido' ? Math.exp(-Math.max(0, tActual - inicio) / 0.9) * 0.28 : 0; },
     radioFinal: RADIO_REMANENTE_SUPERNOVA,
@@ -370,7 +380,8 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
     aplazar(segundos = 30) { proxima = tActual + segundos; },
     recordar,
     // El corazón mira a casa (a la galaxia de Xiomara) y no se gira hacia la cámara.
-    orientarHacia(direccionLocal) { corazon.quaternion.setFromRotationMatrix(new THREE.Matrix4().lookAt(direccionLocal, new THREE.Vector3(), new THREE.Vector3(0, 1, 0))); },
+    // La estrella se orienta con él: su infinito queda horizontal y las dos estrellitas giran en el plano del corazón.
+    orientarHacia(direccionLocal) { corazon.quaternion.setFromRotationMatrix(new THREE.Matrix4().lookAt(direccionLocal, new THREE.Vector3(), new THREE.Vector3(0, 1, 0))); progenitora.quaternion.copy(corazon.quaternion); },
     orientar() {}, mirarA() {},
     reiniciar() { estado = 'estable'; proxima = Infinity; orientado = false; },
     preparar({ repetir = false } = {}) {
@@ -388,30 +399,32 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
       // larga, como su canción, y faltaAnimacion la reparte: js/util/supernovaAmor.js):
       //  14 → 9,5 late «pum-pum» (despacio y luego deprisa), creciendo con cada latido; sus ondas respiran
       //           (se expanden y se contraen) y sus llamas se mueven;
-      // 9,5 → 7,5 se aplasta por arriba y por abajo, en el medio, hasta formar un infinito (se apagan sus llamas);
-      // 7,5 → 4,8 el infinito gira sobre sí mismo en muchas direcciones, rojo, y se contrae hasta desaparecer;
+      // 9,5 → 4,8 el núcleo colapsa a golpes con la canción: en cada tiempo se encoge de un tirón, la envoltura tiembla
+      //           y suelta una capa que se aleja y se enfría; se apaga justo cuando calla la voz (colapsoCancion);
       // 4,8 → 3,8 oscuridad: un instante sin nada;
       // 3,8 → 0   dos estrellitas, azul y rosa, giran en órbita y se acercan en espiral; al juntarse, ¡pum!
       const activa = estado === 'inestable', falta = faltaAnimacion(inicio - t);
       const agita = activa ? THREE.MathUtils.clamp((14 - falta) / (14 - 9.5), 0, 1) : 0;
-      const pellizco = activa ? 1 - THREE.MathUtils.smoothstep(falta, 7.5, 9.5) : 0;
-      const giroInf = activa ? 1 - THREE.MathUtils.smoothstep(falta, 4.8, 7.5) : 0;
-      const colapso = activa ? 1 - THREE.MathUtils.smoothstep(falta, 4.8, 6.6) : 0;
+      const sC = activa ? TIEMPOS_AMOR.espera - (inicio - t) : null, cc = activa ? colapsoCancion(sC) : null;
+      const contra = cc ? cc.contraccion : 0, colapso = cc ? cc.apagado : 0;
+      const pellizco = 0, giroInf = 0;   // (sin figuras: la estrella no se deforma en un infinito)
       const silencio = activa ? 1 - THREE.MathUtils.smoothstep(falta, 4.8, 5.3) : 0;
       progenitora.visible = estado === 'estable' || (activa && falta > 4.8);
       explosion.visible = estado === 'estallido' || estado === 'remanente';
-      superficie.material.uniforms.uT.value = t; superficie.material.uniforms.uAgita.value = agita * (1 - colapso);
+      superficie.material.uniforms.uT.value = t; superficie.material.uniforms.uAgita.value = agita * (1 + contra * 0.9) * (1 - colapso);   // la envoltura tiembla más al colapsar
       superficie.material.uniforms.uPellizco.value = pellizco;
       materialPlasma.uniforms.uT.value=t*(1+agita*2);materialPlasma.uniforms.uLuz.value=(0.6+agita*1.4)*(1-pellizco);plasma.visible=pellizco<0.98;plasma.rotation.y=t*(0.05+agita*0.25);
-      // Latido doble («pum-pum»), cada vez más rápido y más fuerte al acercarse el final.
-      if (dt > 0) faseLatido += dt * (0.7 + agita * agita * 2.6);
-      const fl = faseLatido % 1, pum = Math.exp(-Math.pow(fl / 0.05, 2)) + 0.65 * Math.exp(-Math.pow((fl - 0.2) / 0.05, 2));
+      // Latido doble («pum-pum»): en la ceremonia, con el golpe de caja de la canción y su corchea (desde el error, también
+      // en el tiempo fuerte: el doble de seguido); fuera de ella, a su aire.
+      if (dt > 0) faseLatido += dt * 0.7;
+      const fl = faseLatido % 1, pum = activa ? latidoCancion(sC) : Math.exp(-Math.pow(fl / 0.05, 2)) + 0.65 * Math.exp(-Math.pow((fl - 0.2) / 0.05, 2));
       const fuerzaLatido = estado === 'estable' ? 0.35 : activa ? 0.5 + agita : 0;
       superficie.material.uniforms.uLatido.value = pum * fuerzaLatido * (1 - colapso);
-      superficie.material.uniforms.uColapso.value = colapso;
+      superficie.material.uniforms.uColapso.value = Math.max(contra * 0.55, colapso);
       // Crece con los latidos y, al final, se contrae hasta nada.
       const crece = 1 + agita * 0.55;
-      const latido = crece * (1 + pum * fuerzaLatido * (0.04 + agita * 0.06) * (1 - pellizco)) * Math.max(0.001, 1 - Math.pow(colapso, 1.3));
+      const temblor = 1 + contra * 0.018 * (Math.sin(t * 43) + Math.sin(t * 29 + 1));   // la envoltura tiembla
+      const latido = crece * (1 + pum * fuerzaLatido * (0.04 + agita * 0.06)) * (1 - 0.68 * contra) * temblor * Math.max(0.001, 1 - Math.pow(colapso, 1.3));
       // El infinito gira sobre sí mismo en varias direcciones, cada vez más deprisa.
       if (dt > 0 && giroInf > 0) { faseGiro += dt * (0.8 + giroInf * 5); superficie.rotation.set(Math.sin(faseGiro * 0.7) * 1.2 * giroInf, faseGiro, Math.cos(faseGiro * 0.5) * 0.9 * giroInf); } else if (!activa) superficie.rotation.set(0, 0, 0);
       const tension = activa ? THREE.MathUtils.smoothstep(agita, 0.45, 0.88) * (1 - colapso) : 0;
@@ -422,11 +435,13 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
       dos.forEach((d, i) => {
         const vis = activa && falta < 3.8 && falta > 0; d.g.visible = vis; d.estela.visible = vis;
         if (!vis) { d.hist.length = 0; return; }
-        const u = THREE.MathUtils.clamp(falta / 3.8, 0, 1);                       // 1 al aparecer, 0 al juntarse
-        const radio = R * P * (0.2 + 4.5 * Math.pow(u, 1.4)), ang = (1 - u) * 8.5 * Math.PI + Math.pow(1 - u, 3) * 9 + i * Math.PI;
-        d.g.position.set(Math.cos(ang) * radio, Math.sin(ang * 2) * radio * 0.08, Math.sin(ang) * radio * 0.55);
-        const tam = R * P * (1.6 + 1.2 * (1 - u)) * (1 + 0.15 * Math.sin(t * 9 + i));
-        d.nucleo.scale.setScalar(tam * 1.4); d.luz.scale.setScalar(tam * 3.2); d.nucleo.material.opacity = kDos; d.luz.material.opacity = 0.6 * kDos;
+        // 1 al aparecer (golpe de caja), 0 al juntarse (el siguiente): giran y se acercan en espiral durante un compás; en
+        // el silencio de antes del grito (falta < 0,5 en la animación) ya son una sola mota, quieta, que se encoge.
+        const u = THREE.MathUtils.clamp((falta - 0.5) / 3.3, 0, 1), calla = THREE.MathUtils.smoothstep(falta, 0, 0.5);
+        const radio = R * P * (0.02 + 4.5 * Math.pow(u, 1.4)), ang = (1 - u) * 8.5 * Math.PI + Math.pow(1 - u, 3) * 9 + i * Math.PI;
+        d.g.position.set(Math.cos(ang) * radio, Math.sin(ang) * radio * 0.55, Math.sin(ang * 2) * radio * 0.08).applyQuaternion(corazon.quaternion);   // en el plano del corazón
+        const tam = R * P * (1.6 + 1.2 * (1 - u)) * (1 + 0.15 * Math.sin(t * 9 + i) * calla) * (0.3 + 0.7 * calla);
+        d.nucleo.scale.setScalar(tam * 1.1); d.luz.scale.setScalar(tam * 1.8); d.nucleo.material.opacity = kDos * (0.55 + 0.45 * calla); d.luz.material.opacity = 0.12 * kDos * calla;   // casi sin halo: motas nítidas
         // Estela con vectores reutilizados (el más antiguo pasa a ser el nuevo): sin memoria nueva en cada cuadro.
         const nuevo = d.hist.length >= NE ? d.hist.pop() : new THREE.Vector3(); d.hist.unshift(nuevo.copy(d.g.position));
         for (let k = 0; k < NE; k++) { const q = d.hist[Math.min(k, d.hist.length - 1)]; d.pos[k * 3] = q.x; d.pos[k * 3 + 1] = q.y; d.pos[k * 3 + 2] = q.z; }
@@ -444,9 +459,16 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
       plasma.scale.set(tamEstrella * estira, superficie.scale.y * aprieta, tamEstrella * aprieta);
       // Ondas de pulsación: salen de la superficie, se agrandan y se desvanecen; cada vez más seguidas.
       // Ondas de radiación que respiran: se expanden y se contraen sin parar (la estrella está viva).
-      if (dt > 0) fasePulso += dt * (0.5 + agita * 1.4);
+      if (activa) fasePulso = respiracionCancion(sC); else if (dt > 0) fasePulso += dt * 0.5;   // una respiración por compás (luego, por medio)
       pulsos.forEach((m, i) => {
         const fuerza = (estado === 'estable' ? 0.35 : activa ? 0.4 + agita * 0.6 : 0) * (1 - pellizco);
+        // En el colapso, cada onda es una capa que la envoltura suelta en un golpe: se aleja sin volver y se enfría.
+        if (cc && cc.ultimo >= 0) {
+          const edad = edadCapa(sC, i), vida = 2.4;
+          m.visible = edad !== null && edad < vida;
+          if (m.visible) { const f = edad / vida; m.scale.setScalar(R * crece * (1.04 + edad * 1.5)); m.material.uniforms.uF.value = Math.min(1, 0.15 + f * 0.85); m.material.uniforms.uA.value = 0.85 * Math.pow(1 - f, 1.5) * (1 - colapso * 0.5); m.material.uniforms.uS.value = i * 7.3 + edad * 0.3; }
+          return;
+        }
         const resp = 0.5 + 0.5 * Math.sin(fasePulso * Math.PI * 2 + i * 2.1);
         m.visible = fuerza > 0.01; m.scale.setScalar(R * tamEstrella * (1.12 + i * 0.22 + resp * (0.25 + agita * 0.25)));
         m.material.uniforms.uF.value = 0.2 + i * 0.15; m.material.uniforms.uS.value = i * 7.3 + fasePulso * 0.05;
@@ -457,10 +479,10 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
       if (!explosion.visible) return;
       const e = desdeAnimacion(Math.max(0, t - inicio)); uE.value = e;   // (en el reloj de la animación)
       const flash = Math.exp(-e / 0.6) * THREE.MathUtils.smoothstep(e, 0, 0.08);   // ruptura del choque: breve
-      destelloGrande.scale.setScalar(60 * (10 + 60 * flash)); destelloGrande.material.opacity = Math.min(1, flash * 0.9);
-      raya.scale.set(60 * 140 * flash + 1, 60 * 6 * flash + 1, 1); raya.material.opacity = flash * 0.7;
+      destelloGrande.scale.setScalar(60 * (4 + 12 * flash)); destelloGrande.material.opacity = Math.min(1, flash * 0.6);   // un destello seco, no una mancha blanca
+      raya.scale.set(60 * 60 * flash + 1, 60 * 1.5 * flash + 1, 1); raya.material.opacity = flash * 0.55;
       fragmentos.visible = e < 15;
-      luzGrande.scale.setScalar(60 * (18 + 55 * flash)); luzGrande.material.opacity = flash * 0.35;
+      luzGrande.scale.setScalar(60 * (18 + 55 * flash)); luzGrande.material.opacity = flash * 0.04;
       bola.visible = e < 10; bola.scale.setScalar(R * P * 0.9 + 720 * (1 - Math.exp(-e / 2.2)));   // nace del tamaño de la estrella
       eco.visible = false;   // sin aros: se veían como círculos quietos
       // El frente de choque solo se dibuja si la cámara está bien fuera de él: visto desde cerca,
@@ -468,7 +490,7 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
       const rOnda = radioOnda(e), lejosCam = camara.distanceTo(grupo.position) / grupo.scale.x;
       onda.material.uniforms.uVer.value = 1 - THREE.MathUtils.smoothstep(rOnda / lejosCam, 0.45, 0.75); onda.visible = false; onda.scale.setScalar(rOnda);
       anillosChoque.forEach(m => { m.visible = false; });   // sin anillos fijos: se veían como aros quietos
-      gas.material.uniforms.uBrillo.value = 1.4 + 0.9 * THREE.MathUtils.smoothstep(lejosCam, 5500, 9500); /* de lejos brilla como las demás nebulosas */ gas.material.uniforms.uOpacidad.value = THREE.MathUtils.smoothstep(e, 6, 17);
+      gas.material.uniforms.uBrillo.value = 1.4 + 0.9 * THREE.MathUtils.smoothstep(lejosCam, 5500, 9500); /* de lejos brilla como las demás nebulosas */ gas.material.uniforms.uOpacidad.value = 0.35 * THREE.MathUtils.smoothstep(e, 6, 17);   // apenas un velo: el corazón lo dibujan las chispas y los hilos
       parejas.forEach((p, i) => { const a = t * 0.12 + i * Math.PI, r = p.userData.orbita; p.position.set(centroCorazon.x + Math.cos(a) * r, centroCorazon.y + Math.sin(a) * r * 0.55, 30); p.scale.setScalar(THREE.MathUtils.smoothstep(e, 5, 14) * (1 + Math.sin(t * 1.5 + i) * 0.03)); });
     }
   };
