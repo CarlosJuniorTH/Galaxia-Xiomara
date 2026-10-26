@@ -426,7 +426,7 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     x.beginPath(); let abierto = false;
     for (let i = 0; i <= 72; i++) {
       const a = i / 72 * TAU;
-      if (proyectar(wx + Math.cos(a) * r, wy + Math.sin(a) * r)) { if (abierto) pA(QX, QY); else pIni(QX, QY, 5.5, 1.7); abierto = true; } else abierto = false;
+      if (proyectar(wx + Math.cos(a) * r, wy + Math.sin(a) * r)) { if (abierto) pA(QX, QY); else pIni(QX, QY, r * S > 400 ? 7 : 5.5, 1.7); abierto = true; } else abierto = false;
     }
     x.fill(); x.globalAlpha = 1;
   }
@@ -438,8 +438,6 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     for (let i = 0; i < CHISPAS; i++) { const c = Math.cos(qa[i]), s = Math.sin(qa[i]), r1 = R * qv[i] * d1, r0 = R * qv[i] * d0; x.moveTo(px + c * r0, py + s * r0); x.lineTo(px + c * r1, py + s * r1); }
     x.stroke(); x.globalAlpha = 1;
   }
-  // Texto con espaciado (sin crear nada si el navegador no lo admite).
-  const espaciar = px => { if ('letterSpacing' in x) x.letterSpacing = px; };
   // Rótulo de un personaje, como en los títulos de una película: el nombre (Great Vibes) y debajo un dato fino
   // (Quicksand espaciada). Centrado en px, con su línea base en py; se recoloca para no salirse de la pantalla.
   function rotulo(px, py, nombre, dato, alfa, tamN) {
@@ -447,31 +445,64 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     const tn = Math.round(tamN), tp = Math.round(Math.max(9, Math.min(12, m * 0.025))), mitad = Math.max(tn * 2.2, tp * 9);
     const qx = Math.max(16 + mitad, Math.min(ancho - 16 - mitad, px)), qy = Math.max(tn + 8, Math.min(alto - tp - 30, py));
     if (soloZonas) { zona(qx - mitad, qy - tn * 0.9, qx + mitad, qy + tp + 14); return; }
-    x.globalCompositeOperation = 'source-over'; x.globalAlpha = alfa; x.textAlign = 'center'; x.textBaseline = 'alphabetic';
-    x.fillStyle = 'rgb(255,214,236)'; x.font = fuente(tn, 'v'); x.fillText(nombre, qx, qy);
-    if (dato) { x.fillStyle = 'rgb(232,200,224)'; x.font = fuente(tp, 'q'); espaciar('3px'); x.fillText(dato, qx + 1.5, qy + tp + 9); espaciar('0px'); }
-    x.globalAlpha = 1; x.globalCompositeOperation = 'lighter';
+    texto(qx, qy, nombre, tn, 'v', 'rgb(255,214,236)', alfa, '0px', true);
+    if (dato) texto(qx + 1.5, qy + tp + 9, dato, tp, 'q', 'rgb(232,200,224)', alfa, '3px', true);
   }
   // «Carlos & Xiomara»: los nombres en Great Vibes y el «&» en Cormorant Garamond redonda (el de Great Vibes y el de
   // la cursiva parecen una «E»; es el mismo de la cabecera del universo), un poco más pequeño y alzado, con su aire a cada lado. Anchos medidos una vez por tamaño.
-  const anchosPareja = new Map();
   // (las fuentes del lienzo se piden ya: si no, el primer texto saldría con la de respaldo y su ancho medido, mal)
-  if (document.fonts?.load) Promise.all(["40px 'Great Vibes'", "italic 40px 'Cormorant Garamond'", "40px 'Cormorant Garamond'", "600 12px Quicksand"].map(f => document.fonts.load(f))).then(() => anchosPareja.clear(), () => {});
+  if (document.fonts?.load) Promise.all(["40px 'Great Vibes'", "italic 40px 'Cormorant Garamond'", "40px 'Cormorant Garamond'", "600 12px Quicksand"].map(f => document.fonts.load(f))).then(() => sellos.clear(), () => {});
   function pareja(cx, py, tam, alfa) {
     if (alfa <= 0.01) return;
-    const tn = Math.round(tam), ta = Math.round(tam * 0.92);
-    let w = anchosPareja.get(tn);
-    if (!w) { x.font = fuente(tn, 'v'); const a = x.measureText('Carlos').width, c = x.measureText('Xiomara').width; x.font = fuente(ta, 'r'); const y = x.measureText('&').width; w = [a, y, c, tn * 0.2]; anchosPareja.set(tn, w); }
-    const [a, y, c, aire] = w, x0 = cx - (a + y + c + 2 * aire) / 2;
-    x.globalCompositeOperation = 'source-over'; x.globalAlpha = alfa; x.textBaseline = 'alphabetic'; x.textAlign = 'left'; x.fillStyle = 'rgb(255,209,230)';
-    x.font = fuente(tn, 'v'); x.fillText('Carlos', x0, py); x.fillText('Xiomara', x0 + a + y + 2 * aire, py);
-    x.fillStyle = 'rgb(255,226,240)'; x.font = fuente(ta, 'r'); x.fillText('&', x0 + a + aire, py - tn * 0.04);
-    x.textAlign = 'center'; x.globalAlpha = 1; x.globalCompositeOperation = 'lighter';
+    const tn = Math.round(tam), clave = 'pareja' + tn;
+    let s = sellos.get(clave);
+    if (!s) {
+      const ta = Math.round(tam * 0.92), g = lienzoSello();
+      g.font = fuente(tn, 'v'); const a = g.measureText('Carlos').width, c = g.measureText('Xiomara').width; g.font = fuente(ta, 'r'); const y = g.measureText('&').width, aire = tn * 0.2;
+      s = nuevoSello(a + y + c + 2 * aire, tn, (g, x0, base) => {
+        g.fillStyle = 'rgb(255,209,230)'; g.font = fuente(tn, 'v'); g.fillText('Carlos', x0, base); g.fillText('Xiomara', x0 + a + y + 2 * aire, base);
+        g.fillStyle = 'rgb(255,226,240)'; g.font = fuente(ta, 'r'); g.fillText('&', x0 + a + aire, base - tn * 0.04);
+      });
+      sellos.set(clave, s);
+    }
+    ponerSello(s, cx, py, alfa);
   }
-  function texto(px, py, cadena, tam, familia, color, alfa, espacio = '0px') {
+  // Texto. Con fijo, se dibuja una vez en un lienzo aparte (un «sello») y en cada cuadro solo se estampa: fillText con
+  // letterSpacing en cada cuadro costaba cuadros en el móvil. Los textos que cambian (km, coordenadas), sin espaciado.
+  const sellos = new Map();
+  let lienzoMedidas = null;
+  const lienzoSello = () => (lienzoMedidas ||= document.createElement('canvas').getContext('2d'));
+  // Un sello de ancho w y cuerpo tam: un lienzo con margen para los rasgos de la letra; dibujo(g, x0, base).
+  function nuevoSello(w, tam, dibujo) {
+    const mx = tam * 0.5, arriba = tam * 1.25, abajo = tam * 0.55, c = document.createElement('canvas');
+    c.width = Math.ceil((w + 2 * mx) * dpr); c.height = Math.ceil((arriba + abajo) * dpr);
+    const g = c.getContext('2d'); g.scale(dpr, dpr); g.textBaseline = 'alphabetic'; g.textAlign = 'left';
+    dibujo(g, mx, arriba);
+    return { c, w: (w + 2 * mx), h: arriba + abajo, arriba, mx };
+  }
+  function ponerSello(s, cx, py, alfa) {
+    x.globalCompositeOperation = 'source-over'; x.globalAlpha = alfa;
+    x.drawImage(s.c, cx - s.w / 2, py - s.arriba, s.w, s.h);
+    x.globalAlpha = 1; x.globalCompositeOperation = 'lighter';
+  }
+  function texto(px, py, cadena, tam, familia, color, alfa, espacio = '0px', fijo = false) {
     if (alfa <= 0.01) return;
+    const tn = Math.round(tam);
+    if (fijo) {
+      const clave = cadena + '|' + tn + familia + color + espacio;
+      let s = sellos.get(clave);
+      if (!s) {
+        if (sellos.size > 60) sellos.clear();
+        const g = lienzoSello(); g.font = fuente(tn, familia); if ('letterSpacing' in g) g.letterSpacing = espacio;
+        const w = g.measureText(cadena).width; if ('letterSpacing' in g) g.letterSpacing = '0px';
+        s = nuevoSello(w, tn, (h, x0, base) => { h.fillStyle = color; h.font = fuente(tn, familia); if ('letterSpacing' in h) h.letterSpacing = espacio; h.fillText(cadena, x0, base); });
+        sellos.set(clave, s);
+      }
+      ponerSello(s, px, py, alfa);
+      return;
+    }
     x.globalCompositeOperation = 'source-over'; x.globalAlpha = alfa; x.textAlign = 'center'; x.textBaseline = 'alphabetic';
-    x.fillStyle = color; x.font = fuente(Math.round(tam), familia); espaciar(espacio); x.fillText(cadena, px, py); espaciar('0px');
+    x.fillStyle = color; x.font = fuente(tn, familia); x.fillText(cadena, px, py);
     x.globalAlpha = 1; x.globalCompositeOperation = 'lighter';
   }
 
@@ -538,7 +569,7 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     nO = 0;
     if (!calma && t < H.espera) {
       for (let o = 0; o < 2; o++) for (const [s, R] of o ? LLAMADAS.xiomara : LLAMADAS.carlos) {
-        const e = t - s; if (e < 0 || e > DUR_ONDA || nO >= 32) continue;
+        const e = t - s; if (e < 0 || e > 0.75 || nO >= 32) continue;   // (encienden motas solo los frentes recientes: cuesta poco)
         enRuta(o ? tX : tC); OX[nO] = WX; OY[nO] = WY; OR[nO] = R * salida(e / DUR_ONDA); nO++;
       }
     }
@@ -846,7 +877,7 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     const tamN = Math.max(34, Math.min(58, m * 0.105)), tp = Math.max(10, Math.min(12, m * 0.027));
     // Apertura: «Para Xiomara», fina, antes de la primera llamada.
     const ap = tramo(t, 0.15, 0.55) * (1 - tramo(t, 0.95, 1.25));
-    if (!soloZonas) texto(ancho / 2 + 3, alto * 0.5, 'PARA XIOMARA', tp + 2, 'q', 'rgb(240,210,230)', ap, '7px');
+    if (!soloZonas) texto(ancho / 2 + 3, alto * 0.5, 'PARA XIOMARA', tp + 2, 'q', 'rgb(240,210,230)', ap, '7px', true);
     // Los nombres, bajo el corazón (durante la nota larga), y dónde se han encontrado.
     const an = tramo(t, H.nombres, H.nombres + 1) * (1 - tramo(t, H.cielo - 0.2, H.cielo + 0.4));
     if (an > 0 && corazon(t)) {
@@ -854,7 +885,7 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
       if (soloZonas) zona(ancho / 2 - tn * 3.3, yN - tn * 0.85, ancho / 2 + tn * 3.3, yN + tn * 0.62 + 8);
       else {
         pareja(ancho / 2, yN + (1 - an) * 8, tn, an);
-        texto(ancho / 2 + 2, yN + tn * 0.62 + (1 - an) * 8, 'EN MITAD DEL MUNDO', tp, 'q', 'rgb(236,206,228)', an * 0.85, '4px');
+        texto(ancho / 2 + 2, yN + tn * 0.62 + (1 - an) * 8, 'EN MITAD DEL MUNDO', tp, 'q', 'rgb(236,206,228)', an * 0.85, '4px', true);
       }
     }
     // Primeros planos: el nombre de quien llama y dónde está, bajo su luz.
@@ -876,12 +907,12 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
       const a = tramo(t, H.espera + 0.3, H.espera + 0.9) * (1 - tramo(t, H.encuentro + 1.2, H.encuentro + 1.8));
       const yb = alto - Math.max(60, alto * (vertical ? 0.1 : 0.09)), tg = Math.max(26, Math.min(40, m * 0.08));
       if (soloZonas) { zona(ancho / 2 - Math.max(tg * 3.4, tp * 13), yb - tg - 8 - tp - 6, ancho / 2 + Math.max(tg * 3.4, tp * 13), yb + tp + 18); return; }
-      texto(ancho / 2 + 2, yb - tg - 8, 'ENTRE TÚ Y YO', tp, 'q', 'rgb(236,206,228)', a * 0.8, '5px');
-      texto(ancho / 2, yb, `${miles(d)} km`, tg, 'q', 'rgb(255,226,240)', a, '2px');
+      texto(ancho / 2 + 2, yb - tg - 8, 'ENTRE TÚ Y YO', tp, 'q', 'rgb(236,206,228)', a * 0.8, '5px', true);
+      texto(ancho / 2, yb, `${miles(d)} km`, tg, 'q', 'rgb(255,226,240)', a);
       // Coordenadas de quien viaja en el plano (él; desde el segundo «wait», ella).
       const quien = t < H.respuesta ? 0 : t < 17.6 ? 1 : -1;
-      if (quien >= 0) { enRuta(quien ? tX : tC); texto(ancho / 2 + 1, yb + tp + 12, coordenadas(WX, WY), tp, 'q', quien ? 'rgb(255,190,224)' : 'rgb(222,200,255)', a * 0.85 * (quien ? tramo(t, H.respuesta, H.respuesta + 0.4) : 1) * (quien ? 1 : 1 - tramo(t, H.respuesta - 0.3, H.respuesta)), '2px'); }
-      else if (t >= H.encuentro) texto(ancho / 2 + 1, yb + tp + 12, '0°00′  ·  ECUADOR', tp, 'q', 'rgb(255,226,240)', a * 0.85, '3px');
+      if (quien >= 0) { enRuta(quien ? tX : tC); texto(ancho / 2 + 1, yb + tp + 12, coordenadas(WX, WY), tp, 'q', quien ? 'rgb(255,190,224)' : 'rgb(222,200,255)', a * 0.85 * (quien ? tramo(t, H.respuesta, H.respuesta + 0.4) : 1) * (quien ? 1 : 1 - tramo(t, H.respuesta - 0.3, H.respuesta))); }
+      else if (t >= H.encuentro) texto(ancho / 2 + 1, yb + tp + 12, '0°00′  ·  ECUADOR', tp, 'q', 'rgb(255,226,240)', a * 0.85, '3px', true);
     }
   }
 
