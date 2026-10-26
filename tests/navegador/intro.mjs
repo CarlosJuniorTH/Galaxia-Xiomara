@@ -7,11 +7,12 @@
 //    sale en su marca y no hay forma de saltarlo. Guarda .pruebas/intro.json.
 import { mkdirSync, writeFileSync } from 'fs';
 import { lanzar } from './arnes.mjs';
-import { HITOS } from '../../js/ui/portada.js';
+import { HITOS, NEGRO } from '../../js/ui/portada.js';
 
 // Se admiten hasta dos cuadros sueltos de más de 33 ms (y ninguno de más de 120): tras la carga del universo, V8 hace
 // una recolección grande (el «reductor de memoria», ~25 ms reales en un móvil, ~100 ms con la CPU ×4) que puede caer en
-// cualquier momento del clip; el resto, ninguno. La tarjeta se prepara en el negro de antes de aparecer (29,55 s).
+// cualquier momento del clip; el resto, ninguno. La tarjeta se prepara en el negro de antes de aparecer (NEGRO, de
+// 29,72 a 30 s: la pantalla no cambia): los cuadros que empiezan ahí no cuentan.
 const LIMITE = 34, P99 = 25, SUELTOS = 2, MAXIMO = 120;
 // Cada segundo y, además, justo después de algunas sílabas y golpes (js/data/introMaps.js) para ver su efecto.
 const INSTANTES = [...new Set([...Array.from({ length: 33 }, (_, i) => i), ...(process.env.INTRO_INSTANTES ? process.env.INTRO_INSTANTES.split(',').map(Number) : [1.6, 2.1, 3.6, 5.6, 7.6, 9.6, 10.6, 11.2, 12.1, 16.1, 20.3, 22.6, 24.4, 25.8, 26.6, 27.6, 28.6, 29.3, 30.4, 31.3])])]
@@ -68,14 +69,14 @@ export default async function ({ base, informe }) {
     informe.comprobar(await pagina.evaluate(() => !document.querySelector('#portada-saltar, .portada-saltar')), 'no hay botón para saltar la intro');
     await pagina.waitForTimeout(1500);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 }); await pagina.waitForTimeout(600);
-    await pagina.evaluate(() => {
-      const M = window.__medida = { dt: [], largas: [], reloj: [] }; let p = 0;
+    await pagina.evaluate(NEGRO => {
+      const M = window.__medida = { dt: [], largas: [], reloj: [] }; let p = 0, tp = 0;
       // Desde 0,4 s de clip: el arranque cae dentro del toque (aquí se toca con la carga ya hecha; en la vida real el clip
       // empieza solo al 100 %, sin toque) y con la pantalla aún en negro.
-      const f = t => { if (p && window.__intro.empezado && window.__intro.tiempo > 0.4) { M.dt.push(t - p); if (t - p > 20) (M.lentos ||= []).push([+(window.__intro.empezado ? window.__intro.tiempo : -1).toFixed(2), Math.round(t - p)]); } p = t; if (window.__intro.empezado) M.reloj.push([window.__intro.tiempo, window.__bandaSonora.tiempo('inicio')]); if (!M.fin) requestAnimationFrame(f); }; requestAnimationFrame(f);
+      const f = t => { const enNegro = tp >= NEGRO[0] && tp < NEGRO[1]; tp = window.__intro.tiempo ?? 0; if (p && window.__intro.empezado && window.__intro.tiempo > 0.4 && !enNegro) { M.dt.push(t - p); if (t - p > 20) (M.lentos ||= []).push([+(window.__intro.empezado ? window.__intro.tiempo : -1).toFixed(2), Math.round(t - p)]); } p = t; if (window.__intro.empezado) M.reloj.push([window.__intro.tiempo, window.__bandaSonora.tiempo('inicio')]); if (!M.fin) requestAnimationFrame(f); }; requestAnimationFrame(f);
       try { new PerformanceObserver(l => { for (const e of l.getEntries()) M.largas.push(Math.round(e.duration)); }).observe({ type: 'longtask', buffered: false }); } catch {}
       new MutationObserver(() => { if (!M.tarjeta && document.getElementById('entrada').classList.contains('formado')) M.tarjeta = window.__bandaSonora.tiempo('inicio'); }).observe(document.getElementById('entrada'), { attributes: true });
-    });
+    }, NEGRO);
     await pagina.click('#toque');
     await pagina.waitForFunction(() => window.__intro.empezado, null, { timeout: 20000 });
     await pagina.waitForFunction(() => document.getElementById('entrada').classList.contains('formado'), null, { timeout: 60000, polling: 250 });

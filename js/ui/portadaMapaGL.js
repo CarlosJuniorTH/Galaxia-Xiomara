@@ -28,7 +28,7 @@ uniform int u_nOndas;
 uniform vec4 u_zonas[4];       // centro x, y y semiejes (px)
 uniform int u_nZonas;
 uniform vec3 u_tonos[8];       // 0–2 tierra, 3 blanco, 4 violeta (él), 5 rosa (ella), 6 blanco rosado (los dos), 7 océano
-uniform vec3 u_luz;            // mapaVis·atenua, destello, —
+uniform vec3 u_luz;            // mapaVis·atenua, destello, escala de las motas
 varying vec4 v_c;
 void main() {
   gl_PointSize = 0.0; gl_Position = vec4(2.0, 2.0, 0.0, 1.0); v_c = vec4(0.0);
@@ -47,7 +47,7 @@ void main() {
   if (u_varios.y < 1.0 && fract(A * 13.7) > u_varios.y) return;
   if (a < 0.08) return;
   bool mar = a_p.z > 2.5;
-  float lado = clamp(2.15 * clamp(f, 0.7, 1.4), 1.5, 3.0);
+  float lado = clamp(2.15 * clamp(f, 0.7, 1.4), 1.5, 3.0) * u_luz.z;   // (en pantallas grandes, donde las motas van más separadas, algo mayores)
   int tono = int(a_p.z + 0.5);
   vec3 col = tono == 0 ? u_tonos[0] : tono == 1 ? u_tonos[1] : u_tonos[2];
   // ¿Quién ha llegado ya aquí? (cada mota con su umbral: el borde de lo descubierto no es un círculo perfecto)
@@ -170,7 +170,7 @@ export function crearMapaGL(lienzo) {
       gl.uniform4f(U.u_orillas, p.CX, p.CY, p.XX, p.XY);
       gl.uniform4f(U.u_enc, p.MX, p.MY, p.ecuador, 0);
       gl.uniform4f(U.u_viaje, p.tC, p.tX, p.camino, 0);
-      gl.uniform3f(U.u_luz, p.luz, p.destello, 0);
+      gl.uniform3f(U.u_luz, p.luz, p.destello, p.escala || 1);
       for (let i = 0; i < 8; i++) { ondas[i * 3] = p.OX[i]; ondas[i * 3 + 1] = p.OY[i]; ondas[i * 3 + 2] = p.OR[i]; }
       gl.uniform3fv(U.u_ondas, ondas); gl.uniform1i(U.u_nOndas, Math.min(8, p.nO));
       for (let i = 0; i < 4; i++) { zonas[i * 4] = p.ZX0[i]; zonas[i * 4 + 1] = p.ZY0[i]; zonas[i * 4 + 2] = p.ZX1[i] || 1; zonas[i * 4 + 3] = p.ZY1[i] || 1; }

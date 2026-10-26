@@ -66,6 +66,10 @@ export const HITOS = HITOS_INTRO;
 export const DURACION = 32;
 const H = HITOS;
 const PLATO = 29.45;   // el plato en el que el salto llega al otro lado
+const FIN_PLATO = PLATO + 0.27;   // se apagan los rayos del plato: desde aquí, negro hasta la tarjeta
+export const NEGRO = Object.freeze([FIN_PLATO, 30]);   // (la pantalla, en negro: ahí se prepara la tarjeta)
+// Los anillos del salto: el compás de 27,98, los pulsos y la caja de 28,70 y de 29,21.
+const ANILLOS = [27.98, 28.25, 28.49, 28.70, 28.96, 29.21];
 // Las llamadas de la voz: cada sílaba, una onda de motas sobre el mapa desde la luz que «habla» y que descubre su orilla
 // hasta donde llega. [segundo, alcance en grados del mapa]. 1.ª y 3.ª serie, él; 2.ª y 4.ª, ella; la 5.ª, los dos.
 const ALCANCES = [[3, 5, 7, 9.5], [3, 5, 7.5, 10], [12, 15, 19, 24], [12, 15, 19, 24], [34, 48, 66, 95]];
@@ -396,6 +400,18 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     const d = Math.hypot(WX - ax, WY - ay) + 1e-3, z = Math.max(1.25, Math.min(2.5, (vertical ? alto * 0.4 : alto * 0.5) / (d * k0)));
     o[0] = (ax + WX) / 2; o[1] = (ay + WY) / 2; o[2] = Math.log(z); o[3] = 30; o[4] = 0; o[5] = 0; o[6] = 0.5; return o;
   }
+  // Limita el zoom de la cámara para que las dos luces (en casa) queden dentro de la pantalla con margen (sin contar la
+  // perspectiva, que en la mitad de abajo agranda un poco: de ahí el margen).
+  function encuadrarDos() {
+    const g = CAM[4] * RAD, cg0 = Math.cos(g), sg0 = Math.sin(g), ci0 = Math.cos(CAM[3] * RAD), ay0 = alto * CAM[6];
+    let zm = Infinity;
+    for (const [lx, ly] of [[CX, CY], [XX, XY]]) {
+      const dx = lx - CAM[0], dy = ly - CAM[1], u = Math.abs(dx * cg0 - dy * sg0), v = (dx * sg0 + dy * cg0) * ci0;
+      if (u > 1e-6) zm = Math.min(zm, (ancho / 2 - 34) / (u * k0));
+      if (v > 1e-6) zm = Math.min(zm, (alto - ay0 - 40) * 0.82 / (v * k0)); else if (v < -1e-6) zm = Math.min(zm, (ay0 - 40) / (-v * k0));
+    }
+    if (zm < Infinity) CAM[2] = Math.min(CAM[2], Math.log(Math.max(0.2, zm)));
+  }
   function camara(t) {
     if (t < H.luzXiomara) mezclar(CAM, P_C0, P_C1, suave(tramo(t, 0, H.luzXiomara)));
     else if (t < H.mapa) mezclar(CAM, P_X0, P_X1, suave(tramo(t, H.luzXiomara, H.mapa)));
@@ -406,6 +422,8 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
       // la voz sostiene y calla, se acerca un poco hacia él (el redoble de antes del «wait»).
       mezclar(TA, P_X3, P_TODO, suave2(tramo(t, H.juntos, SERIES[4][3] + 0.25)));
       mezclar(CAM, TA, P_TODO2, suave(tramo(t, SERIES[4][3] + 0.25, H.espera)));
+      // (los dos llaman: sus dos luces siempre enteras en la pantalla, también en el móvil apaisado)
+      encuadrarDos();
     }
     else if (t < H.respuesta) {
       // Con él: un latigazo del plano general al travelling (0,8 s) y luego viaja a su lado.
@@ -622,7 +640,7 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     // Fases del final: el mapa se curva en globo (morf), el globo se aleja (lejos) y el salto.
     const morf = suave(tramo(t, H.globo, H.globo + 1.3)), lejos = entra(tramo(t, 26.9, H.salto));
     const uS = calma ? 0 : tramo(t, H.salto, PLATO), enSalto = uS > 0 && uS < 1;
-    const vivo = calma ? 1 - tramo(t, H.salto, H.salto + 1.4) : 1 - tramo(uS, 0.7, 1);
+    const vivo = calma ? 1 - tramo(t, H.salto, H.salto + 1.4) : 1 - tramo(uS, 0.88, 1);
     // Brillo de los golpes de la letra.
     const golpe = calma ? 0 : Math.max(0, 1 - (t - H.espera) / 0.5) * (t >= H.espera) + Math.max(0, 1 - (t - H.respuesta) / 0.5) * (t >= H.respuesta) + 0.8 * Math.max(0, 1 - (t - H.encuentro) / 0.6) * (t >= H.encuentro);
 
@@ -699,7 +717,7 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
       // El mapa en penumbra (antes de que lo descubran las llamadas) aparece en el primer compás.
       const penumbra = calma ? tramo(t, 0.2, 1.4) : tramo(t, 0.3, 1.1);
       // Mientras late el corazón, el mapa baja a la mitad (que el corazón y los nombres se lean).
-      const atenua = 1 - 0.3 * tramo(t, H.encuentro, H.encuentro + 0.4) * (1 - tramo(t, H.cielo, H.cielo + 0.6));
+      const atenua = 1 - 0.15 * tramo(t, H.encuentro, H.encuentro + 0.4) * (1 - tramo(t, H.cielo, H.cielo + 0.6));
       nL = 0;
       const cx0 = Math.max(0, Math.floor((bx0 + 180) / CEL)), cx1 = Math.min(NCX - 1, Math.floor((bx1 + 180) / CEL));
       const cy0 = Math.max(0, Math.floor((by0 - Y0C) / CEL)), cy1 = Math.min(NCY - 1, Math.floor((by1 - Y0C) / CEL));
@@ -717,7 +735,7 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
         // (0,5 s antes, para el frente recién descubierto; el camino encendido hasta cada luz; el ecuador desde el encuentro)
         const t0 = t - 0.5, viaja = t > H.espera;
         Object.assign(PGL, { cX, cY, S, cg, sg, ci, si, ca, sa, D, ax, ay, ancho, alto, dpr, e0, e1, t, CX, CY, XX, XY, MX, MY, revC, revX, revM, revC0: revelado(LLAMADAS.carlos, t0), revX0: revelado(LLAMADAS.xiomara, t0), revM0: revEncuentro(t0), revCalma, penumbra,
-          ecuador: ecuador(t), tC: viaja ? tC : -1, tX: t > H.respuesta ? tX : 2, camino: viaja ? 1 : 0, luz: mapaVis * atenua, destello: destelloMapa, nO, nZ });
+          escala: Math.min(1.45, pasoBase / 5.4), ecuador: ecuador(t), tC: viaja ? tC : -1, tX: t > H.respuesta ? tX : 2, camino: viaja ? 1 : 0, luz: mapaVis * atenua, destello: destelloMapa, nO, nZ });
         mapaGL.dibujar(PGL, ACTIVOS, na);
       } else for (let nvl = 0; nvl < niveles.length; nvl++) {
         const N = niveles[nvl], esp = N.paso * S;
@@ -888,22 +906,15 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
       }
       dibujarGlobo(t, gx, gy, R, lon0, lat0, alfa, quedan, final ? 1 : morf, final);
     }
-    // El salto: dos estelas, violeta y rosa (los dos), salen en espiral desde la luz y nos llevan dentro.
-    if (enSalto) {
-      const cx = ancho / 2, cy = alto / 2, Rm = Math.hypot(ancho, alto) * 0.62, a0 = 1 - tramo(uS, 0.55, 0.95);
-      for (let o = 0; o < 2; o++) {
-        x.fillStyle = COL[o]; x.globalAlpha = a0; x.beginPath();
-        for (let k = 0; k < 90; k++) {
-          const q = k / 90, r = Rm * entra(Math.min(1, uS * 1.25 + q * 0.18)) * (0.15 + 0.85 * q), ang = (o ? 1 : -1) * (q * 5.2 + uS * 2.4) + o * Math.PI;
-          const l = 1.5 + 1.6 * q * (1 - q) * 4 * uS;
-          x.rect(cx + Math.cos(ang) * r - l / 2, cy + Math.sin(ang) * r - l / 2, l, l);
-        }
-        x.fill();
-      }
-      x.globalAlpha = 1;
+    // El salto, a golpes de la batería: calla la voz y volamos hacia la luz del mundo por un túnel de anillos de motas
+    // (uno en cada golpe: el compás, los pulsos y la caja de 28,70), con los dos hilos, violeta y rosa, enroscados en
+    // doble hélice; en el plato (29,45) la luz estalla en rayos finos y una onda, y todo se apaga hasta la tarjeta.
+    if (enSalto || (t >= PLATO && t < FIN_PLATO && !calma)) dibujarSalto(t, uS);
+    // La luz del mundo, ya un punto, en el centro: crece con el salto y late en cada golpe.
+    if (!calma && lejos > 0.6 && t < PLATO) {
+      let g = 0; for (const s of ANILLOS) if (t >= s && t < s + 0.3) g = Math.max(g, 1 - (t - s) / 0.3);
+      luz(ancho / 2, alto / 2, BLANCO, 0.7 + 0.8 * tramo(t, 26.9, H.salto) + 1.4 * entra(uS) + 0.5 * g, t, 1);
     }
-    // El salto: la luz del mundo, ya un punto, en el centro de la estampida.
-    if (!calma && lejos > 0.6 && t < H.salto + 0.9) { const a = t < H.salto ? 1 : 1 - tramo(t, H.salto, H.salto + 0.9); luz(ancho / 2, alto / 2, BLANCO, 0.7 + 0.8 * tramo(t, 26.9, H.salto) + 1.6 * uS, t, a); }
 
     // 9. Rótulos: los nombres en los primeros planos, la distancia y las coordenadas en el viaje, «0 km» en el encuentro.
     if (antes) rotulos(t, tC, tX);
@@ -911,9 +922,9 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     // El texto de la historia y el final (tarjeta y cielo).
     let indice = -1; for (let i = 0; i < FRASES.length; i++) if (t >= FRASES[i].desde) indice = i;
     if (indice !== frase) { frase = indice; alFrase(FRASES[indice]?.texto ?? ''); }
-    // Medio segundo antes, con la pantalla en negro tras el salto, se prepara la tarjeta (su primer pintado y su desenfoque
+    // En cuanto se apagan los rayos del plato, con la pantalla en negro, se prepara la tarjeta (su primer pintado y su desenfoque
     // cuestan un cuadro largo: así cae donde no se ve nada moverse).
-    if (!previoDado && t >= H.tarjeta - 0.45) { previoDado = true; alPrevio(); huecoMundo(); }
+    if (!previoDado && t >= FIN_PLATO + 0.02) { previoDado = true; alPrevio(); huecoMundo(); }
     if (!finalDado && t >= H.tarjeta) { finalDado = true; alFinal(); huecoMundo(); }
     // (y de vez en cuando, por si la tarjeta cambia de tamaño: fuentes, giro de pantalla)
     if (finalDado && ((t * 2) | 0) !== medidaHueco) { medidaHueco = (t * 2) | 0; huecoMundo(); }
@@ -1053,6 +1064,44 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     const lat = calma ? 0 : latido(t, H.encuentro);
     enGlobo(MX, MY);
     if (QF > 0) luz(QX, QY, BLANCO, (final ? 0.55 : 0.9) * (1 + 0.15 * lat) * Math.min(1, 0.4 + R / 120), t, alfa * (final ? 1 : sat(forma * 3)));
+    x.globalAlpha = 1;
+  }
+
+  // El salto (ver el paso del cuadro). uS: 0 → 1 del compás de 27,98 al plato.
+  function dibujarSalto(t, uS) {
+    const cx = ancho / 2, cy = alto / 2, Rm = Math.hypot(ancho, alto) * 0.6;
+    if (t < PLATO) {
+      // Los anillos: nacen pequeños en el centro y se abren cada vez más deprisa (perspectiva), girando un poco.
+      for (const s of ANILLOS) {
+        const e = t - s; if (e < 0 || e > 0.9) continue;
+        const k = e / 0.9, r = 6 + Rm * k * k * (0.6 + 0.4 * k), n = 48, l = 1.8 + 2 * k, gira = s * 1.7 + e * 0.8;
+        for (let o = 0; o < 2; o++) {
+          x.fillStyle = COL[o]; x.globalAlpha = (1 - k * k) * 0.95; x.beginPath();
+          for (let i = o; i < n; i += 2) { const an = gira + i * TAU / n; x.rect(cx + Math.cos(an) * r - l / 2, cy + Math.sin(an) * r - l / 2, l, l); }
+          x.fill();
+        }
+      }
+      // La doble hélice: dos hilos de motas que salen del centro enroscados (los dos, juntos, en el mismo sentido).
+      const a0 = 1 - tramo(uS, 0.75, 1);
+      for (let o = 0; o < 2; o++) {
+        x.fillStyle = COL[o]; x.globalAlpha = a0; x.beginPath();
+        for (let k = 0; k < 70; k++) {
+          const q = k / 70, r = Rm * entra(Math.min(1, uS * 1.1 + q * 0.25)) * (0.08 + 0.92 * q), ang = q * 7 + uS * 5 + o * Math.PI;
+          const l = 1.4 + 1.6 * q * uS;
+          x.rect(cx + Math.cos(ang) * r - l / 2, cy + Math.sin(ang) * r - l / 2, l, l);
+        }
+        x.fill();
+      }
+    } else {
+      // El plato: rayos finos desde el centro que se disparan y se apagan, y una onda de motas que sale a toda prisa.
+      const e = t - PLATO, k = e / (FIN_PLATO - PLATO), r1 = Rm * salida(Math.min(1, e / 0.16)), r0 = Rm * salida(Math.min(1, e / 0.26)) * 0.92;
+      x.strokeStyle = 'rgb(255,238,248)'; x.lineWidth = 1.2; x.globalAlpha = 1 - k; x.beginPath();
+      for (let i = 0; i < 36; i++) { const an = i * TAU / 36 + 0.09 * (i & 1), c = Math.cos(an), sn = Math.sin(an), f = i & 1 ? 0.7 : 1; x.moveTo(cx + c * r0 * f * 0.5, cy + sn * r0 * f * 0.5); x.lineTo(cx + c * r1 * f, cy + sn * r1 * f); }
+      x.stroke();
+      const ro = 10 + Rm * 0.8 * salida(k);
+      for (let o = 0; o < 2; o++) { x.fillStyle = COL[o]; x.globalAlpha = (1 - k) * 0.9; x.beginPath(); for (let i = o; i < 72; i += 2) { const an = i * TAU / 72; x.rect(cx + Math.cos(an) * ro - 1, cy + Math.sin(an) * ro - 1, 2, 2); } x.fill(); }
+      if (e < 0.1) luz(cx, cy, BLANCO, 2.6 * (1 - e / 0.1) + 0.5, t, 1 - e / 0.1);
+    }
     x.globalAlpha = 1;
   }
 
