@@ -26,9 +26,36 @@ export function crearEstrellasSecretas({ scene, camera, uScale, uPR }, cantidad,
     s.scale.set(tam, tam, 1);
     s.userData = { indice: i, fase: Math.random() * 10, base: s.position.clone(), baseY: s.position.y, encontrada: encontradas.includes(i) };
     if (s.userData.encontrada) s.material.color.copy(DORADO);
+    s.visible = false;   // se dibujan todas juntas (abajo); el sprite queda para tocarlas y para su posición
     grupo.add(s);
     estrellas.push(s);
   }
+  // Todas en UNA orden de dibujo: un punto por estrella con la misma imagen, color y tamaño que su sprite (antes, una orden
+  // por estrella, una por cada mes: en casa son lo que más órdenes sumaba después de la telaraña y los lugares).
+  // Tamaño en pantalla de un sprite de s unidades: s · P[1][1] · (alto en píxeles / 2) / profundidad.
+  const n = estrellas.length, posLuz = new Float32Array(n * 3), colLuz = new Float32Array(n * 3), tamLuz = new Float32Array(n);
+  const geoLuz = new THREE.BufferGeometry();
+  geoLuz.setAttribute('position', new THREE.BufferAttribute(posLuz, 3).setUsage(THREE.DynamicDrawUsage));
+  geoLuz.setAttribute('aColor', new THREE.BufferAttribute(colLuz, 3).setUsage(THREE.DynamicDrawUsage));
+  geoLuz.setAttribute('aTam', new THREE.BufferAttribute(tamLuz, 1).setUsage(THREE.DynamicDrawUsage));
+  const uAlto = { value: vista.alto * uPR.value };
+  const luces = new THREE.Points(geoLuz, new THREE.ShaderMaterial({
+    uniforms: { map: { value: tex }, uAlto },
+    vertexShader: /* glsl */`attribute vec3 aColor; attribute float aTam; uniform float uAlto; varying vec3 vC;
+      void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv; vC = aColor;
+        gl_PointSize = aTam * projectionMatrix[1][1] * 0.5 * uAlto / max(1e-3, -mv.z); }`,
+    // (gl_PointCoord va de arriba abajo; las coordenadas del sprite, de abajo arriba)
+    fragmentShader: /* glsl */`uniform sampler2D map; varying vec3 vC;
+      void main(){ vec4 t = texture2D(map, vec2(gl_PointCoord.x, 1.0 - gl_PointCoord.y)); gl_FragColor = vec4(t.rgb * vC, t.a); }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+  }));
+  luces.frustumCulled = false; grupo.add(luces);
+  const copiarLuces = () => {
+    for (let i = 0; i < n; i++) { const s = estrellas[i]; posLuz[i * 3] = s.position.x; posLuz[i * 3 + 1] = s.position.y; posLuz[i * 3 + 2] = s.position.z; colLuz[i * 3] = s.material.color.r; colLuz[i * 3 + 1] = s.material.color.g; colLuz[i * 3 + 2] = s.material.color.b; tamLuz[i] = s.scale.y; }
+    for (const a of Object.values(geoLuz.attributes)) a.needsUpdate = true;
+    uAlto.value = vista.alto * uPR.value;
+  };
+  copiarLuces();
 
   const ray = new THREE.Raycaster();
   const v = new THREE.Vector2();
@@ -59,7 +86,7 @@ export function crearEstrellasSecretas({ scene, camera, uScale, uPR }, cantidad,
   let zonaT = 0, zonaIndice = -1;
   const centroZona = i => estrellas[i].position.clone();
   return {
-    destruir() { scene.remove(grupo); for (const s of estrellas) s.material.dispose(); tex.dispose(); },
+    destruir() { scene.remove(grupo); for (const s of estrellas) s.material.dispose(); geoLuz.dispose(); luces.material.dispose(); tex.dispose(); },
     posicion(i) { return estrellas[i]?.getWorldPosition(new THREE.Vector3()); },
     senalar(i) { pista = i; pistaT = 22; },
     iluminarZona(i) { if (!estrellas[i]) return null; zonaIndice = i; zonaT = 20; return centroZona(i); },
@@ -128,6 +155,7 @@ export function crearEstrellasSecretas({ scene, camera, uScale, uPR }, cantidad,
         const visible = escalaLimitada(k * (reunida ? 1.6 : 1), senalada ? 38 : reunida ? 44 : 26, -enVista.z, vista.alto, camera.fov);
         s.scale.set(visible, visible, 1);
       }
+      copiarLuces();
     }
   };
 }
