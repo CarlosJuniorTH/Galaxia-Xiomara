@@ -113,7 +113,7 @@ export const elevacionHaz = config => 90 - config.inclinacion;
 //             ondaEdad / ondaPeriodo: segundos desde la última onda y cada cuánto sale una (un compás; un pulso con el grave)
 //  barrido    cuánto iluminan los haces los filamentos que barren (0–1);  frente  luz de la nebulosa del centro hacia fuera
 //             (0 → 1,15);  brillo  luz de la nebulosa encendida (0–1);  tibio  rosa y oro de la segunda vuelta (0–1)
-//  foco       penumbra del resto del cielo (0–0,6)
+//  foco       penumbra del resto del cielo (0–0,85: la telaraña; también apaga el polvo del fondo, cosmos.js)
 export function estadoPulsar(s, config, e = {}, reducido = false) {
   const m = config.marcas, P = config.pulso, f = Math.min(Math.max(s, 0), m.fin);
   e.ritmo = ritmoGiro(f / P, config); e.vueltas = vueltasPulsar(s, config);
@@ -134,6 +134,6 @@ export function estadoPulsar(s, config, e = {}, reducido = false) {
   e.frente = 1.15 * suave(f, m.grave, m.grave + (reducido ? 4 : 2.8));
   e.brillo = suave(f, m.grave - 0.2, m.grave + 0.8) * (1 - 0.3 * suave(f, m.fundido, m.fin));
   e.tibio = suave(f, m.segunda - 0.4, m.segunda + 1.2) * (1 - 0.5 * suave(f, m.fundido, m.fin));
-  e.foco = 0.6 * suave(f, 0, m.quererte) - 0.25 * suave(f, m.fundido, m.fin);
+  e.foco = 0.85 * suave(f, 0, m.quererte) - 0.4 * suave(f, m.fundido, m.fin);
   return e;
 }

@@ -19,6 +19,7 @@ import { SITIOS_DESTINO } from '../data/sitios.js';
 import { materialSombra } from './materiales.js';
 import { crearEscenaCuasar } from './escenasGigantes.js';
 import { construirPulsar } from './pulsar.js';
+import { atenuarFondo } from '../util/fondoEscena.js';
 import { crearDeneb, RADIO_DENEB } from './deneb.js';
 import { ESCENA_PULSAR, ESCENA_CUASAR, ESCENA_DENEB, estadoPulsar, estadoCuasar, estadoDeneb, crearDirector } from '../util/escenasGigantes.js';
 const reducido = !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -293,7 +294,7 @@ export function* construirCosmos({ uScale, uPR }) {
   const directores = { pulsar: crearDirector(ESCENA_PULSAR, { salida: reducido ? 2.5 : 1.5 }), cuasar: crearDirector(ESCENA_CUASAR, { salida: reducido ? 2.5 : 1.5 }), deneb: crearDirector(ESCENA_DENEB, { salida: reducido ? 3 : 2 }) };
   const estadoP = estadoPulsar(0, ESCENA_PULSAR, {}), estadoC = estadoCuasar(0, ESCENA_CUASAR, {}), estadoD = estadoDeneb(0, ESCENA_DENEB, {}), normalD = estadoDeneb(ESCENA_DENEB.duracion, ESCENA_DENEB, {});   // normalD: Deneb fuera de su escena
   const camPulsar = new THREE.Vector3(), centroPulsar = new THREE.Vector3();
-  let camaraMundo = null, tActual = 0;
+  let camaraMundo = null, tActual = 0, atenuandoPulsar = false;
   const pulsarDormido = estadoPulsar(0, ESCENA_PULSAR, {});
   // La cámara en el espacio del grupo del púlsar, relativa a su centro.
   const camaraEnPulsar = () => camPulsar.copy(camLocal).sub(pulsar.position).divideScalar(pulsar.scale.x);
@@ -443,6 +444,10 @@ export function* construirCosmos({ uScale, uPR }) {
       tActual = t; camaraMundo = camera.position;
       const dP = directores.pulsar, sP = dP.avanzar(t, dt), wP = dP.peso; estadoPulsar(sP, dP.config, estadoP, reducido);
       piezasPulsar.actualizar({ e: estadoP, e0: pulsarDormido, w: wP, activa: dP.activa, s: sP, t, dt, camara: camaraEnPulsar(), reducido });
+      // Las paredes de polvo del cielo profundo y las nebulosas cercanas (nubes moradas y naranjas de bordes blancos) se apagan
+      // mientras se le mira: su nebulosa es la suya, de filamentos (js/util/fondoEscena.js). Al irse, vuelven.
+      if (wP > 0.0005) { pulsar.getWorldPosition(centroPulsar); atenuandoPulsar = true; atenuarFondo(centroPulsar.x, centroPulsar.y, centroPulsar.z, 12 * 3850 * pulsar.getWorldScale(camPulsar).x, wP * Math.min(0.9, 1.06 * Math.max(0, estadoP.foco))); }
+      else if (atenuandoPulsar) { atenuandoPulsar = false; atenuarFondo(0, 0, 0, 0, 0); }
       for (const h of animar) h.material.uniforms.uT.value = t;
       // Deneb: su videoclip (nace de la nada con «Middle») sobre su estado de siempre (deneb.js, js/util/escenaDeneb.js).
       const dD = directores.deneb, sD = dD.avanzar(t, dt), wD = dD.peso; estadoDeneb(sD, dD.config, estadoD, reducido);

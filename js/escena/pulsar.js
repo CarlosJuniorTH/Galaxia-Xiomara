@@ -21,7 +21,7 @@ import * as THREE from 'three';
 import { EXPOSICION } from './exposicion.js';
 import { ESCENA_PULSAR, vueltasPulsar } from '../util/escenaPulsar.js';
 
-export const PULSAR = Object.freeze({ estrella: 62, haz: 3600, viento: 650, nebulosa: [3000, 2300, 2400] });
+export const PULSAR = Object.freeze({ estrella: 34, haz: 3600, viento: 650, nebulosa: [3000, 2300, 2400] });
 const DORMIDO = ESCENA_PULSAR.giros[0][1];   // vueltas por pulso dormido
 
 function azarCon(semilla) { let s = semilla >>> 0; return () => { s = (Math.imul(1664525, s) + 1013904223) >>> 0; return s / 4294967296; }; }
@@ -65,11 +65,11 @@ export function* construirPulsar({ uScale, uPR, config = ESCENA_PULSAR }) {
                    mix(mix(h3(i + vec3(0,0,1)), h3(i + vec3(1,0,1)), f.x), mix(h3(i + vec3(0,1,1)), h3(i + vec3(1,1,1)), f.x), f.y), f.z); }
       void main(){ float mu = clamp(dot(normalize(vN), normalize(vV)), 0.0, 1.0);
         float grano = mix(0.5, rn3(vP * 9.0) * 0.6 + rn3(vP * 23.0) * 0.4, uCasquetes);
-        vec3 base = mix(vec3(0.3, 0.45, 1.0), vec3(1.0, 1.0, 1.0), pow(mu, 0.7)) * (0.35 + 1.3 * mu * mu) * (0.8 + 0.4 * grano);
-        float y = abs(vP.y), polo = smoothstep(0.93, 0.945, y), anillo = smoothstep(0.86, 0.87, y) * (1.0 - smoothstep(0.885, 0.895, y));
+        vec3 base = mix(vec3(0.22, 0.36, 1.0), vec3(0.72, 0.84, 1.0), mu) * (0.45 + 0.65 * mu) * (0.8 + 0.4 * grano);
+        float y = abs(vP.y), polo = smoothstep(0.86, 0.88, y), anillo = smoothstep(0.78, 0.795, y) * (1.0 - smoothstep(0.81, 0.825, y));
         vec3 caliente = mix(vec3(1.0, 0.98, 1.0), vec3(1.0, 0.82, 0.9), uTibio * 0.6);
         float borde = smoothstep(0.08, 0.16, mu) * (1.0 - smoothstep(0.2, 0.3, mu));
-        vec3 c = base * uCalor * (1.0 + 0.7 * uPulso) + vec3(0.7, 0.8, 1.0) * borde * 0.5 * uCalor + caliente * (polo * 2.4 + anillo * 0.9) * uCasquetes * (1.0 + 0.8 * uPulso) + vec3(0.9, 0.95, 1.0) * uDestello * (0.4 + 0.6 * mu);
+        vec3 c = base * uCalor * (1.0 + 0.7 * uPulso) + vec3(0.7, 0.8, 1.0) * borde * 0.5 * uCalor + caliente * (polo * 4.0 + anillo * 1.4) * uCasquetes * (1.0 + 0.8 * uPulso) + vec3(0.9, 0.95, 1.0) * uDestello * (0.4 + 0.6 * mu);
         gl_FragColor = vec4(c * 1.15, 1.0); }`
   }));
   magnetico.add(estrella);
@@ -149,7 +149,7 @@ export function* construirPulsar({ uScale, uPR, config = ESCENA_PULSAR }) {
   }
   yield;
 
-  // ── Nebulosa: una jaula de filamentos (hilos de 1 px, ≈ 8000 tramos) en una cáscara (0,55–0,97 de la caja 3000 × 2300 × 2400,
+  // ── Nebulosa: filamentos coherentes (hilos de 1 px, ≈ 8400 tramos) en una cáscara elipsoidal (0,82–0,97 de 3000 × 2300 × 2400,
   // como el Cangrejo) y 2400 motas azules de sincrotrón dentro. Rosas, violetas y algunos turquesa (sin naranjas). Los haces
   // iluminan lo que barren; con el estribillo se encienden del centro hacia fuera y cada latido sale del centro. ──
   const uN = { uScale, uPR, uExpo: EXPOSICION, uHaz: { value: new THREE.Vector3(0, 1, 0) }, uBarrido: { value: 0 }, uFrente: { value: 0 }, uLuz: { value: 0 }, uBase: { value: 0.5 },
@@ -161,41 +161,51 @@ export function* construirPulsar({ uScale, uPR, config = ESCENA_PULSAR }) {
     vec3 tinte(vec3 c, float azar){ return mix(c, mix(vec3(1.0, 0.6, 0.78), vec3(1.0, 0.84, 0.55), azar), uTibio * 0.55); }`;
   const ESCALA = [NX, NY, NZ];
   {
-    // Una jaula de filamentos, como la del Cangrejo: nudos en la cáscara unidos con sus vecinos más cercanos por arcos que
-    // ondulan (celdas), y dedos cortos que salen hacia fuera desde los arcos.
-    const NODOS = 210, VECINOS = 3, SEG = 12, DEDOS = 160, SEGD = 5, HEBRAS = 2, nodos = [];
-    for (let i = 0; i < NODOS; i++) { const z = azar() * 2 - 1, f = azar() * Math.PI * 2, q = Math.sqrt(1 - z * z), r = 0.55 + azar() * 0.37; nodos.push([Math.cos(f) * q * r, z * r, Math.sin(f) * q * r]); }
-    const aristas = new Map();
-    for (let i = 0; i < NODOS; i++) nodos.map((n, j) => [j, Math.hypot(n[0] - nodos[i][0], n[1] - nodos[i][1], n[2] - nodos[i][2])]).sort((x, y) => x[1] - y[1]).slice(1, 1 + VECINOS)
-      .forEach(([j]) => aristas.set(Math.min(i, j) * NODOS + Math.max(i, j), [Math.min(i, j), Math.max(i, j)]));
-    const total = (aristas.size * SEG * HEBRAS + DEDOS * SEGD) * 2, pos = new Float32Array(total * 3), dato = new Float32Array(total * 3); let j = 0;
-    const poner = (x, y, z, color, luz) => { pos.set([x * NX, y * NY, z * NZ], j * 3); dato.set([Math.hypot(x, y, z), color, luz], j * 3); j++; };
-    const puntos = [];
-    let n = 0;
-    for (const [a, b] of aristas.values()) {
-      if (++n % 40 === 0) yield;
-      const A = nodos[a], B = nodos[b], color = azar(), luz = 0.45 + azar() * 0.55, f1 = 0.6 + azar() * 1.2, f2 = 1 + azar() * 1.6, fase = azar() * 6.28, amp = 0.008 + azar() * 0.014;
-      const ra = Math.hypot(...A), rb = Math.hypot(...B), arco = [];
-      for (let k = 0; k <= SEG; k++) {
-        const u = k / SEG, d = [A[0] / ra + (B[0] / rb - A[0] / ra) * u, A[1] / ra + (B[1] / rb - A[1] / ra) * u, A[2] / ra + (B[2] / rb - A[2] / ra) * u], ld = Math.hypot(...d);
-        // Ondula a lo largo (dos frecuencias) en el radio y de lado; los nudos (más luz) caen al azar en cada arco.
-        const r = (ra + (rb - ra) * u) * (1 + amp * Math.sin(u * f1 * 6.28 + fase)), lado = amp * Math.sin(u * f2 * 6.28 + fase * 2);
-        arco.push([d[0] / ld * r + lado * d[2] / ld, d[1] / ld * r, d[2] / ld * r - lado * d[0] / ld, luz * (0.65 + 0.35 * Math.sin(u * f2 * 3.1 + fase) ** 2)]);
+    // Filamentos COHERENTES, como los del Cangrejo: siguen la superficie de la cáscara elipsoidal a lo largo de las curvas de
+    // nivel de un campo suave sobre la esfera (sumas de ondas; su gradiente girado 90° en el plano tangente): así forman
+    // celdas, lazos y hebras largas que se curvan juntas, no garabatos. Cada filamento se integra hacia los dos lados desde
+    // su semilla; algunos echan ramas cortas. Están en una cáscara fina (0,82–0,97), así que se ven más densos en el borde
+    // (de canto se superponen), como en las fotos. Nudos de más luz donde el campo tiene crestas.
+    // Ondas largas (las celdas) y unas pocas cortas y débiles (los filamentos ondulan y se retuercen, no son curvas de mapa).
+    const onda = (f0, f1, a0, a1) => { const z = azar() * 2 - 1, f = azar() * Math.PI * 2, q = Math.sqrt(1 - z * z); return [Math.cos(f) * q, z, Math.sin(f) * q, f0 + azar() * (f1 - f0), azar() * 6.28, a0 + azar() * (a1 - a0)]; };
+    const ONDAS = [...Array.from({ length: 7 }, () => onda(2, 5.5, 0.5, 1)), ...Array.from({ length: 4 }, () => onda(10, 16, 0.12, 0.22))];
+    const gradiente = (x, y, z, g) => { g[0] = g[1] = g[2] = 0; let n = 0;
+      for (const [kx, ky, kz, f, fase, a] of ONDAS) { const arg = (kx * x + ky * y + kz * z) * f + fase, c = Math.cos(arg) * a * f; n += Math.sin(arg) * a; g[0] += c * kx; g[1] += c * ky; g[2] += c * kz; }
+      return n; };
+    const SEMILLAS = 150, PASOS = 26, PASO = 0.022, RAMAS = 70, PASOSR = 9, total = (SEMILLAS * PASOS * 2 + RAMAS * PASOSR) * 2;
+    const pos = new Float32Array(total * 3), dato = new Float32Array(total * 3), g3 = [0, 0, 0], p = [0, 0, 0], q = [0, 0, 0]; let j = 0;
+    const poner = (v, r, color, luz) => { pos.set([v[0] * r * NX, v[1] * r * NY, v[2] * r * NZ], j * 3); dato.set([r, color, luz], j * 3); j++; };
+    // Un paso a lo largo de la curva de nivel (tangente = p × ∇n, normalizada), sobre la esfera unidad; `giro` la tuerce (ramas).
+    const paso = (v, signo, giro) => {
+      const n = gradiente(v[0], v[1], v[2], g3), d = g3[0] * v[0] + g3[1] * v[1] + g3[2] * v[2];
+      const gx = g3[0] - d * v[0], gy = g3[1] - d * v[1], gz = g3[2] - d * v[2];
+      let tx = v[1] * gz - v[2] * gy, ty = v[2] * gx - v[0] * gz, tz = v[0] * gy - v[1] * gx;
+      tx += gx * giro; ty += gy * giro; tz += gz * giro;
+      const L = Math.hypot(tx, ty, tz) || 1, k = signo * PASO / L;
+      v[0] += tx * k; v[1] += ty * k; v[2] += tz * k; const lv = Math.hypot(v[0], v[1], v[2]); v[0] /= lv; v[1] /= lv; v[2] /= lv;
+      return n;
+    };
+    const radio = v => 0.82 + 0.15 * (0.5 + 0.5 * Math.sin(v[0] * 5.1 + v[1] * 3.7 - v[2] * 4.3));
+    const brotes = [];
+    for (let i = 0; i < SEMILLAS; i++) {
+      if (i % 50 === 49) yield;
+      // Semillas repartidas por igual (espiral de Fibonacci con un poco de azar).
+      const zz = 1 - 2 * (i + 0.5) / SEMILLAS, ff = i * 2.39996 + azar() * 0.3, qq = Math.sqrt(1 - zz * zz);
+      const color = azar(), luz = 0.5 + azar() * 0.5;
+      for (const signo of [1, -1]) {
+        p[0] = Math.cos(ff) * qq; p[1] = zz; p[2] = Math.sin(ff) * qq;
+        for (let k = 0; k < PASOS; k++) {
+          q[0] = p[0]; q[1] = p[1]; q[2] = p[2]; const ra = radio(q);
+          const n = paso(p, signo, 0), rb = radio(p), punta = 1 - k / PASOS, nudo = 0.6 + 0.4 * Math.abs(n) / 2;
+          poner(q, ra, color, luz * punta * nudo); poner(p, rb, color, luz * (1 - (k + 1) / PASOS) * nudo);
+          if (k === 8 || k === 17) brotes.push([p[0], p[1], p[2], signo, color, luz * punta]);
+        }
       }
-      // Dos hebras trenzadas por arco (la segunda, algo separada y más tenue): el filamento tiene cuerpo sin ser un borrón.
-      for (let h = 0; h < HEBRAS; h++) {
-        const sep = h * (0.006 + azar() * 0.006), fh = 3 + azar() * 3, en = k => { const q = arco[k], w = sep * Math.sin(k / SEG * fh * 6.28 + fase); return [q[0] * (1 + w), q[1] * (1 - w), q[2] * (1 + w * 0.5)]; };
-        for (let k = 0; k < SEG; k++) { poner(...en(k), color, arco[k][3] * (h ? 0.55 : 1)); poner(...en(k + 1), color, arco[k + 1][3] * (h ? 0.55 : 1)); }
-      }
-      puntos.push(arco[SEG >> 1], arco[SEG >> 2], arco[(3 * SEG) >> 2]);
     }
-    for (let k = 0; k < DEDOS; k++) {
-      const o = puntos[Math.floor(azar() * puntos.length)], r = Math.hypot(o[0], o[1], o[2]), largo = 0.05 + azar() * 0.08, color = azar(), luz = 0.35 + azar() * 0.4;
-      const t = [(azar() - 0.5) * 0.4, (azar() - 0.5) * 0.4, (azar() - 0.5) * 0.4];
-      for (let i = 0; i < SEGD; i++) {
-        const u0 = i / SEGD, u1 = (i + 1) / SEGD, en = u => [o[0] + (o[0] / r + t[0]) * largo * u, o[1] + (o[1] / r + t[1]) * largo * u, o[2] + (o[2] / r + t[2]) * largo * u];
-        poner(...en(u0), color, luz * (1 - u0)); poner(...en(u1), color, luz * (1 - u1));
-      }
+    for (let i = 0; i < RAMAS; i++) {
+      const [x, y, z, signo, color, luz] = brotes[Math.floor(azar() * brotes.length)], giro = (azar() < 0.5 ? -1 : 1) * (0.7 + azar() * 0.6);
+      p[0] = x; p[1] = y; p[2] = z;
+      for (let k = 0; k < PASOSR; k++) { q[0] = p[0]; q[1] = p[1]; q[2] = p[2]; paso(p, signo, giro * (1 - k / PASOSR)); poner(q, radio(q), color, luz * 0.7 * (1 - k / PASOSR)); poner(p, radio(p), color, luz * 0.7 * (1 - (k + 1) / PASOSR)); }
     }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aDato', new THREE.BufferAttribute(dato, 3));
     var filamentos = new THREE.LineSegments(g, material(uN, /* glsl */`${NEB}
@@ -242,7 +252,7 @@ export function* construirPulsar({ uScale, uPR, config = ESCENA_PULSAR }) {
       uE.uCalor.value = v('calor'); uE.uCasquetes.value = v('casquetes'); uE.uPulso.value = pulso; uE.uTibio.value = v('tibio');
       uE.uDestello.value = alineado * v('luzHaz') * 1.4;
       uD.uLuz.value = Math.min(1, (alineado * 0.9 + pulso * 0.55) * v('casquetes')) * (reducido ? 0.5 : 1);
-      uD.uLargo.value = R * (1.4 + 7 * alineado + 3.2 * pulso);
+      uD.uLargo.value = R * (2.5 + 14 * alineado + 6 * pulso);
       flujo += dt * (0.05 + 0.12 * v('luzHaz'));
       uH.uLuz.value = v('luzHaz'); uH.uLargo.value = largo; uH.uPaquete.value = reducido ? 0 : 0.9 * v('fuerza'); uH.uEdad.value = e.edad; uH.uFlujo.value = flujo; uH.uTibio.value = v('tibio');
       motasHaz.material.uniforms.uFlujo.value = flujo;
