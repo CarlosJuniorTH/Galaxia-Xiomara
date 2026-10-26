@@ -17,6 +17,7 @@
 // cuadros): con la canción, t es su reloj (js/ui/entrada.js) y la imagen va clavada a la música aunque se pierdan cuadros.
 // Con movimiento reducido (calma), la misma historia sin destellos, ondas, sacudidas ni el salto final.
 import { ORILLAS, COSTAS, LAGOS, ISLAS } from '../data/costas.js';
+import { crearMapaGL } from './portadaMapaGL.js';
 
 const TAU = Math.PI * 2, RAD = Math.PI / 180;
 const sat = k => k < 0 ? 0 : k > 1 ? 1 : k;
@@ -105,6 +106,13 @@ const S_ENC = (() => { for (let j = 0; j < RUTA_N; j++) if (RY[j] <= 0 && RY[j +
 enRuta(S_ENC);
 const MX = WX, MY = 0, M_LON = MX;
 const CX = ORILLAS.carlos[0], CY = -merc(ORILLAS.carlos[1]), XX = ORILLAS.xiomara[0], XY = -merc(ORILLAS.xiomara[1]);
+// Ciudades de las dos orillas y del camino (sus luces de noche): Valencia, Palma, Madrid, Sevilla, Lisboa, Oporto, Málaga,
+// Tánger, Casablanca, Las Palmas, Dakar, Praia; Montevideo, Rosario, Córdoba, La Plata, Mar del Plata, Porto Alegre,
+// São Paulo, Río de Janeiro, Salvador, Recife, Fortaleza. [x, y] del mundo.
+const CIUDADES = Float64Array.from([[-0.38, 39.47], [2.65, 39.57], [-3.7, 40.42], [-5.98, 37.39], [-9.14, 38.72], [-8.61, 41.15], [-4.42, 36.72],
+  [-5.83, 35.77], [-7.59, 33.57], [-15.43, 28.12], [-17.45, 14.69], [-23.51, 14.93], [-56.16, -34.9], [-60.64, -32.95], [-64.18, -31.42],
+  [-57.95, -34.92], [-57.55, -38], [-51.23, -30.03], [-46.63, -23.55], [-43.2, -22.91], [-38.5, -12.97], [-34.88, -8.05], [-38.53, -3.73]]
+  .flatMap(([lon, lat]) => [lon, -merc(lat)]));
 
 // Índice del último pulso ≤ t (búsqueda binaria; -1 antes del primero).
 function pulso(t) {
@@ -183,13 +191,20 @@ function tierraEn(x, y) { const i = Math.floor((x + 180) * MR), j = Math.floor((
 // reloj(): t del clip en segundos, o null mientras no ha empezado (no se dibuja nada).
 // alFrase(texto): cambia el texto de la historia. alPrevio(): 0,45 s antes de «tarjeta». alFinal(): llega «tarjeta»
 // (aparece el cielo y la tarjeta).
-export function crearPortada(lienzo, { reloj = () => null, calma = false, alFrase = () => {}, alPrevio = () => {}, alFinal = () => {} } = {}) {
+// tarjeta(): el elemento de la tarjeta final (para dejar el pequeño mundo en el hueco libre, sin que lo tape).
+export function crearPortada(lienzo, { reloj = () => null, calma = false, alFrase = () => {}, alPrevio = () => {}, alFinal = () => {}, tarjeta = () => null } = {}) {
   const x = lienzo.getContext('2d');
   const movil = matchMedia('(pointer:coarse)').matches;
   const dpr = Math.min(devicePixelRatio || 1, 2);
   let ancho = 0, alto = 0, m = 0, vertical = true, k0 = 1, activo = true, id = 0, frase = -1, finalDado = false, previoDado = false, saltoCuadro = false;
-  let Fx = 0, Fy = 0, Sf = 1;
+  let Fx = 0, Fy = 0, Sf = 1, medidaHueco = -1;
   if (!mascara) construirMascara();
+  // El mapa de motas va en WebGL, en un lienzo detrás de este (js/ui/portadaMapaGL.js); sin WebGL, en este mismo.
+  const lienzoGL = document.createElement('canvas');
+  lienzoGL.setAttribute('aria-hidden', 'true'); lienzoGL.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none';
+  lienzo.parentNode?.insertBefore(lienzoGL, lienzo);
+  const mapaGL = lienzo.parentNode ? crearMapaGL(lienzoGL) : null;
+  if (!mapaGL) lienzoGL.remove();
 
   // ── Contenido fijo (sembrado): el mismo en el móvil y en el PC ──
   const azar = sembrado(15122025);
@@ -268,8 +283,9 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     lienzo.width = Math.round(ancho * dpr); lienzo.height = Math.round(alto * dpr);
     // Escala base (zoom 1): las dos orillas ocupan ~60 % de la pantalla (en horizontal, la altura manda).
     k0 = Math.min(ancho * (vertical ? 0.62 : 0.42) / (CX - XX), alto * (vertical ? 0.54 : 0.62) / (XY - CY));
-    // Paso de las motas en el plano general: ~6,5 px (algo más en pantallas grandes, que no se llenen de motas).
-    pasoBase = Math.max(6.5, m / 108); const p0 = pasoBase / k0;
+    // Paso de las motas en el plano general: ~5,4 px con WebGL (~6,5 px sin él, que en 2D cada mota cuesta), algo más en
+    // pantallas grandes, que no se llenen de motas.
+    pasoBase = mapaGL ? Math.max(5.4, m / 125) : Math.max(6.5, m / 108); const p0 = pasoBase / k0;
     niveles = [
       nivel(p0, 0, -180, 180, -150, 100, true),
       nivel(p0, 1, -125, 80, -125, 100),
@@ -279,11 +295,21 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
       nivel(p0, 3, -73, -43, 22, 52)
     ];
     construirGlobo(m * 0.4);
+    if (mapaGL) { mapaGL.medir(ancho, alto, dpr); mapaGL.subir(niveles); }
     // Al final, el mundo pequeño arriba y la tarjeta debajo.
-    Fx = ancho / 2; Fy = alto * (vertical ? 0.17 : 0.18); Sf = vertical ? Math.min(m * 0.19, alto * 0.115) : m * 0.11;
-    // En el móvil apaisado la tarjeta ocupa toda la altura: el mundo va a su izquierda, en el hueco libre.
-    if (!vertical && alto < 560) { const hueco = (ancho - Math.min(430, ancho - 32)) / 2; Fx = hueco / 2; Fy = alto * 0.5; Sf = Math.max(0, Math.min(m * 0.22, hueco / 2 - 14)); }
+    huecoMundo();
     x.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  // El pequeño mundo del final, en el hueco libre más grande que deja la tarjeta (medida en la página, sin sus
+  // transformaciones de entrada): encima de ella o a su izquierda (móvil apaisado). Sin tarjeta, arriba al centro.
+  function huecoMundo() {
+    Fx = ancho / 2; Fy = alto * (vertical ? 0.17 : 0.18); Sf = vertical ? Math.min(m * 0.19, alto * 0.115) : m * 0.11;
+    const el = tarjeta?.(); if (!el || !el.offsetHeight) return;
+    const arriba = 12, top = el.offsetTop, izq = el.offsetLeft;
+    const rArriba = Math.min((top - arriba - 14) / 2, ancho / 2 - 16), rIzq = Math.min(izq / 2 - 14, alto / 2 - 16);
+    const tope = m * (vertical ? 0.2 : 0.16);
+    if (rArriba >= rIzq) { Sf = Math.max(0, Math.min(tope, rArriba)); Fx = ancho / 2; Fy = arriba + (top - arriba) / 2; }
+    else { Sf = Math.max(0, Math.min(tope, rIzq)); Fx = izq / 2; Fy = alto / 2; }
   }
   medir();
   let esperaMedir = 0;
@@ -373,6 +399,8 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
   // Zonas de los rótulos del cuadro (las motas del mapa que caen dentro se apagan).
   const ZX0 = new Float32Array(4), ZX1 = new Float32Array(4), ZY0 = new Float32Array(4), ZY1 = new Float32Array(4);
   let nZ = 0;
+  // (estado del cuadro para el mapa en WebGL, reutilizado)
+  const PGL = { OX, OY, OR, ZX0, ZY0, ZX1, ZY1 }, ACTIVOS = Array.from({ length: 6 }, () => ({ i: 0, esp: 0, l0: false, queda0: 1 }));
   const enZona = (px, py) => { for (let z = 0; z < nZ; z++) { const ex = (px - ZX0[z]) / ZX1[z], ey = (py - ZY0[z]) / ZY1[z]; if (ex * ex + ey * ey < 1) return true; } return false; };
   const zona = (x0, y0, x1, y1) => { if (nZ < 4) { ZX0[nZ] = (x0 + x1) / 2; ZY0[nZ] = (y0 + y1) / 2; ZX1[nZ] = (x1 - x0) * 0.62; ZY1[nZ] = (y1 - y0) * 0.75; nZ++; } };
 
@@ -607,7 +635,18 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
       const cy0 = Math.max(0, Math.floor((by0 - Y0C) / CEL)), cy1 = Math.min(NCY - 1, Math.floor((by1 - Y0C) / CEL));
       const destelloMapa = Math.min(1, golpe) * (t < H.encuentro + 1 ? 1 : 0), dMin = D * 0.3;
       const todo = revC >= 999 && revX >= 999;
-      for (let nvl = 0; nvl < niveles.length; nvl++) {
+      if (mapaGL?.activo) {
+        // En la GPU: los mismos cálculos, en el sombreador; aquí solo el estado del cuadro.
+        const e0 = pasoBase * 0.95, e1 = pasoBase * 1.35;
+        let na = 0;
+        for (let nvl = 0; nvl < niveles.length; nvl++) {
+          const esp = niveles[nvl].paso * S;
+          if (nvl > 0 && esp < e0) continue;
+          const A = ACTIVOS[na++]; A.i = nvl; A.esp = esp; A.l0 = nvl === 0; A.queda0 = nvl === 0 && esp < e1 * 0.8 ? (esp / (e1 * 0.8)) ** 2 : 1;
+        }
+        Object.assign(PGL, { cX, cY, S, cg, sg, ci, si, ca, sa, D, ax, ay, ancho, alto, dpr, e0, e1, revC, revX, revCalma, penumbra, todo, luz: mapaVis * atenua, destello: destelloMapa, nO, nZ });
+        mapaGL.dibujar(PGL, ACTIVOS, na);
+      } else for (let nvl = 0; nvl < niveles.length; nvl++) {
         const N = niveles[nvl], esp = N.paso * S;
         // Cada nivel fino entra cuando sus motas quedan a más de ~3,6 px (y del todo a ~5,2); el 0, si se aleja mucho,
         // se aclara para no amontonarse.
@@ -652,7 +691,7 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
           }
         }
       }
-      for (let b = 0; b < 9; b++) {
+      if (!mapaGL?.activo) for (let b = 0; b < 9; b++) {
         if (b === 7) continue;
         x.fillStyle = b === 6 ? TONOS[3] : b === 8 ? TONOS[1] : TONOS[b >> 1]; x.globalAlpha = mapaVis * atenua * (b === 6 ? 1 : b === 8 ? 0.27 * Math.max(penumbra, todo ? 1 : 0) : b & 1 ? 0.95 : 0.55); x.beginPath();
         let hay = false;
@@ -660,13 +699,13 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
         if (hay) x.fill();
       }
       // En cada golpe de la letra, el mapa entero se enciende un instante.
-      if (destelloMapa > 0.02) {
+      if (destelloMapa > 0.02 && !mapaGL?.activo) {
         x.fillStyle = TONOS[3]; x.globalAlpha = destelloMapa * 0.55 * mapaVis; x.beginPath();
         for (let i = 0; i < nL; i++) if (LB[i] < 7) { const l = LS[i]; x.rect(LX[i] - l / 2, LY[i] - l / 2, l, l); }
         x.fill();
       }
       x.globalAlpha = 1;
-    }
+    } else mapaGL?.limpiar();
 
     // 4. Las ondas de las llamadas sobre el plano.
     if (!calma && t < H.espera + 1.4) {
@@ -674,6 +713,20 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
         const e = t - s; if (e < 0 || e > DUR_ONDA) continue;
         enRuta(o ? tX : tC); ondaPlano(WX, WY, R * salida(e / DUR_ONDA), o ? ROSA : VIOLETA, (1 - e / DUR_ONDA) * 0.9 * (1 - tramo(t, H.espera, H.espera + 0.35)));
       }
+    }
+
+    // 4b. Las luces de las ciudades de las dos orillas y del camino (motas blancas finas): aparecen cuando su orilla está
+    // descubierta, titilan un poco y se apagan con el mapa.
+    if (mapaVis > 0.01 && t > H.luzCarlos) {
+      x.fillStyle = 'rgb(255,248,252)'; x.beginPath(); let hay = false;
+      for (let i = 0; i < CIUDADES.length; i += 2) {
+        const wx = CIUDADES[i], wy = CIUDADES[i + 1];
+        if (revC < 999 && Math.hypot(wx - CX, wy - CY) > revC * 0.92 && Math.hypot(wx - XX, wy - XY) > revX * 0.92 && t < H.espera) continue;
+        if (!proyectar(wx, wy) || QX < -3 || QX > ancho + 3 || QY < -3 || QY > alto + 3 || QF < 0.6) continue;
+        const l = Math.min(2.6, 1.7 * Math.min(1.3, QF)) * (0.85 + 0.15 * Math.sin(t * 2.3 + i));
+        x.rect(QX - l / 2, QY - l / 2, l, l); hay = true;
+      }
+      if (hay) { x.globalAlpha = mapaVis * (1 - 0.5 * tramo(t, H.encuentro, H.encuentro + 0.4)); x.fill(); x.globalAlpha = 1; }
     }
 
     // 5. El camino: el mapa que lleva hasta ella se traza en el primer «wait» (motas tenues de una orilla a otra); las
@@ -769,6 +822,20 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
       }
       dibujarGlobo(t, gx, gy, R, lon0, lat0, alfa, quedan, final ? 1 : morf, final);
     }
+    // El salto: dos estelas, violeta y rosa (los dos), salen en espiral desde la luz y nos llevan dentro.
+    if (enSalto) {
+      const cx = ancho / 2, cy = alto / 2, Rm = Math.hypot(ancho, alto) * 0.62, a0 = 1 - tramo(uS, 0.55, 0.95);
+      for (let o = 0; o < 2; o++) {
+        x.fillStyle = COL[o]; x.globalAlpha = a0; x.beginPath();
+        for (let k = 0; k < 90; k++) {
+          const q = k / 90, r = Rm * entra(Math.min(1, uS * 1.25 + q * 0.18)) * (0.15 + 0.85 * q), ang = (o ? 1 : -1) * (q * 5.2 + uS * 2.4) + o * Math.PI;
+          const l = 1.5 + 1.6 * q * (1 - q) * 4 * uS;
+          x.rect(cx + Math.cos(ang) * r - l / 2, cy + Math.sin(ang) * r - l / 2, l, l);
+        }
+        x.fill();
+      }
+      x.globalAlpha = 1;
+    }
     // El salto: la luz del mundo, ya un punto, en el centro de la estampida.
     if (!calma && lejos > 0.6 && t < H.salto + 0.9) { const a = t < H.salto ? 1 : 1 - tramo(t, H.salto, H.salto + 0.9); luz(ancho / 2, alto / 2, BLANCO, 0.7 + 0.8 * tramo(t, 26.9, H.salto) + 1.6 * uS, t, a); }
 
@@ -780,8 +847,10 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     if (indice !== frase) { frase = indice; alFrase(FRASES[indice]?.texto ?? ''); }
     // Medio segundo antes, con la pantalla en negro tras el salto, se prepara la tarjeta (su primer pintado y su desenfoque
     // cuestan un cuadro largo: así cae donde no se ve nada moverse).
-    if (!previoDado && t >= H.tarjeta - 0.45) { previoDado = true; alPrevio(); }
-    if (!finalDado && t >= H.tarjeta) { finalDado = true; alFinal(); }
+    if (!previoDado && t >= H.tarjeta - 0.45) { previoDado = true; alPrevio(); huecoMundo(); }
+    if (!finalDado && t >= H.tarjeta) { finalDado = true; alFinal(); huecoMundo(); }
+    // (y de vez en cuando, por si la tarjeta cambia de tamaño: fuentes, giro de pantalla)
+    if (finalDado && ((t * 2) | 0) !== medidaHueco) { medidaHueco = (t * 2) | 0; huecoMundo(); }
   }
 
   // Un segmento recto del mundo (los meridianos y paralelos de Mercator lo son, y la perspectiva los deja rectos),
@@ -931,8 +1000,10 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
   return {
     // Para las pruebas: un cuadro en un instante dado (sin esperar al reloj).
     dibujar,
-    parar() { activo = false; cancelAnimationFrame(id); removeEventListener('resize', alCambiar); clearTimeout(esperaMedir); },
+    parar() { activo = false; cancelAnimationFrame(id); removeEventListener('resize', alCambiar); clearTimeout(esperaMedir); try { lienzoGL.getContext('webgl')?.getExtension('WEBGL_lose_context')?.loseContext(); } catch {} lienzoGL.remove(); },
     get finalDado() { return finalDado; },
+    // (para las pruebas: dónde queda el pequeño mundo del final, en px CSS)
+    get mundo() { return { x: Fx, y: Fy, r: Sf }; },
     // (para las pruebas: motas pintadas en el último cuadro)
     get motas() { return nL; }
   };

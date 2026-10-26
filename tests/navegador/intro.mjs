@@ -1,6 +1,6 @@
 // La intro de verdad (con «Maps», assets/musica/inicio.m4a): «Toca para empezar ♡», la carga y el videoclip de 32 s.
 // 1. Capturas del clip cada 2 s y en sus golpes, fijando el reloj del clip en cada instante (window.__intro.fijar), en el
-//    iPhone, en el PC y en los tamaños de móvil (390×844, 360×780 y apaisado): .pruebas/capturas/intro/<perfil>-<segundo>.png
+//    iPhone, en el PC y en los tamaños de móvil (390×844, 360×780, 430×932 y apaisado): .pruebas/capturas/intro/<perfil>-<segundo>.png
 //    (para revisarlas a ojo).
 // 2. Fluidez en el iPhone con la CPU ×4: se espera a que la carga termine sin tocar, se limita la CPU y se toca; el clip
 //    entero (y la tarjeta) con p99 ≤ 25 ms (ver SUELTOS). El reloj del clip sigue al de la canción, la tarjeta
@@ -28,7 +28,7 @@ async function abrirIntro(perfil, base, { tocar = true, calma = false } = {}) {
 export default async function ({ base, informe }) {
   mkdirSync('.pruebas/capturas/intro', { recursive: true });
   // 1. Capturas.
-  for (const perfil of process.env.INTRO_SIN_CAPTURAS ? [] : (process.env.INTRO_PERFILES || 'iphoneMax,pc,movil390,movil360,movilApaisado').split(',')) {
+  for (const perfil of process.env.INTRO_SIN_CAPTURAS ? [] : (process.env.INTRO_PERFILES || 'iphoneMax,pc,movil390,movil360,movil430,movilApaisado').split(',')) {
     const { navegador, pagina, errores } = await abrirIntro(perfil, base);
     try {
       await pagina.waitForFunction(() => window.__intro?.empezado, null, { timeout: 150000, polling: 100 });
@@ -38,6 +38,10 @@ export default async function ({ base, informe }) {
         await pagina.screenshot({ path: `.pruebas/capturas/intro/${perfil}-${t.toFixed(1).padStart(4, '0')}.png` });
       }
       informe.comprobar(errores.length === 0, `${perfil}: capturas del clip sin errores en la consola`, errores.slice(0, 5));
+      // Al final, el pequeño mundo queda entero en el hueco libre: ni la tarjeta lo tapa ni se sale de la pantalla.
+      const final = await pagina.evaluate(() => { const m = window.__intro.mundo, r = document.querySelector('#entrada .tarjeta').getBoundingClientRect(); return { m, t: { x: r.left, y: r.top, d: r.right, a: r.bottom }, w: innerWidth, h: innerHeight }; });
+      const { m, t: c } = final, dx = Math.max(c.x - m.x, 0, m.x - c.d), dy = Math.max(c.y - m.y, 0, m.y - c.a);
+      informe.comprobar(m.r >= 30 && Math.hypot(dx, dy) >= m.r + 2 && m.x - m.r >= 0 && m.x + m.r <= final.w && m.y - m.r >= 0 && m.y + m.r <= final.h, `${perfil}: el mundo final se ve entero, sin que la tarjeta lo tape`, final);
     } finally { await navegador.close(); }
   }
 

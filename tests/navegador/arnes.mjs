@@ -25,6 +25,7 @@ export const PERFILES = {
   // Tamaños de móvil para la composición de la intro (vertical estrecho y apaisado).
   movil390: { ...devices['iPhone 13'], viewport: { width: 390, height: 844 }, screen: { width: 390, height: 844 } },
   movil360: { ...devices['Pixel 7'], viewport: { width: 360, height: 780 }, screen: { width: 360, height: 780 } },
+  movil430: { ...devices['iPhone 13'], viewport: { width: 430, height: 932 }, screen: { width: 430, height: 932 } },
   movilApaisado: { ...devices['iPhone 13'], viewport: { width: 844, height: 390 }, screen: { width: 844, height: 390 } }
 };
 

@@ -63,7 +63,7 @@ export function crearEntrada(config, { viaje, banda } = {}) {
     setTimeout(() => { introAcabada = true; for (const fn of trasIntro.splice(0)) fn(); }, sinIntro ? 0 : 2500);
   }
   const portada = crearPortada($('#portada-lienzo'), {
-    calma: reducido, reloj: relojClip, alFinal: mostrarTarjeta, alPrevio: () => entrada.classList.add('previa'),
+    calma: reducido, reloj: relojClip, alFinal: mostrarTarjeta, alPrevio: () => entrada.classList.add('previa'), tarjeta: () => entrada.querySelector('.tarjeta'),
     alFrase: texto => {
       frase.classList.remove('visible');
       clearTimeout(alFraseEspera);
@@ -166,7 +166,7 @@ export function crearEntrada(config, { viaje, banda } = {}) {
     if (!cancion || tocado) cuandoCancion(empezarClip);
   }
   // Para las pruebas (#debug): fijar el clip en un instante (captura cuadro a cuadro) o soltarlo.
-  if (location.hash === '#debug') window.__intro = { fijar: t => { fijo = t; }, soltar: () => { fijo = null; }, get tiempo() { return ultimo; }, get empezado() { return empezado; }, get conCancion() { return conCancion; } };
+  if (location.hash === '#debug') window.__intro = { fijar: t => { fijo = t; }, soltar: () => { fijo = null; }, get tiempo() { return ultimo; }, get empezado() { return empezado; }, get conCancion() { return conCancion; }, get mundo() { return portada.mundo; } };
   return {
     progreso(f, hasta = f) {
       f = Math.max(0, Math.min(1, f)); meta = Math.max(meta, f); techo = Math.max(meta, Math.min(1, hasta));

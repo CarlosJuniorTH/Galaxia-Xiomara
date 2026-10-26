@@ -48,6 +48,11 @@
   #entrada .nombre{font-size:clamp(2.6rem,12vw,3.3rem);}
   #entrada .cita{margin-bottom:12px;}
 }
+/* En un móvil bajo (vertical con las barras del navegador, o apaisado) la tarjeta se compacta sin su imagen: el pequeño
+   mundo del final ocupa ese papel y así cabe entero en el hueco libre, sin que la tarjeta lo tape (js/ui/portada.js). */
+@media (orientation:portrait) and (max-height:760px),(orientation:landscape) and (max-height:500px){
+  #entrada .tarjeta-foto{display:none;}
+}
 /* En horizontal, igual que en el móvil: la galaxia arriba en el centro y la tarjeta debajo, compacta. */
 @media (orientation:landscape){
   #entrada{align-items:flex-end;}
