@@ -28,7 +28,9 @@ export function crearGestorCalidad({ canvas, nucleo, telarana, muestrasNube }) {
     ventanaMs: 1000, ventanasParaSubir: 4 });
   // (El cambio de resolución ya no rehace búferes, zona.js: se aplica en el acto.)
   let resolucionPendiente = null;
-  function regularResolucion(ms) { const nueva = regular(ms); if (nueva !== null) resolucionPendiente = nueva; aplicarResolucionPendiente(); }
+  // quieto = false (un gesto, la inercia del giro, un viaje): el cambio espera a que la vista se pare. Cambiar la resolución
+  // en pleno movimiento se notaba como una pérdida de nitidez de golpe mientras se miraba.
+  function regularResolucion(ms, quieto = true) { const nueva = regular(ms); if (nueva !== null) resolucionPendiente = nueva; if (quieto) aplicarResolucionPendiente(); }
   // Cambiar de resolución ya no rehace ningún búfer (solo la zona en la que se dibuja, zona.js): se aplica en el acto.
   // Antes esperaba 2,5 s tras soltar el dedo… y caía justo en la cola de la inercia: un cuadro de 30–100 ms en un móvil.
   function aplicarResolucionPendiente() { if (resolucionPendiente === null) return; nucleo.fijarResolucion(resolucionPendiente); resolucionPendiente = null; regular.reiniciar(); }

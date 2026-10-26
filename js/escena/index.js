@@ -1435,6 +1435,10 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       // cámara tal como se dibuja: si no, la respiración lo hacía acercarse, alejarse y moverse.
       acompanar();
     }
+    // Las capas a menor resolución se dibujan ANTES que la escena y con las matrices tal como estén (no recorren la escena):
+    // se ponen al día aquí, con las de este cuadro. Antes usaban las del cuadro anterior y, al girar o viajar deprisa, el gas
+    // volumétrico iba un cuadro por detrás de lo demás («algunas cosas se separan»). El dibujo principal ya no recalcula nada.
+    if (escenaActiva !== 'solar') scene.updateMatrixWorld();
     if (escenaActiva !== 'solar') { capaVolumen.dibujar(camera); telarana.dibujarGalaxias(renderer, camera); }   // capas a menor resolución: gas volumétrico (capaVolumen.js) y galaxias de la telaraña (telarana.js)
     seguirLuces(); inclinarCasa();
     try { if (document.body.dataset.supernovaAislada === 'true') conFocoSupernova(scene, cosmos.raiz, cosmos.supernova.grupo, () => composer.render()); else composer.render(); } catch (e) { suspendida = true; alProblema('No se ha podido dibujar el universo. Conservamos tu progreso; vuelve a intentarlo en 3D.'); console.error(e); }
@@ -1449,7 +1453,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     if (temporal) { camera.position.copy(camaraGuardada.pos); camera.quaternion.copy(camaraGuardada.rot); camera.updateMatrixWorld(); }
     if (captura) { const pendiente = captura; captura = null; clearTimeout(pendiente.timer); pendiente.resolver(renderer.domElement); }
     // La resolución dinámica mide a 60 FPS: en interacción y, ahora que el reposo también va a 60, en reposo.
-    if ((modo === 'interaccion' || (modo === 'contemplacion' && !ritmoAhorro)) && tEntrada !== null && entradaResuelta && dtReal < 0.5 && (window.top !== window || document.hasFocus())) regularResolucion(dtReal * 1000);   // sin foco (ventana tapada o detrás), el navegador frena los cuadros: no es que el aparato no llegue
+    if ((modo === 'interaccion' || (modo === 'contemplacion' && !ritmoAhorro)) && tEntrada !== null && entradaResuelta && dtReal < 0.5 && (window.top !== window || document.hasFocus())) regularResolucion(dtReal * 1000, !(vuelo || gesto || giro.moviendo || zoom.moviendo));   // sin foco (ventana tapada o detrás), el navegador frena los cuadros: no es que el aparato no llegue
     if (medir && tEntrada !== null && entradaResuelta) {
       cuadros++; acumulado += dtReal; coste += performance.now() - inicioCuadro;
       if (acumulado > 4) {
