@@ -287,7 +287,7 @@ export function* construirMundos({ scene, uScale, uPR }, { alConstelar = () => {
   // Corazoncitos que se desprenden de los sobres y suben despacio.
   const corazonesCorreo = new THREE.Points(geometriaPuntos(40, (i, p) => { p.x = p.y = p.z = 0; const c = new THREE.Color(i % 2 ? '#ffb7d6' : '#ffe2ef'); p.r = c.r; p.g = c.g; p.b = c.b; p.s = 6; }), materialPuntos({ uScale, uPR, corazon: true, maximo: 10, titileo: 0.2 }));
   corazonesCorreo.frustumCulled = false; correo.add(corazonesCorreo);
-  const puntoSobre = new THREE.Vector3();
+  const puntoSobre = new THREE.Vector3(); let todosSobres = null;
 
   yield;
   // ── El jardín de lo que viene ──
@@ -617,7 +617,7 @@ export function* construirMundos({ scene, uScale, uPR }, { alConstelar = () => {
       posEstela2.needsUpdate = true; estelaSobres2.material.uniforms.uTime.value = t; polvoRuta2.material.uniforms.uTime.value = t;
       // Destello al pasar por delante (el lado de la ruta más cercano a la cámara).
       const distanciaLuna = camera.position.distanceTo(luna.getWorldPosition(puntoSobre));
-      for (const sp of [...sobres, ...sobres2]) {
+      for (const sp of todosSobres ??= [...sobres, ...sobres2]) {   // (la misma lista siempre: sin memoria nueva por cuadro)
         sp.getWorldPosition(puntoSobre); const cerca = 1 - Math.min(1, (puntoSobre.distanceTo(camera.position) - distanciaLuna + 150) / 300);
         sp.material.color.setScalar(0.8 + Math.max(0, cerca) * 0.25);
       }

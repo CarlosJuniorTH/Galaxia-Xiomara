@@ -259,16 +259,20 @@ export function crearCampoGalaxias({ lista, texturas, descriptores, uPR }) {
       // las 7.379 en cada cuadro. Las que tienen estrellas se actualizan siempre (visibilidad y liberación).
       camera.updateMatrixWorld(); const e = camera.matrixWorldInverse.elements, cx = camera.position.x, cy = camera.position.y, cz = camera.position.z, f = uFocal.value;
       // Sin memoria temporal por cuadro (nada de arrays por galaxia): menos pausas del recolector en el móvil.
-      let zv = 0;
-      const medir = g => { const p = g.pos, z = -(e[2] * p.x + e[6] * p.y + e[10] * p.z + e[14]), dx = p.x - cx, dy = p.y - cy, dz = p.z - cz, d = Math.sqrt(dx * dx + dy * dy + dz * dz); zv = z; return g.radio * f / Math.max(1, d); };   // crear/soltar según la DISTANCIA (girar no las crea ni las borra); la profundidad solo decide si se ven
+      // Sin cierres ni variables capturadas que cambian en cada llamada (cada número guardado así era memoria nueva: ~0,7 MB/s
+      // en un viaje, que alimentaba al recolector): la distancia y la profundidad se calculan en línea.
       let nuevas = 0;
       const n = lista.length, tramo = Math.ceil(n / 4), fin = Math.min(n, turno + tramo);
-      for (let i = turno; i < fin && nuevas < 2; i++) { const g = lista[i]; if (!g.estrellas && medir(g) > 24) { crearEstrellas(g); nuevas++; } }
+      for (let i = turno; i < fin && nuevas < 2; i++) {
+        const g = lista[i]; if (g.estrellas) continue;
+        const p = g.pos, dx = p.x - cx, dy = p.y - cy, dz = p.z - cz;
+        if (g.radio * f / Math.max(1, Math.sqrt(dx * dx + dy * dy + dz * dz)) > 24) { crearEstrellas(g); nuevas++; }   // crear/soltar según la DISTANCIA (girar no las crea ni las borra); la profundidad solo decide si se ven
+      }
       turno = fin >= n ? 0 : fin;
       for (const g of activas) {   // borrar de un Set mientras se recorre es seguro
-        const px = medir(g);
-        if (px < 12) { liberarEstrellas(g); continue; }
-        g.estrellas.visible = zv > 0 && g.radio * f / Math.max(1, zv) > 34;
+        const p = g.pos, dx = p.x - cx, dy = p.y - cy, dz = p.z - cz, z = -(e[2] * p.x + e[6] * p.y + e[10] * p.z + e[14]);
+        if (g.radio * f / Math.max(1, Math.sqrt(dx * dx + dy * dy + dz * dz)) < 12) { liberarEstrellas(g); continue; }
+        g.estrellas.visible = z > 0 && g.radio * f / Math.max(1, z) > 34;
       }
     }
   };

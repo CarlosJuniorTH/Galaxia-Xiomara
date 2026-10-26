@@ -107,12 +107,6 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   const K = 1;   // el mismo contenido en móvil y en PC
   const O = web.centro;   // las coordenadas se guardan respecto al centro (precisión de float en la GPU)
 
-  const empaquetar = (lista, tamPorPunto) => {
-    const n = lista.length / 3, pos = new Float32Array(n * 3), c = new Float32Array(n * 3), tam = new Float32Array(n);
-    for (let i = 0; i < n; i++) { const p = lista[i * 3], k = lista[i * 3 + 1]; pos.set([p.x - O.x, p.y - O.y, p.z - O.z], i * 3); c.set([k.r, k.g, k.b], i * 3); tam[i] = lista[i * 3 + 2]; }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aCol', new THREE.BufferAttribute(c, 3)); g.setAttribute(tamPorPunto, new THREE.BufferAttribute(tam, 1));
-    return g;
-  };
   const uniformes = { uPR, uScale, uCamL: { value: new THREE.Vector3() }, uGigA: { value: Array.from({ length: 6 }, () => new THREE.Vector4(0, 0, 1, 2)) }, uGigB: { value: Array.from({ length: 6 }, () => new THREE.Vector4(0, 0, 0, 0)) }, uCasa: { value: 1 }, uT: { value: 0 }, uRes: { value: new THREE.Vector2(1, 1) }, uF: { value: 800 } };
   // En el móvil se dibuja el 45 % de los puntos de la telaraña y cada uno lleva la luz de los que no se dibujan (uComp): la
   // misma luz total con menos de la mitad de trabajo para la GPU (en un iPhone la telaraña completa bajaba a ~10 FPS).
@@ -271,20 +265,25 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
       for (const m of cerca) {
         // Cuántas caen en esta celda alrededor de esta muestra (más en los cúmulos).
         for (let i = 0, n = Math.round(240 * m.n * K); i < n; i++) {
-          const p = m.p.clone().add(new V(gauss(rnd), gauss(rnd), gauss(rnd)).multiplyScalar(m.g * 0.55));
-          if (p.x < x0 || p.x >= x0 + C || p.y < y0 || p.y >= y0 + C || p.z < z0 || p.z >= z0 + C) continue;
-          lista.push(p, galaxiaColor(rnd), 0.35 + rnd() * 0.75);
+          // En números sueltos (antes dos vectores nuevos por galaxia: miles de objetos en cada rehecho, en pleno clip).
+          const s = m.g * 0.55, gx = gauss(rnd), gy = gauss(rnd), gz = gauss(rnd), px = m.p.x + gx * s, py = m.p.y + gy * s, pz = m.p.z + gz * s;
+          if (px < x0 || px >= x0 + C || py < y0 || py >= y0 + C || pz < z0 || pz >= z0 + C) continue;
+          const k = galaxiaColor(rnd); lista.push(px - O.x, py - O.y, pz - O.z, k.r, k.g, k.b, 0.35 + rnd() * 0.75);
         }
       }
     }
     // Lejos de la telaraña (en los gigantes, al girar la cámara cambia de celda en cada cuadro) la lista sale vacía: no se
     // rehace la geometría vacía una y otra vez (creaba y borraba búferes de la GPU en cada cuadro).
     if (!lista.length && !cercano.geometry.attributes.position?.count) return;
-    cercano.geometry.dispose(); cercano.geometry = empaquetar(lista, 'aBrillo');
+    const n = lista.length / 7, pos = new Float32Array(n * 3), c = new Float32Array(n * 3), br = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const j = i * 7; pos[i * 3] = lista[j]; pos[i * 3 + 1] = lista[j + 1]; pos[i * 3 + 2] = lista[j + 2]; c[i * 3] = lista[j + 3]; c[i * 3 + 1] = lista[j + 4]; c[i * 3 + 2] = lista[j + 5]; br[i] = lista[j + 6]; }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aCol', new THREE.BufferAttribute(c, 3)); g.setAttribute('aBrillo', new THREE.BufferAttribute(br, 1));
+    cercano.geometry.dispose(); cercano.geometry = g;
   }
   // Toda la telaraña es fija: sus matrices se calculan una vez y no se recorren en cada cuadro (menos CPU en el móvil).
   raiz.updateMatrixWorld(true); raiz.matrixWorldAutoUpdate = false;
   const tam = new THREE.Vector2(), aux = new V(); let gigantes = [];
+  const PESOS_LUZ = [[bloquesPolvo, 1, 4500000], [bloquesNubes, 0.6, 3000000], [bloquesGalaxias, 5, 2500000]];   // (una vez: sin memoria nueva por cuadro)
   const frustum = new THREE.Frustum(), mProy = new THREE.Matrix4(), esfera = new THREE.Sphere();
   let cuadroExpo = 0, densidadWeb = 0, expoAuto = 1, luzCasa = null;
   let penumbra = 1;   // las escenas del púlsar y de Deneb la atenúan un poco mientras duran (el gigante, en primer plano)
@@ -311,7 +310,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
       if (++cuadroExpo % 3 === 0) {
         camera.updateMatrixWorld(); frustum.setFromProjectionMatrix(mProy.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
         let luz = 0;
-        for (const [grupo, peso, ref] of [[bloquesPolvo, 1, 4500000], [bloquesNubes, 0.6, 3000000], [bloquesGalaxias, 5, 2500000]]) for (const t of grupo.children) {
+        for (const [grupo, peso, ref] of PESOS_LUZ) for (const t of grupo.children) {
           const b = t.userData.bloque; esfera.center.set(b.centro[0] + O.x, b.centro[1] + O.y, b.centro[2] + O.z); esfera.radius = b.radio;
           if (!frustum.intersectsSphere(esfera)) continue;
           const d = Math.max(1, esfera.center.distanceTo(camera.position) - b.radio * 0.5);

@@ -501,7 +501,8 @@ export function* construirCosmos({ uScale, uPR }) {
       else if (escenaG && (!id || escenaG.id === id)) escenaG.viva = false;
     },
     // Hay animación de escena (el planificador dibuja a 60): mientras suena y mientras se funde al salir. En calma, no.
-    get enEscenaAgujero() { return !!escenaG && (!escenaG.viva || escenaG.t < finEscena(escenaG.id)); },
+    // (Con las marcas ya leídas al empezar: finEscena las volvía a montar —objetos nuevos— dos veces por cuadro.)
+    get enEscenaAgujero() { return !!escenaG && (!escenaG.viva || escenaG.t < escenaG.marcas.fundido + 2.5); },
     // Segundo de la escena del agujero que suena (null si no hay ninguna viva): el reloj del director de cámara (index.js).
     segundoAgujero: id => escenaG && escenaG.viva && escenaG.id === id ? escenaG.t : null,
     agujeros: { ton618: piezasTon, sagitario: piezasSgr },   // (diagnóstico y pruebas)
