@@ -1,23 +1,31 @@
-// Intro: un videoclip de 32 s con «Maps» (momento «inicio» de js/data/bandaSonora.js), rodado como una película con una
-// cámara que se mueve sobre un mapa del Atlántico hecho de motas. La canción es una súplica a alguien que está lejos: la
-// voz llama una y otra vez («say…»), pide que la esperen («wait…») y jura que nadie la quiere como ella. El clip lo cuenta
-// con los dos: Carlos llama desde Barcelona y cada llamada, una onda sobre el mapa, va descubriendo su orilla; Xiomara
-// responde desde Buenos Aires (plano y contraplano, cada vez más abiertos); al llamarse a la vez la cámara se aleja y
-// aparece el océano entero entre los dos. En el primer «wait» él sale a buscarla siguiendo el mapa (la cámara viaja con
-// él: travelling con su ruta, sus coordenadas y los kilómetros que faltan); en el segundo sale ella. Se encuentran en el
-// ecuador, en mitad del mundo (0 km): la línea del ecuador se enciende, la cámara gira despacio alrededor del encuentro
-// mientras la voz sostiene su nota y nace un corazón de motas con sus nombres. En el último estribillo la cámara sube, el
-// mapa se curva y se cierra en un globo (el mundo se les queda pequeño), el globo se aleja hasta ser una sola luz y la
-// cámara se lanza hacia ella: al otro lado, el cielo de nuestro universo, la tarjeta y, arriba, ese pequeño mundo con su
-// punto de encuentro, girando.
-// Lienzo 2D sin degradados ni halos: la luz son motas nítidas (cuadrados y círculos de 1,5–3 px, líneas finas).
+// Intro: un videoclip de 32 s con «Maps» (Yeah Yeah Yeahs; momento «inicio» de js/data/bandaSonora.js), rodado como una
+// película con una cámara que se mueve sobre un mapa del Atlántico hecho de motas. La canción es una súplica a alguien que
+// está lejos: la voz llama una y otra vez (cinco series de una exclamación y tres sílabas iguales), pide que la esperen
+// (tres veces, cada una con un portamento hacia arriba) y jura que nadie la quiere como ella. El clip lo cuenta con los
+// dos, sílaba a sílaba (tiempos medidos sobre la voz aislada: js/data/introMaps.js):
+//   · Carlos llama desde Barcelona: la exclamación enciende su luz (corte a su orilla) y cada sílaba es una onda de motas
+//     que descubre su orilla un poco más; lo descubierto se queda encendido, de su color (violeta), y las ciudades a las
+//     que llega la onda se encienden y se unen a las suyas con líneas finas: la constelación de su mundo, que crece.
+//     Xiomara responde desde Buenos Aires (rosa), plano y contraplano en cada exclamación, cada vez más abiertos; en la
+//     quinta serie llaman los dos a la vez y la cámara se abre al océano entero, que también se llena de motas.
+//   · En el primer «wait» la luz de él despega (sube con el portamento) y sale a buscarla siguiendo el mapa: la cámara
+//     viaja con él, el camino se va encendiendo detrás de él y se queda; en el segundo, sale ella.
+//   · Se encuentran en el ecuador en el compás de la nota larga (0 km): el ecuador se enciende hacia los dos lados, desde el
+//     punto del encuentro el resto del mundo se llena de vida, nace un corazón de motas y sus nombres.
+//   · En el tercer «wait» la cámara sube y, con la última frase, el mapa se curva en un globo con todo lo encendido y el
+//     lazo que los une en medio; al callar la voz el globo se aleja hasta ser una luz y la cámara se lanza hacia ella
+//     (llega con el platillo); al otro lado, el cielo de nuestro universo, la tarjeta y ese pequeño mundo, girando.
+// Sin degradados ni halos: la luz son motas nítidas (cuadrados y círculos de 1,5–3 px, líneas finas). El mapa, el océano y
+// sus estados (descubierto, recién descubierto, camino, ecuador) se calculan en la GPU (js/ui/portadaMapaGL.js).
 // La «cámara» es una proyección en perspectiva del plano del mapa (centro, zoom, inclinación, giro sobre la vertical y
 // alabeo): da profundidad, paralaje con el cielo de fondo (tres capas de estrellas a distintas distancias) y la luz de
 // cada uno flota sobre el mapa con su reflejo. Todo se calcula en función del tiempo t del clip (sin estado entre
-// cuadros): con la canción, t es su reloj (js/ui/entrada.js) y la imagen va clavada a la música aunque se pierdan cuadros.
+// cuadros): con la canción, t es su reloj (js/ui/entrada.js) y la imagen va clavada a la música aunque se pierdan cuadros;
+// lo que «se queda» se deduce también de t (lo que ya alcanzó cada onda), así que nada se apaga al saltar cuadros.
 // Con movimiento reducido (calma), la misma historia sin destellos, ondas, sacudidas ni el salto final.
 import { ORILLAS, COSTAS, LAGOS, ISLAS } from '../data/costas.js';
 import { crearMapaGL } from './portadaMapaGL.js';
+import { SERIES, VOZ, CAJA, HITOS_INTRO } from '../data/introMaps.js';
 
 const TAU = Math.PI * 2, RAD = Math.PI / 180;
 const sat = k => k < 0 ? 0 : k > 1 ? 1 : k;
@@ -39,45 +47,54 @@ export const PULSOS = Object.freeze([0, 0.49, 1, 1.49, 1.97, 2.48, 3, 3.51, 3.99
   18.51, 19.02, 19.51, 19.99, 20.5, 21.01, 21.5, 22.01, 22.5, 23.01, 23.52, 24.03, 24.52, 25.01, 25.5, 26.01, 26.49, 27.01, 27.49,
   27.98, 28.49, 29, 29.49, 30, 30.51, 31, 31.51, 32]);
 // Guion (segundos del clip = segundos del fragmento; con canción, cada hito cae en la marca del mismo nombre de su
-// momento «inicio», js/util/sincronia.js). La letra, con sus tiempos (Whisper large-v3 sobre la voz aislada, verificada
-// con los ataques de la voz), en js/data/bandaSonora.js; aquí, lo que se ve:
-//   luzCarlos   1,17  primera llamada de la voz: se enciende la luz de Carlos (primer plano de Barcelona, cámara inclinada)
-//   luzXiomara  3,25  la respuesta: corte al contraplano, Buenos Aires, se enciende la de Xiomara
-//   mapa        5,11  él vuelve a llamar (plano más abierto: las ondas descubren su orilla)
-//   ruta        7,13  ella responde (más abierto)
-//   juntos      9,09  se llaman a la vez: la cámara se aleja y aparece el océano entre los dos (clímax a 9,8)
-//   espera     10,91  primer «wait»: el mapa entero, el camino se traza y él sale a buscarla (travelling con él)
-//   respuesta  15,73  segundo «wait»: corte a ella, que sale a su encuentro
-//   encuentro  19,99  se encuentran en el ecuador (0 km): se enciende el ecuador, nace el corazón, la cámara gira
-//   nombres    22,01  «Carlos & Xiomara» (durante la nota larga de la voz)
-//   cielo      24,03  último estribillo: la cámara sube, el corazón vuelve a ser una luz y el mapa se curva
-//   mundo      26,01  el mapa ya es un globo: el mundo se les queda pequeño
-//   salto      27,98  el globo, ya una luz, nos lleva a toda velocidad hacia dentro (instrumental)
+// momento «inicio», js/util/sincronia.js). Los tiempos de la voz y de la batería, medidos: js/data/introMaps.js.
+//   luzCarlos   1,42  1.ª exclamación (entra la voz): se enciende la luz de Carlos (primer plano de Barcelona)
+//   luzXiomara  3,47  2.ª: corte al contraplano, Buenos Aires, se enciende la de Xiomara
+//   mapa        5,47  3.ª: él vuelve a llamar (plano más abierto: sus ondas llegan a Europa y al norte de África)
+//   ruta        7,48  4.ª: ella responde (más abierto: Sudamérica)
+//   juntos      9,48  5.ª: llaman los dos a la vez, la cámara se abre y aparece el océano entero entre los dos
+//   espera     11,88  1.er «wait»: su luz despega con el portamento y sale a buscarla (travelling con él)
+//   respuesta  15,88  2.º «wait»: corte a ella, que sale a su encuentro
+//   encuentro  19,99  compás de la nota larga: se encuentran en el ecuador (0 km), nace el corazón, el mundo se enciende
+//   nombres    22,01  «Carlos & Xiomara» (aún en la nota larga)
+//   cielo      23,89  3.er «wait»: la cámara sube y el corazón vuelve a ser una luz
+//   globo      25,32  la última frase: el mapa se curva y se cierra en un globo
+//   mundo      26,01  el globo ya entero, con su lazo: el mundo se les queda pequeño
+//   salto      27,98  calla la voz: el globo, ya una luz, nos lleva a toda velocidad hacia dentro (llega en el plato de 29,45)
 //   tarjeta    30     al otro lado, el cielo de nuestro universo, la tarjeta y el pequeño mundo arriba
-export const HITOS = Object.freeze({ luzCarlos: 1.17, luzXiomara: 3.25, mapa: 5.11, ruta: 7.13, juntos: 9.09, espera: 10.91, respuesta: 15.73, encuentro: 19.99, nombres: 22.01, cielo: 24.03, mundo: 26.01, salto: 27.98, tarjeta: 30 });
+export const HITOS = HITOS_INTRO;
 export const DURACION = 32;
 const H = HITOS;
-// Las llamadas de la voz (cada sílaba, una onda de motas sobre el mapa desde la luz que «habla»): primero él, luego ella,
-// otra vez él y ella, y a la vez en la última, cuando la canción crece hacia el primer «wait». [segundo, alcance en
-// grados del mapa]
-const LLAMADAS = {
-  carlos: [[1.17, 3.5], [1.65, 5], [2.11, 6.5], [2.59, 8], [2.95, 10], [5.11, 13], [5.45, 16], [6.15, 19], [6.67, 23], [9.09, 40], [9.49, 55], [10.13, 70], [10.61, 95]],
-  xiomara: [[3.25, 3.5], [3.63, 5.5], [4.19, 7.5], [4.65, 10], [7.13, 13], [7.53, 16], [8.19, 19], [8.65, 23], [9.09, 40], [9.49, 55], [10.13, 70], [10.61, 95]]
-};
+const PLATO = 29.45;   // el plato en el que el salto llega al otro lado
+// Las llamadas de la voz: cada sílaba, una onda de motas sobre el mapa desde la luz que «habla» y que descubre su orilla
+// hasta donde llega. [segundo, alcance en grados del mapa]. 1.ª y 3.ª serie, él; 2.ª y 4.ª, ella; la 5.ª, los dos.
+const ALCANCES = [[3, 5, 7, 9.5], [3, 5, 7.5, 10], [12, 15, 19, 24], [12, 15, 19, 24], [34, 48, 66, 95]];
+const serie = i => SERIES[i].map((s, j) => [s, ALCANCES[i][j]]);
+const LLAMADAS = { carlos: [...serie(0), ...serie(2), ...serie(4)], xiomara: [...serie(1), ...serie(3), ...serie(4)] };
+// Todas las sílabas de las llamadas, en orden (para los latidos de la luz y los empujones de la cámara).
+const SILABAS = SERIES.flat();
 const DUR_ONDA = 1.25;
-// Golpes de la base y de la letra: un empujón de la cámara (zoom) que se apaga enseguida. [segundo, fuerza]
-const GOLPES = [[1.49, 0.01], [2.74, 0.01], [4.76, 0.01], [7.52, 0.012], [8.75, 0.012], [10.91, 0.05], [11.28, 0.012], [15.73, 0.04], [19.99, 0.05], [28.72, 0.03], [29.48, 0.02]];
-// El texto de la historia (lo dice Carlos, con sus palabras: no es la letra), arriba. «» = se apaga.
+// El encuentro enciende el resto del mundo: una onda desde el ecuador que dura la nota larga. [desde, hasta, alcance]
+const ONDA_M = [H.encuentro + 0.2, VOZ.finNota, 210];
+// Golpes de la cámara (zoom) que se apagan enseguida: cada sílaba de las llamadas, la caja de la batería y los golpes de
+// la letra (los «wait», el encuentro, el salto). [segundo, fuerza]
+const GOLPES = [
+  ...SILABAS.map((s, i) => [s, i % 4 ? 0.014 : 0.022]),
+  ...CAJA.filter(([s]) => s > 11 && s < H.salto).map(([s, f]) => [s, 0.012 * f]),
+  [VOZ.espera1, 0.05], [VOZ.espera2, 0.04], [H.encuentro, 0.05], [VOZ.espera3, 0.03], [28.70, 0.03], [PLATO, 0.02]
+].sort((a, b) => a[0] - b[0]);
+// El texto de la historia (lo dice Carlos, con sus palabras: no es la letra), arriba. «» = se apaga. Cada uno ~0,3 s
+// antes de su golpe (js/ui/entrada.js lo muestra con 0,28 s de espera y un fundido).
 export const FRASES = Object.freeze([
-  { desde: 5.5, texto: 'Te llamé desde mi orilla…' },
-  { desde: 7.5, texto: '…y me respondiste desde la tuya.' },
-  { desde: 9.05, texto: '' },
-  { desde: 12.3, texto: 'Seguí el mapa que lleva hasta ti…' },
-  { desde: 15.5, texto: '' },
-  { desde: 16.5, texto: '…y tú venías a buscarme.' },
-  { desde: 19.3, texto: '' },
-  { desde: 24.6, texto: 'Y el mundo se nos quedó pequeño.' },
-  { desde: 27.7, texto: '' }
+  { desde: H.mapa - 0.3, texto: 'Te llamé desde mi orilla…' },
+  { desde: H.ruta - 0.3, texto: '…y me respondiste desde la tuya.' },
+  { desde: H.juntos - 0.3, texto: '' },
+  { desde: VOZ.frase1 - 0.3, texto: 'Seguí el mapa que lleva hasta ti…' },
+  { desde: H.respuesta - 0.4, texto: '' },
+  { desde: VOZ.frase2 - 0.3, texto: '…y tú venías a buscarme.' },
+  { desde: H.encuentro - 0.5, texto: '' },
+  { desde: H.globo - 0.3, texto: 'Y el mundo se nos quedó pequeño.' },
+  { desde: VOZ.finVoz - 0.2, texto: '' }
 ]);
 // Puntos de paso del camino (longitud, latitud): de Barcelona baja por el Mediterráneo frente a Valencia y Cartagena,
 // cruza el mar de Alborán, sale al Atlántico por el estrecho de Gibraltar, baja al oeste de Canarias y Cabo Verde, cruza
@@ -106,14 +123,44 @@ const S_ENC = (() => { for (let j = 0; j < RUTA_N; j++) if (RY[j] <= 0 && RY[j +
 enRuta(S_ENC);
 const MX = WX, MY = 0, M_LON = MX;
 const CX = ORILLAS.carlos[0], CY = -merc(ORILLAS.carlos[1]), XX = ORILLAS.xiomara[0], XY = -merc(ORILLAS.xiomara[1]);
-// Ciudades de las dos orillas y del camino (sus luces de noche): Valencia, Palma, Madrid, Sevilla, Lisboa, Oporto, Málaga,
-// Tánger, Casablanca, Las Palmas, Dakar, Praia; Montevideo, Rosario, Córdoba, La Plata, Mar del Plata, Porto Alegre,
-// São Paulo, Río de Janeiro, Salvador, Recife, Fortaleza. [x, y] del mundo.
-const CIUDADES = Float64Array.from([[-0.38, 39.47], [2.65, 39.57], [-3.7, 40.42], [-5.98, 37.39], [-9.14, 38.72], [-8.61, 41.15], [-4.42, 36.72],
-  [-5.83, 35.77], [-7.59, 33.57], [-15.43, 28.12], [-17.45, 14.69], [-23.51, 14.93], [-56.16, -34.9], [-60.64, -32.95], [-64.18, -31.42],
-  [-57.95, -34.92], [-57.55, -38], [-51.23, -30.03], [-46.63, -23.55], [-43.2, -22.91], [-38.5, -12.97], [-34.88, -8.05], [-38.53, -3.73]]
-  .flatMap(([lon, lat]) => [lon, -merc(lat)]));
-
+// Cerca del camino: para cada punto del mundo, la fracción s del punto del camino más cercano y su distancia (en grados
+// del mapa), con una rejilla de celdas de 4° (el camino se enciende detrás de cada luz y se queda: js/ui/portadaMapaGL.js).
+const RC = 4, rejillaRuta = new Map();
+for (let j = 0; j <= RUTA_N; j++) { const k = Math.floor(RX[j] / RC) * 1000 + Math.floor(RY[j] / RC); let l = rejillaRuta.get(k); if (!l) rejillaRuta.set(k, l = []); l.push(j); }
+let RS = -1, RD = 99;
+export function cercaDelCamino(x, y) {
+  RS = -1; RD = 99; const cx = Math.floor(x / RC), cy = Math.floor(y / RC);
+  for (let i = -1; i <= 1; i++) for (let k = -1; k <= 1; k++) {
+    const l = rejillaRuta.get((cx + i) * 1000 + cy + k); if (!l) continue;
+    for (const j of l) { const d = Math.hypot(RX[j] - x, RY[j] - y); if (d < RD) { RD = d; RS = j / RUTA_N; } }
+  }
+  if (RD > RC) RS = -1;
+  return RS;
+}
+// Lo que alcanza una llamada: radio de la onda de la sílaba (s, R) en t, y en qué segundo llega a la distancia d (o ∞).
+const salidaInv = k => 1 - Math.cbrt(1 - k);   // (inversa de salida)
+function llegaOnda(lista, d) { let m = Infinity; for (const [s, R] of lista) if (d < R) m = Math.min(m, s + DUR_ONDA * salidaInv(d / R)); return m; }
+// Las ciudades de cada uno (sus luces de noche): se encienden cuando la onda de una de sus llamadas llega a ellas, se
+// quedan encendidas y se unen con una línea fina a la más cercana de las suyas ya encendidas: la constelación de su
+// mundo, que crece con cada sílaba. [longitud, latitud]
+const LUGARES = {
+  carlos: [[2.82, 41.98], [1.25, 41.12], [-0.38, 39.47], [2.65, 39.57], [-3.7, 40.42], [-0.88, 41.65], [-5.98, 37.39], [-4.42, 36.72], [-2.93, 43.26], [-9.14, 38.72],
+    [-8.61, 41.15], [5.37, 43.3], [2.35, 48.86], [-5.83, 35.77], [-7.59, 33.57], [3.06, 36.75], [12.5, 41.9], [-0.13, 51.5], [-15.43, 28.12], [-17.45, 14.69],
+    [-23.51, 14.93], [-1.68, 48.11], [10.18, 36.8], [-8.0, 31.63]],
+  xiomara: [[-57.95, -34.92], [-56.16, -34.9], [-60.64, -32.95], [-57.55, -38], [-64.18, -31.42], [-60.7, -31.63], [-68.83, -32.89], [-62.27, -38.72], [-51.23, -30.03],
+    [-57.58, -25.26], [-70.65, -33.45], [-65.2, -26.8], [-46.63, -23.55], [-48.55, -27.6], [-43.2, -22.91], [-38.5, -12.97], [-34.88, -8.05], [-38.53, -3.73],
+    [-47.88, -15.79], [-77.03, -12.05], [-68.15, -16.5], [-54.6, -25.5], [-67.5, -45.87], [-60.0, -3.1]]
+};
+// { x, y, t (se enciende), p (índice de la que la une, -1 = la luz de casa), q: 0 él / 1 ella }, por orden de encendido.
+const CIUDADES = [];
+for (const [q, quien] of [[0, 'carlos'], [1, 'xiomara']]) {
+  const ox = q ? XX : CX, oy = q ? XY : CY, propias = [];
+  for (const [lon, lat] of LUGARES[quien]) { const x = lon, y = -merc(lat), t = llegaOnda(LLAMADAS[quien], Math.hypot(x - ox, y - oy)); if (t < Infinity) propias.push({ x, y, t, q, p: -1 }); }
+  propias.sort((a, b) => a.t - b.t);
+  const base = CIUDADES.length;   // (p es el índice en CIUDADES: las de él van primero)
+  propias.forEach((c, i) => { let m = Math.hypot(c.x - ox, c.y - oy) * 1.15; for (let j = 0; j < i; j++) { const d = Math.hypot(c.x - propias[j].x, c.y - propias[j].y); if (d < m) { m = d; c.p = base + j; } } });
+  CIUDADES.push(...propias);
+}
 // Índice del último pulso ≤ t (búsqueda binaria; -1 antes del primero).
 function pulso(t) {
   if (t < PULSOS[0]) return -1;
@@ -239,24 +286,25 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
   // Las rejillas están anidadas: todas parten del mismo origen y la de cada nivel, con la mitad de paso, solo guarda las
   // motas que la anterior no tiene; así, con dos niveles a la vez, la densidad es justo la del fino (sin dobles).
   const h32 = (a, b, c) => { let h = Math.imul(a, 0x27d4eb2d) ^ Math.imul(b, 0x165667b1) ^ Math.imul(c + 7, 0x9e3779b1); h = Math.imul(h ^ (h >>> 15), 0x85ebca6b); h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
-  function nivel(p0, k, lon0, lon1, y0, y1, islas = false) {
+  // oceano: las motas del agua en lugar de las de tierra (más separadas; tono 3), solo en el Atlántico y alrededores.
+  function nivel(p0, k, lon0, lon1, y0, y1, islas = false, oceano = false) {
     const paso = p0 / 2 ** k, dy = paso * 0.866, xs = [], ys = [], tn = [], al = [];
     for (let f = Math.ceil((y0 + 150) / dy), fF = Math.floor((y1 + 150) / dy); f <= fF; f++) {
       const y = -150 + f * dy, off = f & 1 ? 0.5 : 0;
       for (let c = Math.ceil((lon0 + 180) / paso - off), cF = Math.floor((lon1 + 180) / paso - off); c <= cF; c++) {
         if (k > 0 && (f & 1) === 0 && ((c - (f >> 1)) & 1) === 0) continue;   // ya está en el nivel anterior
         const h1 = h32(f, c, k), h2 = h32(c, f, k + 31), px = -180 + (c + off) * paso + (h1 - 0.5) * paso * 0.16, py = y + (h2 - 0.5) * paso * 0.16;
-        if (!tierraEn(px, py)) continue;
-        xs.push(px); ys.push(py); const t = h32(f + 3, c, k + 9); tn.push(t < 0.48 ? 0 : t < 0.8 ? 1 : 2); al.push(0.55 + 0.45 * h32(f, c + 5, k + 17));
+        if (tierraEn(px, py) === oceano) continue;
+        xs.push(px); ys.push(py); const t = h32(f + 3, c, k + 9); tn.push(oceano ? 3 : t < 0.48 ? 0 : t < 0.8 ? 1 : 2); al.push(0.55 + 0.45 * h32(f, c + 5, k + 17));
       }
     }
     if (islas) for (const [lon, lat] of ISLAS) { xs.push(lon); ys.push(-merc(lat)); tn.push(2); al.push(1); }
     const n = xs.length, celda = new Uint16Array(n), cuenta = new Uint32Array(NCX * NCY + 1);
     for (let i = 0; i < n; i++) { const c = Math.min(NCY - 1, Math.max(0, Math.floor((ys[i] - Y0C) / CEL))) * NCX + Math.min(NCX - 1, Math.max(0, Math.floor((xs[i] + 180) / CEL))); celda[i] = c; cuenta[c + 1]++; }
     for (let c = 0; c < NCX * NCY; c++) cuenta[c + 1] += cuenta[c];
-    const pos = cuenta.slice(), X = new Float32Array(n), Y = new Float32Array(n), T = new Uint8Array(n), A = new Float32Array(n);
-    for (let i = 0; i < n; i++) { const j = pos[celda[i]]++; X[j] = xs[i]; Y[j] = ys[i]; T[j] = tn[i]; A[j] = al[i]; }
-    return { paso, n, X, Y, T, A, inicio: cuenta };
+    const pos = cuenta.slice(), X = new Float32Array(n), Y = new Float32Array(n), T = new Uint8Array(n), A = new Float32Array(n), RS = new Float32Array(n), RDs = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const j = pos[celda[i]]++; X[j] = xs[i]; Y[j] = ys[i]; T[j] = tn[i]; A[j] = al[i]; RS[j] = cercaDelCamino(xs[i], ys[i]); RDs[j] = RD; }
+    return { paso, n, X, Y, T, A, RS, RD: RDs, inicio: cuenta };
   }
   // Globo: motas de tierra sobre una esfera (espiral de Fibonacci) con su rango para aclararlas cuando el globo es pequeño,
   // más meridianos y paralelos en motas muy tenues.
@@ -267,7 +315,7 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     for (let i = 0; i < N; i++) {
       const z = 1 - 2 * (i + 0.5) / N, rr = Math.sqrt(1 - z * z), a = i * oro, lat = Math.asin(z) / RAD, lon = ((a / RAD + 180) % 360 + 360) % 360 - 180;
       if (lat < -80 || !tierraEn(lon, -merc(lat))) continue;
-      gx.push(rr * Math.cos(a)); gy.push(z); gz.push(rr * Math.sin(a)); const c = r(); gt.push(c < 0.48 ? 0 : c < 0.8 ? 1 : 2); gr.push(r());
+      gx.push(rr * Math.cos(a)); gy.push(z); gz.push(rr * Math.sin(a)); gt.push(estadoFinal(lon, -merc(lat), r())); gr.push(r());
     }
     // (la longitud de cada mota se guarda en su vector: lon = atan2(z, x))
     globo = { n: gx.length, x: Float32Array.from(gx), y: Float32Array.from(gy), z: Float32Array.from(gz), t: Uint8Array.from(gt), r: Float32Array.from(gr) };
@@ -276,6 +324,15 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     for (const la of [-60, -30, 0, 30, 60]) for (let lon = -180; lon < 180; lon += 3.5) { const c = Math.cos(la * RAD); rx.push(c * Math.cos(lon * RAD)); ry.push(Math.sin(la * RAD)); rz.push(c * Math.sin(lon * RAD)); }
     rejillaGlobo = { n: rx.length, x: Float32Array.from(rx), y: Float32Array.from(ry), z: Float32Array.from(rz) };
   }
+
+  // Cómo queda cada mota de tierra al final (el globo guarda todo lo que se encendió en el mapa): 0 lo que encendió el
+  // encuentro (blanco rosado), 1 lo de él (violeta), 2 lo de ella (rosa), 3 el camino y el ecuador (blanco).
+  function estadoFinal(x, y, h) {
+    if (Math.abs(y) < 1.4 || (cercaDelCamino(x, y) >= 0 && RD < 2.6)) return 3;
+    const dC = Math.hypot(x - CX, y - CY), dX = Math.hypot(x - XX, y - XY), R = ALCANCES[4][3] * (0.86 + 0.28 * h);
+    return dC < R || dX < R ? (dC < dX ? 1 : 2) : 0;
+  }
+  const TONOS_GLOBO = ['rgb(255,214,236)', 'rgb(210,176,255)', 'rgb(255,162,212)', 'rgb(255,246,252)'];
 
   // ── Medidas ──
   function medir() {
@@ -294,6 +351,8 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
       nivel(p0, 3, -19, 11, -59, -29),
       nivel(p0, 3, -73, -43, 22, 52)
     ];
+    // El océano entre los dos (y algo más), con motas al doble de paso: solo en la GPU.
+    if (mapaGL) niveles.push(nivel(p0 * 2, 0, -95, 35, -90, 80, false, true));
     construirGlobo(m * 0.4);
     if (mapaGL) { mapaGL.medir(ancho, alto, dpr); mapaGL.subir(niveles); }
     // Al final, el mundo pequeño arriba y la tarjeta debajo.
@@ -327,7 +386,7 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
   const P_X0 = E(XX, XY, 4.9, 52, 18, 0, 0.45), P_X1 = E(XX, XY, 5.9, 46, 7, 0, 0.45);
   const P_C2 = E(CX, CY + 1.5, 2.7, 40, -11, 0, 0.45), P_C3 = E(CX, CY + 1.5, 3.15, 35, -4, 0, 0.45);
   const P_X2 = E(XX, XY - 1.5, 2.7, 40, 11, 0, 0.52), P_X3 = E(XX, XY - 1.5, 3.15, 35, 4, 0, 0.52);
-  const P_TODO = E((CX + XX) / 2, (CY + XY) / 2, 1, 16, 0, 0, 0.5);
+  const P_TODO = E((CX + XX) / 2, (CY + XY) / 2, 1, 16, 0, 0, 0.5), P_TODO2 = E((CX + XX) / 2 + 3, (CY + XY) / 2 - 3, 1.07, 19, -3, 0, 0.5);
   const P_ORBITA = E(MX, MY, 2.4, 50, -36, 0, 0.64), P_ALTO = E(MX, MY, 0.42, 0, 0, 0, 0.5);
   // Plano que sigue a una luz: centrado un poco por delante de ella en su camino.
   function siguiendo(o, s, ds, z, inc, giro, ancla) { enRuta(s + ds); o[0] = WX; o[1] = WY; o[2] = Math.log(z); o[3] = inc; o[4] = giro; o[5] = 0; o[6] = ancla; return o; }
@@ -342,7 +401,12 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     else if (t < H.mapa) mezclar(CAM, P_X0, P_X1, suave(tramo(t, H.luzXiomara, H.mapa)));
     else if (t < H.ruta) mezclar(CAM, P_C2, P_C3, suave(tramo(t, H.mapa, H.ruta)));
     else if (t < H.juntos) mezclar(CAM, P_X2, P_X3, suave(tramo(t, H.ruta, H.juntos)));
-    else if (t < H.espera) mezclar(CAM, P_X3, P_TODO, suave2(tramo(t, H.juntos, H.espera)));
+    else if (t < H.espera) {
+      // Los dos a la vez: la cámara se abre hasta el océano entero en las tres sílabas (llega con la última) y, mientras
+      // la voz sostiene y calla, se acerca un poco hacia él (el redoble de antes del «wait»).
+      mezclar(TA, P_X3, P_TODO, suave2(tramo(t, H.juntos, SERIES[4][3] + 0.25)));
+      mezclar(CAM, TA, P_TODO2, suave(tramo(t, SERIES[4][3] + 0.25, H.espera)));
+    }
     else if (t < H.respuesta) {
       // Con él: un latigazo del plano general al travelling (0,8 s) y luego viaja a su lado.
       const s = viajeCarlos(t, calma), z = 2.15 - 0.3 * tramo(t, 11.7, H.respuesta);
@@ -356,7 +420,7 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     } else if (t < H.cielo) {
       aDos(TA, H.encuentro);
       mezclar(CAM, TA, P_ORBITA, suave(tramo(t, H.encuentro, H.cielo)));
-    } else mezclar(CAM, P_ORBITA, P_ALTO, suave2(tramo(t, H.cielo, 25.6)));
+    } else mezclar(CAM, P_ORBITA, P_ALTO, suave2(tramo(t, H.cielo, H.globo + 0.3)));
     // Empujones de los golpes.
     if (!calma) { let g = 0; for (const [s, f] of GOLPES) if (t >= s && t < s + 0.6) g += f * Math.exp(-(t - s) * 9); CAM[2] += g; }
   }
@@ -401,7 +465,7 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
   const ZX0 = new Float32Array(4), ZX1 = new Float32Array(4), ZY0 = new Float32Array(4), ZY1 = new Float32Array(4);
   let nZ = 0;
   // (estado del cuadro para el mapa en WebGL, reutilizado)
-  const PGL = { OX, OY, OR, ZX0, ZY0, ZX1, ZY1 }, ACTIVOS = Array.from({ length: 6 }, () => ({ i: 0, esp: 0, l0: false, queda0: 1 }));
+  const PGL = { OX, OY, OR, ZX0, ZY0, ZX1, ZY1 }, ACTIVOS = Array.from({ length: 8 }, () => ({ i: 0, esp: 0, l0: false, queda0: 1 }));
   const enZona = (px, py) => { for (let z = 0; z < nZ; z++) { const ex = (px - ZX0[z]) / ZX1[z], ey = (py - ZY0[z]) / ZY1[z]; if (ex * ex + ey * ey < 1) return true; } return false; };
   const zona = (x0, y0, x1, y1) => { if (nZ < 4) { ZX0[nZ] = (x0 + x1) / 2; ZY0[nZ] = (y0 + y1) / 2; ZX1[nZ] = (x1 - x0) * 0.62; ZY1[nZ] = (y1 - y0) * 0.75; nZ++; } };
 
@@ -422,8 +486,8 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     x.fill(); x.globalAlpha = 1;
   }
   // Una luz que flota sobre el mapa: su reflejo en el plano y un hilo finísimo hasta ella (se ve con la cámara inclinada).
-  function luzSobreMapa(wx, wy, color, tam, t, alfa = 1) {
-    const alt = 14 * tam;
+  function luzSobreMapa(wx, wy, color, tam, t, alfa = 1, elev = 1) {
+    const alt = 14 * tam * elev;
     if (!proyectar(wx, wy, 0)) return false;
     const rx = QX, ry = QY, f = QF;
     proyectar(wx, wy, alt);
@@ -537,6 +601,10 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
   }
 
   // Revelado del mapa: cada llamada descubre la orilla de quien llama hasta donde llega su onda.
+  // Desde el encuentro, el resto del mundo: una onda desde el punto de encuentro que dura la nota larga.
+  function revEncuentro(t) { return calma ? 0 : ONDA_M[2] * salida(tramo(t, ONDA_M[0], ONDA_M[1])); }
+  // La luz del ecuador, desde el encuentro hacia los dos lados (grados a cada lado).
+  function ecuador(t) { return t > H.encuentro ? salida(tramo(t, H.encuentro, H.encuentro + 2.2)) * 200 : 0; }
   function revelado(lista, t) {
     let r = 0;
     for (const [s, R] of lista) { if (t < s) break; const u = Math.min(1, (t - s) / DUR_ONDA); r = Math.max(r, R * salida(u)); }
@@ -552,8 +620,8 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     const antes = t < H.tarjeta;
     const tC = viajeCarlos(t, calma), tX = viajeXiomara(t, calma);
     // Fases del final: el mapa se curva en globo (morf), el globo se aleja (lejos) y el salto.
-    const morf = suave(tramo(t, 25.0, 26.5)), lejos = entra(tramo(t, 26.9, H.salto));
-    const uS = calma ? 0 : tramo(t, H.salto, H.salto + 1.6), enSalto = uS > 0 && uS < 1;
+    const morf = suave(tramo(t, H.globo, H.globo + 1.3)), lejos = entra(tramo(t, 26.9, H.salto));
+    const uS = calma ? 0 : tramo(t, H.salto, PLATO), enSalto = uS > 0 && uS < 1;
     const vivo = calma ? 1 - tramo(t, H.salto, H.salto + 1.4) : 1 - tramo(uS, 0.7, 1);
     // Brillo de los golpes de la letra.
     const golpe = calma ? 0 : Math.max(0, 1 - (t - H.espera) / 0.5) * (t >= H.espera) + Math.max(0, 1 - (t - H.respuesta) / 0.5) * (t >= H.respuesta) + 0.8 * Math.max(0, 1 - (t - H.encuentro) / 0.6) * (t >= H.encuentro);
@@ -594,7 +662,8 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     }
 
     // Revelado y ondas del cuadro.
-    const revC = t < H.espera + 0.3 ? revelado(LLAMADAS.carlos, t) : 999, revX = t < H.espera + 0.3 ? revelado(LLAMADAS.xiomara, t) : 999;
+    // (lo que ha alcanzado cada onda no vuelve atrás: el mapa se va llenando y se queda encendido)
+    const revC = revelado(LLAMADAS.carlos, t), revX = revelado(LLAMADAS.xiomara, t), revM = revEncuentro(t);
     const revCalma = calma ? 999 * tramo(t, H.luzCarlos, H.espera) : 0;
     nO = 0;
     if (!calma && t < H.espera) {
@@ -630,12 +699,12 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
       // El mapa en penumbra (antes de que lo descubran las llamadas) aparece en el primer compás.
       const penumbra = calma ? tramo(t, 0.2, 1.4) : tramo(t, 0.3, 1.1);
       // Mientras late el corazón, el mapa baja a la mitad (que el corazón y los nombres se lean).
-      const atenua = 1 - 0.55 * tramo(t, H.encuentro, H.encuentro + 0.4) * (1 - tramo(t, H.cielo, H.cielo + 0.6));
+      const atenua = 1 - 0.3 * tramo(t, H.encuentro, H.encuentro + 0.4) * (1 - tramo(t, H.cielo, H.cielo + 0.6));
       nL = 0;
       const cx0 = Math.max(0, Math.floor((bx0 + 180) / CEL)), cx1 = Math.min(NCX - 1, Math.floor((bx1 + 180) / CEL));
       const cy0 = Math.max(0, Math.floor((by0 - Y0C) / CEL)), cy1 = Math.min(NCY - 1, Math.floor((by1 - Y0C) / CEL));
       const destelloMapa = Math.min(1, golpe) * (t < H.encuentro + 1 ? 1 : 0), dMin = D * 0.3;
-      const todo = revC >= 999 && revX >= 999;
+      const todo = calma ? revCalma >= 999 : revM >= ONDA_M[2] - 1;
       if (mapaGL?.activo) {
         // En la GPU: los mismos cálculos, en el sombreador; aquí solo el estado del cuadro.
         const e0 = pasoBase * 0.95, e1 = pasoBase * 1.35;
@@ -645,7 +714,10 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
           if (nvl > 0 && esp < e0) continue;
           const A = ACTIVOS[na++]; A.i = nvl; A.esp = esp; A.l0 = nvl === 0; A.queda0 = nvl === 0 && esp < e1 * 0.8 ? (esp / (e1 * 0.8)) ** 2 : 1;
         }
-        Object.assign(PGL, { cX, cY, S, cg, sg, ci, si, ca, sa, D, ax, ay, ancho, alto, dpr, e0, e1, revC, revX, revCalma, penumbra, todo, luz: mapaVis * atenua, destello: destelloMapa, nO, nZ });
+        // (0,5 s antes, para el frente recién descubierto; el camino encendido hasta cada luz; el ecuador desde el encuentro)
+        const t0 = t - 0.5, viaja = t > H.espera;
+        Object.assign(PGL, { cX, cY, S, cg, sg, ci, si, ca, sa, D, ax, ay, ancho, alto, dpr, e0, e1, t, CX, CY, XX, XY, MX, MY, revC, revX, revM, revC0: revelado(LLAMADAS.carlos, t0), revX0: revelado(LLAMADAS.xiomara, t0), revM0: revEncuentro(t0), revCalma, penumbra,
+          ecuador: ecuador(t), tC: viaja ? tC : -1, tX: t > H.respuesta ? tX : 2, camino: viaja ? 1 : 0, luz: mapaVis * atenua, destello: destelloMapa, nO, nZ });
         mapaGL.dibujar(PGL, ACTIVOS, na);
       } else for (let nvl = 0; nvl < niveles.length; nvl++) {
         const N = niveles[nvl], esp = N.paso * S;
@@ -664,7 +736,8 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
                 const h = 0.86 + 0.28 * ((N.A[i] * 7.31) % 1);
                 const ac = wx - CX, bc = wy - CY, ax2 = wx - XX, bx2 = wy - XY;   // (sqrt a mano: Math.hypot es lento en el bucle caliente)
                 dC = Math.sqrt(ac * ac + bc * bc) - revC * h; dX = Math.sqrt(ax2 * ax2 + bx2 * bx2) - revX * h;
-                oscura = dC > 0 && dX > 0 && dC + revC * h > revCalma && dX + revX * h > revCalma;
+                const am = wx - MX, bm = wy - MY;
+                oscura = dC > 0 && dX > 0 && dC + revC * h > revCalma && dX + revX * h > revCalma && Math.sqrt(am * am + bm * bm) > revM * h;
                 // (la penumbra, con la mitad de motas: se lee igual y cuesta la mitad)
                 if (oscura && (penumbra <= 0.01 || h > 1.0)) continue;
               }
@@ -716,19 +789,9 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
       }
     }
 
-    // 4b. Las luces de las ciudades de las dos orillas y del camino (motas blancas finas): aparecen cuando su orilla está
-    // descubierta, titilan un poco y se apagan con el mapa.
-    if (mapaVis > 0.01 && t > H.luzCarlos) {
-      x.fillStyle = 'rgb(255,248,252)'; x.beginPath(); let hay = false;
-      for (let i = 0; i < CIUDADES.length; i += 2) {
-        const wx = CIUDADES[i], wy = CIUDADES[i + 1];
-        if (revC < 999 && Math.hypot(wx - CX, wy - CY) > revC * 0.92 && Math.hypot(wx - XX, wy - XY) > revX * 0.92 && t < H.espera) continue;
-        if (!proyectar(wx, wy) || QX < -3 || QX > ancho + 3 || QY < -3 || QY > alto + 3 || QF < 0.6) continue;
-        const l = Math.min(2.6, 1.7 * Math.min(1.3, QF)) * (0.85 + 0.15 * Math.sin(t * 2.3 + i));
-        x.rect(QX - l / 2, QY - l / 2, l, l); hay = true;
-      }
-      if (hay) { x.globalAlpha = mapaVis * (1 - 0.5 * tramo(t, H.encuentro, H.encuentro + 0.4)); x.fill(); x.globalAlpha = 1; }
-    }
+    // 4b. Las ciudades de cada uno: se encienden cuando su onda llega a ellas (un anillo de motas que se abre) y se quedan;
+    // cada una se une con una línea de puntos a la más cercana de las suyas: la constelación de su mundo, que crece.
+    if (mapaVis > 0.01 && t > H.luzCarlos) dibujarCiudades(t, mapaVis * (1 - 0.25 * tramo(t, H.encuentro, H.encuentro + 0.4) * (1 - tramo(t, H.cielo, H.cielo + 0.6))));
 
     // 5. El camino: el mapa que lleva hasta ella se traza en el primer «wait» (motas tenues de una orilla a otra); las
     // estrellas que cada luz va dejando; tras el encuentro, una línea fina lo une todo.
@@ -766,16 +829,18 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
       for (let o = 0; o < 2; o++) {
         const col = o ? ROSA : VIOLETA, enc = o ? H.luzXiomara : H.luzCarlos, sale = o ? H.respuesta : H.espera, f = o ? viajeXiomara : viajeCarlos;
         if (t < enc) continue;
+        // Al salir, la luz despega con el portamento del «wait» (0,37 s) y viaja más alta.
+        const elev = t > sale && !calma ? 1 + 0.75 * suave(tramo(t, sale, sale + 0.37)) : 1;
         if (t > sale) {   // estela: dónde estaba hace unos instantes (sin memoria: se recalcula con el reloj)
           x.fillStyle = rgba(col, 1); x.beginPath();
-          for (let j = 1; j <= 14; j++) { enRuta(f(t - j * 0.04, calma)); if (proyectar(WX, WY, 14)) { const r = 1.9 * (1 - j / 16); x.rect(QX - r, QY - r, 2 * r, 2 * r); } }
+          for (let j = 1; j <= 18; j++) { enRuta(f(t - j * 0.035, calma)); if (proyectar(WX, WY, 14 * elev)) { const r = 2 * (1 - j / 20); x.rect(QX - r, QY - r, 2 * r, 2 * r); } }
           x.globalAlpha = 0.7 * mapaVis; x.fill(); x.globalAlpha = 1;
         }
         const nace = calma ? tramo(t, enc, enc + 0.6) : rebote(tramo(t, enc, enc + 0.45));
         // Mientras llama, la luz crece un poco con cada sílaba.
         let voz = 0; if (!calma && t < H.espera) for (const [s] of o ? LLAMADAS.xiomara : LLAMADAS.carlos) if (t >= s && t < s + 0.4) voz = Math.max(voz, 1 - (t - s) / 0.4);
         enRuta(f(t, calma));
-        luzSobreMapa(WX, WY, col, nace * (1 + 0.25 * voz + 0.35 * Math.max(0, 1 - (t - sale) / 0.5) * (t >= sale)), t, mapaVis);
+        luzSobreMapa(WX, WY, col, nace * (1 + 0.3 * voz + 0.35 * Math.max(0, 1 - (t - sale) / 0.5) * (t >= sale)), t, mapaVis, elev);
         if (!calma && QF > 0) chispas(QX, QY, t - sale, col, m * 0.15);
       }
     }
@@ -854,6 +919,50 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     if (finalDado && ((t * 2) | 0) !== medidaHueco) { medidaHueco = (t * 2) | 0; huecoMundo(); }
   }
 
+  // Las ciudades y sus constelaciones (ver el paso 4b del cuadro). Cada ciudad: núcleo blanco y una cruz fina de su color.
+  const CPX = new Float32Array(CIUDADES.length), CPY = new Float32Array(CIUDADES.length), CPV = new Uint8Array(CIUDADES.length);
+  function dibujarCiudades(t, alfa) {
+    for (let i = 0; i < CIUDADES.length; i++) { const c = CIUDADES[i]; CPV[i] = t >= c.t && proyectar(c.x, c.y, 0) && QF > 0.55 ? 1 : 0; CPX[i] = QX; CPY[i] = QY; }
+    for (let q = 0; q < 2; q++) {
+      const col = q ? ROSA : VIOLETA;
+      // Las líneas de la constelación: crecen en 0,35 s desde la ciudad que la une (o desde la luz de casa).
+      x.globalAlpha = 0.55 * alfa; x.fillStyle = rgba(col, 1); x.beginPath();
+      for (let i = 0; i < CIUDADES.length; i++) {
+        const c = CIUDADES[i]; if (c.q !== q || !CPV[i]) continue;
+        let ox, oy; if (c.p >= 0) { if (!CPV[c.p]) continue; ox = CPX[c.p]; oy = CPY[c.p]; } else { if (!proyectar(q ? XX : CX, q ? XY : CY, 0)) continue; ox = QX; oy = QY; }
+        const k = calma ? 1 : salida(tramo(t, c.t, c.t + 0.35));
+        pIni(ox, oy, 4.2, 1.1); pA(ox + (CPX[i] - ox) * k, oy + (CPY[i] - oy) * k);
+      }
+      x.fill();
+      // La cruz fina (rayos de 1 px) y el anillo del encendido.
+      x.strokeStyle = rgba(col, 0.9); x.lineWidth = 1; x.globalAlpha = 0.85 * alfa; x.beginPath();
+      for (let i = 0; i < CIUDADES.length; i++) {
+        if (CIUDADES[i].q !== q || !CPV[i]) continue;
+        const e = t - CIUDADES[i].t, L = 3 + (calma ? 0 : 5 * Math.max(0, 1 - e / 0.5)), px = CPX[i], py = CPY[i];
+        x.moveTo(px - L, py); x.lineTo(px + L, py); x.moveTo(px, py - L); x.lineTo(px, py + L);
+      }
+      x.stroke();
+      if (!calma) {
+        x.fillStyle = rgba(col, 1); x.beginPath(); let hay = false, am = 0;
+        for (let i = 0; i < CIUDADES.length; i++) {
+          if (CIUDADES[i].q !== q || !CPV[i]) continue;
+          const e = t - CIUDADES[i].t; if (e > 0.55) continue;
+          const r = 3 + 13 * salida(e / 0.55); am = Math.max(am, 1 - e / 0.55); hay = true;
+          for (let k = 0; k < 10; k++) { const an = k * TAU / 10; x.rect(CPX[i] + Math.cos(an) * r - 0.7, CPY[i] + Math.sin(an) * r - 0.7, 1.4, 1.4); }
+        }
+        if (hay) { x.globalAlpha = alfa * am; x.fill(); }
+      }
+    }
+    // El núcleo: blanco, titila un poco (cada una a su ritmo).
+    x.fillStyle = 'rgb(255,250,253)'; x.globalAlpha = alfa; x.beginPath();
+    for (let i = 0; i < CIUDADES.length; i++) {
+      if (!CPV[i]) continue;
+      const e = t - CIUDADES[i].t, l = (2.3 + (calma ? 0 : 1.2 * Math.max(0, 1 - e / 0.4))) * (0.88 + 0.12 * Math.sin(t * 2.3 + i * 1.7));
+      x.rect(CPX[i] - l / 2, CPY[i] - l / 2, l, l);
+    }
+    x.fill(); x.globalAlpha = 1;
+  }
+
   // Un segmento recto del mundo (los meridianos y paralelos de Mercator lo son, y la perspectiva los deja rectos),
   // recortado por delante de la cámara.
   function segmento(x1, y1, x2, y2) {
@@ -893,8 +1002,8 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
       if (px < -3 || px > ancho + 3 || py < -3 || py > alto + 3) continue;
       if (nL < MAXP) { LX[nL] = px; LY[nL] = py; LS[nL] = lado * (0.75 + 0.25 * Math.max(0, zb)); LB[nL] = globo.t[i] * 2 + (a > 0.6 ? 1 : 0); nL++; }
     }
-    for (let b = 0; b < 6; b++) {
-      x.fillStyle = TONOS[b >> 1]; x.globalAlpha = alfa * (b & 1 ? 0.95 : 0.5); x.beginPath();
+    for (let b = 0; b < 8; b++) {
+      x.fillStyle = TONOS_GLOBO[b >> 1]; x.globalAlpha = alfa * (b & 1 ? 0.95 : 0.5); x.beginPath();
       let hay = false;
       for (let i = 0; i < nL; i++) if (LB[i] === b) { const l = LS[i]; x.rect(LX[i] - l / 2, LY[i] - l / 2, l, l); hay = true; }
       if (hay) x.fill();
@@ -918,10 +1027,28 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     // El camino de los dos sobre el globo y su luz en el ecuador.
     const enGlobo = (wx, wy) => { const lon = wx * RAD, lat = desmerc(-wy) * RAD, X0 = Math.cos(lat) * Math.cos(lon), Z0 = Math.cos(lat) * Math.sin(lon), Y0 = Math.sin(lat), xa = Z0 * cl - X0 * sl, za = X0 * cl + Z0 * sl; QX = gx + xa * R; QY = gy - (Y0 * cp - za * sp) * R; QF = Y0 * sp + za * cp; };
     if (g > 0.01) {
-      x.globalAlpha = 0.75 * g; x.strokeStyle = 'rgb(246,222,255)'; x.lineWidth = R > 60 ? 1.1 : 0.9; x.beginPath();
-      for (let j = 0; j <= RUTA_N; j += 4) { enGlobo(RX[j], RY[j]); if (j) x.lineTo(QX, QY); else x.moveTo(QX, QY); }
-      x.stroke();
-      for (let o = 0; o < 2; o++) { enGlobo(o ? XX : CX, o ? XY : CY); x.fillStyle = COL[o ? 1 : 0]; x.globalAlpha = g; x.beginPath(); circulo(QX, QY, R > 60 ? 2 : 1.4); x.fill(); }
+      // El lazo: dos hilos, el de él (violeta) desde Barcelona y el de ella (rosa) desde Buenos Aires, que se atan en el
+      // ecuador; por cada uno corren tres motas hacia el medio, una en cada pulso.
+      const jM = Math.round(S_ENC * RUTA_N), paso = R > 60 ? 2 : 4;
+      for (let o = 0; o < 2; o++) {
+        x.globalAlpha = 0.85 * g; x.strokeStyle = COL[o]; x.lineWidth = R > 60 ? 1.3 : 1; x.beginPath();
+        const j0 = o ? RUTA_N : 0, dj = o ? -paso : paso;
+        for (let j = j0; o ? j >= jM : j <= jM; j += dj) { enGlobo(RX[j], RY[j]); if (j === j0) x.moveTo(QX, QY); else x.lineTo(QX, QY); }
+        enGlobo(MX, MY); x.lineTo(QX, QY); x.stroke();
+        enGlobo(o ? XX : CX, o ? XY : CY); x.fillStyle = COL[o]; x.globalAlpha = g; x.beginPath(); circulo(QX, QY, R > 60 ? 2.2 : 1.5); x.fill();
+        if (!calma) {
+          x.fillStyle = '#fff'; x.beginPath();
+          const ip = pulso(t), fase = ip >= 0 ? (t - PULSOS[ip]) / 0.5 : 0;
+          for (let k = 0; k < 3; k++) {
+            const u = sat((k + fase) / 3), s = o ? 1 - (1 - S_ENC) * u : S_ENC * u; enRuta(s); enGlobo(WX, WY);
+            const l = (R > 60 ? 2.2 : 1.6) * (0.6 + 0.4 * u); x.rect(QX - l / 2, QY - l / 2, l, l);
+          }
+          x.globalAlpha = g * 0.9; x.fill();
+        }
+      }
+      // El nudo: un anillo de motas alrededor del encuentro que late con la canción.
+      const lt = calma ? 0 : latido(t, H.encuentro); enGlobo(MX, MY);
+      if (QF > 0 && R > 20) { const rn = Math.max(4, R * 0.06) * (1 + 0.25 * lt); x.fillStyle = 'rgb(255,226,244)'; x.globalAlpha = g * 0.8; x.beginPath(); for (let k = 0; k < 12; k++) { const an = k * TAU / 12 + t * 0.6; x.rect(QX + Math.cos(an) * rn - 0.7, QY + Math.sin(an) * rn * 0.8 - 0.7, 1.4, 1.4); } x.fill(); }
     }
     const lat = calma ? 0 : latido(t, H.encuentro);
     enGlobo(MX, MY);
@@ -947,8 +1074,15 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
   function rotulos(t, tC, tX) {
     const tamN = Math.max(34, Math.min(58, m * 0.105)), tp = Math.max(10, Math.min(12, m * 0.027));
     // Apertura: «Para Xiomara», fina, antes de la primera llamada.
-    const ap = tramo(t, 0.15, 0.55) * (1 - tramo(t, 0.95, 1.25));
-    if (!soloZonas) texto(ancho / 2 + 3, alto * 0.5, 'PARA XIOMARA', tp + 2, 'q', 'rgb(240,210,230)', ap, '7px', true);
+    const ap = tramo(t, 0.15, 0.55) * (1 - tramo(t, 1.05, H.luzCarlos));
+    if (!soloZonas && ap > 0.01) {
+      texto(ancho / 2 + 3, alto * 0.5, 'PARA XIOMARA', tp + 2, 'q', 'rgb(240,210,230)', ap, '7px', true);
+      // (dos rayas finas a los lados, que se abren con el golpe de caja de 0,69 s)
+      const L = Math.min(ancho * 0.16, 90) * salida(tramo(t, 0.69, 1.1)), m0 = (tp + 2) * 6.2 + 14;
+      x.globalAlpha = ap * 0.7; x.fillStyle = 'rgb(240,210,230)';
+      x.fillRect(ancho / 2 - m0 - L, alto * 0.5 - (tp + 2) * 0.38, L, 1); x.fillRect(ancho / 2 + m0, alto * 0.5 - (tp + 2) * 0.38, L, 1);
+      x.globalAlpha = 1;
+    }
     // Los nombres, bajo el corazón (durante la nota larga), y dónde se han encontrado.
     const an = tramo(t, H.nombres, H.nombres + 1) * (1 - tramo(t, H.cielo - 0.2, H.cielo + 0.4));
     if (an > 0 && corazon(t)) {
@@ -998,7 +1132,7 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
   }
   id = requestAnimationFrame(cuadro);
 
-  return {
+  const api = {
     // Para las pruebas: un cuadro en un instante dado (sin esperar al reloj).
     dibujar,
     parar() { activo = false; cancelAnimationFrame(id); removeEventListener('resize', alCambiar); clearTimeout(esperaMedir); try { lienzoGL.getContext('webgl')?.getExtension('WEBGL_lose_context')?.loseContext(); } catch {} lienzoGL.remove(); },
@@ -1006,6 +1140,11 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     // (para las pruebas: dónde queda el pequeño mundo del final, en px CSS)
     get mundo() { return { x: Fx, y: Fy, r: Sf }; },
     // (para las pruebas: motas pintadas en el último cuadro)
-    get motas() { return nL; }
+    get motas() { return nL; },
+    // (para depurar: los niveles de motas y la cámara del último cuadro)
+    get niveles() { return niveles; },
+    get camara() { return Array.from(CAM); }
   };
+  if (typeof location !== 'undefined' && location.hash === '#debug') window.__portada = api;
+  return api;
 }

@@ -5,6 +5,7 @@ import { MOMENTOS, PRUEBA, FASES_SUPERNOVA, configuracionActiva } from '../js/da
 import { faseSupernova, TIEMPOS_AMOR } from '../js/util/supernovaAmor.js';
 import { DESTINOS, LEJANOS } from '../js/data/universo.js';
 import { HITOS as HITOS_INTRO, DURACION as DURACION_INTRO, PULSOS } from '../js/ui/portada.js';
+import { SERIES, VOZ } from '../js/data/introMaps.js';
 
 // Hitos de ejemplo (los de la portada anterior) para probar el reescalado.
 const HITOS = { encuentro: 4.6, corazon: 5.1, galaxia: 6.1, tarjeta: 8.9 };
@@ -79,8 +80,15 @@ test('las marcas de la supernova caen en las fases de su ceremonia', () => {
 test('el videoclip de la intro va a 1:1 con «Maps» y sus hitos de imagen caen en compás o en la voz', () => {
   const mi = MOMENTOS.inicio.marcas;
   for (const [k, h] of Object.entries(HITOS_INTRO)) assert.ok(Math.abs(reescalar(h, mi, HITOS_INTRO) - h) < 1e-9, k);
-  // Encuentro, nombres, cielo, salto y tarjeta, en el primer tiempo de un compás (cada cuatro pulsos).
-  for (const k of ['encuentro', 'nombres', 'cielo', 'salto', 'tarjeta']) { const i = PULSOS.indexOf(HITOS_INTRO[k]); assert.ok(i >= 0 && i % 4 === 0, k); }
+  // Encuentro, nombres, mundo, salto y tarjeta, en el primer tiempo de un compás (cada cuatro pulsos); los demás, en la voz
+  // medida (las cinco series de llamadas, los tres «wait» y la última frase: js/data/introMaps.js).
+  for (const k of ['encuentro', 'nombres', 'mundo', 'salto', 'tarjeta']) { const i = PULSOS.indexOf(HITOS_INTRO[k]); assert.ok(i >= 0 && i % 4 === 0, k); }
+  ['luzCarlos', 'luzXiomara', 'mapa', 'ruta', 'juntos'].forEach((k, i) => assert.equal(HITOS_INTRO[k], SERIES[i][0], k));
+  for (const [k, v] of [['espera', 'espera1'], ['respuesta', 'espera2'], ['cielo', 'espera3'], ['globo', 'frase3']]) assert.equal(HITOS_INTRO[k], VOZ[v], k);
+  // Cada sílaba de las llamadas tiene su marca, cada serie dentro de su compás y las sílabas a ~0,5 s (una por pulso).
+  SERIES.forEach((s, i) => { s.forEach((t, j) => assert.equal(mi[`serie${i + 1}${j ? 'abc'[j - 1] : ''}`], t)); for (let j = 1; j < 4; j++) assert.ok(Math.abs(s[j] - s[j - 1] - 0.5) < 0.05, `serie ${i + 1}`); });
+  // El salto, cuando calla la voz; la tarjeta, después del plato en el que llega.
+  assert.ok(VOZ.finVoz < HITOS_INTRO.salto && HITOS_INTRO.salto - VOZ.finVoz < 0.2);
   // Los pulsos, crecientes y a ~0,5 s (120 BPM) de 0 a 32.
   for (let i = 1; i < PULSOS.length; i++) assert.ok(Math.abs(PULSOS[i] - PULSOS[i - 1] - 0.5) < 0.06, `pulso ${i}`);
 });

@@ -13,7 +13,8 @@ import { HITOS } from '../../js/ui/portada.js';
 // una recolección grande (el «reductor de memoria», ~25 ms reales en un móvil, ~100 ms con la CPU ×4) que puede caer en
 // cualquier momento del clip; el resto, ninguno. La tarjeta se prepara en el negro de antes de aparecer (29,55 s).
 const LIMITE = 34, P99 = 25, SUELTOS = 2, MAXIMO = 120;
-const INSTANTES = [...Array.from({ length: 17 }, (_, i) => i * 2), 1.4, 2.6, 3.5, 5.6, 7.6, 9.8, 11.1, 13.2, 15.9, 18.5, 20.3, 21, 22.8, 25, 25.8, 26.6, 27.4, 27.7, 28.3, 28.9, 29.5, 30.4, 31.3]
+// Cada segundo y, además, justo después de algunas sílabas y golpes (js/data/introMaps.js) para ver su efecto.
+const INSTANTES = [...new Set([...Array.from({ length: 33 }, (_, i) => i), ...(process.env.INTRO_INSTANTES ? process.env.INTRO_INSTANTES.split(',').map(Number) : [1.6, 2.1, 3.6, 5.6, 7.6, 9.6, 10.6, 11.2, 12.1, 16.1, 20.3, 22.6, 24.4, 25.8, 26.6, 27.6, 28.6, 29.3, 30.4, 31.3])])]
   .sort((a, b) => a - b);
 
 async function abrirIntro(perfil, base, { tocar = true, calma = false } = {}) {
@@ -35,7 +36,7 @@ export default async function ({ base, informe }) {
       for (const t of INSTANTES) {
         await pagina.evaluate(t => window.__intro.fijar(t), t);
         await pagina.waitForTimeout(t >= HITOS.tarjeta ? 1700 : 1150);   // el texto entra con un fundido; la tarjeta, en 1,3 s
-        await pagina.screenshot({ path: `.pruebas/capturas/intro/${perfil}-${t.toFixed(1).padStart(4, '0')}.png` });
+        await pagina.screenshot({ path: `.pruebas/capturas/intro/${perfil}-${t.toFixed(2).padStart(5, '0')}.png` });
       }
       informe.comprobar(errores.length === 0, `${perfil}: capturas del clip sin errores en la consola`, errores.slice(0, 5));
       // Al final, el pequeño mundo queda entero en el hueco libre: ni la tarjeta lo tapa ni se sale de la pantalla.

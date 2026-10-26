@@ -25,6 +25,7 @@ import { TIEMPOS_AMOR } from '../util/supernovaAmor.js';
 import { ESCENA_PULSAR, ESCENA_CUASAR, ESCENA_DENEB } from '../util/escenasGigantes.js';
 import { MARCAS_TON618 } from '../util/guionTon618.js';
 import { MARCAS_SAGITARIO } from '../util/guionSagitario.js';
+import { MARCAS_INTRO } from './introMaps.js';
 
 export const CARPETA = 'assets/musica/';
 export const FUNDIDO = 1.6;   // segundos del fundido entre dos momentos (1–2 s: ni corte ni espera)
@@ -46,13 +47,13 @@ const momento = (otros = {}) => ({ archivo: null, duracion: null, volumen: 0.9, 
 const estancia = (archivo, volumen = 0.9) => ({ archivo, volumen });
 
 export const MOMENTOS = {
-  // Canción de la intro: «Maps» (Maroon 5), el estribillo: 32 s a ~117,5 BPM, un compás cada ~2,0 s desde el 0. Suena al
-  // terminar la carga, a la vez que el videoclip (js/ui/portada.js), que sigue su reloj. Las marcas son los segundos del
-  // fragmento en los que deben caer los hitos del clip (HITOS de portada.js, que explica cada uno: las dos luces con las
-  // primeras llamadas de la voz, los dos golpes de la letra a 10,9 y 15,7, el encuentro en el compás de 20,0, el salto en
-  // el de 28,0 y la tarjeta en el de 30,0); con este fragmento coinciden y el clip va a 1:1. Sin archivo (o si no carga),
-  // el clip va con su propio reloj de 32 s.
-  inicio: momento({ archivo: 'inicio.m4a', duracion: 32, marcas: { luzCarlos: 1.17, luzXiomara: 3.25, mapa: 5.11, ruta: 7.13, juntos: 9.09, espera: 10.91, respuesta: 15.73, encuentro: 19.99, nombres: 22.01, cielo: 24.03, mundo: 26.01, salto: 27.98, tarjeta: 30 } }),
+  // Canción de la intro: «Maps» (Yeah Yeah Yeahs), el estribillo: 32 s a ~117,5 BPM, un compás cada ~2,0 s desde el 0.
+  // Suena al terminar la carga, a la vez que el videoclip (js/ui/portada.js), que sigue su reloj. Las marcas son los
+  // segundos del fragmento medidos sobre la voz aislada y la batería (js/data/introMaps.js, que explica cómo): los hitos
+  // del clip (las cinco series de llamadas, los tres «wait», el encuentro en el compás de la nota larga, el salto al
+  // callar la voz y la tarjeta en el compás de 30,0) y cada sílaba de las llamadas; con este fragmento el clip va a 1:1.
+  // Sin archivo (o si no carga), el clip va con su propio reloj de 32 s.
+  inicio: momento({ archivo: 'inicio.m4a', duracion: 32, marcas: { ...MARCAS_INTRO } }),
   // Instrumental de los viajes («Duvet», bôa): 15 s, lo que dura el viaje más largo, sin bucle. hastaLlegar: al despegar
   // empieza en el segundo 15 − duración del viaje, para que su final caiga justo en la llegada (allí se funde con la canción
   // del destino o con el ambiente).
