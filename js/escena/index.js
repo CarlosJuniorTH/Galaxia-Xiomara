@@ -870,7 +870,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
         objetivo.addScaledVector(derecha, -base * 0.32);
       }
     }
-    medirZonaLibre();
+    // (A casa el encuadre no depende de la franja libre: se mide después, sin obligar al navegador a maquetar la página dos
+    // veces en el cuadro del clic: la tarjeta acaba de cambiar y el viaje aún va a cambiar más cosas.)
+    if (id === 'hogar') libre(medirZonaLibre); else medirZonaLibre();
     const hasta = objetivo.clone().add(offset);
     // El primer vuelo (entrada) conserva su arco amplio; los demás cuentan algo y llegan
     // girando alrededor del lugar en su último tramo, en lugar de entrar de frente.
@@ -1153,7 +1155,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
         if (!compuesto || fin.continuacion) alLlegar(destinoActual);
         // Si el gigante al que se llegó no abre su clip (la supernova ya nacida), la franja libre vuelve a mandar.
         if (clipEsperado) setTimeout(() => { if (!clip && clipEsperado) { clipEsperado = null; medirZonaLibre(); } }, 4000);
-        controls.update(); fin.resolver(true); fin.alLlegar?.(); entradaResuelta = true; medirZonaLibre();
+        // (En un gigante el encuadre no depende de la franja libre y su videoclip la anula enseguida: se mide después, sin una
+        // maquetación más de la página en el cuadro de la llegada, que ya cambia la tarjeta y empieza el clip.)
+        controls.update(); fin.resolver(true); fin.alLlegar?.(); entradaResuelta = true; if (lejano && lejano.id !== 'supernova') libre(medirZonaLibre); else medirZonaLibre();   // (la supernova sí: su encuadre usa la franja)
         marcarActividad();   // llegar es actividad: el lugar recién llegado se mira a 60 (no a 30 por llevar rato sin tocar)
         fijarEncuadre(); ajuste = null;
         // Si la pantalla giró o cambió la interfaz DURANTE el vuelo, la curva llevó la cámara al
