@@ -17,13 +17,13 @@
     "lufs": -16
   },
   "deneb-estancia.m4a": {
-    "bytes": 1141578,
+    "bytes": 1141590,
     "duracion": 69.665,
     "origen": "Deneb-Galaxia",
     "desde": 196.25,
     "hasta": 265.915,
     "lufs": -20,
-    "separacion": "bsrof1297"
+    "separacion": "ensamble"
   },
   "deneb.m4a": {
     "bytes": 713530,
@@ -59,13 +59,13 @@
     "lufs": -16
   },
   "pulsar-estancia.m4a": {
-    "bytes": 655755,
+    "bytes": 653990,
     "duracion": 40.4,
     "origen": "Galaxia-Analizar1",
     "desde": 126.289,
     "hasta": 166.639,
     "lufs": -20,
-    "separacion": "bsrof1297"
+    "separacion": "ensamble"
   },
   "pulsar.m4a": {
     "bytes": 549032,
@@ -76,13 +76,13 @@
     "lufs": -16
   },
   "sagitario-estancia.m4a": {
-    "bytes": 413044,
+    "bytes": 413146,
     "duracion": 25.55,
     "origen": "Galaxia-Analizar2",
     "desde": 180.345,
     "hasta": 205.895,
     "lufs": -20,
-    "separacion": "bsrof1297"
+    "separacion": "ensamble"
   },
   "sagitario.m4a": {
     "bytes": 619916,
@@ -93,13 +93,13 @@
     "lufs": -16
   },
   "supernova-estancia.m4a": {
-    "bytes": 836828,
+    "bytes": 835607,
     "duracion": 51.282,
     "origen": "Supernova-Galaxia",
     "desde": 174.3,
     "hasta": 225.582,
     "lufs": -20,
-    "separacion": "bsrof1297"
+    "separacion": "ensamble"
   },
   "supernova.m4a": {
     "bytes": 1022724,
@@ -110,13 +110,13 @@
     "lufs": -16
   },
   "ton618-estancia.m4a": {
-    "bytes": 715001,
-    "duracion": 44.15,
+    "bytes": 716075,
+    "duracion": 44.2,
     "origen": "Galaxia-Analizar4",
     "desde": 135.971,
-    "hasta": 180.121,
+    "hasta": 180.171,
     "lufs": -20,
-    "separacion": "bsrof1297"
+    "separacion": "ensamble"
   },
   "ton618.m4a": {
     "bytes": 607215,

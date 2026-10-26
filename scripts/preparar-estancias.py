@@ -1,7 +1,8 @@
 # Estancias: la instrumental que suena en cada lugar cuando acaba su canción (js/data/bandaSonora.js, `estancia`).
 #
 # Cada estancia es la MISMA canción sin la voz y nada más: la instrumental tal cual, sacada con un separador de calidad
-# profesional (BS-RoFormer / Mel-Band RoFormer, los modelos de UVR, vía audio-separator; ver --modelo), sin nada añadido.
+# profesional, sin nada añadido: la media de BS-RoFormer y MelBand Inst V2 (scripts/ensamblar-instrumental.py: es la
+# que mejor reproduce la instrumental verdadera en mezclas de prueba), o BS-RoFormer solo donde Inst V2 deja voz.
 #   · Un solo tramo continuo, sin empalmes: empieza 3 s antes de donde acaba el fragmento del clip (el mezclador,
 #     js/ui/bandaSonora.js, la funde en esos 3 s finales), así que la canción sigue en el mismo compás, y llega hasta su
 #     final natural (la canción se apaga sola) o, si es demasiado larga, hasta un primer tiempo de compás con un fundido
@@ -31,15 +32,17 @@ PLANES = {
     'deneb': dict(cancion='Deneb-Galaxia', clip=(155.806, 199.25), desde=196.25, hasta=265.915),
     'ton618': dict(cancion='Galaxia-Analizar4', clip=(101.634, 138.971), desde=135.971, hasta=None),      # «I Wanna Be Yours»
     'sagitario': dict(cancion='Galaxia-Analizar2', clip=(145.241, 183.345), desde=180.345, hasta=None),   # «Say Yes to Heaven»
-    'hogar': dict(cancion='Galaxia-Analizar3', clip=(23.057, 54.195), desde=51.195, hasta=None),          # «I Saw Your Face Today»
+    # «I Saw Your Face Today»: solo BS-RoFormer. Con Inst V2 en la media, Whisper oye restos de la letra (11 palabras
+    # en el cuásar, 0 con BS-RoFormer solo): esta voz se cuela en Inst V2.
+    'hogar': dict(cancion='Galaxia-Analizar3', clip=(23.057, 54.195), desde=51.195, hasta=None, separacion='bsrof1297'),
     # El cuásar (su clip es un mensaje hablado): la misma canción de casa desde su solo instrumental hasta el final.
-    'cuasar': dict(cancion='Galaxia-Analizar3', clip=None, desde=95.202, hasta=None),
+    'cuasar': dict(cancion='Galaxia-Analizar3', clip=None, desde=95.202, hasta=None, separacion='bsrof1297'),
 }
 
 ap = argparse.ArgumentParser()
 ap.add_argument('lugares', nargs='*')
 ap.add_argument('--originales', default=str(RAIZ.parent.parent.parent / 'audios-originales') if 'worktrees' in str(RAIZ) else str(RAIZ / 'audios-originales'))
-ap.add_argument('--separacion', default='bsrof1297', help='carpeta de la separación dentro de .separado/<huella>/')
+ap.add_argument('--separacion', default='ensamble', help='carpeta de la separación dentro de .separado/<huella>/')
 ap.add_argument('--destino', default=str(RAIZ / 'assets/musica'))
 ap.add_argument('--informe', default=None, help='carpeta para el wav sin comprimir y el JSON de cada estancia')
 ap.add_argument('--lufs', type=float, default=-20)
@@ -53,7 +56,7 @@ def rms_db(x, hop):
     return 20 * np.log10(np.sqrt((m[:k * h].reshape(k, h) ** 2).mean(1)) + 1e-9)
 
 def construir(lugar, plan):
-    ruta = ORIG / plan['cancion']; base = ruta.parent / '.separado' / huella(ruta) / A.separacion
+    ruta = ORIG / plan['cancion']; base = ruta.parent / '.separado' / huella(ruta) / plan.get('separacion', A.separacion)
     inst, sr = sf.read(base / 'instrumental.wav', dtype='float64'); assert sr == SR, sr
     an = json.load(open(ORIG / (plan['cancion'] + '.analisis.json'))); compases = np.array(an['compases'])
     a = plan['desde']; b = plan['hasta'] or len(inst) / SR
@@ -69,7 +72,7 @@ def construir(lugar, plan):
         nf = int(2.0 * SR); x[-nf:] *= np.linspace(1, 0, nf)[:, None] ** 1.5
     ni = int(0.03 * SR); x[:ni] *= np.linspace(0, 1, ni)[:, None]   # (el mezclador ya funde 3 s; esto evita un clic)
     fin = a + len(x) / SR
-    return x, dict(tramo=[round(a, 3), round(fin, 3)], separacion=A.separacion, cancion=plan['cancion'],
+    return x, dict(tramo=[round(a, 3), round(fin, 3)], separacion=plan.get('separacion', A.separacion), cancion=plan['cancion'],
                    continua_clip=bool(plan['clip']) and abs(a - (plan['clip'][1] - 3)) < 0.01, duracion=round(len(x) / SR, 3), uniones=[])
 
 def codificar(lugar, x, info):
