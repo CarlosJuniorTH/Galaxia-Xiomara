@@ -175,21 +175,25 @@ export function* construirSolar({ haciaCentroGalactico, uPR = { value: 1 } }) {
       // Granulación: celdas de convección (Voronoi): centros brillantes y bordes oscuros finos.
       float celdas(vec3 p){ vec3 i = floor(p), f = fract(p); float d1 = 8.0, d2 = 8.0;
         for (int x = -1; x <= 1; x++) for (int y = -1; y <= 1; y++) for (int z = -1; z <= 1; z++) { vec3 g = vec3(x, y, z), o = vec3(h3(i + g), h3(i + g + 7.1), h3(i + g + 13.7));
-          o = 0.5 + 0.4 * sin(uT * 0.25 + 6.2831 * o); float d = length(g + o - f); if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d; }
+          o = 0.5 + 0.4 * sin(uT * 0.6 + 6.2831 * o); float d = length(g + o - f); if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d; }
         return d2 - d1; }
       void main(){
         vec3 q = normalize(vP);
-        float g = smoothstep(0.0, 0.5, celdas(q * 75.0)), fina = rn3(q * 220.0 + uT * 0.05);
+        float g = smoothstep(0.0, 0.45, celdas(q * 55.0)), fina = rn3(q * 220.0 + uT * 0.05);
         // Pocas manchas y pequeñas: solo donde un ruido de frecuencia alta pasa de un umbral alto.
         float mancha = fbm3(q * 5.5 + 11.0), umbra = smoothstep(0.835, 0.845, mancha), penumbra = smoothstep(0.815, 0.825, mancha) - umbra;
         float mu = max(dot(normalize(vN), vec3(0.0, 0.0, 1.0)), 0.0);
         // Una estrella ardiente: centro amarillo dorado claro, limbo naranja rojizo intenso. Valores LINEALES (la salida los
         // pasa a sRGB, que aclara los medios: con 0,66 de verde salía beige): en pantalla ≈ (255, 200, 90) en el centro,
         // (255, 140, 20) en medio y (200, 60, 10) en el borde. Luminancia del centro ≈ 0,64, bajo el umbral de 0,78.
-        vec3 centro = vec3(1.0, 0.58, 0.1), medio = vec3(1.0, 0.27, 0.008), borde = vec3(0.58, 0.045, 0.003);
-        vec3 col = mix(borde, medio, smoothstep(0.0, 0.45, mu)); col = mix(col, centro, smoothstep(0.45, 1.0, mu));
-        col *= (0.78 + 0.22 * g) * (0.94 + 0.06 * fina);              // granulación sutil
+        vec3 centro = vec3(1.0, 0.64, 0.13), medio = vec3(1.0, 0.27, 0.01), borde = vec3(0.3, 0.012, 0.001);
+        vec3 col = mix(borde, medio, smoothstep(0.0, 0.6, mu)); col = mix(col, centro, smoothstep(0.45, 1.0, mu));
+        // Hierve: granulación visible (celdas que cambian), supergranulación más amplia y un fino ruido que se mueve.
+        float superg = fbm3(q * 9.0 + vec3(0.0, uT * 0.03, 0.0));
+        col *= (0.58 + 0.42 * g) * (0.8 + 0.4 * superg) * (0.97 + 0.03 * fina);
         col *= 1.0 - penumbra * 0.35 - umbra * 0.7;
+        // Tope de luminancia por debajo del umbral del resplandor (0,78): el centro amarillo no se difumina.
+        float lum = dot(col, vec3(0.2126, 0.7152, 0.0722)); col *= min(1.0, 0.74 / max(lum, 1e-4));
         gl_FragColor = vec4(col, 1.0); }`
   }));
   sol.add(superficie);
@@ -230,9 +234,12 @@ export function* construirSolar({ haciaCentroGalactico, uPR = { value: 1 } }) {
   // Protuberancias: arcos de plasma que salen de la superficie siguiendo el campo magnético.
   const materialArco = new THREE.ShaderMaterial({
     uniforms: { uT: { value: 0 } },
-    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    fragmentShader: RUIDO + `uniform float uT; varying vec2 vUv;
-      void main(){ float n = fbm3(vec3(vUv.x * 12.0, vUv.y * 3.0, uT * 0.3));
+    // Solo se ven asomando por el borde: la parte que se proyecta sobre el disco (de canto se veía como un trazo recto que
+    // cruzaba el Sol) se descarta. vM: posición en el mundo; el Sol está en el origen.
+    vertexShader: 'varying vec2 vUv; varying vec3 vM; void main(){ vUv = uv; vec4 m = modelMatrix * vec4(position, 1.0); vM = m.xyz; gl_Position = projectionMatrix * viewMatrix * m; }',
+    fragmentShader: RUIDO + `uniform float uT; varying vec2 vUv; varying vec3 vM;
+      void main(){ vec3 v = normalize(cameraPosition - vM); if (length(vM - v * dot(vM, v)) < ${(RADIO_SOL * 1.01).toFixed(1)}) discard;
+        float n = fbm3(vec3(vUv.x * 12.0, vUv.y * 3.0, uT * 0.3));
         float k = (0.55 + 0.6 * n) * (0.5 + 0.5 * sin(vUv.x * 3.14159)); vec3 c = mix(vec3(1.0, 0.12, 0.01), vec3(1.0, 0.3, 0.03), n);
         gl_FragColor = vec4(c * k * 0.9, k); }`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide
