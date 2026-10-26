@@ -7,7 +7,7 @@ import { EXPOSICION } from './exposicion.js';
 import { crearNube } from './nube.js';
 import { RADIO_REMANENTE_SUPERNOVA, PROGENITORA_RELATIVA as P } from '../data/escalaCosmica.js';
 import { crearRuido } from '../util/ruido.js';
-import { puntoCorazon, puntoCorazonVolumen, faseSupernova, TIEMPOS_AMOR, faltaAnimacion, desdeAnimacion, latidoCancion, respiracionCancion, colapsoCancion, edadCapa } from '../util/supernovaAmor.js';
+import { puntoCorazon, puntoCorazonVolumen, faseSupernova, TIEMPOS_AMOR, faltaAnimacion, desdeAnimacion, latidoCancion, respiracionCancion, colapsoCancion, edadCapa, cantoCancion } from '../util/supernovaAmor.js';
 import { texBrillo, texDestello, texEstrellaGigante } from './texturas.js';
 
 const RUIDO = /* glsl */`
@@ -89,7 +89,7 @@ export function* construirSupernova({ uScale, uPR, escala }) {
   // Dos lotes de puntos y seis cintas, sin añadir objetos por cada partícula.
   const explosion = new THREE.Group(), corazon = new THREE.Group();
   explosion.visible = false; grupo.add(explosion); explosion.add(corazon);
-  const uE = { value: 0 }, uT = { value: 0 };
+  const uE = { value: 0 }, uT = { value: 0 }, uCanto = { value: 0 };   // uCanto: la nota larga que se sostiene (la luz la sigue)
   const n = 7600;
   let semilla = 180125;
   const azar = () => { semilla = (Math.imul(1664525, semilla) + 1013904223) >>> 0; return semilla / 4294967296; };
@@ -110,8 +110,8 @@ export function* construirSupernova({ uScale, uPR, escala }) {
     geo.setAttribute('position', new THREE.BufferAttribute(posiciones, 3));
     geo.setAttribute('aSalida', new THREE.BufferAttribute(salidas, 3));
     geo.setAttribute('aDato', new THREE.BufferAttribute(datos, 3));
-    const mat = aditivo({ uE, uT, uScale, uPR }, /* glsl */`
-      attribute vec3 aSalida, aDato; uniform float uE, uT, uScale, uPR;
+    const mat = aditivo({ uE, uT, uScale, uPR, uCanto }, /* glsl */`
+      attribute vec3 aSalida, aDato; uniform float uE, uT, uScale, uPR, uCanto;
       varying vec3 vColor; varying float vA;
       ${RUIDO}
       void main(){
@@ -136,7 +136,7 @@ export function* construirSupernova({ uScale, uPR, escala }) {
         vA = smoothstep(0.0, 1.0, uE) * (0.48 + 0.09 * sin(uT * 0.22 + aDato.z * 6.283)) * (1.0 + 4.5 * (1.0 - forma) * smoothstep(1.0, 3.5, uE));   // en vuelo, chispas vivas que se ven contra el fondo
         float px = (12.0 + aDato.z * 14.0) * ${escala.toFixed(3)} * uScale / max(1.0, -mv.z);
         gl_PointSize = clamp(px, 1.5 * uPR * (1.0 - forma) + 1.0 * forma, 3.2 * uPR);
-        vA *= min(1.0, px * px);
+        vA *= min(1.0, px * px) * (1.0 + 0.45 * uCanto);   // con la voz sostenida, más luz
       }`, /* glsl */`
       varying vec3 vColor; varying float vA;
       void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; if(d > 1.0) discard;
@@ -159,9 +159,9 @@ export function* construirSupernova({ uScale, uPR, escala }) {
       const a = j / 128 * Math.PI * 2, p = puntoCorazonVolumen(a, (i/9-0.5)*1.55 + Math.sin(a*2+i)*0.08, radio, i*0.7);
       return new THREE.Vector3(...p);
     }), true);
-    const cinta = new THREE.Mesh(new THREE.TubeGeometry(curva, 256, 9 + i%3 * 3, 8, true), aditivo({ uE, uT, uSemilla: { value: i } },
+    const cinta = new THREE.Mesh(new THREE.TubeGeometry(curva, 256, 9 + i%3 * 3, 8, true), aditivo({ uE, uT, uCanto, uSemilla: { value: i } },
       'varying vec2 vUv; void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}', /* glsl */`
-      varying vec2 vUv; uniform float uE, uT, uSemilla;
+      varying vec2 vUv; uniform float uE, uT, uSemilla, uCanto;
       void main(){
         // Las líneas del corazón se dibujan con la materia de la explosión: avanzan a lo largo del contorno,
         // con una cabeza brillante, en vez de aparecer de golpe.
@@ -176,7 +176,7 @@ export function* construirSupernova({ uScale, uPR, escala }) {
         vec3 col = mix(vec3(1.0, 0.32, 0.55), vec3(1.0, 0.74, 0.45), 0.5 + 0.5 * sin(vUv.x * 6.283 + uSemilla));
         col = mix(col, vec3(0.6, 0.78, 1.0), pow(0.5 + 0.5 * sin(vUv.x * 18.85 + uSemilla * 2.3), 8.0) * 0.6);
         col *= 1.0 + 0.5 * exp(-pow(fract(vUv.x - uT * 0.025 + uSemilla * 0.1) * 6.0 - 3.0, 2.0));
-        float a = hilo * (fil * tejido * 0.48 + cabeza * 0.4 * smoothstep(4.0, 6.0, uE));
+        float a = hilo * (fil * tejido * 0.48 + cabeza * 0.4 * smoothstep(4.0, 6.0, uE)) * (1.0 + 0.5 * uCanto);
         gl_FragColor = vec4(col * a, a);
       }`, { side: THREE.DoubleSide }));
     corazon.add(cinta);
@@ -429,12 +429,13 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
       if (dt > 0) faseLatido += dt * 0.7;
       const fl = faseLatido % 1, pum = activa ? latidoCancion(sC) : Math.exp(-Math.pow(fl / 0.05, 2)) + 0.65 * Math.exp(-Math.pow((fl - 0.2) / 0.05, 2));
       const fuerzaLatido = estado === 'estable' ? 0.35 : activa ? 0.5 + agita : 0;
-      superficie.material.uniforms.uLatido.value = pum * fuerzaLatido * (1 - colapso);
+      const canto = activa ? cantoCancion(sC) : 0;   // la nota larga: la estrella se enciende mientras se sostiene
+      superficie.material.uniforms.uLatido.value = (pum * fuerzaLatido + canto * 0.35) * (1 - colapso);
       superficie.material.uniforms.uColapso.value = Math.max(contra * 0.55, colapso);
       // Crece con los latidos y, al final, se contrae hasta nada.
       const crece = 1 + agita * 0.55;
       const temblor = 1 + contra * 0.018 * (Math.sin(t * 43) + Math.sin(t * 29 + 1));   // la envoltura tiembla
-      const latido = crece * (1 + pum * fuerzaLatido * (0.04 + agita * 0.06)) * (1 - 0.68 * contra) * temblor * Math.max(0.001, 1 - Math.pow(colapso, 1.3));
+      const latido = crece * (1 + pum * fuerzaLatido * (0.04 + agita * 0.06) + canto * 0.03) * (1 - 0.68 * contra) * temblor * Math.max(0.001, 1 - Math.pow(colapso, 1.3));
       // El infinito gira sobre sí mismo en varias direcciones, cada vez más deprisa.
       if (dt > 0 && giroInf > 0) { faseGiro += dt * (0.8 + giroInf * 5); superficie.rotation.set(Math.sin(faseGiro * 0.7) * 1.2 * giroInf, faseGiro, Math.cos(faseGiro * 0.5) * 0.9 * giroInf); } else if (!activa) superficie.rotation.set(0, 0, 0);
       const tension = activa ? THREE.MathUtils.smoothstep(agita, 0.45, 0.88) * (1 - colapso) : 0;
@@ -487,7 +488,7 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
       });
 
       if (!explosion.visible) return;
-      const e = desdeAnimacion(Math.max(0, t - inicio)); uE.value = e;   // (en el reloj de la animación)
+      const e = desdeAnimacion(Math.max(0, t - inicio)); uE.value = e; uCanto.value = estado === 'estallido' ? cantoCancion(TIEMPOS_AMOR.espera + t - inicio) : 0;   // (en el reloj de la animación)
       const flash = Math.exp(-e / 0.6) * THREE.MathUtils.smoothstep(e, 0, 0.08);   // ruptura del choque: breve
       destelloGrande.scale.setScalar(60 * (2 + 5 * flash)); destelloGrande.material.opacity = Math.min(1, flash * 0.5);   // un punto seco   // un destello seco, no una mancha blanca
       raya.scale.set(60 * 40 * flash + 1, 60 * 0.8 * flash + 1, 1); raya.material.opacity = flash * 0.45;

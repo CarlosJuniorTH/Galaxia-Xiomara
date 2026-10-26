@@ -72,26 +72,28 @@ test('la supernova se puede repetir, conservar y cancelar antes del estallido si
   } finally { globalThis.document = guardarDocumento; globalThis.matchMedia = guardarMedia; globalThis.location = guardarLocation; }
 });
 
-test('la ceremonia sigue a «Sparks»: estalla con el grito (41,7 s), forma el corazón a golpes y se revela en la nota más alta', async () => {
-  const { faltaAnimacion, faltaReal, desdeAnimacion, LETRA_SUPERNOVA: L, latidoCancion, COMPAS_SUPERNOVA: C } = await import('../js/util/supernovaAmor.js');
+test('la ceremonia sigue a «Sparks» al milisegundo: estalla con el grito (41,665 s), forma el corazón a golpes y se revela en la nota más alta', async () => {
+  const { faltaAnimacion, faltaReal, desdeAnimacion, LETRA_SUPERNOVA: L, latidoCancion, cantoCancion, CAJAS_SUPERNOVA: CAJAS, FUERTES_SUPERNOVA: FUERTES, GOLPES_COLAPSO, NOTAS_SUPERNOVA } = await import('../js/util/supernovaAmor.js');
   const T = TIEMPOS_AMOR;
-  assert.ok(Math.abs(T.espera - 41.7) < 1e-9 && Math.abs(T.espera + T.formado - L.alto) < 1e-9 && Math.abs(T.espera + T.reposo - 62.3) < 1e-9);
-  // El silencio es el hueco de los graves justo antes del grito (41,24 → 41,7), no antes.
-  assert.ok(Math.abs(T.espera - T.silencio - L.uno) < 1e-9 && T.silencio < 0.6);
+  assert.ok(Math.abs(T.espera - 41.665) < 1e-9 && Math.abs(T.espera + T.formado - L.alto) < 1e-6 && Math.abs(T.espera + T.reposo - 62.338) < 1e-6);
+  // El silencio es el hueco de los graves justo antes del grito (la caja de 41,213 → 41,665), no antes.
+  assert.ok(Math.abs(T.espera - T.silencio - L.uno) < 1e-6 && T.silencio < 0.6 && CAJAS.includes(L.uno) && CAJAS.includes(L.dos));
   // Los tramos empiezan y terminan donde la animación de siempre (14 s de espera; 4/16/19/25 tras el estallido), sin saltos.
   assert.equal(faltaAnimacion(T.espera), 14); assert.equal(faltaAnimacion(0), 0);
-  assert.equal(desdeAnimacion(T.formar), 4); assert.equal(desdeAnimacion(T.formado), 16); assert.equal(desdeAnimacion(T.revelar), 19); assert.equal(desdeAnimacion(T.reposo), 25);
+  for (const [x, y] of [[T.formar, 4], [T.formado, 16], [T.revelar, 19], [T.reposo, 25]]) assert.ok(Math.abs(desdeAnimacion(x) - y) < 1e-6);
   let a = -1, b = -1; for (let x = 0; x <= 70; x += 0.01) { const fa = faltaAnimacion(Math.min(x, T.espera)), da = desdeAnimacion(x); assert.ok(fa >= a - 1e-9 && da > b); a = fa; b = da; }
   for (const f of [0.5, 3.8, 7, 9.5, 13]) assert.ok(Math.abs(faltaAnimacion(faltaReal(f)) - f) < 1e-9);
-  // Cada fase visible cae en su frase: el infinito se apaga cuando calla la voz y las dos estrellitas nacen en el golpe.
-  assert.ok(Math.abs(faltaAnimacion(T.espera - L.calla) - 4.8) < 1e-9 && Math.abs(faltaAnimacion(T.espera - L.dos) - 3.8) < 1e-9);
+  // Cada fase visible cae en su frase: la estrella se apaga cuando calla la voz y las dos estrellitas nacen en la caja.
+  assert.ok(Math.abs(faltaAnimacion(T.espera - L.calla) - 4.8) < 1e-6 && Math.abs(faltaAnimacion(T.espera - L.dos) - 3.8) < 1e-6);
   // La formación avanza a golpes: deprisa justo después de cada tiempo y despacio antes del siguiente.
   const paso = (x, h = 0.05) => desdeAnimacion(x + h) - desdeAnimacion(x);
-  assert.ok(paso(47.72 - T.espera + 0.02) > 2 * paso(49.03 - T.espera - 0.1));
-  // Los latidos caen en el golpe de caja de la canción (y no entre medias).
-  assert.ok(latidoCancion(C.caja) > 0.9 && latidoCancion(C.caja + C.compas) > 0.9 && latidoCancion(C.caja + C.compas / 2) < 0.05);
-  // Desde que reconoce su error, laten el doble de seguido (también en el tiempo fuerte).
-  assert.ok(latidoCancion(C.fuerte + 9 * C.compas) > 0.9);
+  assert.ok(paso(48.974 - T.espera + 0.02) > 2 * paso(50.297 - T.espera - 0.1));
+  // Los latidos caen en cada golpe de caja medido (y no entre medias); desde el error, también en los tiempos fuertes.
+  for (const c of CAJAS) assert.ok(latidoCancion(c) > 0.9, `caja ${c}`);
+  assert.ok(latidoCancion((CAJAS[2] + FUERTES[3]) / 2) < 0.05 && latidoCancion(FUERTES[12]) > 0.9 && latidoCancion(FUERTES[2]) < 0.05);
+  // Los tirones del colapso son golpes de la canción; la luz sigue las notas largas (más con la más alta).
+  for (const g of GOLPES_COLAPSO) assert.ok(CAJAS.includes(g) || FUERTES.includes(g));
+  assert.ok(cantoCancion(56.5) > 0.8 && cantoCancion(40) === 0 && cantoCancion(44.5) > cantoCancion(42.6) && NOTAS_SUPERNOVA.length > 10);
   assert.equal(faseSupernova('estallido', T.formado - 0.01), 'formacion'); assert.equal(faseSupernova('estallido', T.formado + 0.01), 'revelacion');
 });
 

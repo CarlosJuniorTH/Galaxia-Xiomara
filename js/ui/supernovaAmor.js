@@ -14,8 +14,8 @@ export function crearSupernovaAmor({ escena, progreso, musica, banda = null, alD
   if (descubierta) escena.recordarSupernova();
   // Dentro del encuentro, unas pocas palabras propias que acompañan el sentido de cada frase de la canción (no la citan):
   // el latido entregado, la duda, la promesa que aprieta, el silencio, las dos luces. [segundo, ceja, título]
-  const ENCUENTRO = [[0, 'UNA ESTRELLA. UN ÚLTIMO LATIDO.', 'Hay encuentros que lo cambian todo.'], [7, 'CADA LATIDO LLEVA TU NOMBRE', 'Late más fuerte cuando estás.'],
-    [22.7, 'TAMBIÉN LAS ESTRELLAS TIEMBLAN', 'Y aun así, sigue ardiendo por ti.'], [31.3, 'TODO SE APRIETA EN UN PUNTO', ''], [38, '', ''], [38.62, 'DOS LUCES', 'Tú y yo.']];
+  const ENCUENTRO = [[0, 'UNA ESTRELLA. UN ÚLTIMO LATIDO.', 'Hay encuentros que lo cambian todo.'], [7.134, 'CADA LATIDO LLEVA TU NOMBRE', 'Late más fuerte cuando estás.'],
+    [22.335, 'TAMBIÉN LAS ESTRELLAS TIEMBLAN', 'Y aun así, sigue ardiendo por ti.'], [31.25, 'TODO SE APRIETA EN UN PUNTO', ''], [37.96, '', ''], [38.606, 'DOS LUCES', 'Tú y yo.']];
   let tramoEncuentro = -1;
   function textoEncuentro() {
     if (raiz.dataset.fase !== 'encuentro') return;
