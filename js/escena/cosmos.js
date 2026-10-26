@@ -252,7 +252,7 @@ export function* construirCosmos({ uScale, uPR }) {
   // Su escena al llegar (escenasGigantes.js): anillo de motas, luz que sube por los chorros, lucecitas y la onda final.
   yield;
   const escenaCuasar = crearEscenaCuasar({ uScale, uPR, largo: CUASAR.chorro }); piezasCuasar.grupo.add(escenaCuasar.grupo);
-  let tCuasar = 0, acentoEscena = false, atenuandoCuasar = false;
+  let tCuasar = 0, acentoEscena = false, atenuandoCuasar = false, fondoCuasar = 0;
   const centroCuasar = new THREE.Vector3();
   const rotacionCuasar = cuasar.quaternion.clone();
 
@@ -469,8 +469,11 @@ export function* construirCosmos({ uScale, uPR }) {
       escenaCuasar.actualizar(estadoC, wC, dt, t, reducido);
       piezasCuasar.luzGas(0.82 * (1 + (estadoC.gas - 1) * wC));
       // Las paredes de polvo y las nebulosas de alrededor se apagan mientras dura su clip (le robaban el encuadre) y vuelven
-      // al terminar, con el cuásar ya entero (js/util/fondoEscena.js; foco: 0 → 0,5 al empezar y de vuelta a 0 al final).
-      if (wC > 0.0005 && estadoC.foco > 0) { atenuandoCuasar = true; cuasar.getWorldPosition(centroCuasar); atenuarFondo(centroCuasar.x, centroCuasar.y, centroCuasar.z, CUASAR.anfitriona * cuasar.matrixWorld.getMaxScaleOnAxis() * 20, 0.88 * Math.min(1, estadoC.foco / 0.5) * wC); }
+      // al terminar, con el cuásar ya entero (js/util/fondoEscena.js).
+      // Al terminar no vuelven de golpe: se encienden en 3 s, mientras el director devuelve la cámara.
+      const metaFondo = dC.activa ? 0.88 * Math.min(1, sC / 1.3) * wC : 0;
+      fondoCuasar = metaFondo >= fondoCuasar ? metaFondo : Math.max(metaFondo, fondoCuasar - dt / 3);
+      if (fondoCuasar > 0.0005) { atenuandoCuasar = true; cuasar.getWorldPosition(centroCuasar); atenuarFondo(centroCuasar.x, centroCuasar.y, centroCuasar.z, CUASAR.anfitriona * cuasar.matrixWorld.getMaxScaleOnAxis() * 20, fondoCuasar); }
       else if (atenuandoCuasar) { atenuandoCuasar = false; atenuarFondo(0, 0, 0, 0, 0); }
       // El frente de los chorros que crecen (la luz del faro, que sube por ellos); se apaga después, sin tocar la del faro.
       if (dC.activa && (estadoC.acento >= 0 || acentoEscena)) { piezasCuasar.acento(estadoC.acento); acentoEscena = estadoC.acento >= 0; }

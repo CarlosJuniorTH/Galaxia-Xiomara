@@ -45,8 +45,8 @@ export function crearEscenaCuasar({ uScale, uPR, largo = 7600 }) {
   const NC = 5000, pC = new Float32Array(NC * 3);
   for (let i = 0; i < NC; i++) pC.set([azar(), azar(), i % 2 ? 1 : -1], i * 3);
   const gC = new THREE.BufferGeometry(); gC.setAttribute('position', new THREE.BufferAttribute(pC, 3));
-  const uC = { uScale, uPR, uExpo: EXPOSICION, uLuz: { value: 0 }, uBase: { value: 0.4 }, uSubida: { value: 1.05 }, uFrente: { value: 0 }, uFlujo: { value: 0 }, uCalido: { value: 0 }, uSilueta: { value: 0 } };
-  const chorros = new THREE.Points(gC, motas(uC, /* glsl */`uniform float uScale, uPR, uExpo, uLuz, uBase, uSubida, uFrente, uFlujo, uCalido, uSilueta; varying vec3 vC; varying float vA;
+  const uC = { uScale, uPR, uExpo: EXPOSICION, uLuz: { value: 0 }, uBase: { value: 0.4 }, uSubida: { value: 1.05 }, uFrente: { value: 0 }, uFlujo: { value: 0 }, uCalido: { value: 0 }, uSilueta: { value: 0 }, uNudos: { value: new THREE.Vector4(-1, -1, -1, -1) }, uNudosLuz: { value: new THREE.Vector4() } };
+  const chorros = new THREE.Points(gC, motas(uC, /* glsl */`uniform float uScale, uPR, uExpo, uLuz, uBase, uSubida, uFrente, uFlujo, uCalido, uSilueta; uniform vec4 uNudos, uNudosLuz; varying vec3 vC; varying float vA;
     ${TAMANO}
     void main(){ float f = fract(position.x + uFlujo * (0.4 + 0.6 * position.y)), y = 300.0 + f * ${(largo * 0.93).toFixed(1)}, yf = y / ${largo.toFixed(1)};
       float a = position.y * 6.2832 + position.x * 31.0 + f * 9.0, r = (30.0 + 300.0 * f) * sqrt(fract(position.x * 7.13 + position.y * 3.1));
@@ -55,7 +55,8 @@ export function crearEscenaCuasar({ uScale, uPR, largo = 7600 }) {
       float dentro = 1.0 - smoothstep(uSubida - 0.03, uSubida, yf), frente = exp(-pow((yf - uSubida + 0.015) / 0.02, 2.0)) * uFrente;
       vC = mix(mix(vec3(1.0), vec3(0.7, 0.8, 1.0), f), mix(vec3(1.0, 0.66, 0.8), vec3(1.0, 0.85, 0.55), position.y), uCalido);
       float base = uBase * (0.4 + 0.6 * position.y) * (1.0 - smoothstep(0.75, 1.0, f));
-      vA = ((base + uLuz * (0.5 + 0.5 * position.y)) * dentro + frente * 2.4) * tamMota(20.0 + position.y * 16.0, mv, 2.8) * uExpo; }`));
+      vec4 dn = (vec4(yf) - uNudos) / 0.02; float nudo = dot(exp(-dn * dn), uNudosLuz);   // los nudos de plasma que recorren el chorro
+      vA = ((base + uLuz * (0.5 + 0.5 * position.y) + nudo * 2.6) * dentro + frente * 2.4) * tamMota(20.0 + position.y * 16.0, mv, 2.8) * uExpo; }`));
   chorros.renderOrder = 22;
 
   // Las otras (impresionantes, bellas, exitosas… pero no ella): 48 estrellas brillantes repartidas por la galaxia, cada una
@@ -132,7 +133,8 @@ export function crearEscenaCuasar({ uScale, uPR, largo = 7600 }) {
       flujo += dt * (reducido ? 0.006 : 0.015) * (ver ? 1 : 2); uC.uFlujo.value = flujo;   // el hilo de los chorros, siempre
       chorros.visible = true; otras.visible = ver && e.otras > 0.002; onda.visible = ver && (e.conv >= 0 || (e.cima >= 0 && e.cima < 2.4)); lobulos.visible = ver && e.estallido >= 0 && e.estallido < 1.6;
       uC.uSubida.value = ver ? 1.05 + (e.alcance - 1.05) * peso : 1.05;
-      if (!ver) { uC.uLuz.value = 0; uC.uFrente.value = 0; uC.uCalido.value = 0; return; }
+      if (!ver) { uC.uLuz.value = 0; uC.uFrente.value = 0; uC.uCalido.value = 0; uC.uNudosLuz.value.set(0, 0, 0, 0); return; }
+      if (e.nudos) { uC.uNudos.value.fromArray(e.nudos); uC.uNudosLuz.value.fromArray(e.nudosLuz).multiplyScalar(peso); }
       uC.uLuz.value = 0.35 * e.frente * peso; uC.uFrente.value = e.frente * peso; uC.uCalido.value = e.calido * peso;
       uO.uLuz.value = e.otras * peso; uO.uT.value = t; uO.uTitileo.value = reducido ? 0 : 1;
       uE.uLuz.value = peso; uE.uCima.value = e.cima; uE.uConv.value = e.conv;

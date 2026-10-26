@@ -15,22 +15,25 @@ export { ESCENA_PULSAR, estadoPulsar };
 // se va encendiendo: los dos chorros —los dos, a la vez, como ellos dos— nacen y crecen en las frases clave, hasta llegar a
 // su diseño de siempre en «mi mujer ideal», que es como queda para explorarlo. (Segundos del fragmento; transcripción de
 // Whisper large-v3 comprobada dos veces: 73 de 74 palabras iguales y con menos de 0,54 s de diferencia.)
-//  0–1,3      empieza el recuerdo: los chorros se recogen en el núcleo y todo se apaga (el cuásar dormido);
-//  vi 3,18    «la primera vez que la vi»: la primera chispa: el disco se enciende con un anillo de luz y asoman los chorros;
-//  salir 4,9  le pidió salir: los chorros dan su primer estirón;
-//  excusa 5,74 buscaba excusas para verla: la materia cae en espiral al disco, más y más deprisa (siempre acercándose), y lo aviva;
-//  novios 9,3 le pidió ser novios: los dos chorros se lanzan juntos hasta la mitad;
-//  increible  «…es simplemente increíble» (10,58; «increíble» en 13,32): el disco se acelera y el anillo de luz del
-//             horizonte crece con la palabra alargada; en «increíble», otro estirón;
-//  otras 14,52 las otras mujeres (impresionantes; bellas 18,6, exitosas): la galaxia se llena de lucecitas… pero los chorros
-//             NO crecen con ellas;
-//  pero 21,02 «pero ella…»: las lucecitas se apagan de golpe; los chorros vuelven a crecer en tres golpes de la música (21,85,
-//             23,13, 24,43) mientras dice que es la primera que…
-//  reir 25,06 «…me hace reír»: el disco ríe: ondas de luz rápidas que salen del centro;
-//  disfrutar 25,98 disfrutar estar con ella: todo se entibia, rosa y oro;
-//  ideal 27,58 «es mi mujer…»: la luz de la galaxia se recoge en el núcleo; cima 28,64 «…ideal»: los chorros se disparan
-//             hasta su punta; estalla 29,4 (la música crece): en las puntas florecen los lóbulos y una onda de motas sale del
-//             disco. Queda el cuásar de siempre, entero, para explorarlo.
+//  0–1,3      empieza el recuerdo: los chorros se recogen en el núcleo y el disco se apaga de fuera hacia dentro (dormido);
+//  vi 3,18    «la primera vez que la vi»: la chispa: el disco se ENCIENDE desde el centro, anillo a anillo (≈2 s), los chorros
+//             salen disparados (a un tercio) con un nudo de plasma que los recorre, y una ola de luz cruza la galaxia;
+//  pedi 4,36 / salir 4,9  el nervio de pedirle salir: titubeos de luz en el núcleo, un estirón pequeño y otro al «saliéramos»;
+//  excusa 5,74 buscaba excusas para verla: la materia cae en espiral al disco, más y más deprisa (siempre acercándose);
+//  novios 9,3 le pidió ser novios: los dos chorros se lanzan juntos (a dos tercios), con su nudo, una onda en el disco y otra
+//             ola por la galaxia;
+//  increible  «…es simplemente increíble» (10,58; «increíble» en 13,32): el disco se acelera y se CALIENTA (blanco azulado),
+//             el anillo de luz del horizonte crece; en «increíble», otro estirón con su nudo y su ola;
+//  otras 14,52 las otras mujeres (impresionantes; bellas 18,6, exitosas): 48 estrellas con su cruz de luz por la galaxia… y los
+//             chorros quietos: ni un nudo (no los encienden);
+//  pero 21,02 «pero ella…»: las estrellas se apagan de golpe; en los tres golpes de la música (21,85, 23,13, 24,43) un nudo
+//             recorre los chorros y crecen otro poco;
+//  reir 25,06 «…me hace reír»: el disco ríe: ondas de luz rápidas que salen del centro, con latidos en las sílabas;
+//  disfrutar 25,98 disfrutar estar con ella: el disco se templa y todo se entibia, rosa y oro;
+//  ideal 27,58 «es mi mujer…»: la luz de la galaxia se recoge en el núcleo; cima 28,64 «…ideal»: los chorros se disparan hasta
+//             su punta con una ráfaga de nudos y una ola ENORME recorre toda la galaxia; estalla 29,4 (la música crece): en las
+//             puntas florecen los lóbulos de radio y una onda de motas sale del disco. Queda el cuásar de siempre, entero.
+// Los nudos de plasma caen en sílabas de la voz y en golpes de la música de fondo medidos en su pista separada (Demucs).
 // camara: la pista del videoclip para el director de cámara (js/util/directorCamara.js): azimut 0 hacia casa (por donde se
 // llega: [≈4°, 44°, 1,0]), elevación sobre el disco (+90 = el chorro del lado de casa), distancia en radios de encuadre
 // (lejano.dist; el disco mide ~0,21, la galaxia ~0,92 y cada chorro ~1,46). Un solo travelling lento y continuo (Carlos: «lentos,
@@ -46,15 +49,16 @@ export const ESCENA_CUASAR = {
     estalla: 29.4, fin: 31 },
   camara: [
     { t: 0, pos: [4, 44, 1.0], mira: [0, 0, 0], fov: 50, curva: 'suave', giro: -135 },     // el encuadre de llegada
-    { t: 3.0, pos: [-4, 32, 0.82], fov: 49, curva: 'lineal', giro: -128 },                 // el recuerdo: se acerca despacio al núcleo dormido
-    { t: 6.5, pos: [-12, 20, 0.76], fov: 48, curva: 'lineal', giro: -123 },                // la chispa y el nervio: baja hacia el disco
-    { t: 10.0, pos: [-22, 14, 0.95], fov: 50, curva: 'lineal', giro: -118 },               // novios: se aparta un poco para ver los dos chorros
-    { t: 13.6, pos: [-32, 22, 0.72], fov: 48, curva: 'lineal', giro: -116 },               // «increíble»: vuelve hacia el núcleo
-    { t: 18.5, pos: [-45, 46, 1.35], fov: 54, curva: 'lineal', giro: -102 },               // las otras: sube y ve la galaxia entera
-    { t: 21.2, pos: [-52, 46, 1.3], fov: 54, curva: 'lineal', giro: -98 },
-    { t: 25.0, pos: [-62, 24, 0.84], fov: 50, curva: 'lineal', giro: -107 },               // «pero ella»: baja despacio hacia ella
-    { t: 28.4, pos: [-72, 20, 0.68], fov: 48, curva: 'lineal', giro: -106 },               // la risa, disfrutar, «es mi mujer…»: cerca y cálido
-    { t: 31, pos: [-84, 18, 1.15], fov: 50, curva: 'suave', giro: -110 }                   // «…ideal»: se aparta despacio y queda el cuásar entero
+    { t: 4.8, pos: [-2, 46, 0.9], fov: 49, curva: 'lineal', giro: -131 },                  // desde arriba: el disco se enciende por anillos
+    { t: 8.5, pos: [-12, 22, 1.15], fov: 50, curva: 'lineal', giro: -123 },                // baja de lado: los chorros salen disparados
+    { t: 11.5, pos: [-20, 12, 1.35], fov: 50, curva: 'lineal', giro: -119 },               // novios: los dos chorros enteros, con sus nudos
+    { t: 14.5, pos: [-28, 30, 0.95], fov: 48, curva: 'lineal', giro: -116 },               // «increíble»: el disco se calienta
+    { t: 19.0, pos: [-40, 52, 1.65], fov: 54, curva: 'lineal', giro: -103 },               // las otras: la galaxia entera, desde arriba
+    { t: 21.5, pos: [-48, 44, 1.55], fov: 54, curva: 'lineal', giro: -101 },
+    { t: 25.0, pos: [-58, 16, 1.3], fov: 50, curva: 'lineal', giro: -111 },                // «pero ella»: de lado, los nudos en los golpes
+    { t: 27.5, pos: [-64, 30, 1.05], fov: 48, curva: 'lineal', giro: -101 },               // la risa y lo cálido
+    { t: 28.6, pos: [-68, 34, 1.25], fov: 50, curva: 'lineal', giro: -96 },                // «es mi mujer…»: se abre para la ola
+    { t: 31, pos: [-78, 24, 1.9], fov: 52, curva: 'suave', giro: -103 }                    // «…ideal»: la ola por la galaxia y los lóbulos
   ]
 };
 
@@ -95,7 +99,7 @@ function curva(s, p) {
 }
 
 // Reposo del cuásar (su diseño de siempre): fuera de la escena y al terminarla todo vale esto.
-export const REPOSO_CUASAR = Object.freeze({ tiempo: 1, pulso: 0, alcance: 1.05, frente: 0, chorro: 1, disco: 1, giro: 1, gas: 1, caida: 1, fotones: 1, destello: 1, ondaK: 0, ondaFase: 0,
+export const REPOSO_CUASAR = Object.freeze({ tiempo: 1, pulso: 0, enc: 9000, tono: 0, olaR: 0, olaK: 0, nudosK: 0, alcance: 1.05, frente: 0, chorro: 1, disco: 1, giro: 1, gas: 1, caida: 1, fotones: 1, destello: 1, ondaK: 0, ondaFase: 0,
   otras: 0, calido: 0, conv: -1, cima: -1, estallido: -1, lobulo: 1, acento: -1, foco: 0 });
 
 // Curvas del cuásar (con las marcas de ESCENA_CUASAR; si se escala la escena, se recalculan).
@@ -103,27 +107,42 @@ function curvasCuasar(m) {
   const g = [m.golpe1, m.golpe2, m.golpe3];
   return {
     // Largo de los chorros (fracción de su largo; ≥ 1,03: enteros). Se recogen al empezar y crecen en las frases clave.
-    alcance: [[0, 1.05], [m.recogido, 0], [m.vi, 0], [m.vi + 0.55, 0.1, 'r'], [m.pedi, 0.1], [m.pedi + 0.3, 0.13, 'r'], [m.salir, 0.13], [m.salir + 0.7, 0.25, 'r'], [m.novios, 0.25], [m.novios + 0.75, 0.5, 'r'],
-      [m.wow, 0.5], [m.wow + 0.65, 0.62, 'r'], [g[0], 0.62], [g[0] + 0.5, 0.68, 'r'], [g[1], 0.68], [g[1] + 0.5, 0.74, 'r'], [g[2], 0.74], [g[2] + 0.5, 0.8, 'r'],
-      [m.reir + 0.46, 0.8], [m.reir + 0.95, 0.85, 'r'], [m.cima, 0.85], [m.estalla, 1.05, 'r']],
-    disco: [[0, 1], [m.recogido, 0.2], [m.vi, 0.26], [m.vi + 0.3, 0.6, 'r'], [m.salir, 0.6], [m.salir + 0.5, 0.65], [m.excusa, 0.65], [m.pedir - 0.3, 0.85], [m.novios, 0.85], [m.novios + 0.4, 0.95, 'r'],
+    alcance: [[0, 1.05], [m.recogido, 0], [m.vi, 0], [m.vi + 0.45, 0.3, 'r'], [m.pedi, 0.3], [m.pedi + 0.3, 0.34, 'r'], [m.salir, 0.34], [m.salir + 0.6, 0.48, 'r'], [m.novios, 0.48], [m.novios + 0.6, 0.66, 'r'],
+      [m.wow, 0.66], [m.wow + 0.5, 0.75, 'r'], [g[0], 0.75], [g[0] + 0.4, 0.8, 'r'], [g[1], 0.8], [g[1] + 0.4, 0.85, 'r'], [g[2], 0.85], [g[2] + 0.4, 0.9, 'r'],
+      [m.cima, 0.9], [m.estalla, 1.05, 'r']],
+    // El disco y la galaxia se apagan de fuera hacia dentro al empezar el recuerdo y en «la vi» se ENCIENDEN desde el centro,
+    // anillo a anillo, hasta el borde de la galaxia (enc: radio encendido en unidades del cuásar; el disco llega a 1100 y la
+    // galaxia a ~6200; ≥ 7000, entero).
+    enc: [[0, 9000], [0.05, 6800], [m.recogido, 0], [m.vi, 0], [m.vi + 2.8, 7000], [m.fin - 0.5, 7000], [m.fin, 9000]],
+    // Con «simplemente increíble» el disco se calienta: blanco azulado; se templa con las otras y vuelve con «pero ella».
+    tono: [[0, 0], [m.simple, 0], [m.wow + 0.3, 1], [m.otras + 1.5, 0.55], [m.pero, 0.45], [m.disfrutar, 0]],
+    disco: [[0, 1], [m.recogido, 0.5], [m.vi, 0.5], [m.vi + 0.3, 0.75, 'r'], [m.salir, 0.6], [m.salir + 0.5, 0.65], [m.excusa, 0.65], [m.pedir - 0.3, 0.85], [m.novios, 0.85], [m.novios + 0.4, 0.95, 'r'],
       [m.wow, 0.95], [m.wow + 0.4, 1.05, 'r'], [m.cima, 1.05], [m.cima + 0.4, 1.3, 'r'], [m.estalla + 0.4, 1.3], [m.fin, 1]],
     giro: [[0, 1], [m.recogido, 0.4], [m.vi, 0.4], [m.vi + 0.6, 0.7], [m.novios, 0.8], [m.simple, 1.1], [m.wow, 2.2], [m.wow + 1.2, 1.4], [m.pero, 1.2], [m.reir, 1.7], [m.disfrutar + 0.5, 1.3],
       [m.ideal, 1.4], [m.cima, 2.4], [m.cima + 0.4, 3, 'r'], [m.estalla + 0.3, 3], [m.fin, 1]],
-    gas: [[0, 1], [m.recogido, 0.3], [m.vi, 0.3], [m.vi + 0.5, 0.5], [m.pedir, 0.6], [m.otras, 0.65], [m.otras + 1.5, 0.8], [m.pero, 0.8], [m.pero + 0.8, 0.62], [m.ideal, 0.7],
-      [m.cima, 0.5], [m.estalla + 0.3, 1.1, 'r'], [m.fin, 1]],
+    gas: [[0, 1], [m.pedir, 1], [m.otras, 0.9], [m.otras + 1.5, 1], [m.pero, 1], [m.pero + 0.8, 0.8], [m.ideal, 0.85], [m.cima, 0.7], [m.estalla + 0.3, 1.1, 'r'], [m.fin, 1]],
     caida: [[0, 1], [m.recogido, 0.3], [m.excusa, 0.3], [m.excusa + 0.8, 1.8], [m.pedir - 0.3, 1.8], [m.pedir + 0.5, 1], [m.ideal, 1], [m.cima, 1.8], [m.estalla + 0.5, 1.4], [m.fin, 1]],
     fotones: [[0, 1], [m.recogido, 0.4], [m.vi, 0.4], [m.vi + 0.35, 1, 'r'], [m.simple, 1], [m.wow, 1.6], [m.otras + 0.5, 1.1], [m.pero, 1.1], [m.ideal, 1.2], [m.cima, 1.5], [m.cima + 0.3, 1.9, 'r'],
       [m.estalla + 0.5, 1.6], [m.fin, 1]],
     destello: [[0, 1], [m.recogido, 0.35], [m.vi, 0.35], [m.vi + 0.25, 0.8, 'r'], [m.ideal, 0.8], [m.cima, 0.6], [m.cima + 0.3, 1.1, 'r'], [m.fin, 1]],
     // Las ondas del disco: la chispa de «la vi» y la risa (un tren de ondas rápido mientras dice «me hace reír»).
-    ondaK: [[0, 0], [m.vi, 0], [m.vi + 0.12, 0.8, 'r'], [m.vi + 1.0, 0], [m.novios - 0.05, 0], [m.novios + 0.1, 0.7, 'r'], [m.novios + 1.0, 0], [m.reir - 0.05, 0], [m.reir + 0.1, 1, 'r'], [m.disfrutar, 1], [m.disfrutar + 0.6, 0]],
+    ondaK: [[0, 0], [m.vi, 0], [m.vi + 0.12, 0.8, 'r'], [m.vi + 1.0, 0], [m.novios - 0.05, 0], [m.novios + 0.1, 0.7, 'r'], [m.novios + 1.0, 0], [m.reir - 0.05, 0], [m.reir + 0.1, 1.6, 'r'], [m.disfrutar, 1.6], [m.disfrutar + 0.6, 0]],
     otras: [[0, 0], [m.otras, 0], [m.otras + 1.4, 0.5], [m.bellas - 0.7, 0.7], [m.bellas, 0.7], [m.bellas + 1.3, 1], [m.pero, 1], [m.pero + 0.8, 0, 'r']],
     calido: [[0, 0], [m.disfrutar - 0.2, 0], [m.disfrutar + 1, 1], [m.estalla, 1], [m.fin, 0]],
     foco: [[0, 0], [m.recogido, 0.5], [m.estalla, 0.5], [m.fin, 0]]
   };
 }
 const curvasGuardadas = new WeakMap();
+
+// Nudos de plasma: en cada golpe (la chispa, las sílabas fuertes de la voz y los golpes de la música de fondo, medidos en su
+// pista separada) sale del núcleo un nudo de luz que recorre los dos chorros a toda velocidad hasta su punta (o hasta donde
+// hayan llegado). Con las otras mujeres (14,5–21) no hay ninguno: no encienden los chorros. [segundo, fuerza].
+export const NUDOS_CUASAR = [[3.18, 1], [3.9, 0.6], [4.9, 0.8], [7.76, 0.7], [9.3, 1], [13.32, 1], [21.85, 0.8], [23.13, 0.8], [24.43, 0.8], [25.52, 0.7], [27.28, 0.7],
+  [28.24, 0.7], [28.64, 1.2], [28.95, 1], [29.4, 1.2]];
+const VIAJE_NUDO = 0.75, VIDA_NUDO = 1.15;   // segundos hasta la punta y de vida
+// Olas de luz por la galaxia anfitriona: un destello del núcleo que la recorre del centro al borde (radio en unidades del
+// cuásar: el remolino llega a ~6200). [segundo, fuerza, velocidad]. La de «ideal», enorme y más lenta: recorre toda la galaxia.
+const OLAS_CUASAR = [[3.18, 0.8, 5200], [9.3, 0.9, 5200], [13.32, 1, 5200], [28.64, 1.6, 3800]];
 
 // Latidos de luz del núcleo (el destello, el anillo del horizonte y el disco), cada uno en una sílaba o un golpe: la chispa
 // de «la vi»; el nervio de pedirle salir (cuatro titubeos pequeños: «y le pedí que…»); «novios»; «increíble»; los tres golpes
@@ -147,11 +166,14 @@ function pulsosCuasar(s, m) {
 //  calido    rosa y oro (0–1);  conv  la luz de la galaxia que se recoge en el núcleo (0–1; −1 nada);
 //  cima      segundos desde «ideal» (−1 antes): la onda de motas;  estallido  segundos desde que florecen los lóbulos (−1);
 //  lobulo    luz de los lóbulos de las puntas (0 sin chorros enteros, 1 normal, más al florecer);  foco  penumbra del resto;
-//  pulso     latidos de luz del núcleo en las sílabas y golpes (0 en reposo; ~0–1,3).
+//  pulso     latidos de luz del núcleo en las sílabas y golpes (0 en reposo; ~0–1,3);
+//  enc       radio encendido del disco y la galaxia (unidades del cuásar; ≥ 7000 entero);  tono  disco calentado, blanco azulado (0–1);
+//  nudos / nudosLuz  hasta 4 nudos de plasma que recorren los chorros (posición 0–1, −1 sin nudo) y su luz; nudosK su suma;
+//  olaR / olaK  la ola de luz que recorre la galaxia anfitriona (radio en unidades del cuásar y fuerza).
 export function estadoCuasar(s, config, e = {}, reducido = false) {
   const m = config.marcas;
   let c = curvasGuardadas.get(config); if (!c) { c = curvasCuasar(m); curvasGuardadas.set(config, c); }
-  if (!(s > 0) || s >= m.fin) { Object.assign(e, REPOSO_CUASAR); return e; }
+  if (!(s > 0) || s >= m.fin) { Object.assign(e, REPOSO_CUASAR); e.nudos ??= [-1, -1, -1, -1]; e.nudosLuz ??= [0, 0, 0, 0]; e.nudos.fill(-1); e.nudosLuz.fill(0); return e; }
   e.tiempo = 1;
   e.alcance = curva(s, c.alcance);
   // El frente brilla mientras los chorros crecen (más cuanto más deprisa), nunca al recogerse.
@@ -163,13 +185,32 @@ export function estadoCuasar(s, config, e = {}, reducido = false) {
   e.gas = curva(s, c.gas); e.caida = curva(s, c.caida); e.fotones = curva(s, c.fotones); e.destello = curva(s, c.destello);
   e.ondaK = curva(s, c.ondaK) * (reducido ? 0.4 : 1); e.ondaFase = s * (reducido ? 1.5 : 3.2);
   e.pulso = pulsosCuasar(s, m) * (reducido ? 0.35 : 1);
+  e.enc = curva(s, c.enc); e.tono = curva(s, c.tono);
+  // Hasta cuatro nudos vivos (los más recientes): posición a lo largo del chorro (fracción de su largo) y su luz.
+  e.nudos ??= [-1, -1, -1, -1]; e.nudosLuz ??= [0, 0, 0, 0];
+  let n = 0;
+  for (let i = NUDOS_CUASAR.length - 1; i >= 0 && n < 4; i--) {
+    const [t0, k] = NUDOS_CUASAR[i], x = s - t0;
+    if (x < 0 || x >= VIDA_NUDO) continue;
+    e.nudos[n] = Math.min(x / VIAJE_NUDO, Math.max(0, e.alcance - 0.01)); e.nudosLuz[n] = k * Math.min(1, x * 25) * (1 - suave(x, VIAJE_NUDO, VIDA_NUDO)) * (reducido ? 0.5 : 1); n++;
+  }
+  for (; n < 4; n++) { e.nudos[n] = -1; e.nudosLuz[n] = 0; }
+  e.nudosK = e.nudosLuz[0] + e.nudosLuz[1] + e.nudosLuz[2] + e.nudosLuz[3];
+  // La ola de la galaxia más reciente.
+  e.olaR = 0; e.olaK = 0;
+  for (let i = OLAS_CUASAR.length - 1; i >= 0; i--) {
+    const [t0, k, vel] = OLAS_CUASAR[i], x = s - t0;
+    if (x < 0) continue;
+    const r = 300 + x * vel; if (r < 7000) { e.olaR = r; e.olaK = k * Math.min(1, x * 8) * (1 - suave(r, 4500, 7000)) * (reducido ? 0.4 : 1); }
+    break;
+  }
   e.otras = curva(s, c.otras); e.calido = curva(s, c.calido); e.foco = curva(s, c.foco);
   e.conv = s >= m.ideal - 0.3 && s < m.cima ? (s - m.ideal + 0.3) / (m.cima - m.ideal + 0.3) : -1;
   e.cima = s >= m.cima ? s - m.cima : -1;
   e.estallido = s >= m.estalla ? s - m.estalla : -1;
-  const florece = e.estallido >= 0 ? Math.min(1, e.estallido * 2.2) * (1 - suave(e.estallido, 0.4, m.fin - m.estalla)) : 0;
+  const florece = e.estallido >= 0 ? Math.min(1, e.estallido * 1.2) * (1 - suave(e.estallido, 0.4, m.fin - m.estalla)) : 0;
   // Las nubes de las puntas: se apagan (suaves) al recogerse los chorros y vuelven cuando llegan enteros, floreciendo.
-  e.lobulo = (s < m.recogido ? 1 - suave(s, 0, m.recogido) : suave(s, m.cima + 0.2, m.estalla + 0.2)) * (1 + 1.3 * florece);
+  e.lobulo = (s < m.recogido ? 1 - suave(s, 0, m.recogido) : suave(s, m.cima + 0.2, m.estalla + 0.2)) * (1 + 2.2 * florece);
   return e;
 }
 

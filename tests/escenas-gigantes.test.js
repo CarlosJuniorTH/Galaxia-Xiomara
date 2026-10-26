@@ -71,13 +71,13 @@ test('la pista de cámara del púlsar: ordenada, dentro de la canción y sin atr
 
 test('el cuásar se enciende con la historia: los chorros se recogen, nacen y crecen en las frases clave y acaba en su diseño de siempre', () => {
   const m = ESCENA_CUASAR.marcas, c = s => ({ ...estadoCuasar(s, ESCENA_CUASAR) });
-  for (const s of [0, ESCENA_CUASAR.duracion, ESCENA_CUASAR.duracion + 3]) assert.deepEqual(c(s), { ...REPOSO_CUASAR }, `reposo en ${s}`);
+  for (const s of [0, ESCENA_CUASAR.duracion, ESCENA_CUASAR.duracion + 3]) { const e = c(s); for (const k in REPOSO_CUASAR) assert.equal(e[k], REPOSO_CUASAR[k], `${k}: reposo en ${s}`); assert.ok(e.nudos.every(x => x === -1) && e.nudosLuz.every(x => x === 0), `sin nudos en ${s}`); }
   // Justo antes de acabar ya es casi el de siempre (sin salto al terminar).
   const casi = c(ESCENA_CUASAR.duracion - 0.02);
   for (const k of ['alcance', 'disco', 'giro', 'gas', 'caida', 'fotones', 'destello', 'lobulo']) assert.ok(Math.abs(casi[k] - REPOSO_CUASAR[k]) < 0.03, `${k} al final: ${casi[k]}`);
   for (const k of ['otras', 'calido', 'foco', 'ondaK', 'frente']) assert.ok(casi[k] < 0.03, k);
   // Dormido: chorros recogidos y disco apagado hasta «la vi»; entonces asoman.
-  assert.ok(c(m.recogido + 0.5).alcance < 0.01 && c(m.recogido + 0.5).disco < 0.4 && c(m.vi - 0.05).alcance < 0.01);
+  assert.ok(c(m.recogido + 0.5).alcance < 0.01 && c(m.recogido + 0.5).enc < 100 && c(m.vi - 0.05).alcance < 0.01);
   assert.ok(c(m.vi + 0.3).alcance > 0.05 && c(m.vi + 0.2).frente > 0.3 && c(m.vi + 0.2).ondaK > 0.5, 'la primera chispa');
   // Los chorros solo crecen (nunca se encogen tras recogerse) y en las frases clave.
   let previo = 0;
@@ -86,10 +86,13 @@ test('el cuásar se enciende con la historia: los chorros se recogen, nacen y cr
   for (const k of ['salir', 'novios', 'wow', 'golpe1', 'golpe2', 'golpe3', 'cima']) assert.ok(salto(m[k] - 0.05, m[k] + 1) > 0.04, `estirón en ${k}`);
   assert.ok(salto(m.otras, m.pero) < 1e-6, 'las otras no hacen crecer los chorros');
   assert.ok(c(m.otras + 2).otras > 0.4 && c(m.bellas + 1.5).otras > 0.95 && c(m.pero + 0.85).otras < 0.01, 'las otras luces se apagan con «pero ella»');
+  assert.ok(c(m.vi - 0.1).enc < 1 && c(m.vi + 1).enc > 800 && c(m.vi + 1).enc < 4000 && c(m.vi + 2.9).enc > 6500, 'el disco se enciende desde el centro con «la vi»');
+  assert.ok(c(m.vi + 0.3).nudosK > 0.5 && c(m.golpe2 + 0.3).nudosK > 0.5 && c(16).nudosK === 0, 'nudos de plasma en los golpes, ninguno con las otras');
+  assert.ok(c(m.cima + 0.5).olaK > 1 && c(m.cima + 0.5).olaR > 1500 && c(m.wow + 0.3).tono > 0.9, 'la ola por la galaxia en «ideal» y el disco calentado en «increíble»');
   assert.ok(c(m.reir + 0.3).ondaK > 0.9 && c(m.disfrutar + 1).ondaK < 0.01, 'la risa');
   assert.ok(c(m.disfrutar + 1.2).calido > 0.95);
   assert.ok(c(m.cima - 0.3).conv > 0.5 && c(m.cima + 0.1).conv === -1 && c(m.cima + 0.5).cima > 0, 'se recoge la luz y sale la onda');
-  assert.ok(c(m.cima - 0.1).alcance < 0.9 && c(m.estalla).alcance > 1.03 && c(m.estalla + 0.2).lobulo > 1.5, 'los chorros llegan a la punta y florecen');
+  assert.ok(c(m.cima - 0.1).alcance < 0.92 && c(m.estalla).alcance > 1.03 && c(m.estalla + 0.2).lobulo > 1.5, 'los chorros llegan a la punta y florecen');
   for (let s = 0.02; s < ESCENA_CUASAR.duracion; s += 1 / 60) { const a = c(s), b = c(s + 1 / 60); for (const k of ['alcance', 'disco', 'gas', 'fotones', 'otras', 'calido', 'foco', 'lobulo']) assert.ok(Math.abs(a[k] - b[k]) < 0.08, `${k} en ${s.toFixed(2)}`); }
 });
 

@@ -287,24 +287,29 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
   }
   // uLuzGas: luz del remolino (la galaxia anfitriona), algo tenue para que luzcan el disco y el chorro; en la escena del
   // cuásar baja más (cosmos.js) y se ven sus motas. Solo el color: el polvo sigue tapando igual.
-  const uLuzGas = { value: 0.82 };
+  const uLuzGas = { value: 0.82 }, uOlaR = { value: 0 }, uOlaK = { value: 0 }, uEncR = { value: 9000 };
   for (let k = 0; k < 5; k++) {
     yield;
     const h = (k - 2) / 2, lam = new THREE.Mesh(new THREE.RingGeometry(R_IN, R_OUT, 256, 48), new THREE.ShaderMaterial({
-      uniforms: { uT: { value: 0 }, uIn: { value: R_IN }, uOut: { value: R_OUT }, uH: { value: h }, uTex: { value: texRemolino }, uLuzGas },
+      uniforms: { uT: { value: 0 }, uIn: { value: R_IN }, uOut: { value: R_OUT }, uH: { value: h }, uTex: { value: texRemolino }, uLuzGas, uOlaR, uOlaK, uEncR },
       vertexShader: 'varying vec2 vP; varying float vC; void main(){ vP = position.xy; vec4 mv = modelViewMatrix * vec4(position, 1.0); vC = abs(dot(normalize(mv.xyz), normalize(normalMatrix * vec3(0.0, 0.0, 1.0)))); gl_Position = projectionMatrix * mv; }',
-      fragmentShader: /* glsl */`uniform sampler2D uTex; uniform float uT, uIn, uOut, uH, uLuzGas; varying vec2 vP; varying float vC;
+      fragmentShader: /* glsl */`uniform sampler2D uTex; uniform float uT, uIn, uOut, uH, uLuzGas, uOlaR, uOlaK, uEncR; varying vec2 vP; varying float vC;
         void main(){
           // Gira entero (en el plano de la elipse) y cada capa exterior es la misma nube girada y algo mayor.
           float L = length(vP), k = mix(1.0, 1.55, smoothstep(uIn * 2.0, uIn * 6.0, L));
           vec2 e = vP * vec2(1.0, k); float a = uT * 0.03 + uH * 1.3, c = cos(a), s = sin(a);
           e = mat2(c, s, -s, c) * e * (1.0 + abs(uH) * 0.06);
           vec4 t = texture2D(uTex, (e / vec2(1.0, k)) / (2.0 * uOut) + 0.5);
-          if (uH == 0.0) { gl_FragColor = vec4(t.rgb * uLuzGas, t.a) * mix(0.55, 1.0, smoothstep(0.08, 0.35, vC)); return; }
+          // Escena: la ola de luz de un destello del núcleo que recorre la galaxia (un frente nítido con su estela corta).
+          float ola = uOlaK > 0.0 ? uOlaK * (exp(-pow((L - uOlaR) / 190.0, 2.0)) + 0.18 * exp(-pow((L - uOlaR + 450.0) / 450.0, 2.0)) * step(L, uOlaR)) : 0.0;
+          // El encendido (escena): más allá de uEncR la galaxia está dormida (apagada); su frente es un anillo de luz.
+          float dormida = 1.0;
+          if (uEncR < 8000.0) { dormida = mix(0.22, 1.0, 1.0 - smoothstep(uEncR - 260.0, uEncR, L)); ola += 1.3 * exp(-pow((L - uEncR) / 200.0, 2.0)) * step(1.0, uEncR); }
+          if (uH == 0.0) { gl_FragColor = vec4(t.rgb * uLuzGas * dormida * (1.0 + 1.6 * ola) + vec3(1.0, 0.85, 0.92) * t.a * ola * 0.2, t.a) * mix(0.55, 1.0, smoothstep(0.08, 0.35, vC)); return; }
           // Capas de arriba y abajo: solo jirones donde el gas es denso, más fríos y translúcidos.
           float al = smoothstep(0.7, 0.98, t.a) * 0.22 * (1.0 - abs(uH) * 0.35) * mix(0.55, 1.0, smoothstep(0.08, 0.35, vC));
           vec3 col = t.rgb / max(t.a, 1e-3); col = mix(col, col * vec3(0.85, 0.9, 1.25), 0.4);
-          gl_FragColor = vec4(col * al * uLuzGas, al); }`,
+          gl_FragColor = vec4(col * al * uLuzGas * dormida * (1.0 + 2.0 * ola), al); }`,
       transparent: true, depthWrite: false, side: THREE.DoubleSide, premultipliedAlpha: true,
       blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor }));
     lam.rotation.x = -Math.PI / 2; lam.scale.y = -1; lam.position.y = h * 320; lam.renderOrder = 10 + (k === 2 ? 3 : k < 2 ? k : 6 - k); remolino.push(lam);
@@ -328,12 +333,12 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
       col.set([c[0] * b, c[1] * b, c[2] * b], j * 3); tam[j] = a() < 0.03 ? 2.6 : 1.0 + a() * 0.9; j++;
     }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aCol', new THREE.BufferAttribute(col, 3)); g.setAttribute('aTam', new THREE.BufferAttribute(tam, 1));
-    const polvoEst = new THREE.Points(g, aditivo({ uT: { value: 0 }, uPR, uExpo: EXPOSICION, uLuzGas },
-      /* glsl */`uniform float uT, uPR, uExpo, uLuzGas; attribute vec3 aCol; attribute float aTam; varying vec3 vC; varying float vA;
+    const polvoEst = new THREE.Points(g, aditivo({ uT: { value: 0 }, uPR, uExpo: EXPOSICION, uLuzGas, uEncR },
+      /* glsl */`uniform float uT, uPR, uExpo, uLuzGas, uEncR; attribute vec3 aCol; attribute float aTam; varying vec3 vC; varying float vA;
         void main(){ float ga = uT * 0.03, c = cos(ga), s = sin(ga);
           float k = position.y / max(1.0, length(position.xy)); vec2 p = position.xy; p.y *= 1.55; p = mat2(c, s, -s, c) * p; p.y /= 1.55;   // gira con el remolino
           vec4 mv = modelViewMatrix * vec4(p, position.z, 1.0); gl_Position = projectionMatrix * mv;
-          gl_PointSize = aTam * uPR; vA = 0.9 * uExpo * step(0.0, -mv.z) * min(1.0, uLuzGas / 0.82); vC = aCol; }`,   // (uLuzGas: en la escena, el cuásar dormido)   // exposición automática: de lejos no se amontona en una mancha
+          gl_PointSize = aTam * uPR; vA = 0.9 * uExpo * step(0.0, -mv.z) * min(1.0, uLuzGas / 0.82) * (uEncR < 8000.0 ? mix(0.2, 1.0, 1.0 - smoothstep(uEncR - 260.0, uEncR, length(position.xy))) : 1.0); vC = aCol; }`,   // (uLuzGas: en la escena, el cuásar dormido)   // exposición automática: de lejos no se amontona en una mancha
       /* glsl */`varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; if (d > 1.0) discard; float a = (1.0 - smoothstep(0.4, 1.0, d)) * vA; gl_FragColor = vec4(vC * a, a); }`));
     polvoEst.rotation.x = -Math.PI / 2; polvoEst.scale.y = -1; polvoEst.frustumCulled = false; polvoEst.renderOrder = 16;
     grupo.add(polvoEst); animados.push(polvoEst);
@@ -381,9 +386,9 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
   yield;
   // ── Disco de acreción ──
   const disco = new THREE.Mesh(new THREE.RingGeometry(discoIn, discoOut, 320, 12), aditivo(
-    { uT: { value: 0 }, uIn: { value: discoIn }, uOut: { value: discoOut }, uLuzD: { value: 1 }, uOndaK: { value: 0 }, uOndaF: { value: 0 }, uCalido: { value: 0 } },
+    { uT: { value: 0 }, uIn: { value: discoIn }, uOut: { value: discoOut }, uLuzD: { value: 1 }, uOndaK: { value: 0 }, uOndaF: { value: 0 }, uCalido: { value: 0 }, uEnc: uEncR, uTono: { value: 0 } },
     'varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    /* glsl */`uniform float uT, uIn, uOut, uLuzD, uOndaK, uOndaF, uCalido; varying vec2 vP; ${RUIDO}
+    /* glsl */`uniform float uT, uIn, uOut, uLuzD, uOndaK, uOndaF, uCalido, uEnc, uTono; varying vec2 vP; ${RUIDO}
       void main(){
         float r = length(vP), t = clamp((r - uIn) / (uOut - uIn), 0.0, 1.0), ang = atan(vP.y, vP.x);
         float giro = ang - 90.0 * pow(uIn / r, 1.5) - uT * 0.35 - log(r / uIn) * 2.6;   // espirales finas con su enroscado fijo (el de la primera imagen); gira entera sin enroscarse más   // Kepler: dentro gira más rápido
@@ -405,6 +410,9 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
         // la luz del disco que se enciende con la historia. En reposo (0, 0, 1) no cambia nada.
         if (uOndaK > 0.0) b *= 1.0 + 1.8 * uOndaK * pow(0.5 + 0.5 * cos(6.2832 * (t * 2.5 - uOndaF)), 16.0) * (1.0 - 0.6 * t);
         c = mix(c, vec3(1.0, 0.62, 0.74) * (0.4 + 0.6 * max(c.r, max(c.g, c.b))), uCalido * 0.35);
+        c = mix(c, vec3(0.78, 0.88, 1.0) * (0.55 + 0.45 * max(c.r, max(c.g, c.b))), uTono * 0.6 * (1.0 - 0.5 * t));   // calentado: blanco azulado
+        // Encendido por anillos desde el centro: apagado más allá de uEnc, con un anillo brillante en el frente.
+        if (uEnc < 8000.0) { float te = (uEnc - uIn) / (uOut - uIn); b *= mix(0.07, 1.0, 1.0 - smoothstep(te - 0.06, te, t)) + 2.4 * exp(-pow((t - te) / 0.025, 2.0)) * step(1.0, uEnc); }
         b *= uLuzD;
         gl_FragColor = vec4(c * b * 1.7, min(1.0, b)); }`));   // más brillante: el disco es lo que más luce del cuásar
   disco.rotation.x = Math.PI / 2; grupo.add(disco); animados.push(disco);
@@ -438,7 +446,7 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
   yield;
   // Acento de luz (el faro): un brillo rosado y dorado que sube por cada chorro. uAc: su posición a lo largo
   // del chorro (0 base, 1 punta; negativo: apagado). Compartido por todas las capas.
-  const uAc = { value: -1 }, uAcK = { value: 1 };
+  const uAc = { value: -1 }, uAcK = { value: 1 }, uNudos = { value: new THREE.Vector4(-1, -1, -1, -1) }, uNudosLuz = { value: new THREE.Vector4() };
   // Largo de los chorros (fracción de LARGO) en la escena del cuásar: nacen y crecen con la historia. En reposo 1,05:
   // enteros (los cortes de abajo no quitan nada). uLob: luz de la nube de las puntas (0 sin chorros enteros, 1 normal).
   const uAlc = { value: 1.05 }, uLob = { value: 1 };
@@ -446,14 +454,17 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
   // puede extrapolar las variables un poco fuera de su rango —con MSAA, siempre— y pow de un negativo da NaN: un punto negro.)
   const capaChorro = ({ rBase, rPunta, colorA, colorB, intensidad, helice }) => {
     const geo = new THREE.CylinderGeometry(rPunta, rBase, LARGO, 48, 24, true); geo.translate(0, LARGO / 2, 0);
-    return new THREE.Mesh(geo, aditivo({ uT: { value: 0 }, uA: { value: C(colorA) }, uB: { value: C(colorB) }, uI: { value: intensidad }, uH: { value: helice }, uAc, uAcK, uAlc },
+    return new THREE.Mesh(geo, aditivo({ uT: { value: 0 }, uA: { value: C(colorA) }, uB: { value: C(colorB) }, uI: { value: intensidad }, uH: { value: helice }, uAc, uAcK, uAlc, uNudos, uNudosLuz },
       'varying vec2 vU; varying float vCara; void main(){ vU = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vCara = abs(dot(normalize(normalMatrix * normal), normalize(-mv.xyz))); gl_Position = projectionMatrix * mv; }',
-      /* glsl */`uniform float uT, uI, uH, uAc, uAcK, uAlc; uniform vec3 uA, uB; varying vec2 vU; varying float vCara;
+      /* glsl */`uniform float uT, uI, uH, uAc, uAcK, uAlc; uniform vec4 uNudos, uNudosLuz; uniform vec3 uA, uB; varying vec2 vU; varying float vCara;
         void main(){ float l = vU.y; if (l > uAlc) discard;
           float hel = mix(1.0, 0.55 + 0.45 * pow(0.5 + 0.5 * sin(vU.x * 6.2832 * 3.0 + l * 38.0 - uT * 5.0), 3.0), uH);
           float nudos = 1.0 + 1.4 * pow(0.5 + 0.5 * sin(l * 26.0 - uT * 3.2), 10.0) + 3.0 * exp(-pow((l - fract(uT * 0.12)) / 0.025, 2.0));   // el latido del faro: un pulso de luz sube cada ≈ 8 s
           float f = pow(max(vCara, 0.0), 1.6) * pow(max(1.0 - l, 0.0), 1.3) * smoothstep(0.0, 0.015, l) * hel * nudos;
           f *= 1.0 - smoothstep(uAlc - 0.03, uAlc, l);   // la punta de un chorro que aún crece
+          // Nudos de plasma que recorren el chorro (escena): bandas de luz nítidas.
+          vec4 dn = (vec4(l) - uNudos) / 0.022; float nudo = dot(exp(-dn * dn), uNudosLuz) * pow(max(vCara, 0.0), 0.8) * smoothstep(0.0, 0.02, l);
+          f += nudo * mix(1.2, 2.6, step(uH, 0.5));
           float ac = uAc < 0.0 ? 0.0 : exp(-pow((l - uAc) / 0.035, 2.0)) * pow(max(vCara, 0.0), 1.2) * smoothstep(0.0, 0.03, l) * (1.0 - smoothstep(0.85, 1.0, uAc)) * uAcK;
           gl_FragColor = vec4(mix(uA, uB, pow(max(l, 0.0), 0.6)) * f * uI + vec3(1.0, 0.72, 0.82) * ac * uI * mix(0.12, 1.1, step(uH, 0.5)), min(1.0, f * uI + ac * uI * mix(0.12, 1.0, step(uH, 0.5)))); }`));   // sobre todo en la columna fina: un hilo de luz, no una mancha
   };
@@ -597,6 +608,9 @@ export function* construirCuasar({ uScale, uPR, texGigante, texBrillo, texNebulo
       for (const [u, i, a, b] of capasChorro) { u.uI.value = i * por(e.chorro); u.uA.value.copy(a).lerp(calidoA, e.calido * w * 0.45); u.uB.value.copy(b).lerp(calidoB, e.calido * w * 0.45); }
       luzNucleo = por(e.destello) * (1 + 0.7 * late); this.giro = por(e.giro); this.prisa = por(e.caida);
       uAcK.value = e.acento >= 0 ? 0.5 + 1.1 * e.frente : 1;
+      const du = disco.material.uniforms; uEncR.value = w > 0 ? e.enc : 9000; du.uTono.value = e.tono * w;
+      uOlaR.value = e.olaR; uOlaK.value = e.olaK * w;
+      if (e.nudos) { uNudos.value.fromArray(e.nudos); uNudosLuz.value.fromArray(e.nudosLuz).multiplyScalar(w); }
     },
     giro: 1, prisa: 1,
     actualizar(t, camera) {
