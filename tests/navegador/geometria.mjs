@@ -25,7 +25,9 @@ export default async function ({ base, informe }) {
         real: {
           tonSombra: extension(ton, 'SphereGeometry'), tonDisco: extension(ton, 'RingGeometry', o => o.geometry.parameters.outerRadius > o.geometry.parameters.innerRadius * 4),
           sgrSombra: extension(sgr, 'SphereGeometry'), cuaToro: extension(cua, 'TorusGeometry'), cuaDisco: extension(cua, 'RingGeometry'),
-          pulToro: extension(pul, 'RingGeometry'), pulEstrella: extension(pul, 'SphereGeometry', o => o.geometry.parameters.radius < 100)
+          // El viento ecuatorial del púlsar: motas cuyo radio (en el plano del ecuador) es su atributo x.
+          pulToro: (() => { let v = null; pul.traverse(o => { if (o.name === 'vientoPulsar') v = o; }); const a = v.geometry.attributes.position; let m = 0; for (let i = 0; i < a.count; i++) m = Math.max(m, a.array[i * 3]); return Math.round(m * v.getWorldScale(new THREE.Vector3()).x); })(),
+          pulEstrella: extension(pul, 'SphereGeometry', o => o.geometry.parameters.radius < 100)
         },
         tabla: Object.fromEntries(ESCALA_UNIVERSO.filter(o => typeof o.radio === 'number').map(o => [o.id, { radio: o.radio, distancia: o.distancia }]))
       };

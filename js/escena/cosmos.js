@@ -7,10 +7,8 @@ import { deUnTiron } from '../util/azarSemilla.js';
 const ejeCometa = new THREE.Vector3(), frenteCometa = new THREE.Vector3(), auxCometa = new THREE.Vector3();   // reutilizados por los cometas en cada cuadro
 import { texturasLigeras } from '../util/dispositivo.js';
 import { texBrillo, texDestello, texEstrellaGigante, prepararTexNebulosa } from './texturas.js';
-import { texturaPlaneta } from './fabricaTexturas.js';
 import { crearVelo } from './cometa.js';
 import { construirSupernova } from './supernova.js';
-import { crearNube } from './nube.js';
 import { construirTon618 } from './ton618.js';
 import { construirSagitario } from './sagitario.js';
 import { guionTon618, guionSagitario, guionReposo, marcasDe, finEscena } from '../util/guionAgujeros.js';
@@ -19,7 +17,8 @@ import { atenuarFondo } from '../util/fondoEscena.js';
 import { ESCALA_SUPERNOVA, PROGENITORA_RELATIVA, ESCALA_CUASAR, ESCALA_TON, ESCALA_PULSAR, ESCALA_DENEB, ESCALA_SGR } from '../data/escalaCosmica.js';
 import { SITIOS_DESTINO } from '../data/sitios.js';
 import { materialSombra } from './materiales.js';
-import { crearEscenaPulsar, crearEscenaCuasar } from './escenasGigantes.js';
+import { crearEscenaCuasar } from './escenasGigantes.js';
+import { construirPulsar } from './pulsar.js';
 import { crearDeneb, RADIO_DENEB } from './deneb.js';
 import { ESCENA_PULSAR, ESCENA_CUASAR, ESCENA_DENEB, estadoPulsar, estadoCuasar, estadoDeneb, crearDirector } from '../util/escenasGigantes.js';
 const reducido = !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -91,19 +90,6 @@ function sprite(mapa, color, tam, opacidad = 1) {
   s.scale.setScalar(tam); return s;
 }
 const aditivo = (uniforms, vertexShader, fragmentShader, extra = {}) => new THREE.ShaderMaterial({ uniforms, vertexShader, fragmentShader, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, ...extra });
-
-// Haz o chorro: cono abierto que brilla en su eje y se desvanece hacia la punta y los bordes.
-function crearHaz({ radio, largo, colorA, colorB, intensidad = 1, nudos = 0 }) {
-  const m = new THREE.Mesh(new THREE.ConeGeometry(radio, largo, 32, 1, true), aditivo(
-    { uT: { value: 0 }, uA: { value: new THREE.Color(colorA) }, uB: { value: new THREE.Color(colorB) }, uI: { value: intensidad }, uN: { value: nudos } },
-    'varying vec2 vU; varying float vCara; void main(){ vU = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vCara = abs(dot(normalize(normalMatrix * normal), normalize(-mv.xyz))); gl_Position = projectionMatrix * mv; }',
-    /* glsl */`uniform float uT, uI, uN; uniform vec3 uA, uB; varying vec2 vU; varying float vCara;
-      void main(){ float l = vU.y; float f = pow(l, 1.4) * vCara * vCara * smoothstep(0.0, 0.08, 1.0 - l);
-        float k = 1.0 + uN * pow(0.5 + 0.5 * sin(l * 40.0 + uT * 4.0), 6.0);
-        gl_FragColor = vec4(mix(uB, uA, l) * f * uI * k, f * uI); }`));
-  m.geometry.translate(0, -largo / 2, 0); m.geometry.rotateX(Math.PI);   // base en el origen, punta hacia +Y
-  return m;
-}
 
 // De un tirón; la carga usa construirCosmos, el mismo código como generador (yield entre pasos: ver porTramos).
 export const crearCosmos = (...a) => deUnTiron(construirCosmos(...a));
@@ -245,84 +231,18 @@ export function* construirCosmos({ uScale, uPR }) {
   });
 
   yield;
-  // ── Púlsar: estrella de neutrones con dos haces enormes que barren el cielo como un faro ──
+  // ── Púlsar (js/escena/pulsar.js): estrella de neutrones que gira con sus dos haces opuestos (un faro), su viento
+  // ecuatorial y la nebulosa de filamentos. Dormido fuera de su escena; con su canción despierta (js/util/escenaPulsar.js) ──
   const pulsar = new THREE.Group(); pulsar.position.copy(direccionCielo(SITIO.pulsar[0], SITIO.pulsar[1], SITIO.pulsar[2])); pulsar.scale.setScalar(ESCALA_PULSAR); raiz.add(pulsar);
-  yield;
-  // Nebulosa del Cangrejo: interior azul de sincrotrón y red de filamentos rojo-anaranjados.
-  const tCangrejo = texturaPlaneta('nebulosaFondo', { semilla: 44, tono: 3, ancho: L, alto: L }, { relleno: [0, 0, 0], bloquea: false }); tCangrejo.wrapS = THREE.ClampToEdgeWrapping;
-  yield;
-  // En 3D: nueve capas de gas y filamentos a distintas profundidades alrededor del púlsar.
-  const cangrejo = crearNube(tCangrejo, new THREE.Vector3(), 4000, 44, ESCALA_CIELO * ESCALA_PULSAR, 9, { variante: 'cavidad' }); pulsar.add(cangrejo); cangrejo.userData.brilloPropio = true;   // anima su brillo con el haz; variante con grosor: volumen desde cualquier lado
-  yield;
-  // Como las demás nebulosas, de frente hacia casa (de donde se llega): visto de canto, su lámina
-  // de gas se ve estirada en vetas.
-  cangrejo.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), pulsar.position.clone().negate().normalize()); cangrejo.rotateZ(0.5);
-  // Sin halos difusos alrededor: el azul de sincrotrón lo ponen las motas de dentro de la nebulosa (escenasGigantes.js).
-  yield;
-  // Eje de giro perpendicular a la línea de visión desde el centro: los haces se ven barrer de lado.
-  const vistaPulsar = pulsar.position.clone().normalize().negate();
-  const ejeGiro = new THREE.Vector3(0, 1, 0).addScaledVector(vistaPulsar, -vistaPulsar.y).normalize().applyAxisAngle(vistaPulsar, 0.45);
-  const giroPulsar = new THREE.Group(); giroPulsar.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), ejeGiro); pulsar.add(giroPulsar);
-  const giroInterno = new THREE.Group(); giroPulsar.add(giroInterno);
-  const magnetico = new THREE.Group(); magnetico.rotation.z = 0.75; giroInterno.add(magnetico);
-  yield;
-  // Toro ecuatorial (anillos de viento con grumos, como en las imágenes de rayos X del Cangrejo)
-  // y chorros por los polos del eje de giro.
-  const toro = new THREE.Mesh(new THREE.RingGeometry(180, 720, 160, 6), aditivo({ uT: { value: 0 } },
-    'varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    /* glsl */`uniform float uT; varying vec2 vP;
-      float h(vec2 p){ vec3 q = fract(p.xyx * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
-      void main(){ float r = length(vP), ang = atan(vP.y, vP.x);
-        float anillos = exp(-pow((r - 300.0) / 40.0, 2.0)) + 0.7 * exp(-pow((r - 520.0) / 70.0, 2.0)) + 0.35 * exp(-pow((r - 660.0) / 50.0, 2.0));
-        float grumos = 0.55 + 0.45 * sin(ang * 14.0 + uT * 0.8 + sin(ang * 5.0) * 2.0) * sin(r * 0.03 - uT * 1.5);
-        anillos += 0.5 * pow(0.5 + 0.5 * sin(r * 0.045 - uT * 2.2), 12.0) * smoothstep(200.0, 300.0, r) * (1.0 - smoothstep(600.0, 720.0, r));   // ondas que se alejan
-        float a = anillos * grumos * 0.75; gl_FragColor = vec4(vec3(0.7, 0.82, 1.0) * a, a); }`));
-  toro.rotation.x = Math.PI / 2; giroPulsar.add(toro);
-  let chorroPulsar = null, hazPulsar = null;
-  // Lo del púlsar que lleva su propio tiempo (en su escena casi se para): chorros, haces y flujo.
-  const tiempoPulsar = [], hacesPulsar = [];
-  for (const s of [1, -1]) { const ch = crearHaz({ radio: 60, largo: 900, colorA: '#e8f0ff', colorB: '#9cb8ff', intensidad: 0.9, nudos: 2 }); if (s < 0) ch.rotation.x = Math.PI; giroPulsar.add(ch); tiempoPulsar.push(ch); chorroPulsar = ch; }
-  for (const s of [1, -1]) { const h = crearHaz({ radio: 90, largo: 2200, colorA: '#f4f8ff', colorB: '#6f9bff', intensidad: 1.2 }); if (s < 0) h.rotation.x = Math.PI; magnetico.add(h); tiempoPulsar.push(h); hacesPulsar.push(h); hazPulsar = h; }
-  yield;
-  // Líneas de campo magnético (dipolo): r = L · sen²θ, en varios planos alrededor del eje.
-  for (let k = 0; k < 10; k++) for (const Lc of [260, 460]) {
-    const pts = Array.from({ length: 64 }, (_, i) => { const th = 0.15 + i / 63 * (Math.PI - 0.3), r = Lc * Math.sin(th) ** 2; return new THREE.Vector3(Math.sin(th) * r, Math.cos(th) * r, 0); });
-    const linea = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: '#9cc2ff', transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false }));
-    linea.rotation.y = k / 10 * Math.PI * 2; magnetico.add(linea);
-  }
+  const piezasPulsar = yield* construirPulsar({ uScale, uPR });
+  pulsar.add(piezasPulsar.grupo);
+  // Ejes del giro = los del marco de su videoclip (index.js, marcoClip): eje de giro el Y del universo (del lado de casa),
+  // z hacia casa en horizontal y x a la derecha. Así la pista de cámara y los haces hablan el mismo idioma.
   {
-    const n = 520, pos = new Float32Array(n * 3);
-    for (let i = 0; i < n; i++) pos.set([Math.random() * Math.PI * 2, Math.random(), Math.random()], i * 3);
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const flujo = new THREE.Points(g, aditivo({ uT: { value: 0 }, uScale, uPR },
-      `uniform float uT, uScale, uPR; varying float vA;
-       void main(){ float f = fract(position.y + uT * 0.35), lado = position.z < 0.5 ? 1.0 : -1.0, r = f * 120.0 * fract(position.x * 3.7);
-         vec3 p = vec3(cos(position.x) * r, lado * f * 2100.0, sin(position.x) * r);
-         vec4 mv = modelViewMatrix * vec4(p, 1.0); gl_Position = projectionMatrix * mv; vA = (1.0 - f) * smoothstep(0.0, 0.05, f);
-         gl_PointSize = clamp(9.0 * ${ESCALA_CIELO.toFixed(1)} * uScale / max(1.0, -mv.z), 1.0, 3.5 * uPR); }`,
-      'varying float vA; void main(){ float d = length(gl_PointCoord - 0.5); float k = pow(max(1.0 - d * 2.0, 0.0), 2.0) * vA; gl_FragColor = vec4(vec3(0.8, 0.9, 1.0) * k, k); }'));
-    flujo.frustumCulled = false; magnetico.add(flujo); tiempoPulsar.push(flujo);
+    const casa = pulsar.position.clone().negate().normalize(), y = new THREE.Vector3(0, 1, 0); if (y.dot(casa) < 0) y.negate();
+    const z = casa.clone().projectOnPlane(y).normalize(), x = new THREE.Vector3().crossVectors(y, z).normalize();
+    piezasPulsar.orientar(x, y, z);
   }
-  yield;
-  // La estrella de neutrones: una esfera diminuta y ardiente con dos puntos calientes en los
-  // polos magnéticos (de ahí salen los haces), girando con ellos.
-  const estrellaNeutrones = new THREE.Mesh(new THREE.SphereGeometry(110, 128, 96),   // diminuta y ardiente (antes 260: parecía un planeta); su luz la da el destello
- new THREE.ShaderMaterial({
-    uniforms: { uEje: { value: new THREE.Vector3(0, 1, 0) } },
-    vertexShader: 'varying vec3 vN, vP; void main(){ vP = normalize(position); vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    fragmentShader: `uniform vec3 uEje; varying vec3 vN, vP;
-      void main(){ float mu = max(dot(normalize(vN), vec3(0.0, 0.0, 1.0)), 0.0), polo = pow(abs(dot(vP, normalize(uEje))), 18.0);
-        vec3 c = mix(vec3(0.55, 0.7, 1.0), vec3(1.0), pow(mu, 2.0)) * (0.6 + 0.6 * mu) + vec3(1.0, 0.95, 1.0) * polo * 2.5;
-        gl_FragColor = vec4(c * 2.0, 1.0); }`
-  }));
-  magnetico.add(estrellaNeutrones);
-  const nucleoPulsar = sprite(gigante, '#eef6ff', 520); pulsar.add(nucleoPulsar);
-  const halo = sprite(brillo, '#a9c8ff', 800, 0.5); halo.visible = false; pulsar.add(halo);   // sin halo difuso (se conserva para las medidas)
-  const ejeHaz = new THREE.Vector3(), haciaCam = new THREE.Vector3();
-  // Su escena (escenasGigantes.js): motas de la nebulosa (alrededor) y de los haces (giran con ellos).
-  yield;
-  const escenaPulsar = crearEscenaPulsar({ uScale, uPR }); pulsar.add(escenaPulsar.nebulosa); magnetico.add(escenaPulsar.haces);
-  let fasePulsar = 0, tPulsar = 0;
 
   yield;
   // ── Cuásar: galaxia anfitriona, anillo de fuego, disco de acreción, sombra y chorros (js/escena/cuasar.js) ──
@@ -372,29 +292,11 @@ export function* construirCosmos({ uScale, uPR }) {
   // llegada) y su peso (al cancelarla baja suave a 0 y el gigante vuelve a su estado normal).
   const directores = { pulsar: crearDirector(ESCENA_PULSAR, { salida: reducido ? 2.5 : 1.5 }), cuasar: crearDirector(ESCENA_CUASAR, { salida: reducido ? 2.5 : 1.5 }), deneb: crearDirector(ESCENA_DENEB, { salida: reducido ? 3 : 2 }) };
   const estadoP = estadoPulsar(0, ESCENA_PULSAR, {}), estadoC = estadoCuasar(0, ESCENA_CUASAR, {}), estadoD = estadoDeneb(0, ESCENA_DENEB, {}), normalD = estadoDeneb(ESCENA_DENEB.duracion, ESCENA_DENEB, {});   // normalD: Deneb fuera de su escena
-  // El púlsar se para con los haces de lado a la cámara (barriendo la pantalla, ni de frente ni de canto): al
-  // empezar se elige cuánto girar hasta «quieto» y la fase se calcula por el segundo de la escena (también con
-  // el reloj del audio). Tablas de ∫giro y ∫giro·u (u: fracción hasta «quieto»), una vez por escena.
-  const PASOS = 64, integral = new Float32Array(PASOS + 1), integralU = new Float32Array(PASOS + 1), aux = {};
-  const ejeLocal = new THREE.Vector3(), qInversa = new THREE.Quaternion();
-  let paradaPulsar = null, camaraMundo = null, tActual = 0;
-  const OMEGA = 2.2, INCLINACION = 0.75;   // giro del púlsar (rad/s) y ángulo del eje magnético (magnetico.rotation.z)
-  function planearParada() {
-    const c = directores.pulsar.config, q = c.marcas[c.parada || 'bailar'] - c.marcas.inicio;
-    integral[0] = integralU[0] = 0;
-    for (let k = 1; k <= PASOS; k++) {
-      const s = (k - 0.5) / PASOS * q, g = estadoPulsar(s, directores.pulsar.config, aux, reducido).giro;
-      integral[k] = integral[k - 1] + g * q / PASOS; integralU[k] = integralU[k - 1] + g * (s / q) * q / PASOS;
-    }
-    // Dirección de la cámara en el espacio del giro (el púlsar no rota; su grupo de giro sí).
-    ejeLocal.copy(camLocal).sub(pulsar.position).normalize().applyQuaternion(qInversa.copy(giroPulsar.quaternion).invert());
-    const natural = fasePulsar + OMEGA * integral[PASOS], B = OMEGA * integralU[PASOS], si = Math.sin(INCLINACION), co = Math.cos(INCLINACION);
-    let mejor = 0, menor = Infinity;
-    // c ∈ [−0,85; 2,4]: la velocidad (OMEGA·giro·(1 + c·u)) nunca se invierte ni da un acelerón al empezar (u = 0).
-    for (let i = 0; i <= 48; i++) { const c = -0.85 + i / 48 * 3.25, f = natural + c * B; const d = Math.abs(-si * Math.cos(f) * ejeLocal.x + co * ejeLocal.y + si * Math.sin(f) * ejeLocal.z); if (d < menor - 1e-3) { menor = d; mejor = c; } }
-    paradaPulsar = { fase0: fasePulsar, c: mejor, q };
-  }
-  const tabla = (t, s, q) => { const x = Math.min(PASOS, Math.max(0, s / q * PASOS)), i = Math.min(PASOS - 1, Math.floor(x)); return t[i] + (t[i + 1] - t[i]) * (x - i); };
+  const camPulsar = new THREE.Vector3(), centroPulsar = new THREE.Vector3();
+  let camaraMundo = null, tActual = 0;
+  const pulsarDormido = estadoPulsar(0, ESCENA_PULSAR, {});
+  // La cámara en el espacio del grupo del púlsar, relativa a su centro.
+  const camaraEnPulsar = () => camPulsar.copy(camLocal).sub(pulsar.position).divideScalar(pulsar.scale.x);
   const escenas = {
     // Empieza la escena de `id` (reloj: función que da los segundos desde el inicio del audio; config: otra
     // duración o marcas). Devuelve una promesa: true al terminar, false si se cancela.
@@ -402,7 +304,7 @@ export function* construirCosmos({ uScale, uPR }) {
       const d = directores[id]; if (!d) return Promise.resolve(false);
       return new Promise(resolve => {
         d.iniciar(tActual, { reloj, config, alFin: resolve });
-        if (id === 'pulsar') planearParada();
+        if (id === 'pulsar') piezasPulsar.iniciarEscena();
       });
     },
     cancelar(id = null) { for (const k in directores) if (!id || k === id) directores[k].cancelar(); },
@@ -420,8 +322,7 @@ export function* construirCosmos({ uScale, uPR }) {
   };
   return {
     escenas,
-    // Motas de la escena del púlsar: dentro del gas del Cangrejo, se dibujan después de su capa (index.js).
-    sobreGas: [escenaPulsar.nebulosa, escenaPulsar.haces],
+    sobreGas: [],
     raiz, decor,
     acentoCuasar: v => piezasCuasar.acento(v),
     hornear: renderer => piezasCuasar.hornearRemolino(renderer),
@@ -463,9 +364,10 @@ export function* construirCosmos({ uScale, uPR }) {
       sgr.navegacion = Math.max(sgr.anillo, sgr.materia);
       const cua = { distancia: d(cuasar), disco: r(anillo(piezasCuasar.disco)), toro: r(toroExt(piezasCuasar.toro)), chorro: r(cono(piezasCuasar.haz)), anfitriona: r(piezasCuasar.medidas.anfitriona * e(cuasar)) };
       cua.navegacion = Math.max(cua.disco, cua.toro);
-      const pul = { distancia: d(pulsar), cuerpo: r(esfera(estrellaNeutrones)), toro: r(anillo(toro)), chorro: r(cono(chorroPulsar)), haces: r(cono(hazPulsar)), gas: r(Math.max(cangrejo.scale.x, cangrejo.scale.y, cangrejo.scale.z) * 0.5 * e(pulsar)),   // semieje mayor de su volumen (no depende de su giro)
-         halo: r(spriteR(halo)) };
-      pul.navegacion = Math.max(pul.toro, pul.chorro);
+      // Púlsar: la estrella (esfera), el viento ecuatorial (lo denso: navegación), los haces y la nebulosa de filamentos.
+      const ep = e(piezasPulsar.grupo), mp = piezasPulsar.medidas;
+      const pul = { distancia: d(pulsar), cuerpo: r(esfera(piezasPulsar.estrella)), toro: r(mp.viento * ep), chorro: 0, haces: r(mp.haz * ep), gas: r(mp.nebulosa * ep), halo: 0 };
+      pul.navegacion = pul.toro;
       const estado = sn.estado, enExplosion = estado === 'estallido';
       const sup = { distancia: d(sn.grupo), estado, progenitora: r(progenitora), envolturas: r(progenitora * 4.75), eyecta: r(eyecta), semiancho: r(tam.x), semialto: r(tam.y), semiespesor: r(tam.z) };
       sup.navegacion = estado === 'remanente' ? sup.semiancho : enExplosion ? Math.max(sup.envolturas, sup.eyecta) : sup.envolturas;
@@ -537,31 +439,11 @@ export function* construirCosmos({ uScale, uPR }) {
         c.velo.quaternion.setFromRotationMatrix(base.makeBasis(eje, auxCometa.crossVectors(frente, eje), frente));
         c.velo.material.uniforms.uTime.value = t; c.velo.material.uniforms.uI.value = 0.75 * Math.min(1, avance * 8, (1 - avance) * 8);
       }
-      // Púlsar: gira rápido; cuando un haz se acerca a la línea de visión, el núcleo destella. En su escena
-      // el giro y el ritmo de su gas casi se paran (fase y tiempo propios, acumulados: sin saltos al volver).
+      // Púlsar: siempre gira; en su escena despierta con la canción y queda despierto mientras se le mira (persiste).
       tActual = t; camaraMundo = camera.position;
       const dP = directores.pulsar, sP = dP.avanzar(t, dt), wP = dP.peso; estadoPulsar(sP, dP.config, estadoP, reducido);
-      const velGiro = 1 + (estadoP.giro - 1) * wP;
-      if (dP.activa && paradaPulsar && sP <= paradaPulsar.q) fasePulsar = paradaPulsar.fase0 + OMEGA * (tabla(integral, sP, paradaPulsar.q) + paradaPulsar.c * tabla(integralU, sP, paradaPulsar.q));
-      else fasePulsar += dt * OMEGA * velGiro;
-      tPulsar += dt * (1 + (estadoP.tiempo - 1) * wP);
-      giroInterno.rotation.y = fasePulsar; toro.material.uniforms.uT.value = tPulsar;
-      magnetico.updateMatrixWorld(); ejeHaz.set(0, 1, 0).transformDirection(magnetico.matrixWorld);
-      haciaCam.copy(camara).sub(pulsar.position).normalize();
-      const alineado = Math.pow(Math.abs(ejeHaz.dot(haciaCam)), 6);
-      // Un punto diminuto y deslumbrante que destella cuando un haz mira hacia aquí (y, en su escena, con cada pulso de la canción).
-      nucleoPulsar.scale.setScalar(90 + alineado * 300 + 220 * estadoP.pulso * wP);
-      // Cada vez que un haz barre hacia aquí, la nebulosa entera se aviva un instante.
-      // El gas del Cangrejo, tenue: su forma la dibujan los hilos de motas (escenasGigantes.js).
-      cangrejo.material.uniforms.uBrillo.value = 0.3 + alineado * 0.08 + 0.12 * estadoP.brillo * wP;
-      // El Cangrejo es casi esférico: su volumen mira siempre hacia la cámara (de canto se veía como vetas paralelas).
-      cangrejo.lookAt(camera.position); cangrejo.rotateZ(0.5);
+      piezasPulsar.actualizar({ e: estadoP, e0: pulsarDormido, w: wP, activa: dP.activa, s: sP, t, dt, camara: camaraEnPulsar(), reducido });
       for (const h of animar) h.material.uniforms.uT.value = t;
-      for (const h of tiempoPulsar) h.material.uniforms.uT.value = tPulsar;
-      // Los haces se abren y se encienden con la frase («hermosa»: del todo).
-      const luzHaz = 1.2 * (1 + (estadoP.haces - 1) * wP), abre = 1 + (estadoP.apertura - 1) * wP;
-      for (const h of hacesPulsar) { h.material.uniforms.uI.value = luzHaz; h.scale.set(abre, 1, abre); }
-      escenaPulsar.actualizar(estadoP, wP, sP, t, reducido);
       // Deneb: su videoclip (nace de la nada con «Middle») sobre su estado de siempre (deneb.js, js/util/escenaDeneb.js).
       const dD = directores.deneb, sD = dD.avanzar(t, dt), wD = dD.peso; estadoDeneb(sD, dD.config, estadoD, reducido);
       // Su brillo de lejos (sprites suaves) se apaga al acercarse: a menos de ~12 veces la distancia de llegada no hay halos.

@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ESCENA_PULSAR, ESCENA_CUASAR, ESCENA_DENEB, estadoPulsar, estadoCuasar, REPOSO_CUASAR, estadoDeneb, crearDirector, escalarEscena, GIRO_QUIETO } from '../js/util/escenasGigantes.js';
+import { ESCENA_PULSAR, ESCENA_CUASAR, ESCENA_DENEB, estadoPulsar, estadoCuasar, REPOSO_CUASAR, estadoDeneb, crearDirector, escalarEscena } from '../js/util/escenasGigantes.js';
+import { vueltasPulsar, ritmoGiro, azimutHaz, elevacionHaz } from '../js/util/escenaPulsar.js';
 
-const NORMAL = { giro: 1, tiempo: 1, haces: 1, apertura: 1, motasHaz: 0, brillo: 0 };
 const cerca = (a, b, e = 1e-6) => Math.abs(a - b) < e;
 
 test('las marcas están en orden y dentro de la duración', () => {
@@ -13,22 +13,58 @@ test('las marcas están en orden y dentro de la duración', () => {
   }
 });
 
-test('el púlsar empieza y termina en su estado normal, casi se para y late al compás de la canción', () => {
-  for (const s of [0, ESCENA_PULSAR.duracion]) { const e = estadoPulsar(s, ESCENA_PULSAR); for (const k in NORMAL) assert.ok(cerca(e[k], NORMAL[k]), `${k} en ${s}`); }
-  const m = ESCENA_PULSAR.marcas, h = s => ({ ...estadoPulsar(s, ESCENA_PULSAR) });
-  for (let s = m.bailar; s <= m.fin - 2; s += 0.25) assert.ok(cerca(h(s).giro, GIRO_QUIETO));
-  // Late en cada pulso (108 BPM: cada 0,556 s desde el 0), con el primero de cada compás más fuerte.
-  const P = ESCENA_PULSAR.pulso, k0 = Math.ceil(m.estribillo / P) + 4;
+test('el púlsar nunca se para: su giro solo cambia con la música y es continuo', () => {
+  const c = ESCENA_PULSAR, P = c.pulso;
+  // Siempre gira hacia delante (nunca se para ni se invierte) y sin saltos de velocidad entre cuadros.
+  for (let s = -2; s < c.duracion + 5; s += 1 / 120) {
+    const a = vueltasPulsar(s, c), b = vueltasPulsar(s + 1 / 120, c);
+    assert.ok(b > a, `gira hacia delante en ${s.toFixed(2)}`);
+    assert.ok(Math.abs(ritmoGiro((s + 1 / 120) / P, c) - ritmoGiro(s / P, c)) < 0.01, `sin acelerones en ${s.toFixed(2)}`);
+  }
+  // La integral exacta coincide con sumar el ritmo (trapecios finos).
+  let v = 0; for (let s = 0; s < 30; s += 1e-3) v += ritmoGiro((s + 5e-4) / P, c) * 1e-3 / P;
+  assert.ok(Math.abs(v - vueltasPulsar(30, c)) < 1e-3, `${v} / ${vueltasPulsar(30, c)}`);
+  // Los cambios de giro caen en la música: dormido 1/8, con «caliente» 1/4 (una vuelta por compás), con el grave 1/2.
+  const m = c.marcas;
+  assert.equal(ritmoGiro(m.quererte / P, c), 0.125);
+  assert.ok(ritmoGiro(m.caliente / P, c) > 0.125 && ritmoGiro((m.caliente + 2) / P, c) === 0.25);
+  assert.equal(ritmoGiro((m.grave - 1.2) / P, c), 0.25); assert.ok(Math.abs(ritmoGiro(m.grave / P, c) - 0.5) < 0.01); assert.equal(ritmoGiro(m.fin / P, c), 0.5);
+  // El haz de arriba pasa por el mismo punto en los golpes: 270° en los compases del pre-estribillo, 180° cada dos pulsos
+  // desde el grave; los planos «en el haz» de la pista de cámara están ahí (a la elevación de su cono).
+  for (let k = 16; k <= 28; k += 4) assert.ok(Math.abs(azimutHaz(k * P, c) - 270) < 1e-6, `compás ${k / 4}`);
+  for (let k = 30; k <= 58; k += 2) assert.ok(Math.abs(azimutHaz(k * P, c) - 180) < 1e-6, `pulso ${k}`);
+  const enHaz = c.camara.filter(p => Math.abs(Math.abs(p.pos[1]) - elevacionHaz(c)) < 3);
+  assert.ok(enHaz.length >= 6, 'planos en el camino del haz');
+});
+
+test('el púlsar despierta con la canción: haces, latido, viento y nebulosa, y queda despierto', () => {
+  const c = ESCENA_PULSAR, m = c.marcas, h = s => ({ ...estadoPulsar(s, c) });
+  const dormido = h(0), final = h(c.duracion), despues = h(c.duracion + 50);
+  assert.ok(dormido.largo === 0 && dormido.luzHaz === 0 && dormido.casquetes === 0 && dormido.fuerza === 0 && dormido.viento === 0 && dormido.frente === 0, 'dormido: sin haces, sin latido');
+  assert.ok(h(m.quererte + 2).largo > 0.99 && h(m.quererte - 0.2).largo === 0, 'los haces nacen con «quererte»');
+  assert.ok(h(m.caliente - 0.5).fuerza === 0 && h(m.caliente + 1).fuerza > 0.35, 'empieza a latir con «caliente»');
+  assert.ok(h(m.previa - 0.5).viento === 0 && h(m.previa + 2.5).viento > 0.99, 'el viento nace en el pre-estribillo');
+  assert.ok(h(m.grave - 0.3).frente === 0 && h(m.grave + 3).frente > 1.1 && h(m.grave + 1).barrido > 0.9, 'la nebulosa se enciende con el grave');
+  assert.ok(h(m.segunda + 1.5).tibio > 0.95, 'rosa y oro en la segunda vuelta');
+  for (const k of ['largo', 'luzHaz', 'casquetes', 'viento', 'frente', 'brillo', 'tibio', 'ritmo']) assert.ok(cerca(final[k], despues[k]), `persiste: ${k}`);
+  assert.ok(final.largo > 0.99 && final.luzHaz > 0.8 && final.viento > 0.99 && final.brillo > 0.6, 'su diseño final, despierto');
+  // Late en cada pulso (107,7 BPM: cada 0,557 s desde el 0), con el primero de cada compás más fuerte.
+  const P = c.pulso, k0 = Math.ceil(m.estribillo / P) + 4;
   const enPulso = h(k0 * P + 0.01).pulso, entre = h(k0 * P + P * 0.6).pulso;
   assert.ok(enPulso > 0.4 && entre < enPulso * 0.3, `pulso ${enPulso} / entre pulsos ${entre}`);
   const compas = Math.ceil(m.estribillo / (4 * P)) * 4;
   assert.ok(h(compas * P + 0.01).pulso > h((compas + 1) * P + 0.01).pulso, 'el primer pulso del compás, más fuerte');
-  // Crece con la canción: la fuerza del latido y los haces, más en el estribillo que al empezar.
-  assert.ok(h(m.estribillo + 1).fuerza > h(m.corazon + 1).fuerza && h(m.corazon + 1).fuerza > h(m.bailar + 0.8).fuerza);
-  assert.ok(h(m.segunda + 1).fuerza > h(m.estribillo + 1).fuerza);
-  assert.ok(h(m.estribillo + 1).apertura > h(m.quererte).apertura && h(m.estribillo - 1).brillo === 0 && h(m.estribillo + 1).brillo > 0.95);
-  // Sin saltos en lo que no es el latido: ninguna curva cambia más de un 8 % de su recorrido en 1/60 s.
-  for (let s = 0; s < ESCENA_PULSAR.duracion; s += 1 / 60) { const a = h(s), b = h(s + 1 / 60); for (const k of ['giro', 'motasHaz', 'brillo', 'fuerza', 'tibio']) assert.ok(Math.abs(a[k] - b[k]) < 0.08, `${k} en ${s.toFixed(2)}`); }
+  // Sin saltos en lo que no es el latido: ninguna curva cambia más de un 8 % en 1/60 s (el grave enciende en 0,3 s).
+  for (let s = 0; s < c.duracion; s += 1 / 60) { const a = h(s), b = h(s + 1 / 60); for (const k of ['largo', 'luzHaz', 'casquetes', 'calor', 'fuerza', 'viento', 'barrido', 'brillo', 'tibio', 'foco']) assert.ok(Math.abs(a[k] - b[k]) < 0.08, `${k} en ${s.toFixed(2)}`); }
+});
+
+test('la pista de cámara del púlsar: ordenada, dentro de la canción y sin atravesar la estrella ni el viento', () => {
+  const pista = ESCENA_PULSAR.camara;
+  assert.equal(pista[0].t, 0); assert.ok(pista.at(-1).t <= ESCENA_PULSAR.duracion);
+  for (let i = 1; i < pista.length; i++) assert.ok(pista[i].t > pista[i - 1].t, `orden en ${pista[i].t}`);
+  for (const p of pista) { assert.ok(['suave', 'rapida', 'corte', 'lineal'].includes(p.curva)); assert.ok(p.pos[2] >= 0.3 && p.pos[2] <= 1.2, `distancia en ${p.t}`); assert.ok(p.fov >= 30 && p.fov <= 60); }
+  // El último plano: un encuadre normal del gigante (no lejísimos ni pegado).
+  assert.ok(pista.at(-1).pos[2] > 0.7 && pista.at(-1).pos[2] < 1.1);
 });
 
 test('el cuásar se enciende con la historia: los chorros se recogen, nacen y crecen en las frases clave y acaba en su diseño de siempre', () => {
@@ -98,7 +134,7 @@ test('el director sigue el reloj que se le pasa, espera si no sabe y se cancela 
   assert.ok(pesos.every((p, i) => i === 0 || p <= pesos[i - 1]) && pesos.at(-1) === 0 && pesos[10] > 0.5);
   assert.equal(d.segundo, 12.5, 'al cancelar, el estado se queda quieto mientras se desvanece');
   // Sin reloj: el tiempo propio desde que empezó.
-  const p = crearDirector(ESCENA_PULSAR); p.iniciar(5, { alFin: v => { fin = v; } }); p.avanzar(9, 0); assert.equal(p.segundo, 4);
+  const p = crearDirector({ ...ESCENA_PULSAR, persiste: false }); p.iniciar(5, { alFin: v => { fin = v; } }); p.avanzar(9, 0); assert.equal(p.segundo, 4);
   p.avanzar(5 + ESCENA_PULSAR.duracion + 1, 0); assert.equal(fin, true); assert.equal(p.peso, 0);
   // Una escena que persiste al terminar se queda hasta que se cancela.
   const n = crearDirector({ ...ESCENA_PULSAR, persiste: true }); n.iniciar(0); n.avanzar(ESCENA_PULSAR.duracion + 1, 0);
@@ -108,6 +144,6 @@ test('el director sigue el reloj que se le pasa, espera si no sabe y se cancela 
 test('escalar una escena mueve sus marcas en proporción', () => {
   const e = escalarEscena(ESCENA_PULSAR, 56);
   const k = 56 / ESCENA_PULSAR.duracion;
-  assert.equal(e.duracion, 56); assert.ok(cerca(e.marcas.estribillo, 15 * k)); assert.equal(ESCENA_PULSAR.marcas.estribillo, 15); assert.ok(cerca(e.pulso, ESCENA_PULSAR.pulso * k));
+  assert.equal(e.duracion, 56); assert.ok(cerca(e.marcas.estribillo, 17.83 * k)); assert.equal(ESCENA_PULSAR.marcas.estribillo, 17.83); assert.ok(cerca(e.pulso, ESCENA_PULSAR.pulso * k));
   assert.ok(cerca(escalarEscena(ESCENA_DENEB, ESCENA_DENEB.duracion / 2).pulso, ESCENA_DENEB.pulso / 2));
 });

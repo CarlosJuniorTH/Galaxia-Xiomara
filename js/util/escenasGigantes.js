@@ -4,29 +4,9 @@
 // `escalarEscena`). El reloj es el del audio (`bandaSonora.tiempo(id)`, js/ui/escenasGigantes.js); sin audio, el
 // tiempo propio desde la llegada. Aquí solo hay números y curvas (sin three.js): las pruebas las comprueban sin navegador.
 
-// Púlsar → pulsar.m4a (33,65 s): la parte de amor de «Neo Romeo» (Rusowsky), a 108 BPM: un pulso cada 0,556 s y un
-// compás (4 pulsos) cada 2,25 s desde el 0. El púlsar casi se para, con los haces de lado, y LATE con la canción
-// como un corazón: haces y destellos a pulsos, cada vez más fuertes, y del todo en el estribillo.
-//  bailar      «Quererte hasta que bailar»: ya está quieto y empieza a latir, suave;
-//  corazon     «Todo este corazón caliente»: los latidos se notan y los haces se abren un poco;
-//  quererte    «Siempre sirvo pa' quererte»: sube (los haces se van abriendo y encendiendo);
-//  estribillo  «De tu amor yo no sé…»: el momento grande: haces del todo, la nebulosa se ilumina con hilos de motas
-//              del centro hacia fuera y todo late al compás;
-//  segunda     segunda vuelta del estribillo: aún más fuerte y con luz rosa y dorada;
-//  fin         en los dos últimos segundos vuelve a girar normal.
-// camara: el videoclip (formato: js/util/directorCamara.js; segundos del fragmento, distancias en radios de encuadre).
-// Pista de ejemplo, sencilla, a la espera de la del agente del púlsar: se acerca mientras se para, rodea el corazón
-// mientras late, un golpe de cámara en el estribillo y una vuelta lenta y abierta en la segunda.
-export const ESCENA_PULSAR = { id: 'pulsar', duracion: 33.6, pulso: 60 / 108, compas: 4, desfase: 0, parada: 'bailar', marcas: { inicio: 0, bailar: 1.4, corazon: 4.9, quererte: 12.5, estribillo: 15, segunda: 28, fin: 33.6 },
-  camara: [
-    { t: 0, pos: [0, 12, 1], curva: 'suave' },
-    { t: 4.9, pos: [-18, 16, 0.78], fov: 54, curva: 'suave' },
-    { t: 12.5, pos: [-62, 22, 0.66], fov: 50, curva: 'lineal' },
-    { t: 14.6, pos: [-74, 20, 0.62], fov: 48, curva: 'lineal' },
-    { t: 15, pos: [-80, 10, 0.5], fov: 44, curva: 'rapida' },
-    { t: 27.5, pos: [-150, 14, 0.62], fov: 50, curva: 'suave' },
-    { t: 33.6, pos: [-190, 18, 0.95], fov: 60, curva: 'suave' }
-  ] };
+// Púlsar → js/util/escenaPulsar.js (su canción, su letra, su giro y su pista de cámara).
+import { ESCENA_PULSAR, estadoPulsar } from './escenaPulsar.js';
+export { ESCENA_PULSAR, estadoPulsar };
 
 // Cuásar → cuasar.m4a (31 s): un hombre cuenta, en voz baja y con una música suave de fondo que va creciendo (≈93 BPM),
 // cómo se enamoró de ella. Un cuásar es el corazón de una galaxia que se ENCIENDE: el gas que cae al agujero lo calienta y
@@ -94,9 +74,6 @@ const sat = x => x < 0 ? 0 : x > 1 ? 1 : x;
 const suave = (s, a, b) => { const x = sat((s - a) / Math.max(1e-6, b - a)); return x * x * (3 - 2 * x); };
 const mezcla = (a, b, k) => a + (b - a) * k;
 
-// Velocidad de giro del púlsar en reposo dentro de la escena (fracción de la normal): casi quieto, pero vivo.
-export const GIRO_QUIETO = 0.006;
-
 // Latido de corazón en cada pulso de la canción («pum-pum»: el golpe y otro menor 0,17 s después), con el primer
 // pulso de cada compás más fuerte. Devuelve 0–1 y deja en `e.edad` los segundos desde el último pulso.
 export function latidoPulso(s, { pulso, compas = 4, desfase = 0 }, e, reducido = false) {
@@ -104,38 +81,6 @@ export function latidoPulso(s, { pulso, compas = 4, desfase = 0 }, e, reducido =
   e.edad = edad;
   const golpe = Math.exp(-edad / (reducido ? 0.3 : 0.13)), eco = !reducido && edad > 0.17 ? 0.45 * Math.exp(-(edad - 0.17) / 0.09) : 0;
   return (golpe + eco) * ((((k % compas) + compas) % compas) === 0 ? 1 : 0.62);
-}
-
-// Estado del púlsar en el segundo `s` (escribe en `e`, sin memoria nueva en cada cuadro). Fuera de la escena
-// (s ≤ inicio o s ≥ fin) coincide con el estado normal: giro 1, tiempo 1, haces 1, apertura 1, motas 0.
-//  giro      fracción de la velocidad de giro;  tiempo  fracción del ritmo de su gas (ondas, nudos, flujo);
-//  pulso     el latido en este instante (0–~1,2: ya multiplicado por su fuerza), `edad` (s desde el último pulso)
-//            y `fuerza` (0–1,15: cuánto late en esta parte de la canción);
-//  haces     intensidad de los haces (1 la normal, con el latido);  apertura  anchura de los haces (1 la normal);
-//  motasHaz  luz de las motas que llenan los haces (0–1);  nebulosa  frente de luz de la nebulosa (0 → 1,15:
-//            hasta dónde, del centro hacia fuera, se han encendido sus motas);  brillo  luz de esas motas (0–1);
-//  tibio     luz rosa y dorada de la segunda vuelta (0–1);  foco  cuánto se atenúa el resto del cielo (0–0,6).
-export function estadoPulsar(s, config, e = {}, reducido = false) {
-  const m = config.marcas, para = suave(s, m.inicio, m[config.parada || 'bailar']), vuelve = suave(s, m.fin - 2, m.fin);
-  e.giro = mezcla(mezcla(1, GIRO_QUIETO, para), 1, vuelve);
-  e.tiempo = mezcla(mezcla(1, 0.15, para), 1, vuelve);
-  // La fuerza del latido crece con la canción: suave al empezar, se nota en «corazón», sube hacia el estribillo,
-  // plena en él y algo más en la segunda vuelta.
-  const fuerza = (suave(s, m.bailar - 0.4, m.bailar + 0.6) * 0.3 + suave(s, m.corazon - 0.3, m.corazon + 0.8) * 0.25 + suave(s, m.quererte, m.estribillo - 0.2) * 0.2
-    + suave(s, m.estribillo - 0.2, m.estribillo + 0.2) * 0.25 + suave(s, m.segunda - 0.3, m.segunda + 0.6) * 0.15) * (1 - vuelve);
-  e.pulso = latidoPulso(s, config, e, reducido) * fuerza * (reducido ? 0.4 : 1);
-  e.fuerza = fuerza;
-  // Los haces se van abriendo y encendiendo con la canción; en el estribillo, del todo (en un cuarto de segundo).
-  const encendido = sat(suave(s, m.corazon - 0.5, m.corazon + 2) * 0.3 + suave(s, m.quererte, m.estribillo - 0.3) * 0.3 + suave(s, m.estribillo - 0.3, m.estribillo + (reducido ? 1.5 : 0.25)) * 0.4);
-  e.haces = mezcla(mezcla(mezcla(1, 0.55, para), 2, encendido), 1, vuelve) * (1 + 0.9 * e.pulso);
-  e.apertura = mezcla(mezcla(1, 1.9, encendido), 1, vuelve) * (1 + 0.1 * e.pulso);
-  e.motasHaz = sat(suave(s, m.bailar - 0.4, m.corazon) * (0.35 + 0.65 * encendido)) * (1 - vuelve);
-  // La nebulosa se enciende en el estribillo, del centro hacia fuera, y se apaga al volver a girar.
-  e.nebulosa = 1.15 * suave(s, m.estribillo - 0.2, m.estribillo + (reducido ? 3 : 1.3));
-  e.brillo = suave(s, m.estribillo - 0.2, m.estribillo + 0.6) * (1 - vuelve);
-  e.tibio = suave(s, m.segunda - 0.5, m.segunda + 1.2) * (1 - vuelve);
-  e.foco = 0.6 * para * (1 - vuelve);
-  return e;
 }
 
 // Una curva por tramos: [[segundo, valor, tipo]] con tipo 's' (suave, por defecto) o 'r' (rápida: sale de golpe y frena,
