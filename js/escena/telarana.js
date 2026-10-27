@@ -13,6 +13,7 @@ import { crearTelarana, puntoFilamento } from '../data/telarana.js';
 import { generarDatosTelarana } from './telaranaDatos.js';
 import { vista } from '../util/vista.js';
 import { conDiagnostico } from '../util/diag.js';
+import { recorteDe } from './recorte.js';
 
 // Lo que queda detrás de un gigante (en su silueta, más lejos que él) se apaga: la telaraña no tapa al cuásar, la
 // supernova… (uGigA/uGigB, ver OCULTO).
@@ -112,9 +113,40 @@ function enBloques({ atributos, bloques }, material, O, fraccion = 1) {
     g.setDrawRange(b.a, Math.min(b.guardados ?? b.n, Math.max(1, Math.ceil(b.n * fraccion))));   // una muestra repartida (los puntos de cada bloque están barajados)
     g.boundingSphere = new THREE.Sphere(new THREE.Vector3(...b.centro), b.radio);
     const t = new THREE.Points(g, material); t.renderOrder = -1.5; t.userData.bloque = b;
+    // Los bloques guardan su tramo y su esfera, pero ya no se dibujan uno a uno: ver tramar.
+    t.visible = false;
     grupo.add(t);
   }
+  // Tramos de dibujo: los bloques visibles que están seguidos en la memoria (los de una misma zona del espacio lo están) se
+  // dibujan juntos, en UNA orden. Antes, una por bloque visible: unas 50 órdenes desde casa, la mayor parte de las de la
+  // telaraña. Su luz se suma (aditiva o en trama, conmutativas): dibujar los mismos puntos en otro orden da la misma imagen.
+  const tramos = new THREE.Group(); tramos.position.copy(O); tramos.renderOrder = -1.5;
+  for (let i = 0; i < bloques.length; i++) {
+    const g = new THREE.BufferGeometry(); for (const [n, a] of Object.entries(attr)) g.setAttribute(n, a);
+    g.setDrawRange(0, 0); g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1);
+    const t = new THREE.Points(g, material); t.renderOrder = -1.5; t.frustumCulled = false; t.visible = false; tramos.add(t);
+  }
+  grupo.userData.tramos = tramos;
   return grupo;
+}
+// Antes de cada dibujo con esa cámara: el mismo recorte que hacía three.js bloque a bloque (su esfera contra la vista) y los
+// visibles seguidos, en un solo tramo.
+const frustumTramos = new THREE.Frustum(), mTramos = new THREE.Matrix4(), esferaTramo = new THREE.Sphere();
+function tramar(grupo, camera) {
+  const tramos = grupo.userData.tramos.children, bloques = grupo.children;
+  if (!grupo.visible) { for (const t of tramos) t.visible = false; return; }
+  frustumTramos.setFromProjectionMatrix(mTramos.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+  let k = 0, ini = -1, fin = -1;
+  const cerrar = () => { if (ini < 0) return; const t = tramos[k++]; t.geometry.setDrawRange(ini, fin - ini); t.visible = true; };
+  for (let i = 0; i < bloques.length; i++) {
+    const t = bloques[i], dr = t.geometry.drawRange;
+    esferaTramo.copy(t.geometry.boundingSphere).applyMatrix4(t.matrixWorld);
+    if (!frustumTramos.intersectsSphere(esferaTramo)) continue;
+    if (ini >= 0 && dr.start === fin) fin = dr.start + dr.count;
+    else { cerrar(); ini = dr.start; fin = dr.start + dr.count; }
+  }
+  cerrar();
+  for (let i = k; i < tramos.length; i++) tramos[i].visible = false;
 }
 
 export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, datos) {
@@ -161,8 +193,8 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
         // un 49 % más y en el móvil se veían manchas amarillas que deslumbraban y tapaban la zona.
         vAng = h(position * 0.001) * 6.2832; vInc = 0.25 + 0.75 * h(position * 0.0013 + 3.1); vBrazos = step(0.45, h(position * 0.0007 + 7.7));
         vC = aCol; }`,
-    fragmentShader: /* glsl */`uniform sampler2D uBrazos; varying vec3 vC; varying float vA, vRes, vAng, vInc, vBrazos, vTipo;
-      void main(){ vec2 q = gl_PointCoord - 0.5; float d = length(q) * 2.0;   // sin discard (ver materiales.js): fuera del círculo, ×0 al final
+    fragmentShader: /* glsl */`precision mediump float; uniform sampler2D uBrazos; varying vec3 vC; varying float vA, vRes, vAng, vInc, vBrazos, vTipo;
+      void main(){ vec2 q = gl_PointCoord - 0.5; float d = length(q) * 2.0; if (d > 1.0) discard;   // fuera del círculo no hay luz: ni se calcula ni se mezcla
         float punto = exp(-d * d * 4.0);
         // Forma: disco elíptico girado e inclinado, núcleo brillante y, en unas, dos brazos.
         float c = cos(vAng), s = sin(vAng); vec2 r = vec2(c * q.x - s * q.y, s * q.x + c * q.y) * 2.0; r.y /= vInc;
@@ -193,7 +225,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
         float onda = pow(0.5 + 0.5 * sin(dot(position, vec3(2.1e-6, 1.3e-6, -1.7e-6)) - uT * 0.35), 8.0) + pow(0.5 + 0.5 * sin(dot(position, vec3(-1.2e-6, 1.9e-6, 1.5e-6)) - uT * 0.27 + 2.0), 8.0);
         vA *= titileo * (0.75 + 0.9 * onda);
       }`,
-    fragmentShader: /* glsl */`varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; float a = exp(-d * d * 3.0) * vA * step(d, 1.0); gl_FragColor = vec4(vC * a, a); }`,
+    fragmentShader: /* glsl */`precision mediump float; varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; if (d > 1.0) discard; float a = exp(-d * d * 3.0) * vA * step(d, 1.0); gl_FragColor = vec4(vC * a, a); }`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
   // Polvo de los filamentos: motas finas (1–2,5 px), con un leve titileo.
   const matPolvo = new THREE.ShaderMaterial({ uniforms: { ...uniformes, uComp },
@@ -211,18 +243,22 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
     // amontonan en la línea de visión (al viajar por dentro de la red, mirando a lo largo de los filamentos) la suma pasaba
     // de 2–3 veces el umbral del resplandor y salían manchas azules y moradas saturadas y con halo; así la luz se satura
     // suave hacia 1 y la mota suelta queda exactamente igual (c = color·a², lo mismo que daba la mezcla aditiva con SRC_ALPHA).
-    fragmentShader: /* glsl */`varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; float a = (1.0 - smoothstep(0.35, 1.0, d)) * vA; /* fuera del círculo a = 0: no suma nada (sin discard) */ gl_FragColor = vec4(min(vC * a * a, vec3(1.0)), a); }`,
+    fragmentShader: /* glsl */`precision mediump float; varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; if (d >= 1.0) discard; float a = (1.0 - smoothstep(0.35, 1.0, d)) * vA; /* fuera del círculo a = 0: no suma nada (sin discard) */ gl_FragColor = vec4(min(vC * a * a, vec3(1.0)), a); }`,
     transparent: true, depthWrite: false, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcColorFactor, blendEquation: THREE.AddEquation });
   // Las tres nubes grandes de puntos (más de un millón en total), en bloques: solo se dibuja lo que está a la vista.
   // (Las cintas, los resplandores y la niebla de gas ya no se construyen: estaban ocultos para siempre —sin líneas ni
   // degradados—; sus datos se siguen calculando para que el azar, y por tanto el universo, no cambie.)
   const bloquesGalaxias = enBloques(datos.galaxias, matGalaxias, O, MUESTRA * PROP_GAL), bloquesNubes = enBloques(datos.nubes, matNubes, O, MUESTRA), bloquesPolvo = enBloques(datos.polvo, matPolvo, O, MUESTRA);
-  raiz.add(bloquesNubes, bloquesPolvo);
+  raiz.add(bloquesNubes, bloquesPolvo, bloquesNubes.userData.tramos, bloquesPolvo.userData.tramos);
+  // Los tramos de la escena principal se eligen al dibujarla (con la cámara de ese dibujo); los de la capa de galaxias, en
+  // dibujarGalaxias.
+  recorteDe(scene).alDibujar(camera => { tramar(bloquesNubes, camera); tramar(bloquesPolvo, camera); });
   // Partículas a baja resolución, como en los juegos: las galaxias de la telaraña (manchas suaves de luz, cientos de miles)
   // se pintan en una capa aparte a la resolución CSS de la pantalla y se suman a la escena. En el móvil (retina) son 4
   // veces menos píxeles para la misma imagen; en el PC es la misma resolución que antes. Su luz es aditiva (el orden da
   // igual) y la ocultación por los gigantes ya la hace su sombreador (ocultoGig): no necesitan la profundidad.
-  const capaGalaxias = new THREE.Scene(); capaGalaxias.add(bloquesGalaxias); bloquesGalaxias.updateMatrixWorld(true); bloquesGalaxias.matrixWorldAutoUpdate = false;
+  const capaGalaxias = new THREE.Scene(); capaGalaxias.add(bloquesGalaxias, bloquesGalaxias.userData.tramos);
+  for (const o of [bloquesGalaxias, bloquesGalaxias.userData.tramos]) { o.updateMatrixWorld(true); o.matrixWorldAutoUpdate = false; }
   const tipoCapa = renderer && (renderer.extensions.has('EXT_color_buffer_float') || renderer.extensions.has('EXT_color_buffer_half_float')) ? THREE.HalfFloatType : THREE.UnsignedByteType;   // la luz sumada puede pasar de 1
   const rtGalaxias = new THREE.WebGLRenderTarget(1, 1, { type: tipoCapa, depthBuffer: false, stencilBuffer: false });
   const uZonaCapa = { value: new THREE.Vector4(1, 1, 1, 1) };
@@ -250,7 +286,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
     fijarZona(rtGalaxias, vista.ancho * escalaCapa, vista.alto * escalaCapa); zonaDe(rtGalaxias, uZonaCapa.value);
     const previo = renderer.getRenderTarget(), alfa = renderer.getClearAlpha(); renderer.getClearColor(colorPrevio);
     renderer.setRenderTarget(rtGalaxias); renderer.setClearColor(0x000000, 0); renderer.clear(true, false, false);
-    renderer.render(capaGalaxias, camera);
+    tramar(bloquesGalaxias, camera); renderer.render(capaGalaxias, camera);
     renderer.setClearColor(colorPrevio, alfa); renderer.setRenderTarget(previo);
   }
   // ── Campo cercano: dentro de un filamento o de un cúmulo, cientos de galaxias diminutas alrededor de la cámara
@@ -327,7 +363,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
     // Unidos dibujan todos los puntos (no la muestra): la luz de cada uno vuelve a ser la normal.
     get densidadWeb() { return densidadWeb; }, get expoAuto() { return expoAuto; },
     set penumbra(v) { penumbra = v; }, get penumbra() { return penumbra; },
-    unirBloques(si) { for (const [grupo, p] of unidos) { grupo.visible = !si; p.visible = si; } uComp.value = si ? 1 : 1 / Math.sqrt(muestraActual); },
+    unirBloques(si) { for (const [grupo, p] of unidos) { grupo.visible = grupo.userData.tramos.visible = !si; p.visible = si; } uComp.value = si ? 1 : 1 / Math.sqrt(muestraActual); },
     // Gigantes que tapan la telaraña: [{ centro, radio }] (coordenadas del mundo).
     fijarGigantes(lista) { gigantes = lista.slice(0, 6).map(g => ({ c: new V(g.centro.x - O.x, g.centro.y - O.y, g.centro.z - O.z), r: g.radio })); },
     actualizar(t, dt, ctx) { const { camera } = ctx; uniformes.uT.value = t;
