@@ -32,11 +32,13 @@ export function crearNucleo(canvas) {
   // Dos resoluciones, como en las consolas, fijas toda la visita (perfil ultra único, sin resolución dinámica):
   //  · Lienzo de salida: la nativa en el PC; en el móvil, DPR 2 como mucho (pintar la pasada final a la nativa de un iPhone,
   //    DPR 3, unos 3 Mpx, no añadía nada visible y costaba a la GPU y a la composición de iOS en cada cuadro).
-  //  · Escena 3D (pr): interna, por PRESUPUESTO DE PÍXELES (no por DPR): ≈ 1,3 Mpx en el móvil y ≈ 3,5 Mpx en el PC, nunca
-  //    más que el lienzo. La pasada de salida la reescala al lienzo con enfoque adaptativo (salida.js).
+  //  · Escena 3D (pr): interna, por PRESUPUESTO DE PÍXELES (no por DPR): ≈ 1,65 Mpx en el móvil y ≈ 3,5 Mpx en el PC, nunca
+  //    más que el lienzo. (En el móvil, con 1,3 Mpx un iPhone de 430×932 dibujaba a DPR 1,78 y el reescalado al lienzo de
+  //    DPR 2 ablandaba estrellas y letras en las capturas comparadas; con 1,65 queda a DPR 2, como antes: la GPU lo permite,
+  //    tras el resto de mejoras cuesta menos que antes a 1,6 Mpx.) La pasada de salida la reescala al lienzo con enfoque adaptativo (salida.js).
   //    Tras un cierre por memoria (nivelSeguro 2, solo la visita siguiente), 1,25 como mucho en el móvil.
   const prMaximo = Math.min(devicePixelRatio, Q.pr);
-  const PRESUPUESTO = esMovil ? 1.3e6 : 3.5e6;
+  const PRESUPUESTO = esMovil ? 1.65e6 : 3.5e6;
   const prPresupuesto = () => {
     const lienzo = esMovil ? Math.min(prMaximo, 2) : prMaximo, porPixeles = Math.sqrt(PRESUPUESTO / Math.max(1, innerWidth * innerHeight));
     return Math.max(0.5, Math.min(lienzo, Math.floor(porPixeles * 32) / 32, esMovil && nivelSeguro >= 2 ? 1.25 : Infinity));
