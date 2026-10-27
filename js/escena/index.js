@@ -1457,7 +1457,11 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     if (temporal) { camera.position.copy(camaraGuardada.pos); camera.quaternion.copy(camaraGuardada.rot); camera.updateMatrixWorld(); }
     if (captura) { const pendiente = captura; captura = null; clearTimeout(pendiente.timer); pendiente.resolver(renderer.domElement); }
     // La resolución dinámica mide a 60 FPS: en interacción y, ahora que el reposo también va a 60, en reposo.
-    if ((modo === 'interaccion' || (modo === 'contemplacion' && !ritmoAhorro)) && tEntrada !== null && entradaResuelta && dtReal < 0.5 && (window.top !== window || document.hasFocus())) regularResolucion(dtReal * 1000, !(vuelo || gesto || giro.moviendo || zoom.moviendo));   // sin foco (ventana tapada o detrás), el navegador frena los cuadros: no es que el aparato no llegue
+    // También en el vuelo de entrada (tras su primer medio segundo): es el tramo más cargado y llega justo tras la intro, con
+    // el teléfono ya caliente. Antes no se medía hasta llegar, y un móvil que no llegaba hacía toda la entrada a tirones,
+    // «muy lenta»; ahí el cambio se aplica en el acto (en pleno vuelo de entrada no se nota, los parones sí).
+    const enEntrada = !entradaResuelta && vuelo && tEntrada !== null && tiempo - tEntrada > 0.5;
+    if ((modo === 'interaccion' || (modo === 'contemplacion' && !ritmoAhorro)) && tEntrada !== null && (entradaResuelta || enEntrada) && dtReal < 0.5 && (window.top !== window || document.hasFocus())) regularResolucion(dtReal * 1000, enEntrada || !(vuelo || gesto || giro.moviendo || zoom.moviendo));   // sin foco (ventana tapada o detrás), el navegador frena los cuadros: no es que el aparato no llegue
     if (medir && tEntrada !== null && entradaResuelta) {
       cuadros++; acumulado += dtReal; coste += performance.now() - inicioCuadro;
       if (acumulado > 4) {

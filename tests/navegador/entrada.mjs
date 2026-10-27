@@ -11,7 +11,7 @@
 import { writeFileSync, mkdirSync } from 'fs';
 import { lanzar } from './arnes.mjs';
 
-const CPU = 4, TIRON = 60, VECES_MEDIANA = 2.2, SUELTOS = 2, MAXIMO = 250, PASADAS = Number(process.env.ENTRADA_PASADAS || 3);
+const CPU = Number(process.env.CPU || 4), TIRON = 60, VECES_MEDIANA = 2.2, SUELTOS = 2, MAXIMO = 250, PASADAS = Number(process.env.ENTRADA_PASADAS || 3);
 
 function resumir(dt) {
   const o = dt.slice().sort((a, b) => a - b), q = p => +(o[Math.min(o.length - 1, Math.floor(o.length * p))] || 0).toFixed(1);
