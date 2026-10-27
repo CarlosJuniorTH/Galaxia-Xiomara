@@ -18,7 +18,6 @@ body.dentro #hud{opacity:1;}
   padding:6px 14px;border-radius:30px;opacity:0;transition:opacity 1.5s ease;
   font-size:.62rem;font-weight:600;letter-spacing:1.5px;color:#ffe1ef;
   background:var(--vidrio);border:1px solid var(--borde);
-  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
 }
 #pastilla-estrellas.visible{opacity:1;}
 #pastilla-estrellas:empty{display:none;}
@@ -44,12 +43,11 @@ body.dentro #hud{opacity:1;}
 .btn-redondo{
   position:fixed;bottom:calc(var(--abajo) + 20px);z-index:20;pointer-events:auto;
   width:56px;height:56px;border-radius:50%;cursor:pointer;display:grid;place-items:center;
-  border:1px solid var(--borde);background:var(--vidrio);color:#ffd6ea;
-  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  border:1px solid var(--borde);background:var(--grano),var(--brillo-vidrio),#2a1230e0;color:#ffd6ea;
   box-shadow:0 8px 26px rgba(255,60,150,.25);transition:transform .25s ease,background .25s ease;
 }
 .btn-redondo:active{transform:scale(.92);}
-@media (hover:hover){.btn-redondo:hover{transform:translateY(-3px);background:rgba(255,110,175,.25);}}
+@media (hover:hover){.btn-redondo:hover{transform:translateY(-3px);background-color:#4a1d45e6;}}
 
 #btn-carta{left:20px;font-size:1.45rem;animation:flotar-btn 3s ease-in-out infinite;}
 #btn-carta::after{content:'';position:absolute;top:8px;right:8px;width:10px;height:10px;border-radius:50%;background:var(--rosa);box-shadow:0 0 10px var(--rosa);}

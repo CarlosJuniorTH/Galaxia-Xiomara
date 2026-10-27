@@ -9,6 +9,11 @@
   --suave:rgba(255,200,228,.68);
   --vidrio:rgba(255,110,175,.13);
   --borde:rgba(255,190,225,.3);
+  /* Cristal sin backdrop-filter (que encima del 3D en movimiento obliga a desenfocar la galaxia entera en cada cuadro):
+     las capas que flotan sobre la escena llevan un fondo casi opaco de su tono, un brillo muy suave arriba a la izquierda
+     y un grano fino (una imagen fija: se pinta una vez y la GPU solo la compone). */
+  --grano:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 .92 0 0 0 0 .96 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)'/%3E%3C/svg%3E");
+  --brillo-vidrio:linear-gradient(165deg,rgba(255,236,246,.07),rgba(255,236,246,0) 50%);
   --arriba:env(safe-area-inset-top,0px);
   --abajo:env(safe-area-inset-bottom,0px);
 }

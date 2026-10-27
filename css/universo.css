@@ -17,19 +17,19 @@ button{touch-action:manipulation;}
 .marca-universo .marca-y{font-style:normal;font-weight:400;color:var(--oro);}.marca-universo small{display:block;font-family:'Quicksand',sans-serif;font-size:.48rem;letter-spacing:3px;color:var(--tenue);margin-top:5px;}.marca-simbolo{font-size:2.3rem;color:var(--oro);}
 .horarios{position:fixed;right:32px;top:calc(var(--arriba) + 31px);display:flex;gap:20px;z-index:12;}
 .horarios span{font-size:.62rem;line-height:1.9;color:#ded0e7;text-align:right;white-space:pre-line;}.horarios small{display:block;letter-spacing:2px;font-size:.45rem;color:var(--tenue);}
-.boton-tour{z-index:20;position:fixed;top:calc(var(--arriba) + 113px);right:32px;border:1px solid #e8c6a043;border-radius:30px;background:#1e132c99;backdrop-filter:blur(12px);padding:11px 17px;display:flex;gap:16px;align-items:center;font-size:.64rem;letter-spacing:.6px;color:#f0decc;cursor:pointer;transition:background .3s;}.boton-tour:hover{background:#59374b99;}
+.boton-tour{z-index:20;position:fixed;top:calc(var(--arriba) + 113px);right:32px;border:1px solid #e8c6a043;border-radius:30px;background:var(--grano),var(--brillo-vidrio),#1e132ce6;padding:11px 17px;display:flex;gap:16px;align-items:center;font-size:.64rem;letter-spacing:.6px;color:#f0decc;cursor:pointer;transition:background .3s;}.boton-tour:hover{background-color:#59374be6;}
 .lugar{position:fixed;left:36px;bottom:145px;width:min(330px,30vw);z-index:12;padding:24px 0 0;background:radial-gradient(ellipse at left,#10071788,transparent);}
 .ceja{font-size:.52rem;letter-spacing:2.8px;line-height:1.8;color:var(--oro);font-weight:600;text-transform:uppercase;}
 .lugar h1{font-family:'Cormorant Garamond',serif;font-size:2.8rem;line-height:1.05;font-weight:400;margin:10px 0 14px;color:#f9e8ed;}
 .lugar p{font-family:'Cormorant Garamond',serif;font-size:1.12rem;color:#d8c3d9;line-height:1.5;max-width:300px;text-shadow:0 2px 15px #05010c;}
 .enlace-accion,.enlace-suave{border:none;border-bottom:1px solid #e8c6a03a;background:none;color:#e8c6a0;padding:14px 0 8px;font-size:.65rem;letter-spacing:.6px;cursor:pointer;}.enlace-accion span{margin-left:18px;}
-.muelle{position:fixed;left:50%;bottom:calc(var(--abajo) + 24px);transform:translateX(-50%);display:flex;align-items:center;padding:5px 14px;border:1px solid #e5cbe029;border-radius:24px;background:linear-gradient(120deg,#26132cdb,#130d23e6);backdrop-filter:blur(20px);box-shadow:0 12px 60px #0005;z-index:22;}
+.muelle{position:fixed;left:50%;bottom:calc(var(--abajo) + 24px);transform:translateX(-50%);display:flex;align-items:center;padding:5px 14px;border:1px solid #e5cbe029;border-radius:24px;background:var(--grano),var(--brillo-vidrio),linear-gradient(120deg,#26132cf2,#130d23f5);box-shadow:0 12px 60px #0005;z-index:22;}
 .muelle button{background:transparent;border:0;cursor:pointer;display:flex;align-items:center;flex-direction:column;gap:5px;padding:10px 20px;min-width:78px;font-size:.57rem;letter-spacing:.5px;color:#c7b8d0;border-radius:15px;transition:background .3s,color .3s;}.muelle button span{font-family:serif;font-size:1.5rem;line-height:1;color:#edd6d5;}.muelle button:hover{background:#e9badb12;color:#ffe2f0;}
-#pastilla-estrellas{bottom:calc(var(--abajo) + 112px);border:0;background:none;backdrop-filter:none;font-size:.54rem;letter-spacing:1px;pointer-events:none;color:#d5bfd8;}
+#pastilla-estrellas{bottom:calc(var(--abajo) + 112px);border:0;background:none;font-size:.54rem;letter-spacing:1px;pointer-events:none;color:#d5bfd8;}
 #mensaje{left:50%;right:auto;width:min(560px,calc(100% - 780px));transform:translateX(-50%);bottom:calc(var(--abajo) + 165px);font-size:1.15rem;line-height:1.45;color:#ead6e3;text-shadow:0 2px 15px #000;}#mensaje.fuera{transform:translate(-50%,6px);}@media(max-width:1180px){#mensaje{display:none;}}
 #pista{bottom:calc(var(--abajo) + 128px);color:#b2a0b8;font-size:.48rem;pointer-events:none;}
-#btn-musica{width:46px;height:46px;bottom:calc(var(--abajo) + 39px);right:30px;background:#20132b99;box-shadow:none;border-color:var(--linea);}
-.cometa-aviso{position:fixed;right:30px;bottom:calc(var(--abajo) + 116px);z-index:15;}.cometa-aviso button{border:1px solid #ffdca82e;background:#20192dcc;backdrop-filter:blur(12px);color:#f5dec2;padding:12px 15px;border-radius:20px;font-family:'Cormorant Garamond',serif;font-size:1rem;cursor:pointer;}.cometa-aviso span{margin-left:10px;}
+#btn-musica{width:46px;height:46px;bottom:calc(var(--abajo) + 39px);right:30px;background:var(--grano),var(--brillo-vidrio),#20132be6;box-shadow:none;border-color:var(--linea);}
+.cometa-aviso{position:fixed;right:30px;bottom:calc(var(--abajo) + 116px);z-index:15;}.cometa-aviso button{border:1px solid #ffdca82e;background:var(--grano),var(--brillo-vidrio),#20192df0;color:#f5dec2;padding:12px 15px;border-radius:20px;font-family:'Cormorant Garamond',serif;font-size:1rem;cursor:pointer;}.cometa-aviso span{margin-left:10px;}
 .tarjeta{width:min(430px,100%);padding:24px 32px 28px;border-color:#ecd1e328;background:linear-gradient(160deg,#2c1a388c,#120c258c);box-shadow:0 30px 100px #0005;}
 .tarjeta-foto{aspect-ratio:16/10;margin-bottom:26px;border-radius:15px;box-shadow:none;border:1px solid #d6b4d01c;}
 .tarjeta-foto img{animation:none;}.tarjeta-foto::after{display:none;}
@@ -71,7 +71,7 @@ dialog::backdrop{background:#08041052;backdrop-filter:blur(4px);}
 .recuerdo-item{width:100%;display:flex;gap:14px;text-align:left;align-items:center;border:0;border-left:1px solid #e8c6a040;background:none;padding:13px 0 13px 18px;color:#ddc7db;cursor:pointer;}.recuerdo-item span{font-size:1.5rem;color:var(--oro);}.recuerdo-item strong{display:block;font-family:'Cormorant Garamond',serif;font-size:1.18rem;font-weight:400;}.recuerdo-item small{display:block;font-size:.53rem;line-height:1.7;letter-spacing:.6px;color:#a993b3;}.recuerdo-item:disabled{opacity:.55;cursor:default;}.recuerdo-item:disabled span{color:#8e7899;}
 .capsula,.sueno{padding:20px 18px;border:1px solid var(--linea);border-radius:16px;margin-bottom:12px;background:#ffffff03;}.capsula h3,.sueno h3{font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:400;line-height:1.15;margin:8px 0;}.capsula p,.sueno p{font-family:'Cormorant Garamond',serif;font-size:1.08rem;line-height:1.5;color:#c4b0cc;margin-bottom:16px;}.capsula small{font-size:.53rem;letter-spacing:1px;color:var(--oro);}.sueno.cumplido{border-color:#c4dfa844;background:#c4dfa808;}.sueno.cumplido h3{color:#d7e6c4;}
 .relojes-panel{display:flex;gap:15px;margin:25px 0;}.reloj-tarjeta{flex:1;padding:20px 10px;border:1px solid var(--linea);border-radius:14px;text-align:center;}.reloj-tarjeta strong{display:block;font-family:'Cormorant Garamond',serif;font-size:2rem;font-weight:400;}.reloj-tarjeta small{font-size:.55rem;letter-spacing:1px;color:#baa7c3;}
-.ruta{position:fixed;left:50%;bottom:calc(var(--abajo) + 125px);transform:translateX(-50%);width:min(470px,calc(100% - 40px));padding:20px 24px 16px;background:linear-gradient(145deg,#251830e8,#110c20ed);border:1px solid var(--linea);border-radius:22px;backdrop-filter:blur(18px);z-index:25;}.ruta-cabecera{display:flex;justify-content:space-between;align-items:center;color:var(--oro);font-size:.51rem;letter-spacing:2px;text-transform:uppercase;}.ruta-cabecera button{border:0;background:transparent;cursor:pointer;font-size:1rem;padding:4px;}.ruta h2{font-family:'Cormorant Garamond',serif;font-size:1.9rem;font-weight:400;margin:6px 0 8px;}.ruta p{font-family:'Cormorant Garamond',serif;font-size:1.06rem;line-height:1.4;color:#cdb8d1;}.ruta-botones{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;}.ruta-botones button{border:0;background:none;padding:8px 10px;color:#e9d3df;cursor:pointer;font-size:.62rem;}.ruta-avance{height:1px;background:#e8c6a020;margin-top:18px;}.ruta-avance i{display:block;width:0;height:1px;background:var(--oro);}
+.ruta{position:fixed;left:50%;bottom:calc(var(--abajo) + 125px);transform:translateX(-50%);width:min(470px,calc(100% - 40px));padding:20px 24px 16px;background:var(--grano),var(--brillo-vidrio),linear-gradient(145deg,#251830f7,#110c20fa);border:1px solid var(--linea);border-radius:22px;z-index:25;}.ruta-cabecera{display:flex;justify-content:space-between;align-items:center;color:var(--oro);font-size:.51rem;letter-spacing:2px;text-transform:uppercase;}.ruta-cabecera button{border:0;background:transparent;cursor:pointer;font-size:1rem;padding:4px;}.ruta h2{font-family:'Cormorant Garamond',serif;font-size:1.9rem;font-weight:400;margin:6px 0 8px;}.ruta p{font-family:'Cormorant Garamond',serif;font-size:1.06rem;line-height:1.4;color:#cdb8d1;}.ruta-botones{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;}.ruta-botones button{border:0;background:none;padding:8px 10px;color:#e9d3df;cursor:pointer;font-size:.62rem;}.ruta-avance{height:1px;background:#e8c6a020;margin-top:18px;}.ruta-avance i{display:block;width:0;height:1px;background:var(--oro);}
 body.en-ruta .lugar,body.en-ruta #mensaje,body.en-ruta #pista,body.en-ruta #pastilla-estrellas,body.en-ruta .boton-tour,body.en-ruta #cometa-aviso{display:none;}
 body.en-ruta .muelle{opacity:.45;}
 .salir-calma{position:fixed;left:50%;bottom:calc(var(--abajo) + 34px);transform:translateX(-50%);border:1px solid var(--linea);background:#21172cbb;padding:14px 22px;color:#decfe5;border-radius:30px;font-size:.65rem;cursor:pointer;z-index:30;white-space:nowrap;}
@@ -158,16 +158,9 @@ body.en-calma #hud>:not(.salir-calma){opacity:0;pointer-events:none;transition:o
   .ruta-botones{margin-top:6px;}
 }
 
-/* Pantallas táctiles: el desenfoque de fondo se recalcula en cada fotograma encima de
-   la escena animada y cuesta GPU en el teléfono. Se sustituye por un fondo algo más
-   opaco con el mismo tono; la lectura no cambia. */
+/* Pantallas táctiles: tampoco se desenfoca detrás de las cartas y los paneles (el resto de capas ya no usa
+   backdrop-filter en ningún aparato: ver --grano en base.css). */
 @media (pointer:coarse){
-  .boton-tour,.muelle,.cometa-aviso button,.ruta,#btn-musica,#pastilla-estrellas,.brindis,.btn-redondo,.tarjeta{-webkit-backdrop-filter:none!important;backdrop-filter:none!important;}
-  .muelle{background:linear-gradient(120deg,#26132cf2,#130d23f5);}
-  .boton-tour{background:#1e132ce6;}
-  .cometa-aviso button{background:#20192df0;}
-  .ruta{background:linear-gradient(145deg,#251830f7,#110c20fa);}
-  #btn-musica{background:#20132be6;}
   dialog::backdrop,.ventana{-webkit-backdrop-filter:none;backdrop-filter:none;}
 }
 
