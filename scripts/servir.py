@@ -4,13 +4,19 @@ from argparse import ArgumentParser
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+import gzip
 import json
+import mimetypes
 from datetime import datetime, timezone
+from email.utils import formatdate, parsedate_to_datetime
 from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
 ARCHIVOS = {'index.html', 'editor.html', 'manifest.webmanifest', 'favicon.ico', 'sw.js', 'app-shell.json'}
 CARPETAS = {'assets', 'css', 'js'}
+# Comprimidos con gzip, como los sirve GitHub Pages (la web publicada): así los MB de las pruebas son los de verdad.
+COMPRIMIBLES = {'.js', '.mjs', '.css', '.json', '.svg', '.html', '.webmanifest', '.txt'}
+_comprimidos = {}   # ruta → (mtime, bytes en gzip)
 
 class AppHandler(SimpleHTTPRequestHandler):
     def recurso_permitido(self):
@@ -47,12 +53,55 @@ class AppHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(cuerpo)
 
+    def comprimido(self):
+        # Texto (módulos, estilos, JSON, SVG, la página) con gzip si el navegador lo acepta. True si ya respondió.
+        if 'gzip' not in self.headers.get('Accept-Encoding', ''):
+            return False
+        ruta = unquote(urlsplit(self.path).path)
+        f = (ROOT / ruta.lstrip('/')).resolve()
+        if f.is_dir():
+            f = f / 'index.html'
+        if f.suffix not in COMPRIMIBLES or not f.is_file():
+            return False
+        st = f.stat()
+        ims = self.headers.get('If-Modified-Since')
+        if ims:
+            try:
+                if int(st.st_mtime) <= parsedate_to_datetime(ims).timestamp():
+                    self.send_response(304)
+                    self.send_header('Vary', 'Accept-Encoding')
+                    self.end_headers()
+                    return True
+            except (TypeError, ValueError, OverflowError):
+                pass
+        guardado = _comprimidos.get(f)
+        if not guardado or guardado[0] != st.st_mtime:
+            guardado = (st.st_mtime, gzip.compress(f.read_bytes(), 6))
+            _comprimidos[f] = guardado
+        cuerpo = guardado[1]
+        tipo = mimetypes.guess_type(f.name)[0] or 'application/octet-stream'
+        if f.suffix in ('.js', '.mjs'):
+            tipo = 'text/javascript'
+        if tipo.startswith('text/') or tipo in ('application/json', 'image/svg+xml'):
+            tipo += '; charset=utf-8'
+        self.send_response(200)
+        self.send_header('Content-Type', tipo)
+        self.send_header('Content-Encoding', 'gzip')
+        self.send_header('Vary', 'Accept-Encoding')
+        self.send_header('Content-Length', str(len(cuerpo)))
+        self.send_header('Last-Modified', formatdate(st.st_mtime, usegmt=True))
+        self.end_headers()
+        self.wfile.write(cuerpo)
+        return True
+
     def do_GET(self):
         if urlsplit(self.path).path == '/paquetes.json' and not (ROOT / 'paquetes.json').exists():
             self.paquetes()
             return
         if not self.recurso_permitido():
             self.send_error(404)
+            return
+        if self.comprimido():
             return
         super().do_GET()
 
