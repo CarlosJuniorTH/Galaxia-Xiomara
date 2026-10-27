@@ -5,7 +5,8 @@
 import * as THREE from 'three';
 import { Q, texturasLigeras } from '../util/dispositivo.js';
 import { descargas, enReposo, cuandoLibre } from '../util/descargas.js';   // MB en la pantalla de carga; la cola de reposo
-import { FONDO_ESCENA } from '../util/fondoEscena.js';   // el videoclip de un gigante apaga sus paredes de polvo
+import { FONDO_ESCENA } from '../util/fondoEscena.js';
+import { subirCuboPorTrozos } from './subidaPorTrozos.js';   // el videoclip de un gigante apaga sus paredes de polvo
 
 const CARAS = ['px', 'nx', 'py', 'ny', 'pz', 'nz'];
 
@@ -46,11 +47,15 @@ export function crearCieloProfundo({ renderer, scene }) {
     if (!(await Promise.all(rutas.map(r => enReposo(r, 4)))).every(Boolean)) return;
     const caras = [];
     try {
-      for (const r of rutas) caras.push(await cuandoLibre(async () => decodificar(await (await fetch(r, { cache: 'force-cache' })).blob())));
-      await cuandoLibre(() => {
-        const nueva = cubo('alta'); subir(nueva, caras);
-        const vieja = textura; textura = nueva; fondo.material.uniforms.uCubo.value = nueva; vieja.dispose();
-      });
+      // Por franjas (subidaPorTrozos.js): una cara cada vez, cada franja (~1 MB) en su momento libre. Subir las seis de
+      // golpe era una tarea de 162 ms (medido, móvil CPU ×4) justo al entrar.
+      const cara = i => cuandoLibre(async () => decodificar(await (await fetch(rutas[i], { cache: 'force-cache' })).blob()));
+      let nueva = await subirCuboPorTrozos(renderer, cubo('alta'), 2048, cara).catch(e => { console.warn('Cielo profundo por franjas', e); return null; });
+      if (!nueva) {   // sin WebGL 2: como antes, de una vez
+        for (let i = 0; i < 6; i++) caras.push(await cara(i));
+        nueva = await cuandoLibre(() => { const t = cubo('alta'); subir(t, caras); return t; });
+      }
+      await cuandoLibre(() => { const vieja = textura; textura = nueva; fondo.material.uniforms.uCubo.value = nueva; vieja.dispose(); });
     } catch (e) { for (const b of caras) b.close?.(); console.warn('Cielo profundo: sin las caras grandes', e); }
   });
   // Al entrar ya está todo: sin fundido (la carga espera a que llegue).

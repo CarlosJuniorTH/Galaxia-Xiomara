@@ -54,6 +54,8 @@ const RADIO_ESTRELLA = 110 * ESCALA_SUPERNOVA * PROGENITORA_RELATIVA;
 import { resolucionPostal, crearCapturador } from '../util/captura.js';
 import { vista } from '../util/vista.js';
 import { conDiagnostico } from '../util/diag.js';
+import { subirDatosPorTrozos } from './subidaPorTrozos.js';
+import { cuandoLibre } from '../util/descargas.js';
 import { vigilarEstrenos } from '../util/estrenos.js';
 
 const OBJETIVO = new THREE.Vector3(0, 70, 0);
@@ -122,7 +124,11 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // Cada textura calculada o descargada va a la GPU en cuanto llega (las que sueltan su copia, la sueltan ya): antes todas
   // esperaban en memoria al final de la carga y se juntaban con todo lo demás (el pico de memoria que cerraba el iPhone).
   { const anisotropiaMax = renderer.capabilities.getMaxAnisotropy();
-    subirAlLlegar(t => { if (t.anisotropy > 1 && t.anisotropy < anisotropiaMax) t.anisotropy = anisotropiaMax; renderer.initTexture(t); }); }
+    // Las que llegan tras la carga (planetas del sistema solar, nebulosas de fondo), por franjas de ~1 MB en momentos libres
+    // (subidaPorTrozos.js): de una vez eran hasta 8 MB en una sola tarea.
+    subirAlLlegar((t, { tardia } = {}) => { if (t.anisotropy > 1 && t.anisotropy < anisotropiaMax) t.anisotropy = anisotropiaMax;
+      if (!tardia) { renderer.initTexture(t); return; }
+      subirDatosPorTrozos(renderer, t).then(ok => ok || cuandoLibre(() => renderer.initTexture(t)), () => cuandoLibre(() => renderer.initTexture(t))); }); }
   // Cada objeto añadido a la escena recuerda su capa: permite aislarlas en el diagnóstico.
   // Cada capa tiene su propia semilla (derivada de su nombre): lo que una capa genere de más o de
   // menos en un dispositivo no desplaza el mapa de las demás. El universo es el mismo en PC y móvil.
@@ -825,6 +831,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   }
   async function entrarOSalir(id, opciones) {
     const haciaSolar = SOLARES.has(id);
+    nucleo.prepararEscena(haciaSolar ? 'solar' : 'principal');   // su búfer, ya en el clic (nada se crea en pleno vuelo)
     destinoActual = id; mundos.enfocar(id); alViajar(id); soltarCielo();
     // En el sistema solar la galaxia no se actualiza: se pone al día para que el brazo, su giro y la marca sean los de ahora.
     galaxia.girar(tiempo);

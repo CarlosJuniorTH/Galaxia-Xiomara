@@ -103,7 +103,9 @@ export function ocupado(motivo, si = true, { cortar = motivo !== 'gesto' } = {})
 export function ocupadoSi(fn) { comprobaciones.add(fn); return () => comprobaciones.delete(fn); }
 
 // Trabajo para un momento libre (decodificar una imagen, subirla a la GPU): fn se ejecuta en un reposo sin motivos.
-export function cuandoLibre(fn) { return new Promise((ok, mal) => { tareas.push({ fn, ok, mal }); programar(); }); }
+export function cuandoLibre(fn) { return new Promise((ok, mal) => { tareas.push({ fn, ok, mal, de: depurar ? (new Error().stack || '').split('\n')[2]?.trim() : '' }); programar(); }); }
+// Con #debug, las tareas de cuandoLibre de más de 4 ms (con quién las pidió): window.__tareasLentas. Ninguna debería.
+const depurar = enNavegador && location.hash === '#debug', tareasLentas = depurar ? (window.__tareasLentas = []) : null;
 
 function programar() {
   if (programado || !enNavegador) return;
@@ -116,7 +118,9 @@ function paso(plazo) {
   // Primero las tareas (cortas), una por reposo, con margen.
   if (tareas.length && (plazo?.timeRemaining?.() ?? 8) > 4) {
     const t = tareas.shift();
+    const t0 = depurar ? performance.now() : 0;
     try { Promise.resolve(t.fn()).then(t.ok, t.mal); } catch (e) { t.mal(e); }
+    if (depurar) { const ms = performance.now() - t0; if (ms > 4) tareasLentas.push({ ms: Math.round(ms), de: t.de, t: Math.round(t0) }); }
   }
   if (!enCurso && cola.length) bajar(cola.shift());
   if (tareas.length || (!enCurso && cola.length)) programar();

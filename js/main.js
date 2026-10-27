@@ -90,7 +90,9 @@ try {
   let mirandoVuelo = 0;
   const vueloOcupa = () => {
     ocupado('vuelo', true); clearTimeout(mirandoVuelo);
-    const mirar = () => { if (escena && !escena.viajando && !(escena.restanteViaje > 0)) ocupado('vuelo', false); else mirandoVuelo = setTimeout(mirar, 250); };
+    // Y 3 s más tras aterrizar: la llegada (la tarjeta, la canción del lugar, el primer cuadro de su escena) tampoco comparte
+    // el hilo con descargas ni subidas a la GPU.
+    const mirar = () => { if (escena && !escena.viajando && !(escena.restanteViaje > 0)) mirandoVuelo = setTimeout(() => { if (!escena.viajando) ocupado('vuelo', false); else mirar(); }, 3000); else mirandoVuelo = setTimeout(mirar, 250); };
     mirandoVuelo = setTimeout(mirar, 1500);
   };
   escena = await crearEscena(document.getElementById('galaxia'), {

@@ -161,6 +161,7 @@ function dataTextura(ancho, alto) {
 let alLlegar = null, tardias = false;
 // Desde aquí (fin de la carga y de su calentamiento, index.js), las texturas que no bloquean se aplican en momentos libres.
 export function texturasTardiasEnReposo() { tardias = true; }
+// fn(textura, { tardia }): tardia = llegó tras la carga (se sube por franjas en momentos libres, subidaPorTrozos.js).
 export function subirAlLlegar(fn) { alLlegar = fn; }
 const comoBytes = d => (d instanceof Uint8Array ? d : new Uint8Array(d.buffer, d.byteOffset, d.byteLength));
 
@@ -183,16 +184,16 @@ export function texturaPlaneta(tipo, opciones, { claves = ['pixeles'], relleno =
       if (hecho) return; hecho = true;
       // Una que no bloquea y llega cuando la carga ya terminó (el cielo de fondo, los planetas del sistema solar): se rellena
       // y se sube a la GPU en un momento libre (cuandoLibre), nunca durante un vuelo, un clip o un gesto.
-      if (!bloquea && tardias) { cuandoLibre(() => aplicar(datos)).catch(() => aplicar(datos)); return; }
-      aplicar(datos);
+      if (!bloquea && tardias) { cuandoLibre(() => aplicar(datos, true)).catch(() => aplicar(datos, true)); return; }
+      aplicar(datos, false);
     } };
-    const aplicar = datos => {
+    const aplicar = (datos, tardia) => {
       try {
         for (const c of claves) { const t = texturas[c], n = ancho * alto * 4; if (!datos?.[c] || datos[c].length !== n) throw new Error(`${clave}: datos que no encajan (${datos?.[c]?.length} para ${n})`);
           t.image.data = comoBytes(datos[c]); t.needsUpdate = true; t.userData.lista = performance.now(); if (liberable) t.onUpdate = soltarCopia; }
       } catch (e) { errores.push(String(e.message || e)); console.warn('Textura', e); }
       for (const c of claves) if (!texturas[c].image.data) rellenar(texturas[c], relleno);   // (la que no llegó: su color de relleno)
-      if (alLlegar) for (const c of claves) { try { alLlegar(texturas[c]); } catch (e) { console.warn('Textura', e); } }
+      if (alLlegar) for (const c of claves) { try { alLlegar(texturas[c], { tardia }); } catch (e) { console.warn('Textura', e); } }
       enCurso.delete(marca); resolve();
     };
     const enviar = () => { iniciarObreros(); (bloquea ? colaBloquea : colaResto).push(pedido); despachar(); };
