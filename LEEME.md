@@ -84,6 +84,12 @@ Durante las pruebas HTTP locales, el servidor guarda el último fallo de arranqu
 
 Three.js y las fuentes se sirven desde la propia carpeta, con sus licencias. Las texturas, la portada y los elementos nuevos se generan localmente; la escena no necesita CDNs. El brillo conserva sus cinco niveles HDR y resolución, agrupando muestras contiguas en el filtro vertical; sus superficies no reservan profundidad innecesaria. Los destellos comparten texturas y el lienzo de efectos solo anima cuando tiene contenido visible. Se detienen los efectos al ocultar la pestaña. Una pérdida del contexto gráfico muestra recuperación explícita y conserva el progreso, sin bucles de recarga.
 
+### Carga por prioridad
+
+Como en un juego, la pantalla de carga solo baja lo imprescindible para la intro y la entrada: los módulos (three.js minificado), las texturas horneadas, los cálculos horneados (`assets/horno/paquete.bin.gz`), el cielo de fondo mediano y las canciones de la intro y de los viajes. La barra «X de Y MB» cuenta exactamente eso (unos 12 MB en el móvil y 15 MB en el PC; antes eran 27–30 MB, con todas las canciones y estancias). Antes del primer toque se bajan unos 4 MB.
+
+Todo lo demás (las canciones de los destinos y sus estancias, las caras grandes del cielo, fuentes y módulos tardíos) lo baja después una cola (`js/util/descargas.js`, `js/util/precarga.js`) de uno en uno y solo en momentos libres: nunca durante el clip, un vuelo o un gesto (un vuelo corta lo que estuviera bajando y vuelve a la cola). Al elegir un destino, su canción se pide en el acto si aún no había llegado; su estancia, al llegar. Cada archivo se pide una sola vez: lo ya bajado se vuelve a leer de la caché sin preguntar al servidor. Con HTTPS el service worker lo guarda todo al pasar. El servidor local (`scripts/servir.py`) comprime con gzip el texto, como GitHub Pages. `tests/navegador/redCarga.mjs` mide los MB de cada tramo y las peticiones repetidas.
+
 La experiencia mantiene el 3D; no se sustituye por una imagen 2D. Eso requiere un navegador con WebGL disponible. Ninguna aplicación puede garantizar que el hardware o el navegador nunca fallen. Añadir a inicio funciona mediante el manifiesto; **no hay service worker ni se promete carga sin conexión tras cerrar el navegador**.
 
 ## Desarrollo y pruebas
