@@ -16,7 +16,7 @@ const $ = s => document.querySelector(s);
 const ESPERA_CANCION = 15000;
 
 export function crearEntrada(config, { viaje, banda } = {}) {
-  $('#entrada-nombre').textContent = config.nombre;
+  $('#entrada-nombre').textContent = $('#entrada-nombre').dataset.texto = config.nombre;
   $('#entrada-cita').textContent = config.cita;
   const foto = $('#foto');
   foto.alt = `Para ${config.nombre}`;

@@ -6,7 +6,12 @@
   background:radial-gradient(ellipse at 50% 40%,#2c0a2c,#080012 72%);
   transition:opacity 1.5s ease;
 }
-#entrada.oculto{opacity:0;pointer-events:none;}
+#entrada.oculto{opacity:0;pointer-events:none;will-change:opacity;}
+/* El fundido al entrar va en su propia capa (solo opacidad, en el compositor) encima de los primeros cuadros del vuelo:
+   lo de dentro se queda quieto (nada que repintar en cada cuadro: ni el brillo del nombre ni el destello del botón, ni
+   el filtro del botón desactivado, que antes se animaba sobre la escena en movimiento). */
+#entrada.oculto *,#entrada.oculto::before,#entrada.oculto *::before,#entrada.oculto *::after{animation-play-state:paused;}
+#entrada.oculto #btn-entrar{filter:none;transition:none;}
 
 /* Intro: el videoclip se dibuja en un lienzo detrás de todo (js/ui/portada.js); el texto de la historia, arriba, nítido
    (sin sombras ni halos). Durante el clip el fondo es negro; al final aparece el cielo del universo (#entrada::before,
@@ -28,14 +33,13 @@
   background:linear-gradient(160deg,rgba(255,255,255,.13),rgba(255,160,205,.05));
   border:1px solid rgba(255,200,230,.28);
   box-shadow:0 30px 80px rgba(255,40,140,.28),inset 0 1px 0 rgba(255,255,255,.25);
-  -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
   /* Aparece cuando el universo de la portada ya se ha formado. */
   opacity:0;transform:translateY(30px) scale(.96);pointer-events:none;will-change:opacity,transform;
   transition:opacity 1.3s ease,transform 1.3s cubic-bezier(.2,.8,.2,1);
 }
 #entrada.formado .tarjeta{opacity:1;transform:none;pointer-events:auto;}
 /* Medio segundo antes de aparecer (pantalla en negro tras el salto del clip): casi invisible, para que su primer pintado
-   y su desenfoque no caigan en el cuadro en que entra. */
+   no caiga en el cuadro en que entra. */
 #entrada.previa:not(.formado) .tarjeta{opacity:.002;transition:none;}
 /* En vertical la tarjeta deja ver el universo recién nacido en la parte de arriba. */
 @media (orientation:portrait){
@@ -82,11 +86,18 @@
 @keyframes kenburns{from{transform:scale(1)}to{transform:scale(1.12) translate(-2%,-2%)}}
 
 .para{font-size:.6rem;font-weight:600;letter-spacing:6px;text-transform:uppercase;color:var(--suave);}
+/* El halo del nombre es fijo (text-shadow del propio elemento, de letras transparentes: igual que el drop-shadow de antes)
+   y el degradado que lo recorre va encima, en ::after, en su capa y sin filtro: antes el drop-shadow se recalculaba en cada
+   cuadro de la animación, encima del clip en movimiento. */
 .nombre{
+  position:relative;
   font-family:'Great Vibes',cursive;font-size:clamp(3rem,14vw,3.9rem);line-height:1.15;margin:0 0 4px;
+  color:transparent;text-shadow:0 0 18px rgba(255,100,170,.45);
+}
+.nombre::after{
+  content:attr(data-texto);position:absolute;inset:0;pointer-events:none;text-shadow:none;will-change:transform;
   background:linear-gradient(90deg,#ffd1e6,#ff6fae,#c58bff,#ffd1e6);background-size:300% 100%;
   -webkit-background-clip:text;background-clip:text;color:transparent;
-  filter:drop-shadow(0 0 18px rgba(255,100,170,.45));
   animation:brillo 7s linear infinite;
 }
 @keyframes brillo{to{background-position:300% 0}}
@@ -109,12 +120,12 @@
 #btn-entrar::before{
   content:'';position:absolute;top:0;left:-60%;width:40%;height:100%;
   background:linear-gradient(100deg,transparent,rgba(255,255,255,.55),transparent);
-  transform:skewX(-20deg);animation:destello 3.2s ease-in-out infinite;
+  transform:skewX(-20deg);animation:destello 3.2s ease-in-out infinite;will-change:transform;
 }
 #btn-entrar .cargando{display:inline-flex;align-items:center;gap:10px;letter-spacing:2px;text-transform:none;font-size:.82rem;font-weight:600;}
 #btn-entrar .cargando i{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;animation:girar .9s linear infinite;}
 @keyframes girar{to{transform:rotate(360deg)}}
-@keyframes destello{0%,60%{left:-60%}100%{left:130%}}
+@keyframes destello{0%,60%{transform:translateX(0) skewX(-20deg)}100%{transform:translateX(475%) skewX(-20deg)}}
 @keyframes latido{0%,100%{box-shadow:0 10px 28px rgba(255,70,150,.42)}50%{box-shadow:0 10px 48px rgba(255,70,150,.8)}}
 
 .audifonos{margin-top:12px;font-size:.66rem;letter-spacing:1.5px;color:rgba(255,210,230,.5);}
@@ -157,3 +168,4 @@
 .toque:focus-visible{outline:none;}
 .toque:focus-visible .toque-texto{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:8px;}
 #entrada.con-toque .carga{opacity:0;}
+@media (prefers-reduced-motion:reduce){.nombre::after{animation:none;}}
