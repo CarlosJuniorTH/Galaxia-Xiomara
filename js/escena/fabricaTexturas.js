@@ -5,15 +5,16 @@ import * as THREE from 'three';
 import { GENERADORES } from './texturasPlaneta.js';
 import { huellaTextura } from './huellaTextura.js';
 import { descargas } from '../util/descargas.js';
-import { esMovil, texturasLigeras, Q } from '../util/dispositivo.js';
+import { esMovil, texturasLigeras } from '../util/dispositivo.js';
 
 // Texturas HORNEADAS (scripts/hornear-texturas.mjs): las mismas, ya calculadas, en imágenes WebP sin pérdidas. Se descargan
 // y el navegador las decodifica (nativo y rápido en cualquier aparato); calcularlas aquí queda solo de respaldo. En un
 // iPhone, calcular las 105 texturas en JavaScript tardaba minutos (la carga se quedaba en el 85 %).
 const enNavegador = typeof window !== 'undefined' && typeof fetch === 'function' && typeof createImageBitmap === 'function';
 // El índice dice qué imágenes descarga este tipo de aparato (y cuánto pesa el cielo): el total de la descarga se conoce y se
-// muestra desde el principio («0 de 11,9 MB»), no sumando por partes.
-const grupoAparato = `${esMovil ? 'movil' : 'pc'}-${texturasLigeras ? 1 : 0}`, sufijoCielo = texturasLigeras || Q.cielo < 1024 ? 'media' : 'alta';
+// muestra desde el principio («0 de 11,9 MB»), no sumando por partes. (Del cielo, la carga solo trae las caras medianas:
+// las grandes llegan después, en reposo, cieloProfundo.js.)
+const grupoAparato = `${esMovil ? 'movil' : 'pc'}-${texturasLigeras ? 1 : 0}`, sufijoCielo = 'media';
 const contadas = new Set(), pedidas = new Set();
 let bytesIndice = {};
 const indiceHorneadas = !enNavegador ? Promise.resolve({}) : fetch('assets/texturas/indice.json').then(r => (r.ok ? r.json() : {})).catch(() => ({})).then(j => {
@@ -167,7 +168,7 @@ const comoBytes = d => (d instanceof Uint8Array ? d : new Uint8Array(d.buffer, d
 const soltarCopia = t => { t.image = { width: t.image.width, height: t.image.height, data: null }; t.onUpdate = null; };
 export function texturaPlaneta(tipo, opciones, { claves = ['pixeles'], relleno = [120, 110, 140], bloquea = true, liberable = false } = {}) {
   const { ancho, alto } = opciones;
-  if (typeof window !== 'undefined') (window.__pedidosTextura ||= []).push({ tipo, opciones, claves });
+  if (typeof window !== 'undefined') (window.__pedidosTextura ||= []).push({ tipo, opciones, claves, bloquea });
   const texturas = Object.fromEntries(claves.map(c => [c, dataTextura(ancho, alto)]));
   const promesa = new Promise(resolve => {
     const clave = `${tipo} ${ancho}×${alto}`; enCurso.set(promesas.length + todas.length + Math.random(), clave);
