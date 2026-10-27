@@ -1,3 +1,4 @@
+import { relojMaestro } from '../util/relojMaestro.js';
 import { FRASE_SUPERNOVA, RECUERDO_SUPERNOVA } from '../util/supernovaAmor.js';
 
 // La ceremonia de la supernova: solo mientras la estrella estalla y nace el corazón. Sin botones:
@@ -58,8 +59,9 @@ export function crearSupernovaAmor({ escena, progreso, musica, banda = null, alD
     try {
       // El sonido (la canción de la supernova, o los tonos sintéticos sin ella) empieza con la cuenta atrás de la escena:
       // espera = lo que le falta para estallar (si ya había empezado, la canción entra por ese mismo segundo).
-      // El reloj del videoclip (director de cámara): el segundo de «Sparks» mientras suena.
-      const reloj = () => banda?.suena?.('supernova') ? banda.tiempo('supernova') : null;
+      // El reloj de la ceremonia y de su videoclip: el maestro desde el ancla de «Sparks» (relojMaestro − ancla, el segundo de
+      // la canción que suena); sin canción programada, null (la escena lleva el mismo reloj desde que empieza).
+      const reloj = () => { const a = banda?.activa ? banda.ancla?.('supernova') : null; return a === null || a === undefined ? null : relojMaestro.ahora() - a; };
       const terminado = await escena.verEstallido({ repetir, reloj, alEmpezar: espera => { if (activa && mia === revision) sonido = musica.supernova?.(espera); }, alFase: fase => { if (activa && mia === revision) mostrarFase(fase); } });
       if (activa && mia === revision && terminado) { mostrarFase('recuerdo'); await new Promise(r => setTimeout(r, 4500)); }
     } catch (error) { console.warn('La supernova conserva su recuerdo:', error); }

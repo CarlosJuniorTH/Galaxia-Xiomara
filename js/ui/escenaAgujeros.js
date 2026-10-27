@@ -1,28 +1,22 @@
 // Escenas de TON 618 y Sagitario A* (como la de la supernova, pero sin pedir nada): empiezan en cuanto llega el viaje, a la
-// vez que su canción, y la imagen sigue el reloj de la canción (bandaSonora.tiempo). Sin canción (música apagada, sin
-// archivo, o si no carga), el reloj es el tiempo desde la llegada. Al terminar queda en calma, sin repetirse; si se sale a
+// vez que su canción, y la imagen lee el reloj maestro desde el ancla de la canción (js/util/relojMaestro.js: el segundo de
+// la escena es el de la canción, sin seguirla). Sin canción (música apagada, sin archivo, o si no carga), el mismo reloj
+// desde la llegada (y si la canción entra después, entra en ese compás). Al terminar queda en calma, sin repetirse; si se sale a
 // mitad, se funde con el reposo. Con movimiento reducido, una versión tranquila (sin destellos ni cámara que se mueve).
 // Lo que se ve está en js/escena/ton618.js y js/escena/sagitario.js; el guion, en js/util/guionAgujeros.js.
 import { finEscena } from '../util/guionAgujeros.js';
+import { relojMaestro } from '../util/relojMaestro.js';
 
 const GIGANTES = new Set(['ton618', 'sagitario']);
-// Lo que se espera a que la canción empiece a sonar al llegar (descarga o arranque) antes de seguir con el reloj propio.
-const ESPERA_CANCION = 3000;
 
 export function crearEscenaAgujeros({ escena, banda = null, alRepetir = () => {} }) {
   const reducido = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let actual = null, llegada = 0, t = 0, ultimo = 0, conReloj = false, vista = null, viajando = true, destino = null;
+  let actual = null, ancla = null, vista = null, viajando = true, destino = null;
 
-  // Segundo de la escena. Mientras suena su canción, el de la canción; si no suena (o deja de sonar), sigue contando el
-  // tiempo real desde ahí (solo con la página a la vista: al volver de otra pestaña no salta).
+  // Segundo de la escena: reloj maestro − ancla de su canción (o la propia, fijada al empezar si no hay canción programada).
   function reloj() {
-    const ahora = performance.now(), dt = Math.min(0.1, (ahora - ultimo) / 1000); ultimo = ahora;
-    if (!conReloj && banda?.activa && banda.tiene(actual)) {
-      const s = (banda.suena ? banda.suena(actual) : banda.objetivo === actual) ? banda.tiempo(actual) : 0;
-      if (s > 0) { t = s; return t; }
-      if (ahora - llegada < ESPERA_CANCION) return t;   // la canción aún no suena: la escena espera en su primer segundo
-    }
-    conReloj = true; t += dt; return t;
+    if (ancla === null) { ancla = banda?.ancla?.(actual) ?? null; if (ancla === null) { ancla = relojMaestro.ahora(); banda?.anclar?.(actual, ancla); } }
+    return Math.max(0, relojMaestro.ahora() - ancla);
   }
   // La escena no se puede saltar: el bloqueo de la navegación es el común de la interfaz (universo.js, escenaEnCurso: la
   // llegada lo abre con la duración de la canción; al volver a vivirla, alRepetir). Aquí solo el mismo gancho que las
@@ -35,10 +29,10 @@ export function crearEscenaAgujeros({ escena, banda = null, alRepetir = () => {}
     document.dispatchEvent(new CustomEvent('escena-en-curso', { detail: { id: id || antes, activa: !!id } }));
   }
   function abrir(id) {
-    actual = id; llegada = ultimo = performance.now(); t = 0; conReloj = false;
+    actual = id; ancla = null;
     escena.escenaAgujero(id, { reloj, reducido });
     enCurso(id);
-    clearTimeout(vista); vista = setTimeout(function mirar() { if (actual === id && t < finEscena(id)) vista = setTimeout(mirar, 250); else enCurso(null); }, 250);
+    clearTimeout(vista); vista = setTimeout(function mirar() { if (actual === id && reloj() < finEscena(id)) vista = setTimeout(mirar, 250); else enCurso(null); }, 250);
   }
   function cancelar() {
     if (!actual) return;

@@ -359,7 +359,7 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
         gl_FragColor=vec4(mix(vec3(1.0,0.55,0.4),vec3(1.0,0.92,0.82),perla)*a,a);}`));
     m.rotation.set(1.05+i*0.28,0.25,i*0.25);explosion.add(m);return m;
   });
-  let estado = 'estable' , inicio = 0, tActual = 0, proxima = 200 + azar() * 60, visitada = false, orientado = false;
+  let reloj = null, estado = 'estable' , inicio = 0, tActual = 0, proxima = 200 + azar() * 60, visitada = false, orientado = false;
 
   function recordar() { estado = 'remanente'; inicio = tActual - TIEMPOS_AMOR.reposo; orientado = false; }
   return {
@@ -372,13 +372,9 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
     get desdeEstallido() { return estado === 'estallido' || estado === 'remanente' ? tActual - inicio : null; },
     // Segundo de su canción en la ceremonia (null fuera de ella): el reloj del videoclip.
     get segundoCancion() { return estado === 'inestable' ? TIEMPOS_AMOR.espera - (inicio - tActual) : estado === 'estallido' ? TIEMPOS_AMOR.espera + (tActual - inicio) : null; },
-    // La canción manda: si su reloj (bandaSonora.tiempo) se separa del de la ceremonia (el audio tardó en arrancar, un
-    // cuadro largo…), la ceremonia se corrige poco a poco hacia él, sin saltos visibles.
-    sincronizar(segundo) {
-      if (!Number.isFinite(segundo) || (estado !== 'inestable' && estado !== 'estallido')) return;
-      const propio = estado === 'inestable' ? TIEMPOS_AMOR.espera - (inicio - tActual) : TIEMPOS_AMOR.espera + (tActual - inicio), d = segundo - propio;
-      if (Math.abs(d) > 1.5) inicio -= d; else if (Math.abs(d) > 0.03) inicio -= d * 0.25;
-    },
+    // El reloj de la ceremonia: reloj() da el segundo de su canción (el reloj maestro desde su ancla) y la ceremonia está
+    // exactamente en él en cada cuadro (al principio de actualizar: sin un cuadro de retraso). Sin reloj, su tiempo propio.
+    fijarReloj(r) { reloj = r; },
     // Destello único y contenido: nunca una pantalla blanca sostenida.
     get destello() { return estado === 'estallido' ? Math.exp(-Math.max(0, tActual - inicio) / 0.9) * 0.28 : 0; },
     radioFinal: RADIO_REMANENTE_SUPERNOVA,
@@ -403,6 +399,10 @@ uniform float uE,uT; varying vec3 vN,vV,vQ; void main(){
     actualizar(t, camara, camaraMundo) {
       const dt = Math.min(0.1, Math.max(0, t - tActual));
       tActual = t; uT.value = t;
+      if (reloj && (estado === 'inestable' || estado === 'estallido')) {
+        const sc = reloj();
+        if (Number.isFinite(sc)) { const c = Math.max(0, sc); if (c < TIEMPOS_AMOR.espera) { estado = 'inestable'; inicio = t + TIEMPOS_AMOR.espera - c; } else { estado = 'estallido'; inicio = t - (c - TIEMPOS_AMOR.espera); } }
+      }
       if (estado === 'inestable' && t >= inicio) { estado = 'estallido'; inicio = t; }
       if (estado === 'estallido' && t - inicio >= TIEMPOS_AMOR.reposo) estado = 'remanente';
       // Secuencia antes del estallido (falta: segundos que faltan, en el reloj de la animación; la ceremonia real es más

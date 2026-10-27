@@ -31,6 +31,13 @@ export default async function ({ base, informe }) {
   try {
     // La supernova que quiere estallar viajaría a ella a la fuerza en mitad de otro clip: se aplaza (se visita al final).
     await pagina.evaluate(() => window.__galaxia.escena.aplazarSupernova(1e6));
+    // Cada cuadro de cada clip con su canción sonando: el segundo del clip (cámara) frente al de la canción (lo que se oye) y
+    // el desfase del reloj maestro. Los dos leen el mismo reloj: deben coincidir a menos de 20 ms.
+    await pagina.evaluate(() => {
+      const S = window.__sincro = {}, e = window.__galaxia.escena, b = window.__bandaSonora;
+      const f = () => { const c = e.clip; if (c && c.fase === 'clip' && b.suena(c.id)) { const r = S[c.id] ??= { cuadros: 0, max: 0, desfase: 0 }, d = Math.abs(c.segundo - b.tiempo(c.id)) * 1000; r.cuadros++; r.max = Math.max(r.max, d); r.desfase = Math.max(r.desfase, Math.abs(window.__relojMaestro.desfase())); } requestAnimationFrame(f); };
+      requestAnimationFrame(f);
+    });
     for (const id of ids) {
       informe.nota(`— ${id}`);
       await visitar(pagina, id);
@@ -50,6 +57,7 @@ export default async function ({ base, informe }) {
       else informe.nota(`${id}: sin pista de cámara (se queda en la llegada, bloqueada)`);
       // Hasta el final del clip y de su fundido de salida.
       await pagina.waitForFunction(() => !window.__galaxia.escena.clip, null, { timeout: 120000, polling: 250 });
+      if (musica) { const r = await pagina.evaluate(id => window.__sincro[id] ?? null, id); informe.comprobar(r && r.cuadros > 100 && r.max < 20 && r.desfase < 20, `${id}: el clip va con su canción cuadro a cuadro (< 20 ms) y el desfase audio↔imagen < 20 ms`, r); }
       await pagina.waitForTimeout(400);
       const c = await estado();
       const razonable = c.zoom.distancia > c.zoom.encuadre * 0.7 && c.zoom.distancia < c.zoom.encuadre * 1.6;

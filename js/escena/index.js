@@ -44,6 +44,7 @@ import { crearCapaVolumen } from './capaVolumen.js';
 import { nivelSeguro } from '../util/dispositivo.js';
 import { esquivar, sinRepetidos } from '../util/ruta.js';
 import { planificarVuelo, crearObreroVuelo } from '../util/vuelo.js';
+import { relojMaestro } from '../util/relojMaestro.js';
 import { TIEMPOS_AMOR, faltaReal, desdeAnimacion } from '../util/supernovaAmor.js';
 import { pistaDe, normalizarPista, muestrearCamara, mezclarMuestras, crearMuestra, crearSuavizador, segundoAdelantado, siguienteCorte, esfericasACartesianas, cartesianasAEsfericas, ENTRADA, SALIDA, LIMITES, ENTRADA_LARGA, CALMA_ENTRADA, escalaMovil } from '../util/directorCamara.js';
 import { finEscena } from '../util/guionAgujeros.js';
@@ -503,7 +504,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // Los viajes largos no atraviesan cuerpos: la galaxia y los objetos del cosmos (TON 618,
     // Sagitario A*, el cuásar, el púlsar, la supernova) son obstáculos con su radio real.
     const curva = esquivar(base, desde, hasta, [...OBSTACULOS, ...(desde.distanceTo(hasta) > 20000 ? [GALAXIA_OBSTACULO, ...cosmos.cuerpos().slice(1).map(c => ({ c: c.centro, r: c.radio }))] : [])], { porDistancia: true });
-    vuelo = { curva, centroDesde, objetivo: objetivo.clone(), transcurrido: 0, duracion: viaje ? tramoRestante ?? duracionViaje(desde.distanceTo(hasta)) * (viajeBreve ? 0.7 : 1) : duracion, fija, distanciaTotal: curva.getLength(), llegada: hasta.distanceTo(objetivo), salida: Math.max(400, desde.distanceTo(centroDesde)), resolver, alLlegar, mirarAntes, corriente, giroMirada,
+    vuelo = { inicio: relojMaestro.ahora(), retraso: 0, curva, centroDesde, objetivo: objetivo.clone(), transcurrido: 0, duracion: viaje ? tramoRestante ?? duracionViaje(desde.distanceTo(hasta)) * (viajeBreve ? 0.7 : 1) : duracion, fija, distanciaTotal: curva.getLength(), llegada: hasta.distanceTo(objetivo), salida: Math.max(400, desde.distanceTo(centroDesde)), resolver, alLlegar, mirarAntes, corriente, giroMirada,
       // Al cometa se llega persiguiéndolo: el vuelo se desplaza con él mientras avanza. Igual al sistema solar en miniatura,
       // que gira con la galaxia (seguir: dónde está ahora lo que se persigue).
       seguir: seguir ??= destinoActual === 'cometa' ? () => mundos.posicionCometa() : null, seguirInicio: seguir ? seguir() : null, continuacion: trasFundido, perfil: paso.length > 0 || corriente >= 1, avance: avance && AVANCE[avance],
@@ -684,7 +685,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // El perfil (lo costoso) se termina ya, fuera de los cuadros: en el obrero y en los ratos libres del navegador.
     plan.enReposo();
     if (diagnosticar) canvas.dataset.planMs = (performance.now() - t0Plan).toFixed(0);   // coste de planificar (diagnóstico)
-    vuelo = { plan, curva: plan.trayectoria(), centroDesde, objetivo: mira.clone(), transcurrido: 0, get duracion() { return plan.duracion; }, distanciaTotal: plan.camino.getLength(), llegada: hasta.distanceTo(mira),
+    vuelo = { inicio: relojMaestro.ahora(), retraso: 0, plan, curva: plan.trayectoria(), centroDesde, objetivo: mira.clone(), transcurrido: 0, get duracion() { return plan.duracion; }, distanciaTotal: plan.camino.getLength(), llegada: hasta.distanceTo(mira),
       salida: Math.max(400, desde.distanceTo(centroDesde)), resolver, corriente: 0, perfil: false, centroDestino: centro.clone(), continuacion: trasFundido,
       vw: vista.ancho, vh: vista.alto, idealSalida: idealDelVuelo(hasta.distanceTo(mira)) };
     canvas.dataset.viaje = destinoActual; canvas.dataset.avance = '0'; canvas.dataset.fase = 'seleccion';
@@ -828,7 +829,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     galaxia.girar(tiempo);
     const desdeUniverso = escenaActiva === 'solar' ? galaxia.puntoBrazo() : camera.position.clone();
     const total = duracionViaje(desdeUniverso.distanceTo(posicionUniverso(id))) * (viajeBreve ? 0.7 : 1);
-    const mio = compuesto = { fin: performance.now() + total * 1000 };
+    const mio = compuesto = { fin: relojMaestro.ahora() + total };   // (en el reloj maestro: la llegada de los dos tramos)
     let primero, fuera = null;
     if (haciaSolar) {
       const p = galaxia.puntoBrazo();
@@ -879,7 +880,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     }
     camaraAntes.copy(camera.position);
     // (Los dos los usa el desplazamiento o el vuelo que viajar crea en el acto.)
-    trasFundido = true; tramoRestante = Math.max(3, (mio.fin - performance.now()) / 1000);
+    trasFundido = true; tramoRestante = Math.max(3, mio.fin - relojMaestro.ahora());
     const viaje = viajar(id, { ...opciones, continuacion: true });
     trasFundido = false; tramoRestante = null; entradaSolar = false; salidaSolar = null;
     // La imagen vuelve tras unos cuadros (ya con la escena nueva dibujada): los primeros de la escena nueva (su búfer, su
@@ -1077,6 +1078,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       if (!c.pista) return;
       const s = c.segundo();
       if (Number.isFinite(s)) {
+        // El filtro avanza lo que avanza la canción (no el cuadro): un cuadro lento no lo deja atrás de la música.
+        if (s >= c.t) dt = Math.min(0.25, s - c.t);
         // Un corte entre el cuadro anterior y este: el filtro salta con la pista. Si no, sigue la pista adelantada.
         if (siguienteCorte(c.pista, c.t) <= s) suaveClip.fijar(muestrearCamara(c.pista, s, crudaClip));
         muestrearCamara(c.pista, segundoAdelantado(c.pista, s), crudaClip); c.t = s;
@@ -1159,6 +1162,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   const tmpDir = new THREE.Vector3(), tmpProy = new THREE.Vector3();   // temporales del bucle (sin crear objetos en cada cuadro)
   function animar(ahora) {
     requestAnimationFrame(animar);
+    // El reloj maestro (el del audio) avanza una vez por cuadro, también sin dibujar: las marcas de la banda sonora se
+    // disparan aquí y todo lo que se mueve con la música lee este mismo instante.
+    const sMaestro = relojMaestro.cuadro(ahora);
     // Estados: con una carta o panel abiertos se conserva la última imagen sin trabajo 3D
     // (en todos los dispositivos); una postal pendiente siempre obtiene su cuadro.
     // Junto al cometa se sigue dibujando mientras se lee: se le ve alejarse con la carta abierta.
@@ -1202,14 +1208,19 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       camera.position.x = Math.sin(tiempo * 0.025) * 400 - 2400;
       camera.lookAt(OBJETIVO);
     } else if (vuelo) {
-      if (!pausa) {
-        // El viaje va con el reloj de verdad (cuadros largos de hasta 0,25 s cuentan enteros): en un móvil a tirones dura lo
-        // previsto y la música de los viajes, que acaba en la llegada, no se queda corta (sin cambiar su velocidad).
-        const dt = modo === 'quieto' ? 0 : Math.min(0.25, dtReal) * escalaTiempo;
-        vuelo.real = (vuelo.real ?? vuelo.transcurrido) + dt;
+      {
+        // El viaje es función del reloj maestro (el de la música de los viajes, que acaba justo en su llegada): su instante
+        // es (reloj − inicio). Un cuadro lento no lo retrasa ni descuadra la música; solo la pausa (o la cámara lenta de las
+        // pruebas) lo retienen, y entonces la llegada se corre lo mismo (retraso).
+        const ds = Math.max(0, sMaestro - (vuelo.ultimo ?? vuelo.inicio)); vuelo.ultimo = sMaestro;
+        if (pausa || modo === 'quieto') vuelo.retraso += ds; else if (escalaTiempo !== 1) vuelo.retraso += ds * (1 - escalaTiempo);
+        const real = sMaestro - vuelo.inicio - vuelo.retraso, antes = vuelo.real ?? 0; vuelo.real = real;
         // Saltar el viaje: el resto del crucero se recorre en unos segundos (vuelo.js, saltar).
-        if (vuelo.saltoPedido && vuelo.plan && vuelo.transcurrido >= vuelo.plan.ruptura[0]) { vuelo.salto = vuelo.plan.saltar(vuelo.transcurrido, movimientoReducido ? 1.5 : 2.5); vuelo.salto0 = vuelo.real - dt; vuelo.saltoPedido = false; }   // salto0: el instante del cuadro anterior (sin un cuadro quieto)
-        vuelo.transcurrido = vuelo.salto ? vuelo.salto(vuelo.real - vuelo.salto0) : vuelo.transcurrido + dt;
+        if (vuelo.saltoPedido && vuelo.plan && vuelo.transcurrido >= vuelo.plan.ruptura[0]) {
+          const seg = movimientoReducido ? 1.5 : 2.5; vuelo.salto = vuelo.plan.saltar(vuelo.transcurrido, seg); vuelo.salto0 = antes; vuelo.saltoPedido = false;   // salto0: el instante del cuadro anterior (sin un cuadro quieto)
+          if (vuelo.salto) vuelo.finSalto = { seg, tFin: vuelo.salto(seg) };
+        }
+        vuelo.transcurrido = vuelo.salto ? vuelo.salto(real - vuelo.salto0) : real;
       }
       const porcentaje = Math.min(100, Math.floor(vuelo.transcurrido / vuelo.duracion * 100)); if (!vuelo.fija && porcentaje !== vuelo.avanceDicho) { vuelo.avanceDicho = porcentaje; canvas.dataset.avance = String(porcentaje); }   // (sin un texto nuevo en cada cuadro)
       const k = Math.min(1, vuelo.transcurrido / vuelo.duracion), lejos = vuelo.distanciaTotal > 20000 && !vuelo.fija;   // fija: recorrido contemplativo a ritmo uniforme
@@ -1587,7 +1598,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // Escenas de TON 618 y Sagitario A* (js/ui/escenaAgujeros.js): empezar con el reloj de su canción o terminar (sin él).
     escenaAgujero(id, opciones) {
       cosmos.escenaAgujero(id, opciones);
-      if (opciones?.reloj) empezarClip(id, { segundo: () => cosmos.segundoAgujero(id), vivo: () => { const s = cosmos.segundoAgujero(id); return s !== null && s < finEscena(id); }, pista: pistaDe(id) });
+      if (opciones?.reloj) empezarClip(id, { segundo: () => cosmos.segundoAgujero(id) === null ? null : Math.max(0, opciones.reloj()), vivo: () => { const s = cosmos.segundoAgujero(id); return s !== null && s < finEscena(id); }, pista: pistaDe(id) });
       else if (clip && (!id || clip.id === id)) soltarClip(false);
     },
     get enEscenaAgujero() { return cosmos.enEscenaAgujero; },
@@ -1595,7 +1606,16 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     get viajando() { return !!vuelo; },
     // Segundos que le quedan al viaje en curso, de principio a fin (también el que cruza al sistema solar en dos tramos):
     // la música de los viajes empieza en 15 − esto para terminar justo al llegar.
-    get restanteViaje() { if (compuesto) return Math.max(0, (compuesto.fin - performance.now()) / 1000); return vuelo && !vuelo.fija ? Math.max(0, vuelo.duracion - vuelo.transcurrido) : 0; },
+    get restanteViaje() { if (compuesto) return Math.max(0, compuesto.fin - relojMaestro.ahora()); return vuelo && !vuelo.fija ? Math.max(0, vuelo.duracion - vuelo.transcurrido) : 0; },
+    // Instante del reloj maestro en que aterriza el viaje en curso (null sin viaje): la música de los viajes tiene ahí su
+    // final. Fijo durante todo el viaje (solo cambia si se salta el crucero o en la pausa).
+    get finViaje() {
+      if (vuelo && !vuelo.fija && (!compuesto || vuelo.continuacion)) {
+        const base = vuelo.inicio + vuelo.retraso;
+        return vuelo.finSalto ? base + vuelo.salto0 + vuelo.finSalto.seg + (vuelo.duracion - vuelo.finSalto.tFin) : base + vuelo.duracion;
+      }
+      return compuesto ? compuesto.fin : null;
+    },
     get cometaVisible() { return mundos.cometaVisible; },
     get supernovaActiva() { return cosmos.supernovaActiva; },
     get estadoSupernova() { return cosmos.supernova.estado; },
@@ -1626,21 +1646,21 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       alEmpezar(espera);
       // La interfaz serializa las repeticiones; los cambios de destino cancelan.
       const inicio = sn;
-      let ultima = '', retrayendo = !!pista, acabada = false; const t0Estallido = performance.now();
-      // El clip de la supernova: su segundo es el de la canción (o el de la ceremonia: la canción entra por TIEMPOS_AMOR.espera − espera).
-      const propio = () => TIEMPOS_AMOR.espera - espera + (performance.now() - t0Estallido) / 1000;
-      // (El reloj de la ceremonia ya sigue al de la canción mientras suena: sn.sincronizar; así cámara y estrella van juntas.)
-      empezarClip('supernova', { segundo: () => sn.segundoCancion ?? propio(), vivo: () => !acabada, pista });
+      let ultima = '', retrayendo = !!pista, acabada = false; const t0Estallido = relojMaestro.ahora();
+      // El segundo de la ceremonia (y de su clip): el de la canción (reloj maestro − su ancla) o, sin ella, el mismo reloj
+      // desde ahora (la canción entraría por TIEMPOS_AMOR.espera − espera). La estrella lo lee en cada cuadro (fijarReloj).
+      const segundo = () => { const c = reloj?.(); return Number.isFinite(c) ? Math.max(0, c) : TIEMPOS_AMOR.espera - espera + (relojMaestro.ahora() - t0Estallido); };
+      sn.fijarReloj(segundo);
+      empezarClip('supernova', { segundo, vivo: () => !acabada, pista });
       return new Promise(fin => {
-        const resolve = v => { acabada = true; fin(v); };
+        const resolve = v => { acabada = true; if (cosmos.supernova === inicio) inicio.fijarReloj(null); fin(v); };
         const seguir = () => {
           if (destinoActual !== 'supernova' || cosmos.supernova !== inicio) { resolve(false); return; }
           if (!document.hidden) {
             const fase = sn.fase;
             if (fase !== ultima) { ultima = fase; alFase(fase); }
-            const cancion = reloj?.(); if (Number.isFinite(cancion) && cancion > 0) sn.sincronizar(cancion);
             // Se aleja durante el infinito (a 7 s del estallido en el reloj de la animación): la bola de fuego se ve crecer desde fuera.
-            if (!retrayendo && (sn.desdeEstallido !== null || fase === 'silencio' || performance.now() - t0Estallido > (espera - faltaReal(7)) * 1000)) {
+            if (!retrayendo && (sn.desdeEstallido !== null || fase === 'silencio' || segundo() > TIEMPOS_AMOR.espera - faltaReal(7))) {
               retrayendo = true;
               const { posicion, objetivo, distancia } = encuadreCorazon('lugar');   // el mismo encuadre que al llegar: al terminar no hay saltos
               lejano.dist = distancia;   // los límites del zoom al llegar son los del remanente, no los de la estrella
@@ -1662,7 +1682,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       controls.autoRotate = false;
       const promesa = cosmos.escenas.iniciar(id, { reloj, config });
       // El videoclip: la cámara sigue la pista de la escena con su segundo (el de su canción) mientras está en curso.
-      empezarClip(id, { segundo: () => cosmos.escenas.segundo(id), vivo: () => cosmos.escenas.enCurso === id, pista: pistaDe(id, config) });
+      // (El segundo, del reloj en este mismo cuadro: el de la escena se calcula después, al dibujar sus capas.)
+      empezarClip(id, { segundo: reloj ? () => Math.max(0, reloj()) : () => cosmos.escenas.segundo(id), vivo: () => cosmos.escenas.enCurso === id, pista: pistaDe(id, config) });
       const terminada = await promesa;
       if (destinoActual === id && !vuelo) controls.autoRotate = !pausa && giraSolo();
       return terminada;

@@ -81,7 +81,9 @@ export function* perfilDesdeDistancias({ dist, longitud, duracion, tRampa, tFren
   // Entonces se estira (o encoge) el tiempo de toda la tabla por igual hasta la duración pedida: el mismo vuelo, igual
   // de suave, solo un poco más lento.
   const n2 = Math.round(duracion / dt);
-  if (Math.abs(n2 - nf) > 1) {
+  // (También si solo difiere en un cuadro de la tabla: la duración queda a menos de medio cuadro de la pedida, y la música
+  // de los viajes, programada con ella antes de tener el perfil, acaba en la llegada.)
+  if (n2 !== nf) {
     const r = nf / n2, otra = new Float64Array(n2 + 1);
     for (let i = 0; i <= n2; i++) { const x = i * r, j = Math.min(nf - 1, Math.floor(x)), f = x - j; otra[i] = tabla[j] + (tabla[j + 1] - tabla[j]) * f; }
     otra[n2] = longitud;

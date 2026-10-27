@@ -62,6 +62,8 @@ También se pueden editar los valores predeterminados en `js/config.js` y `js/da
 
 La versión nueva usa una composición ambiental original sintetizada con Web Audio, sin descargar MP3 de terceros. Empieza tras tocar Entrar y se pausa al salir de la pestaña. Para usar vuestra canción, pon el audio en `assets/musica/` y escribe su ruta en el editor. Si ese archivo falla, se utiliza el ambiente original.
 
+La banda sonora (`js/data/bandaSonora.js`, `js/ui/bandaSonora.js`) y todo lo que se mueve con ella van con **un solo reloj maestro**, el del audio (`js/util/relojMaestro.js`: `AudioContext` con su latencia de salida compensada; sin audio, el de la página). Las canciones con marcas (la intro, la de los viajes y la de cada destino) son búferes programados en ese reloj y decodificados justo a tiempo (la intro y la de los viajes en la carga, la de un destino al elegirlo; en memoria solo las que hacen falta). El clip de la intro, los vuelos, la supernova y las escenas de los gigantes leen su segundo de ese reloj: la música nunca se acelera, se frena ni salta para seguir a la imagen, y la imagen no puede separarse de ella. La música de los viajes arranca una vez en el segundo «15 − duración del vuelo» y la llegada cae justo donde acaba. Las estancias (las instrumentales de cada lugar) siguen siendo `<audio>` con su fundido. `npm run test:navegador musicaViajes intro videoclips` comprueba el desfase (< 20 ms) y cada llegada.
+
 ## Guardado, copias y reinicio
 
 El progreso se guarda en `localStorage`, exclusivamente en este navegador y origen. `localhost:8080` y `127.0.0.1:8080` tienen guardados separados. No hay cuenta, servidor de datos ni sincronización entre dispositivos.

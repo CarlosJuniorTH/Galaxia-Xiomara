@@ -70,10 +70,13 @@ export default async function ({ base, informe }) {
     await pagina.waitForTimeout(1500);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 }); await pagina.waitForTimeout(600);
     await pagina.evaluate(NEGRO => {
-      const M = window.__medida = { dt: [], largas: [], reloj: [] }; let p = 0, tp = 0;
+      const M = window.__medida = { dt: [], largas: [], reloj: [], desfase: [], voces: [] }; let p = 0, tp = 0;
+      // La voz de la canción: el instante del contexto en que empieza a sonar y desde qué segundo.
+      const S = AudioBufferSourceNode.prototype, start = S.start;
+      S.start = function (cuando = 0, desde = 0) { if (Math.abs((this.buffer?.duration || 0) - 32) < 1) M.voces.push({ cuando, desde, ahora: this.context.currentTime }); return start.call(this, cuando, desde); };
       // Desde 0,4 s de clip: el arranque cae dentro del toque (aquí se toca con la carga ya hecha; en la vida real el clip
       // empieza solo al 100 %, sin toque) y con la pantalla aún en negro.
-      const f = t => { const enNegro = tp >= NEGRO[0] && tp < NEGRO[1]; tp = window.__intro.tiempo ?? 0; if (p && window.__intro.empezado && window.__intro.tiempo > 0.4 && !enNegro) { M.dt.push(t - p); if (t - p > 20) (M.lentos ||= []).push([+(window.__intro.empezado ? window.__intro.tiempo : -1).toFixed(2), Math.round(t - p)]); } p = t; if (window.__intro.empezado) M.reloj.push([window.__intro.tiempo, window.__bandaSonora.tiempo('inicio')]); if (!M.fin) requestAnimationFrame(f); }; requestAnimationFrame(f);
+      const f = t => { const enNegro = tp >= NEGRO[0] && tp < NEGRO[1]; tp = window.__intro.tiempo ?? 0; if (p && window.__intro.empezado && window.__intro.tiempo > 0.4 && !enNegro) { M.dt.push(t - p); if (t - p > 20) (M.lentos ||= []).push([+(window.__intro.empezado ? window.__intro.tiempo : -1).toFixed(2), Math.round(t - p)]); } p = t; if (window.__intro.empezado) { M.reloj.push([window.__intro.tiempo, window.__bandaSonora.tiempo('inicio')]); if (window.__bandaSonora.suena('inicio')) M.desfase.push(window.__relojMaestro.desfase()); } if (!M.fin) requestAnimationFrame(f); }; requestAnimationFrame(f);
       try { new PerformanceObserver(l => { for (const e of l.getEntries()) M.largas.push(Math.round(e.duration)); }).observe({ type: 'longtask', buffered: false }); } catch {}
       new MutationObserver(() => { if (!M.tarjeta && document.getElementById('entrada').classList.contains('formado')) M.tarjeta = window.__bandaSonora.tiempo('inicio'); }).observe(document.getElementById('entrada'), { attributes: true });
     }, NEGRO);
@@ -81,7 +84,7 @@ export default async function ({ base, informe }) {
     await pagina.waitForFunction(() => window.__intro.empezado, null, { timeout: 20000 });
     await pagina.waitForFunction(() => document.getElementById('entrada').classList.contains('formado'), null, { timeout: 60000, polling: 250 });
     await pagina.waitForTimeout(3000);
-    const M = await pagina.evaluate(() => { window.__medida.fin = true; return window.__medida; });
+    const M = await pagina.evaluate(() => { window.__medida.fin = true; const m = window.__medida, a = window.__bandaSonora.estado().pistas.inicio.ancla; m.arranque = m.voces.map(v => ({ ...v, desfaseMs: +((window.__relojMaestro.deContexto(v.cuando) - v.desde - a) * 1000).toFixed(2) })); return m; });
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
     const dt = M.dt.filter(x => x < 1000), o = dt.slice().sort((a, b) => a - b), q = p => +(o[Math.min(o.length - 1, Math.floor(o.length * p))] || 0).toFixed(1);
     const r = { cuadros: dt.length, p50: q(0.5), p95: q(0.95), p99: q(0.99), max: +(o.at(-1) || 0).toFixed(1), sobre33: dt.filter(x => x > LIMITE).length, tareasLargas: M.largas, lentos: M.lentos || [] };
@@ -91,7 +94,12 @@ export default async function ({ base, informe }) {
     const sonando = M.reloj.filter(([, s]) => s > 0.5 && s < 29);
     const desfase = sonando.length ? Math.max(...sonando.map(([t, s]) => Math.abs(t - s))) : Infinity;
     datos.desfaseMax = +desfase.toFixed(3);
-    informe.comprobar(sonando.length > 300 && desfase < 0.05, 'el clip va clavado al reloj de la canción', { muestras: sonando.length, desfaseMax: datos.desfaseMax });
+    informe.comprobar(sonando.length > 300 && desfase < 0.02, 'el clip va clavado al reloj de la canción (< 20 ms)', { muestras: sonando.length, desfaseMax: datos.desfaseMax });
+    // Un solo arranque, programado (por delante del contexto) en el mismo instante en que el clip empieza a correr.
+    datos.arranque = M.arranque;
+    informe.comprobar(M.arranque.length === 1 && M.arranque[0].cuando > M.arranque[0].ahora && Math.abs(M.arranque[0].desfaseMs) < 1, 'música e imagen arrancan en el mismo instante programado (una sola voz, sin saltos ni cambios de ritmo)', M.arranque);
+    const dAudio = Math.max(0, ...M.desfase.map(Math.abs)); datos.desfaseAudioMs = +dAudio.toFixed(2);
+    informe.comprobar(M.desfase.length > 300 && dAudio < 20, 'desfase audio↔imagen del reloj < 20 ms en todo el clip', { muestras: M.desfase.length, maxMs: datos.desfaseAudioMs });
     informe.comprobar(M.tarjeta >= HITOS.tarjeta - 0.15, `la tarjeta sale al final del clip (marca «tarjeta», ${HITOS.tarjeta} s)`, { tarjeta: M.tarjeta });
     informe.comprobar(errores.length === 0, 'sin errores en la consola', errores.slice(0, 5));
   } finally {

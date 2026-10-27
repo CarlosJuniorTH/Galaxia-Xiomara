@@ -5,11 +5,13 @@ import { descargas } from '../util/descargas.js';
 //   2. La pantalla de carga, con el porcentaje y los MB descargados de los previstos. La descarga empieza al abrir la
 //      página (la canción, la primera), sin esperar al toque.
 //   3. Al llegar al 100 %, el videoclip de la intro (js/ui/portada.js) y la canción, a la vez y desde el principio. El clip
-//      sigue el reloj de la canción (sus hitos caen en las marcas); si no hay canción, falla o no arranca, va con su propio
-//      reloj de 32 s. En la marca «tarjeta» aparece la tarjeta para entrar sobre el cielo del universo.
+//      lee el reloj maestro (js/util/relojMaestro.js): su segundo es el de la canción programada (sus hitos caen en las
+//      marcas) y los dos empiezan en el mismo instante programado; si no hay canción, falla o el audio no arranca, va con
+//      ese mismo reloj sin canción (32 s). En la marca «tarjeta» aparece la tarjeta para entrar sobre el cielo del universo.
 // Quien vuelve puede continuar donde lo dejó (desde la tarjeta).
 import { crearPortada, HITOS } from './portada.js';
 import { reescalar } from '../util/sincronia.js';
+import { relojMaestro } from '../util/relojMaestro.js';
 import { DESTINOS } from '../data/universo.js';
 const $ = s => document.querySelector(s);
 // Lo que se espera a la canción al terminar la carga (si aún se descarga) antes de empezar el clip sin ella.
@@ -34,14 +36,12 @@ export function crearEntrada(config, { viaje, banda } = {}) {
   // Solo para las pruebas automáticas (?sinIntro con #debug): la tarjeta en cuanto carga, sin toque ni clip.
   const sinIntro = location.hash === '#debug' && new URLSearchParams(location.search).has('sinIntro');
 
-  // Reloj del clip: el de la canción llevado al del clip (reescalar). Si la canción no avanza en 1,5 s de cuadros (no
-  // arrancó, se cortó), sigue con un reloj propio desde ese punto. El propio avanza con los cuadros (tope 0,1 s): con
-  // la pestaña oculta se para, igual que la canción.
-  // El clip no empieza a correr hasta que la canción suena DE VERDAD (en el móvil, sobre todo Safari, tarda unas décimas en
-  // arrancar): mientras, se queda en su primer cuadro (así se ve entero desde el principio, sin adelantarse a la música).
-  // Si la canción se para un rato, sigue con su propio reloj, pero en cuanto vuelve a avanzar se vuelve a pegar a ella
-  // (antes, una vez suelto, ya no volvía: el clip y la música quedaban descuadrados hasta el final).
-  let ultimo = null, ultimoS = null, quieto = 0, ultimoT = 0, antes = 0, fijo = null, arrancada = false, esperaArranque = 0;
+  // Reloj del clip: el segundo de la canción (relojMaestro − su ancla) llevado al del clip (reescalar). Mientras la canción
+  // está programada pero aún no suena (los primeros ~0,15 s, o el contexto de audio tardando en arrancar) el clip espera en
+  // su primer cuadro: música e imagen empiezan a la vez y ya no se separan (los dos son el mismo reloj). Sin canción, o si
+  // el audio no llega a arrancar en 2,5 s, el clip va con el reloj maestro desde ahí (sin saltos: estaba quieto).
+  let ultimo = null, ultimoT = 0, fijo = null, t0Clip = 0, propio = null;
+  const ESPERA_AUDIO = 2.5;
   function relojClip() { ultimo = relojAhora(); if (nivelEnsayo === 0 && ultimo !== null && ultimo >= HITOS.tarjeta - 2) ensayar(1); return ultimo; }
   // El 3D se dibuja detrás de la portada (opaca) en los últimos ~4 s del clip y mientras se ve la tarjeta, con la cámara en
   // la pose inicial del vuelo de entrada (escena.precalentar): al pulsar «Entrar» el 3D ya lleva cuadros calientes. Mientras
@@ -54,14 +54,15 @@ export function crearEntrada(config, { viaje, banda } = {}) {
   function relojAhora() {
     if (fijo !== null) return fijo;
     if (!empezado) return null;
-    const ahora = performance.now(), dt = Math.min(0.1, Math.max(0, (ahora - antes) / 1000)); antes = ahora;
-    if (conCancion) {
+    const ahora = relojMaestro.ahora();
+    if (conCancion && propio === null) {
       const s = banda.tiempo('inicio');
-      if (s !== null && s !== ultimoS) { if (ultimoS !== null && s > ultimoS) arrancada = true; ultimoS = s; quieto = 0; } else quieto += dt;
-      if (!arrancada) { esperaArranque += dt; if (esperaArranque < 3) return ultimoT = 0; }   // (como mucho 3 s esperando)
-      else if (s !== null && quieto < 0.5) return ultimoT = reescalar(s, marcas, HITOS);
+      if (s !== null && banda.ancla('inicio') !== null) return ultimoT = reescalar(s, marcas, HITOS);
+      if (s !== null && ahora - t0Clip < ESPERA_AUDIO) return ultimoT = 0;
+      propio = ahora - ultimoT;
     }
-    return ultimoT += dt;
+    if (propio === null) propio = t0Clip;
+    return ultimoT = ahora - propio;
   }
 
   function mostrarTarjeta() {
@@ -85,7 +86,7 @@ export function crearEntrada(config, { viaje, banda } = {}) {
   // Empieza el clip (y la canción desde el principio, si está lista). Se llama dentro del toque si la carga ya terminó.
   function empezarClip(sonar) {
     if (empezado) return;
-    empezado = true; antes = performance.now();
+    empezado = true; t0Clip = relojMaestro.ahora();
     entrada.classList.remove('cargando', 'con-toque'); entrada.classList.add('clip');
     conCancion = !!sonar;
     if (conCancion) { banda.ir('inicio', { desde: 0 }); banda.activar(true); }
