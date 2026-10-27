@@ -413,6 +413,7 @@ export function* construirCosmos({ uScale, uPR }) {
     // Segundo de la escena del agujero que suena (null si no hay ninguna viva): el reloj del director de cámara (index.js).
     segundoAgujero: id => escenaG && escenaG.viva && escenaG.id === id ? escenaG.t : null,
     agujeros: { ton618: piezasTon, sagitario: piezasSgr },   // (diagnóstico y pruebas)
+    gruposGigantes: { pulsar, cuasar, ton618: gigantesco, sagitario },   // (recorte por grupos: index.js)
     get escenaAgujeroEstado() { return escenaG ? { id: escenaG.id, t: escenaG.t, presencia: escenaG.presencia, viva: escenaG.viva, guion: { ...escenaG.guion } } : null; },
     actualizar(t, dt, { camera }) {
       // El cielo acompaña a la cámara (index.js): en el espacio de la raíz, la cámara está aquí.

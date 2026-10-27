@@ -30,6 +30,7 @@ import { matricesSoloVisibles, actualizarVisibles } from './matrices.js';
 import { crearRutas } from './camara/rutas.js';
 import { construirMaravillas } from './maravillas.js';
 import { crearPolvo } from './polvo.js';
+import { recorteDe, esferaDe } from './recorte.js';
 import { texturasListas, texturasTodas, subirAlLlegar, texturasTardiasEnReposo } from './fabricaTexturas.js';
 import { hornoListo, soltarHorno } from '../util/horno.js';
 import { DESTINOS, LEJANOS, ZONAS_LUGARES } from '../data/universo.js';
@@ -144,6 +145,10 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   await ceder();
   const mundos = await capaPorPasos('mundos', () => porTramos(construirMundos(nucleo, { consteladas, alConstelar })));
   for (const id of SOLARES) if (mundos.grupos.get(id)) solar.escena.add(mundos.grupos.get(id));
+  // Cada lugar entero fuera de la vista no se dibuja (recorte.js): desde casa casi siempre hay varios detrás o a los lados
+  // (decenas de órdenes de dibujo de puntos y destellos que three.js no podía recortar: su forma la mueve el sombreador).
+  // Su esfera lleva 300 unidades de margen para eso (luciérnagas que suben, corazoncitos, ondulación de las flores).
+  for (const [id, g] of mundos.grupos) { let raiz = g; while (raiz.parent) raiz = raiz.parent; const { centro, radio } = esferaDe(g, 300); g.name ||= 'Lugar ' + id; recorteDe(raiz).anadir(g, radio, centro); }
   await ceder();
   // Escala de los puntos de la galaxia de casa: la de siempre, salvo con el teleobjetivo de «Mirar hacia casa», que la
   // amplía como al resto de la imagen (si no, sus estrellas, calculadas para la vista normal, eran miles de veces pequeñas).
@@ -153,6 +158,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   await ceder();
   const cosmos = await capaPorPasos('cosmos', async () => { const c = await porTramos(construirCosmos(nucleo)); nucleo.scene.add(c.raiz, c.decor); return c; });
   await ceder();
+  // Los gigantes, igual (recorte.js): fuera de la vista, ninguno de sus puntos se dibuja. Esfera de sus geometrías ×2,5: sus
+  // chorros, haces y motas se estiran en el sombreador (y TON 618 recoloca su cuadrado delante del disco en cada dibujo).
+  for (const g of Object.values(cosmos.gruposGigantes)) { const { centro, radio } = esferaDe(g); recorteDe(scene).anadir(g, radio * 2.5, centro); }
   const lejanas = await capaPorPasos('galaxiasLejanas', () => crearGalaxiasLejanas(nucleo));
   // El cielo del «más allá»: otro universo lleno de vida detrás de todo, lejos de casa.
   await ceder();
@@ -351,9 +359,13 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     avance(0.96, 0.99);
     pasos.paso = 'subir'; await subirTexturas(); await subirTexturas(solar.escena); solarPreparado = true;
     await new Promise(r => setTimeout(r, 0));
-    await calentar();
-    // Y a tamaño real, con todas las pasadas, en la pose de llegada de cada destino (carga/preparacion.js).
-    pasos.paso = 'calentar destinos'; const ensayo = await calentarDestinos(); if (diagnosticar) canvas.dataset.calentamiento = JSON.stringify(ensayo);
+    // (Sin recorte por grupos mientras se calienta: todo se estrena, también lo que queda fuera de la vista.)
+    recorteDe(scene).activo = recorteDe(solar.escena).activo = false;
+    try {
+      await calentar();
+      // Y a tamaño real, con todas las pasadas, en la pose de llegada de cada destino (carga/preparacion.js).
+      pasos.paso = 'calentar destinos'; const ensayo = await calentarDestinos(); if (diagnosticar) canvas.dataset.calentamiento = JSON.stringify(ensayo);
+    } finally { recorteDe(scene).activo = recorteDe(solar.escena).activo = true; }
     // Lo que aún no ha llegado y no bloquea la carga (nebulosas de fondo, planetas del sistema solar) se rellena y se sube a
     // la GPU en momentos libres tras la intro (cuandoLibre), nunca en un vuelo, un clip o un gesto.
     texturasTardiasEnReposo();
@@ -1571,7 +1583,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // Quieta la cámara sin congelar el tiempo (la celebración sigue animándose).
     detenerGiro(valor) { controls.autoRotate = !valor && !pausa && !vuelo && giraSolo(); },
     // Solo en #debug: acceso a la escena para vistas de diagnóstico por capas.
-    get interno() { return diagnosticar ? { THREE, scene, camera, controls, renderer, bloom, nucleo, telarana, capaVolumen, cosmos, galaxia, planetas, solar, get escenaActiva() { return escenaActiva; }, lento: v => { escalaTiempo = v; }, get encuadre() { return estadoEncuadre(); }, get tiempo() { return tiempo; }, get estelas() { return campoVelocidad.mesh.material.uniforms.uFuerza.value; }, nube: { MUESTRAS: muestrasNube }, get curvaVuelo() { return vuelo ? { curva: vuelo.curva, desde: vuelo.curva.getPoint(0), hasta: vuelo.curva.getPoint(1), duracion: vuelo.duracion, transcurrido: vuelo.transcurrido, real: vuelo.real ?? vuelo.transcurrido, plan: vuelo.plan } : null; }, lejanas, cercania: cercaniaUniverso, get lente() { return { activa: nucleo.lente.enabled, uL: nucleo.lente.uniforms.uL.value.map(v => v.toArray()) }; } } : null; },
+    get interno() { return diagnosticar ? { THREE, scene, camera, controls, renderer, bloom, nucleo, telarana, capaVolumen, cosmos, galaxia, planetas, solar, get escenaActiva() { return escenaActiva; }, lento: v => { escalaTiempo = v; }, fijarTiempo: v => { const antes = tiempo; tiempo = v; return antes; }, get encuadre() { return estadoEncuadre(); }, get tiempo() { return tiempo; }, get estelas() { return campoVelocidad.mesh.material.uniforms.uFuerza.value; }, nube: { MUESTRAS: muestrasNube }, get curvaVuelo() { return vuelo ? { curva: vuelo.curva, desde: vuelo.curva.getPoint(0), hasta: vuelo.curva.getPoint(1), duracion: vuelo.duracion, transcurrido: vuelo.transcurrido, real: vuelo.real ?? vuelo.transcurrido, plan: vuelo.plan } : null; }, lejanas, cercania: cercaniaUniverso, get lente() { return { activa: nucleo.lente.enabled, uL: nucleo.lente.uniforms.uL.value.map(v => v.toArray()) }; } } : null; },
     // Escenas de TON 618 y Sagitario A* (js/ui/escenaAgujeros.js): empezar con el reloj de su canción o terminar (sin él).
     escenaAgujero(id, opciones) {
       cosmos.escenaAgujero(id, opciones);
