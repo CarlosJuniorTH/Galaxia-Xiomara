@@ -33,15 +33,17 @@ export function curvaSalida([r, g, b], brillo = [0, 0, 0]) {
 // Fuerza del enfoque adaptativo (RCAS, como en FSR 1) según cuánto se amplía la escena hasta la pantalla FÍSICA (escena →
 // lienzo en esta pasada y lienzo → pantalla en el navegador, que en el móvil va a DPR 2 como mucho): 1 = sin ampliar, sin
 // enfoque (PC a la nativa).
-export const nitidezPara = ampliacion => Math.min(1, Math.max(0, (ampliacion - 1.02) * 1.4));
+export const nitidezPara = ampliacion => Math.min(1, Math.max(0, (ampliacion - 1.02) * 1.6));
 export const LIMITE_RCAS = 0.25 - 1 / 16;
 
-// Réplica en JavaScript del enfoque (por canal): se usa en las pruebas. RCAS: el lóbulo negativo se limita para no salirse
-// de [0, pico] y se escala con k; después, sin halos: nunca fuera del rango del centro y sus cuatro vecinos.
+// Réplica en JavaScript del enfoque (por canal): se usa en las pruebas. Como RCAS, el lóbulo negativo se adapta al contraste
+// para no pasar del pico y se escala con k; sin el límite de RCAS junto al negro (dejaba sin enfocar las estrellas sobre el
+// cielo oscuro: se veían más blandas que antes), porque después nunca sale del rango del centro y sus cuatro vecinos (sin
+// halos ni negativos).
 export function enfocar(centro, vecinos, k) {
   const mn = Math.min(...vecinos), mx = Math.max(...vecinos), pico = Math.max(1, 1.25 * mx);   // (con margen: en HDR no hay tope que respetar)
-  const hitMin = (mn / pico) / (4 * (mx / pico) + 1e-5), hitMax = (1 - mx / pico) / (4 * (mn / pico) - 4 - 1e-5);
-  const lobulo = Math.max(-LIMITE_RCAS, Math.min(Math.max(-hitMin, hitMax), 0)) * k;
+  const hitMax = (1 - mx / pico) / (4 * (mn / pico) - 4 - 1e-5);
+  const lobulo = Math.max(-LIMITE_RCAS, Math.min(hitMax, 0)) * k;
   const v = (lobulo * vecinos.reduce((a, b) => a + b, 0) + centro) / (4 * lobulo + 1);
   return Math.min(Math.max(mx, centro), Math.max(Math.min(mn, centro), v));
 }
@@ -105,15 +107,15 @@ const fragmentShader = /* glsl */`
     vec2 uvPantalla = uLente > 0.5 ? lente(vUv) : vUv;
     vec2 uv = uvPantalla * uZona.xy;
     vec3 c = uEscalar > 0.5 ? max(bicubica(uv), vec3(0.0)) : muestra(uv);
-    // Enfoque adaptativo en el mismo pase (estilo FSR 1, RCAS): el lóbulo se adapta al contraste local para no salirse del
-    // rango, y nunca fuera del mínimo/máximo de los vecinos (sin halos ni brillos nuevos en estrellas y bordes).
+    // Enfoque adaptativo en el mismo pase (estilo FSR 1, RCAS): el lóbulo se adapta al contraste local, y nunca fuera del
+    // mínimo/máximo de los vecinos (sin halos ni brillos nuevos en estrellas y bordes).
     if (uNitidez > 0.0) {
       vec3 n = muestra(uv + vec2(0.0, uTexel.y)), s = muestra(uv - vec2(0.0, uTexel.y));
       vec3 e = muestra(uv + vec2(uTexel.x, 0.0)), o = muestra(uv - vec2(uTexel.x, 0.0));
       vec3 mn4 = min(min(n, s), min(e, o)), mx4 = max(max(n, s), max(e, o));
       float pico = max(1.0, 1.25 * max(max(mx4.r, mx4.g), mx4.b));   // (con margen: en HDR no hay tope que respetar)
       vec3 a = mn4 / pico, z = mx4 / pico;
-      vec3 l3 = max(-a / (4.0 * z + 1e-5), (1.0 - z) / (4.0 * a - 4.0 - 1e-5));
+      vec3 l3 = (1.0 - z) / (4.0 * a - 4.0 - 1e-5);   // (sin el límite junto al negro: ver enfocar)
       float lobulo = clamp(max(max(l3.r, l3.g), l3.b), -${LIMITE_RCAS.toFixed(4)}, 0.0) * uNitidez;
       vec3 r = (lobulo * (n + s + e + o) + c) / (4.0 * lobulo + 1.0);
       c = clamp(r, min(mn4, c), max(mx4, c));
