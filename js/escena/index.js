@@ -42,7 +42,7 @@ import { crearZoom } from '../util/zoom.js';
 import { crearCapaVolumen } from './capaVolumen.js';
 import { nivelSeguro } from '../util/dispositivo.js';
 import { esquivar, sinRepetidos } from '../util/ruta.js';
-import { planificarVuelo } from '../util/vuelo.js';
+import { planificarVuelo, crearObreroVuelo } from '../util/vuelo.js';
 import { TIEMPOS_AMOR, faltaReal, desdeAnimacion } from '../util/supernovaAmor.js';
 import { pistaDe, normalizarPista, muestrearCamara, mezclarMuestras, crearMuestra, crearSuavizador, segundoAdelantado, siguienteCorte, esfericasACartesianas, cartesianasAEsfericas, ENTRADA, SALIDA, LIMITES, ENTRADA_LARGA, CALMA_ENTRADA, escalaMovil } from '../util/directorCamara.js';
 import { finEscena } from '../util/guionAgujeros.js';
@@ -305,6 +305,10 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   scene.traverse(o => { if (o.isLight && !o.isAmbientLight && o.parent !== scene) lucesFijas.push(o); });
   for (const luz of lucesFijas) { const ancla = new THREE.Object3D(); ancla.position.copy(luz.position); luz.parent.add(ancla); luz.removeFromParent(); scene.add(luz); luz.userData.ancla = ancla; }
   const seguirLuces = () => { for (const luz of lucesFijas) { const a = luz.userData.ancla; let o = a; while (o && o.visible) o = o.parent; if (!o) luz.position.setFromMatrixPosition(a.matrixWorld); } };
+  // Obrero del perfil de los vuelos (util/obreroVuelo.js): se crea y se estrena en la carga (su módulo ya compilado), así
+  // el primer viaje no lo espera.
+  const obreroVuelo = crearObreroVuelo();
+  obreroVuelo?.({ dist: new Float64Array(17).fill(10), longitud: 1000, duracion: 5, tRampa: 1, tFrenada: 1, lRecta: 1000, tArco: 0 }).catch(() => {});
   // Gas volumétrico a resolución reducida y reconstruido (capaVolumen.js): las nebulosas con volumen se pintan en su propia capa.
   const capaVolumen = crearCapaVolumen({ scene, renderer, uPR: nucleo.uPR, hdr: canvas.dataset.brillo3d === 'hdr', sinProfundidad: canvas.dataset.brillo3d === 'directo' && !modoCompatible });
   const listo = (async () => {
@@ -621,7 +625,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       if (mejor) { const c = mejor.c; salidaFrente = { centro: c.centro.clone(), minimo: c.radio * 1.3, radio: Math.max(cosmos.objetivo(c.id)?.distancia ?? 0, LLEGADA_GIGANTE[c.id] ?? 0, lejano && lejano.id === c.id ? lejano.dist : 0, centroDesde.distanceTo(c.centro) < c.radio ? encuadre?.d || 0 : 0) }; }
     }
     partida = null;
-    const plan = planificarVuelo({ desde, miraDesde: centroDesde, hasta, mira, centro, obstaculos: obstaculosVuelo(), reducido: movimientoReducido, rAprox, cercania: cercaniaUniverso, breve: viajeBreve, salidaFrente, duracionTotal: tramoRestante ?? undefined });
+    const plan = planificarVuelo({ desde, miraDesde: centroDesde, hasta, mira, centro, obstaculos: obstaculosVuelo(), reducido: movimientoReducido, rAprox, cercania: cercaniaUniverso, breve: viajeBreve, salidaFrente, duracionTotal: tramoRestante ?? undefined, obrero: obreroVuelo });
+    // El perfil (lo costoso) se termina ya, fuera de los cuadros: en el obrero y en los ratos libres del navegador.
+    plan.enReposo();
     if (diagnosticar) canvas.dataset.planMs = (performance.now() - t0Plan).toFixed(0);   // coste de planificar (diagnóstico)
     vuelo = { plan, curva: plan.trayectoria(), centroDesde, objetivo: mira.clone(), transcurrido: 0, get duracion() { return plan.duracion; }, distanciaTotal: plan.camino.getLength(), llegada: hasta.distanceTo(mira),
       salida: Math.max(400, desde.distanceTo(centroDesde)), resolver, corriente: 0, perfil: false, centroDestino: centro.clone(), continuacion: trasFundido,
@@ -1141,9 +1147,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       const porcentaje = String(Math.min(100, Math.floor(vuelo.transcurrido / vuelo.duracion * 100))); if (!vuelo.fija && canvas.dataset.avance !== porcentaje) canvas.dataset.avance = porcentaje;
       const k = Math.min(1, vuelo.transcurrido / vuelo.duracion), lejos = vuelo.distanciaTotal > 20000 && !vuelo.fija;   // fija: recorrido contemplativo a ritmo uniforme
       if (vuelo.plan) {
-        // Vuelo por fases: posición y mirada planificadas; las estelas siguen la fase. El perfil del viaje se termina de
-        // preparar a trozos en estos primeros cuadros (antes se calculaba entero en el cuadro del clic: una pausa al pulsar).
-        if (!vuelo.plan.listo) vuelo.plan.preparar(esMovil ? 3 : 2);
+        // Vuelo por fases: posición y mirada planificadas; las estelas siguen la fase. El perfil del viaje se prepara fuera
+        // de los cuadros (obrero y ratos libres, desde el clic: plan.enReposo); ningún cuadro lo calcula.
         const e = vuelo.plan.evaluar(vuelo.transcurrido);
         camera.position.copy(e.pos); controls.target.copy(e.mira); camera.lookAt(controls.target);
         vuelo.corriente = e.corriente; vuelo.fase = e.fase; if (canvas.dataset.fase !== e.fase) canvas.dataset.fase = e.fase; if (diagnosticar) canvas.dataset.recorrido = e.avance.toFixed(3);   // (solo para diagnóstico: cambiaba un atributo del lienzo en cada cuadro)
