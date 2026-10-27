@@ -7,12 +7,13 @@
 // La clave incluye una huella del código del cálculo: si se cambia, deja de coincidir y se calcula aquí hasta que se
 // vuelva a hornear.
 import { descargas } from './descargas.js';
+import { conDiagnostico } from './diag.js';
 
 const enNavegador = typeof window !== 'undefined' && typeof fetch === 'function';
 const grabando = enNavegador && /[?&]hornear\b/.test(location.search);
 const paquete = new Map();
 if (grabando) window.__horno = {};
-const calculados = []; if (enNavegador && !grabando) window.__hornoCalculados = calculados;   // diagnóstico: lo que no venía horneado
+const calculados = []; if (enNavegador && !grabando && conDiagnostico) window.__hornoCalculados = calculados;   // diagnóstico: lo que no venía horneado
 
 const huella = s => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); } return (h >>> 0).toString(16).padStart(8, '0'); };
 const TIPOS = { Uint8Array, Uint16Array, Uint32Array, Int32Array, Float32Array, Float64Array };

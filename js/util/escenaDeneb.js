@@ -25,6 +25,7 @@
 //   32,00    segunda mitad: todo igual de vivo, más cálido.
 //   41,15    se serena hasta su estado de siempre (el mismo que al llegar: sin saltos).
 // El estado es el mismo en s = 0 y en s ≥ fin (el «normal», lo que se ve fuera de la escena).
+import { vista } from './vista.js';
 export const ESCENA_DENEB = {
   id: 'deneb', duracion: 43.4, pulso: 43.44 / 76, compas: 4, desfase: 0,
   marcas: { inicio: 0, silencio: 2.5, atras: 4.27, tiempo: 5.11, bien: 7.03, bien2: 8.56, nada: 9.57, promesa: 10.87, construir: 12.01, mundo: 12.86, dos: 14.93, contigo: 16.01, tu: 17.35, medio: 19.16, drop: 20.57, segunda: 32, fundido: 41.15, fin: 43.4 }
@@ -53,7 +54,8 @@ export const CAMARA_DENEB = PISTA;
 // En vertical (móvil): más cerca (la nube llena el alto) y mirando algo más arriba (el director deja el centro del gigante
 // por encima del de la pantalla: así queda centrada).
 export const CAMARA_DENEB_VERTICAL = PISTA.map(p => ({ ...p, pos: [p.pos[0], p.pos[1], +(p.pos[2] * 0.82).toFixed(3)], ...(p.mira ? { mira: [0, 0.05, 0] } : {}) }));
-const vertical = () => typeof window !== 'undefined' && window.innerWidth < window.innerHeight * 0.9;
+// (Con el tamaño guardado de la ventana: leer innerWidth en un cuadro puede obligar a maquetar la página.)
+const vertical = () => typeof window !== 'undefined' && vista.ancho < vista.alto * 0.9;
 Object.defineProperty(ESCENA_DENEB, 'camara', { get: () => vertical() ? CAMARA_DENEB_VERTICAL : CAMARA_DENEB, enumerable: true });
 
 // Curva monótona por claves [[s, v], …] (Fritsch–Carlson): pasa por cada clave sin pasarse ni rebotar, con velocidad

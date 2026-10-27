@@ -12,6 +12,7 @@ import { generador, semillaDe, ceder } from '../util/azarSemilla.js';
 import { crearTelarana, puntoFilamento } from '../data/telarana.js';
 import { generarDatosTelarana } from './telaranaDatos.js';
 import { vista } from '../util/vista.js';
+import { conDiagnostico } from '../util/diag.js';
 
 // Lo que queda detrás de un gigante (en su silueta, más lejos que él) se apaga: la telaraña no tapa al cuásar, la
 // supernova… (uGigA/uGigB, ver OCULTO).
@@ -65,14 +66,14 @@ export function pedirDatosTelarana() {
     return new Promise(resolver => {
       let hecho = false; const partes = [];
       const cerrar = () => { hecho = true; clearTimeout(vigia); for (const o of obreros) o.terminate(); };
-      const respaldo = () => { window.__respaldoTelarana = true; if (hecho) return; cerrar(); aqui().then(resolver); };
+      const respaldo = () => { if (conDiagnostico) window.__respaldoTelarana = true; if (hecho) return; cerrar(); aqui().then(resolver); };
       // Si el sistema cierra un obrero sin avisar (iOS lo hace cuando falta memoria), no se espera para siempre: los obreros
       // dan un latido en cada pausa (el que espera al otro no late); si pasan 10 s sin ninguno (o 25 s sin el primero,
       // mientras cargan), se calcula aquí.
       let vigia = setTimeout(respaldo, 25000);
       for (const obrero of obreros) {
         obrero.onmessage = ({ data }) => {
-          if (data.latido) { window.__latidosTelarana = (window.__latidosTelarana || 0) + 1; clearTimeout(vigia); vigia = setTimeout(respaldo, 10000); return; }
+          if (data.latido) { if (conDiagnostico) window.__latidosTelarana = (window.__latidosTelarana || 0) + 1; clearTimeout(vigia); vigia = setTimeout(respaldo, 10000); return; }
           if (!data.datos) return respaldo();
           partes.push(data.datos); if (partes.length === PARTES.length && !hecho) { cerrar(); resolver(Object.assign({}, ...partes)); }
         };

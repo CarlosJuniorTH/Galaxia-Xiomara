@@ -23,6 +23,7 @@ import { precargarEnReposo } from './util/precarga.js';
 import { ocupado, ocupadoSi } from './util/descargas.js';
 import { crearMedidor } from './ui/medidor.js';
 import { cargaTerminada, texturasLigeras } from './util/dispositivo.js';
+import { conDiagnostico } from './util/diag.js';
 
 // Medidor de fluidez (?fps, js/util/medidorFps.js): solo se carga con ?fps, antes que nada (cuenta toda subida a la GPU).
 if (new URLSearchParams(location.search).has('fps')) await import('./util/medidorFps.js');
@@ -67,7 +68,8 @@ document.getElementById('btn-restaurar').addEventListener('click', () => { if (p
 
 // En la red local (pruebas con el móvil): cada segundo se avisa al servidor del PC de en qué paso va la carga, para saber
 // dónde se para en un aparato real. No sale de la red de casa.
-if (location.protocol === 'http:' && /^(192\.168\.|10\.)/.test(location.hostname)) {
+// (Solo a petición, con ?diag o #debug: sin eso la página no informa a nadie.)
+if (conDiagnostico && location.protocol === 'http:' && /^(192\.168\.|10\.)/.test(location.hostname)) {
   const t0 = performance.now(); let ultimo = '';
   // Cuándo empieza cada paso de la carga (para ver dónde se va el tiempo en un aparato real).
   const pasos = []; { let paso; Object.defineProperty(window, '__pasoCarga', { configurable: true, get: () => paso, set: v => { if (v !== paso) pasos.push(`${v} ${Math.round((performance.now() - t0) / 1000)}s`); paso = v; } }); }
@@ -199,5 +201,5 @@ try {
   console.error('Arranque del universo:', informe, e); problema(informe.texto);
   document.getElementById('error-arranque').hidden = false;
   document.getElementById('error-arranque-texto').textContent = `${informe.etapa}\n${informe.tipo}: ${informe.mensaje}`;
-  if (location.protocol === 'http:' && /^(localhost$|127\.|192\.168\.|10\.)/.test(location.hostname)) fetch('./__diagnostico3d', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...informe, navegador: navigator.userAgent }) }).catch(() => {});
+  if (conDiagnostico && location.protocol === 'http:' && /^(localhost$|127\.|192\.168\.|10\.)/.test(location.hostname)) fetch('./__diagnostico3d', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...informe, navegador: navigator.userAgent }) }).catch(() => {});
 }

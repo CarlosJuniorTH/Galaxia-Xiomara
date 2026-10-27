@@ -50,6 +50,8 @@ import { aMal, SEMIEJES_CORAZON, ESCALA_SUPERNOVA, PROGENITORA_RELATIVA, LLEGADA
 const RADIO_ESTRELLA = 110 * ESCALA_SUPERNOVA * PROGENITORA_RELATIVA;
 import { resolucionPostal, crearCapturador } from '../util/captura.js';
 import { vista } from '../util/vista.js';
+import { conDiagnostico } from '../util/diag.js';
+import { vigilarEstrenos } from '../util/estrenos.js';
 
 const OBJETIVO = new THREE.Vector3(0, 70, 0);
 // Figuras más pequeñas que la media para su distancia base (el planeta azul mide la mitad):
@@ -80,12 +82,14 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // Progreso de la carga: cada paso informa de dónde está (f) y hasta dónde llegará al terminar (techo); la barra
   // avanza despacio hacia el techo mientras el paso trabaja. Cada capa pesa lo que tarda de verdad (ms medidos en
   // un móvil modesto), así el porcentaje avanza al ritmo real y no se queda parado en las capas grandes.
+  // Paso de la carga en curso: solo se publica (window.__pasoCarga) con diagnóstico.
+  const pasos = { set paso(v) { if (conDiagnostico) window.__pasoCarga = v; } };
   const avance = (f, techo = f) => alProgreso(Math.max(0, Math.min(1, f)), Math.max(0, Math.min(1, techo)));
   const PESO_CAPA = { mundos: 110, galaxia: 250, cosmos: 630, galaxiasLejanas: 2000, telarana: 2950, maravillas: 700, universoLocal: 100, viaLactea: 100 };
   const CAPAS = ['mundos', 'galaxia', 'cosmos', 'galaxiasLejanas', 'cieloProfundo', 'telarana', 'maravillas', 'universoLocal', 'viaLactea', 'amor', 'agujeroNegro', 'corazon', 'nombre', 'frases', 'estrellas', 'secretas', 'polvo'];
   const pesoCapa = n => PESO_CAPA[n] ?? 15, PESO_TOTAL = CAPAS.reduce((a, n) => a + pesoCapa(n), 0);
   let pesoHecho = 0; const enCapas = ms => 0.05 + 0.45 * Math.min(1, ms / PESO_TOTAL);   // las capas: del 5 % al 50 %
-  const empiezaCapa = n => { window.__pasoCarga = 'capa ' + n; avance(enCapas(pesoHecho), enCapas(pesoHecho + pesoCapa(n))); };
+  const empiezaCapa = n => { pasos.paso = 'capa ' + n; avance(enCapas(pesoHecho), enCapas(pesoHecho + pesoCapa(n))); };
   const terminaCapa = n => { pesoHecho += pesoCapa(n); avance(enCapas(pesoHecho)); };
   avance(0, 0.05);
   await hornoListo;   // los cálculos horneados (se descargan desde el principio de la página, en paralelo con todo)
@@ -109,6 +113,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   const datosTelarana = pedirDatosTelarana();
   const nucleo = crearNucleo(canvas);
   const { renderer, scene, camera, controls, composer, bloom } = nucleo;
+  // Estrenos en la GPU (compilaciones, texturas, geometrías, búferes) con lo que se estaba haciendo: solo con diagnóstico o
+  // con el medidor (?fps, ?hud). Durante vuelos, clips y gestos deben ser cero (util/estrenos.js).
+  const estrenos = conDiagnostico || /[?&](fps|hud)\b/.test(location.search) ? vigilarEstrenos(renderer.getContext()) : null;
   // Cada textura calculada o descargada va a la GPU en cuanto llega (las que sueltan su copia, la sueltan ya): antes todas
   // esperaban en memoria al final de la carga y se juntaban con todo lo demás (el pico de memoria que cerraba el iPhone).
   { const anisotropiaMax = renderer.capabilities.getMaxAnisotropy();
@@ -116,7 +123,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // Cada objeto añadido a la escena recuerda su capa: permite aislarlas en el diagnóstico.
   // Cada capa tiene su propia semilla (derivada de su nombre): lo que una capa genere de más o de
   // menos en un dispositivo no desplaza el mapa de las demás. El universo es el mismo en PC y móvil.
-  const tiemposCapas = {}; window.__tiemposCapas = tiemposCapas;   // cuánto tarda en crearse cada capa (diagnóstico)
+  const tiemposCapas = {}; if (conDiagnostico) window.__tiemposCapas = tiemposCapas;   // cuánto tarda en crearse cada capa (diagnóstico)
   const capa = (nombre, crear) => {
     empiezaCapa(nombre);
     const restaurar = sembrarAzar(semillaDe(nombre)), antes = new Set(scene.children);
@@ -301,15 +308,15 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // Gas volumétrico a resolución reducida y reconstruido (capaVolumen.js): las nebulosas con volumen se pintan en su propia capa.
   const capaVolumen = crearCapaVolumen({ scene, renderer, uPR: nucleo.uPR, hdr: canvas.dataset.brillo3d === 'hdr', sinProfundidad: canvas.dataset.brillo3d === 'directo' && !modoCompatible });
   const listo = (async () => {
-    window.__pasoCarga = 'nebulosas'; await lejanas.prepararTodas((h, t) => avance(0.5 + 0.06 * h / t, 0.56));
-    window.__pasoCarga = 'texturas'; await texturasTodas((h, t) => avance(0.56 + 0.28 * h / t, 0.84));
+    pasos.paso = 'nebulosas'; await lejanas.prepararTodas((h, t) => avance(0.5 + 0.06 * h / t, 0.56));
+    pasos.paso = 'texturas'; await texturasTodas((h, t) => avance(0.56 + 0.28 * h / t, 0.84));
     galaxia.prepararLuz();   // (la luz media de casa vista de lejos: antes se medía al salir de casa en el primer viaje)
-    window.__pasoCarga = 'cielo'; avance(0.84, 0.86); await cieloProfundo.listo;
-    window.__pasoCarga = 'cuasar'; avance(0.86, 0.88); cosmos.hornear(renderer); await new Promise(r => setTimeout(r, 0));
+    pasos.paso = 'cielo'; avance(0.84, 0.86); await cieloProfundo.listo;
+    pasos.paso = 'cuasar'; avance(0.86, 0.88); cosmos.hornear(renderer); await new Promise(r => setTimeout(r, 0));
     avance(0.88, 0.96);
-    window.__pasoCarga = 'compilar'; await texturasListas(); await lejanas.campo.prepararLuz(); await compilarTodo(scene); await compilarTodo(solar.escena);
+    pasos.paso = 'compilar'; await texturasListas(); await lejanas.campo.prepararLuz(); await compilarTodo(scene); await compilarTodo(solar.escena);
     avance(0.96, 0.99);
-    window.__pasoCarga = 'subir'; await subirTexturas(); await subirTexturas(solar.escena); solarPreparado = true;
+    pasos.paso = 'subir'; await subirTexturas(); await subirTexturas(solar.escena); solarPreparado = true;
     await new Promise(r => setTimeout(r, 0));
     await calentar(); soltarHorno(); avance(1);
   })();
@@ -370,10 +377,22 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     if (destinoActual === 'hogar') desplazamientoMeta -= vista.alto * 0.13;
     fraccionZona = Math.max(0, abajo - arriba) / vista.alto;
   }
-  // Cada 1,5 s, pero nunca en mitad de un gesto, una inercia o un viaje (medir obliga al navegador a recalcular la
-  // maquetación de la página, y el contador la cambia cada segundo) y cuando el navegador está libre.
+  // Solo cuando cambia la interfaz (ResizeObserver y cambios de clase o visibilidad de las piezas que la limitan, y al
+  // terminar sus transiciones), nunca en el bucle de dibujo ni en mitad de un gesto, una inercia o un viaje (medir obliga
+  // al navegador a recalcular la maquetación): se aplaza y se mide cuando el navegador está libre. Antes se medía cada
+  // 1,5 s aunque nada cambiase.
   const libre = window.requestIdleCallback ? f => requestIdleCallback(f, { timeout: 500 }) : f => setTimeout(f, 0);
-  setInterval(() => { if (!gesto && !vuelo && !giro.moviendo && !zoom.moviendo) libre(medirZonaLibre); }, 1500);
+  let zonaPedida = false, zonaEnCola = false;
+  const ocupadoZona = () => gesto || !!vuelo || giro.moviendo || zoom.moviendo;
+  const pedirZona = () => { if (zonaEnCola) return; zonaEnCola = true; libre(() => { zonaEnCola = false; if (ocupadoZona()) { zonaPedida = true; return; } zonaPedida = false; medirZonaLibre(); }); };
+  if (typeof ResizeObserver === 'function') {
+    const piezas = ['#titulo', '#btn-tour', '.marca-universo', '.horarios', '#ruta', '#lugar', '#cometa-aviso'].flatMap(s => [...document.querySelectorAll(s)]);
+    const ro = new ResizeObserver(pedirZona), mo = new MutationObserver(pedirZona);
+    for (const el of piezas) { ro.observe(el); mo.observe(el, { attributes: true, attributeFilter: ['class', 'hidden'] }); el.addEventListener('transitionend', pedirZona); }
+    mo.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  }
+  // Lo que se aplazó por un gesto o un viaje se mide al acabar (esto no lee nada si no hay nada pendiente).
+  setInterval(() => { if (zonaPedida && !ocupadoZona()) pedirZona(); }, 700);
   function aplicarDesplazamiento(dt) {
     const anterior = desplazamiento;
     desplazamiento += (desplazamientoMeta - desplazamiento) * Math.min(1, dt * 2.5);
@@ -603,7 +622,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     }
     partida = null;
     const plan = planificarVuelo({ desde, miraDesde: centroDesde, hasta, mira, centro, obstaculos: obstaculosVuelo(), reducido: movimientoReducido, rAprox, cercania: cercaniaUniverso, breve: viajeBreve, salidaFrente, duracionTotal: tramoRestante ?? undefined });
-    canvas.dataset.planMs = (performance.now() - t0Plan).toFixed(0);   // coste de planificar (diagnóstico)
+    if (diagnosticar) canvas.dataset.planMs = (performance.now() - t0Plan).toFixed(0);   // coste de planificar (diagnóstico)
     vuelo = { plan, curva: plan.trayectoria(), centroDesde, objetivo: mira.clone(), transcurrido: 0, get duracion() { return plan.duracion; }, distanciaTotal: plan.camino.getLength(), llegada: hasta.distanceTo(mira),
       salida: Math.max(400, desde.distanceTo(centroDesde)), resolver, corriente: 0, perfil: false, centroDestino: centro.clone(), continuacion: trasFundido,
       vw: vista.ancho, vh: vista.alto, idealSalida: idealDelVuelo(hasta.distanceTo(mira)) };
@@ -899,7 +918,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     if (lejano) { const o = lejano.id === 'gigante' ? { distancia: 680 } : cosmos.objetivo(lejano.id); return o ? { d: o.distancia * ESCALA_CIELO * Math.max(1, Math.min(1.6, 0.95 / aspecto)) } : null; }
     if (id === 'hogar') return { d: encuadreHogar(aspecto).distancia };
     const d = DESTINOS.find(x => x.id === id); if (!d) return null;
-    medirZonaLibre();
+    // (Con la franja ya medida: al despegar —viajar— y, si la interfaz cambió, en cuanto el navegador estuvo libre. Medirla
+    // aquí obligaba a maquetar la página en el cuadro de la llegada.)
     // Punto de mira del lugar; en horizontal bajo (móvil girado) se aparta de la tarjeta, como al llegar.
     const mira = v3(d.posicion).add(v3(d.foco || [0, -15, 0])), base = d.distancia || 530;
     if (vista.alto < 620 && vista.ancho > vista.alto && vista.ancho <= 900) mira.addScaledVector(new THREE.Vector3().crossVectors(controls.target.clone().sub(camera.position), EJE_Y).normalize(), -base * 0.32);
@@ -1078,7 +1098,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // Junto al cometa se sigue dibujando mientras se lee: se le ve alejarse con la carta abierta.
     const lecturaActiva = leyendo && !captura && destinoActual !== 'cometa';
     const estadoDibujo = lecturaActiva ? 'lectura' : 'activo';
-    if (canvas.dataset.dibujo !== estadoDibujo) canvas.dataset.dibujo = estadoDibujo;
+    if (diagnosticar && canvas.dataset.dibujo !== estadoDibujo) canvas.dataset.dibujo = estadoDibujo;   // (diagnóstico: #debug, ?diag, ?hud)
     // Mientras se ve la portada (opaca) el 3D no se dibuja: menos trabajo y calor al empezar.
     const reposo = document.hidden || suspendida || lecturaActiva || (tEntrada === null && !document.body.classList.contains('dentro') && !captura);
     // Motivo por el que se dibuja a ritmo de interacción (se informa en el diagnóstico).
@@ -1089,11 +1109,12 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       : Math.abs(desplazamientoMeta - desplazamiento) > 0.5 ? 'encuadre' : cosmos.enEscenaAgujero || clip ? 'escena'
       : controls.autoRotate || giroSuave > 0.002 ? 'giro' : mundos.cometaVisible ? 'cometa' : '';
     const activo = !!motivo;
+    if (estrenos) estrenos.momento = vuelo ? 'vuelo' : clip ? 'clip' : gesto || giro.moviendo || zoom.moviendo ? 'gesto' : '';
     const modo = planificador.decidir(ahora, { reposo, quieto: pausa && !vuelo && !captura, activo });
     if (modo === null) { if (reposo) prev = ahora; return; }
-    if (modo !== modoAnterior) { modoAnterior = modo; canvas.dataset.ritmo = modo; }
+    if (modo !== modoAnterior) { modoAnterior = modo; if (diagnosticar) canvas.dataset.ritmo = modo; }
     const motivoActual = modo === 'activo' ? motivo || 'reciente' : '';
-    if (canvas.dataset.motivo !== motivoActual) canvas.dataset.motivo = motivoActual;
+    if (diagnosticar && canvas.dataset.motivo !== motivoActual) canvas.dataset.motivo = motivoActual;
     const dtReal = Math.max(0, (ahora - prev) / 1000); prev = ahora;
     // En pausa completa el tiempo se congela: solo se redibuja la imagen.
     const dt = modo === 'quieto' ? 0 : Math.min(0.065, dtReal) * escalaTiempo;
@@ -1323,7 +1344,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       // Los soles del cielo son masivos: siguen viéndose (algo más tenues) desde el cuásar, el púlsar o la supernova.
       const fs = 0.55 + 0.45 * locales;
       cosmos.decor.traverse(o => { for (const m of [].concat(o.material || [])) { if (m.uniforms?.uOpacidad) { m.userData.base ??= m.uniforms.uOpacidad.value; m.uniforms.uOpacidad.value = m.userData.base * fs; } else if (m.opacity !== undefined) { m.userData.base ??= m.opacity; m.opacity = m.userData.base * fs; } } });
-      cosmos.decor.visible = true; canvas.dataset.estrellasLocales = locales.toFixed(2);
+      cosmos.decor.visible = true; if (diagnosticar) canvas.dataset.estrellasLocales = locales.toFixed(2);   // (cambiaba en cada cuadro de un viaje)
     }
     // En el sistema solar (Rosa, Azul, las cartas) solo se dibuja su escena: las piezas del universo principal no trabajan
     // (antes se actualizaban en cada cuadro sin verse). Los mundos sí: el correo de la luna vive allí.
@@ -1467,6 +1488,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // Para el medidor ?hud: programas de GPU compilados, geometrías y texturas en la GPU y frecuencia medida de la pantalla.
     get rendimiento() { const i = renderer.info; return { programas: i.programs?.length ?? 0, geometrias: i.memory.geometries, texturas: i.memory.textures, hz: planificador.hz }; },
     get cuadrosDibujados() { return cuadrosDibujados; },
+    // Estrenos en la GPU con su momento (util/estrenos.js; solo con diagnóstico o el medidor): { total, enMovimiento, ultimos }.
+    get estrenos() { return estrenos; },
     viajar,
     cancelarViaje() { delete canvas.dataset.viaje; vuelo?.resolver(false); vuelo = null; limpiarVuelo(); controls.enabled = true; controls.autoRotate = false; },
     // Saltar el resto del crucero (se recorre en unos segundos y se llega con la aproximación normal).

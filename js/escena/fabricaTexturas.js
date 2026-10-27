@@ -3,6 +3,7 @@
 // `texturasListas()` resuelve cuando todas están rellenas: la pantalla de carga la espera.
 import * as THREE from 'three';
 import { GENERADORES } from './texturasPlaneta.js';
+import { conDiagnostico } from '../util/diag.js';
 import { huellaTextura } from './huellaTextura.js';
 import { descargas } from '../util/descargas.js';
 import { esMovil, texturasLigeras } from '../util/dispositivo.js';
@@ -88,7 +89,7 @@ let obreros = null, vigilante = 0;
 const colaBloquea = [], colaResto = [], promesas = [], todas = [], enCurso = new Map(), errores = [];
 // Diagnóstico de la carga (main.js lo envía al PC en la red local): qué texturas faltan y qué ha fallado.
 let hechasAqui = 0, hechasObreros = 0;
-if (typeof window !== 'undefined') window.__texturas = () => ({ faltan: [...enCurso.values()], enHiloPrincipal: hechasAqui, porObreros: hechasObreros, obreros: obreros ? obreros.length : null, errores: errores.slice(-3), decodificadasFuera });
+if (typeof window !== 'undefined' && conDiagnostico) window.__texturas = () => ({ faltan: [...enCurso.values()], enHiloPrincipal: hechasAqui, porObreros: hechasObreros, obreros: obreros ? obreros.length : null, errores: errores.slice(-3), decodificadasFuera });
 // En el móvil, dos como mucho: junto con el obrero de la telaraña y el hilo principal no se satura el procesador.
 const movil = /Android|iPhone|iPad|Mobi/i.test(navigator.userAgent);
 const NUM_OBREROS = Math.max(1, Math.min(movil ? 2 : 4, (navigator.hardwareConcurrency || 2) - 1));
@@ -168,7 +169,7 @@ const comoBytes = d => (d instanceof Uint8Array ? d : new Uint8Array(d.buffer, d
 const soltarCopia = t => { t.image = { width: t.image.width, height: t.image.height, data: null }; t.onUpdate = null; };
 export function texturaPlaneta(tipo, opciones, { claves = ['pixeles'], relleno = [120, 110, 140], bloquea = true, liberable = false } = {}) {
   const { ancho, alto } = opciones;
-  if (typeof window !== 'undefined') (window.__pedidosTextura ||= []).push({ tipo, opciones, claves, bloquea });
+  if (typeof window !== 'undefined' && conDiagnostico) (window.__pedidosTextura ||= []).push({ tipo, opciones, claves, bloquea });
   const texturas = Object.fromEntries(claves.map(c => [c, dataTextura(ancho, alto)]));
   const promesa = new Promise(resolve => {
     const clave = `${tipo} ${ancho}×${alto}`; enCurso.set(promesas.length + todas.length + Math.random(), clave);
