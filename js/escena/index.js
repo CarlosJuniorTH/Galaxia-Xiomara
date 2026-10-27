@@ -355,7 +355,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   });
   for (const ventana of ventanas) lectura.observe(ventana, { attributes: true, attributeFilter: ['open', 'class'] });
   const medir = location.hash === '#debug';
-  const diagnosticar = medir || (['render', 'completo', 'gigantes'].includes(new URLSearchParams(location.search).get('diag')) || new URLSearchParams(location.search).has('hud'));
+  const diagnosticar = medir || (['render', 'completo', 'gigantes'].includes(new URLSearchParams(location.search).get('diag')) || new URLSearchParams(location.search).has('hud') || new URLSearchParams(location.search).has('fps'));
   let exposicion = 1;
   const ctx = { camera, exposicion: 1, pulso: 0, tiempoDentro: null, escala: 1, velocidadPolvo: new THREE.Vector3() };
 

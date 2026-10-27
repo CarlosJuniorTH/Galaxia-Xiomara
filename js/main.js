@@ -23,6 +23,8 @@ import { precargarTodo } from './util/precarga.js';
 import { crearMedidor } from './ui/medidor.js';
 import { cargaTerminada, esMovil } from './util/dispositivo.js';
 
+// Medidor de fluidez (?fps, js/util/medidorFps.js): solo se carga con ?fps, antes que nada (cuenta toda subida a la GPU).
+if (new URLSearchParams(location.search).has('fps')) await import('./util/medidorFps.js');
 let interfaz, escena, contemplacion, etapa = 'fuentes';
 const problema = texto => { document.getElementById('problema-texto').textContent = texto; document.getElementById('problema-3d').hidden = false; if (interfaz?.enRuta) interfaz.pausarRuta(true); };
 document.getElementById('reintentar-3d').addEventListener('click', () => location.reload());
@@ -161,6 +163,7 @@ try {
   });
   entrada.listo();
   crearMedidor(escena);
+  window.__medidor?.conectar(escena);
   if (location.hash === '#debug') window.__galaxia = { escena, recuerdos, interfaz, progreso, estrellas };
   // El cielo crece también si se queda abierto al cumplirse un nuevo mes.
   setInterval(() => {
