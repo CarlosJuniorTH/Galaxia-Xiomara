@@ -10,8 +10,9 @@ for (const carpeta of ['assets','css','js']) await cp(carpeta,path.join(destino,
 // El taller es una herramienta local, separada de la experiencia publicada.
 for (const archivo of ['js/editor.js','css/editor.css']) await rm(path.join(destino,archivo),{force:true});
 await writeFile(path.join(destino,'.nojekyll'),'');
-// three.js minificado (la versión oficial de la misma r160, ~45 % menos): se publica en lugar del legible.
-{ const v = path.join(destino, 'assets/vendor/three'); await cp(path.join(v, 'three.module.min.js'), path.join(v, 'three.module.js')); await rm(path.join(v, 'three.module.min.js'), { force: true }); }
+// three.js: la página usa el minificado (la versión oficial de la misma r160, ~45 % menos; mapa de importación de
+// index.html); el legible no se publica.
+await rm(path.join(destino, 'assets/vendor/three/three.module.js'), { force: true });
 // App sin conexión (solo se registra en HTTPS): lista exacta de archivos y versión
 // derivada de su contenido. Cada publicación usa una caché nueva y borra las viejas.
 async function listar(dir) {
@@ -23,8 +24,8 @@ async function listar(dir) {
   }
   return salida;
 }
-// Lista de todos los archivos públicos con sus bytes: la precarga (js/util/precarga.js) descarga en la pantalla de carga
-// lo que la web pueda pedir después.
+// Lista de todos los archivos públicos con sus bytes: la precarga (js/util/precarga.js) pone en la cola de reposo lo que la
+// web pueda pedir después de la carga.
 { const todos = {}; for (const r of await listar(destino)) { const rel = path.relative(destino, r).split(path.sep).join('/'); todos[rel] = (await stat(r)).size; } await writeFile(path.join(destino, 'paquetes.json'), JSON.stringify(todos)); }
 const archivos = (await listar(destino)).map(r => path.relative(destino, r).split(path.sep).join('/')).filter(r => r !== 'sw.js' && !/^assets\/cielo\/.*-alta\.webp$/.test(r)).sort();   // el cielo grande (solo PC) no se guarda en el teléfono
 // Huella de cada archivo: una actualización solo descarga los paquetes que han cambiado.
@@ -78,35 +79,12 @@ async function completar() {
   await Promise.all(Array.from({ length: 2 }, async () => { while (pendientes.length) { try { await uno(pendientes.shift()); } catch {} } }));
   await c.put(MANIFIESTO, new Response(JSON.stringify(HUELLAS), { headers: { 'Content-Type': 'application/json' } }));
 }
-// Precarga (js/util/precarga.js): durante la pantalla de carga la página manda la lista de lo que aún puede pedir
-// (canciones de los destinos, fuentes, módulos…); aquí se descarga lo que no esté guardado, de tres en tres, se comprueba
-// con su huella y se guarda, avisando a la página de cuánto falta y de cada archivo (para los MB de la barra). Nada de
-// esto pasa por la memoria de la página. Una petición de la página a un archivo que se está descargando aquí espera a esa
-// descarga (enCurso) en lugar de pedirlo otra vez.
+// Una petición de la página a un archivo que el service worker está guardando en ese momento espera a ese guardado en
+// lugar de pedirlo otra vez (enCurso): cada archivo, una sola descarga.
 const enCurso = new Map();
-async function guardarDeRed(c, clave) {
-  if (enCurso.has(clave)) return enCurso.get(clave);
-  const p = (async () => {
-    const r = await fetch(clave, { cache: 'no-cache' }).catch(() => null);
-    if (!r || !r.ok) return false;
-    const h = HUELLAS[clave];
-    if (h !== undefined && await huellaDe(r) !== h) return false;   // de otra versión: no se guarda como de esta
-    await c.put(clave, r); return true;
-  })().finally(() => enCurso.delete(clave));
-  enCurso.set(clave, p); return p;
-}
-async function precargar(lista, puerto) {
-  const c = await caches.open(VERSION), pendientes = [];
-  for (const [ruta, bytes] of lista) { const clave = './' + ruta; if (!(await c.match(clave))) pendientes.push([clave, bytes]); }
-  puerto.postMessage({ tipo: 'plan', archivos: pendientes.length, bytes: pendientes.reduce((a, [, b]) => a + b, 0) });
-  await Promise.all(Array.from({ length: 3 }, async () => { while (pendientes.length) { const [clave, bytes] = pendientes.shift(); let ok = false; try { ok = await guardarDeRed(c, clave); } catch {} puerto.postMessage({ tipo: 'hecho', bytes, ok }); } }));
-  if (!(await c.match(MANIFIESTO))) await c.put(MANIFIESTO, new Response(JSON.stringify(HUELLAS), { headers: { 'Content-Type': 'application/json' } }));
-  puerto.postMessage({ tipo: 'fin' });
-}
 self.addEventListener('message', e => {
   if (e.data === 'aplicar') self.skipWaiting();   // solo cuando quien mira pulsa «Actualizar»
   if (e.data === 'completar') e.waitUntil(completando ||= completar().finally(() => { completando = null; }));
-  if (e.data?.tipo === 'precargar' && e.ports[0]) e.waitUntil(precargar(e.data.lista || [], e.ports[0]));
 });
 self.addEventListener('fetch', e => {
   const peticion = e.request, url = new URL(peticion.url);
@@ -119,11 +97,11 @@ self.addEventListener('fetch', e => {
   // La página y sus paquetes salen siempre de la MISMA versión guardada (nunca se mezclan dos versiones).
   const clave = peticion.mode === 'navigate' ? './' : claveDe(peticion.url);
   const listado = clave && HUELLAS[clave] !== undefined;
-  // (Si la precarga lo está descargando ahora mismo, se espera a ella: una sola descarga.)
+  // (Si se está guardando ahora mismo, se espera a ese guardado: una sola descarga.)
   e.respondWith(caches.open(VERSION).then(c => c.match(clave || peticion, { ignoreSearch: true }).then(r => r || (clave && enCurso.has(clave) ? enCurso.get(clave).then(() => c.match(clave)) : null)).then(r => r || fetch(listado ? new Request(peticion, { cache: 'no-cache' }) : peticion).then(red => {
     // Se guarda según llega (lo listado, revalidado con el servidor; lo que no está en la lista —el cielo grande, solo en
     // el PC— la primera vez que se usa). La página de entrada se guarda al completar.
-    // (Mientras se guarda, la precarga no lo vuelve a pedir: espera a este guardado.)
+    // (Mientras se guarda, otra petición al mismo archivo espera a este guardado.)
     if (red.ok && red.status === 200 && peticion.mode !== 'navigate') { const g = c.put(clave || peticion, red.clone()).then(() => true, () => false); if (clave && !enCurso.has(clave)) { enCurso.set(clave, g); g.finally(() => enCurso.delete(clave)); } }
     return red;
   }))));

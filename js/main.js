@@ -19,9 +19,10 @@ import { cargarContenido, aplicarContenido } from './data/contenido.js';
 import { crearContemplacion } from './ui/contemplacion.js';
 import { crearViaje } from './util/viaje.js';
 import { vigilarPaquetes } from './util/paquetes.js';
-import { precargarTodo } from './util/precarga.js';
+import { precargarEnReposo } from './util/precarga.js';
+import { ocupado, ocupadoSi } from './util/descargas.js';
 import { crearMedidor } from './ui/medidor.js';
-import { cargaTerminada, esMovil } from './util/dispositivo.js';
+import { cargaTerminada, texturasLigeras } from './util/dispositivo.js';
 
 // Medidor de fluidez (?fps, js/util/medidorFps.js): solo se carga con ?fps, antes que nada (cuenta toda subida a la GPU).
 if (new URLSearchParams(location.search).has('fps')) await import('./util/medidorFps.js');
@@ -35,13 +36,12 @@ window.addEventListener('unhandledrejection', e => { console.error('Universo:', 
 const banda = crearBandaSonora({ volumen: () => CONFIG.volumen });
 if (location.hash === '#debug' || new URLSearchParams(location.search).has('pruebaAudio')) window.__bandaSonora = banda;
 // Paquetes guardados en el dispositivo desde el primer momento (también en la primera visita: lo que se descarga se
-// guarda mientras llega, sin descargas de más que compitan con la carga). Nunca recarga la página por sí solo.
-const paquetes = vigilarPaquetes();
-// Y TODO lo demás que la web pueda pedir ya dentro (las canciones de los destinos y sus estancias, fuentes, módulos…) se
-// descarga ya, durante la carga, y cuenta en sus MB: el clip de la intro no empieza hasta tenerlo, y después nada sale a
-// la red (con service worker se guarda en su caché, sin pasar por la memoria de la página).
-let escenaCreada; const trasEscena = new Promise(r => { escenaCreada = r; }); setTimeout(escenaCreada, 30000);
-precargarTodo({ movil: esMovil, servicio: paquetes.servicio, tras: trasEscena });
+// guarda mientras llega). Nunca recarga la página por sí solo.
+vigilarPaquetes();
+// Descargas por prioridad (util/descargas.js): en la carga solo lo imprescindible (módulos, texturas horneadas, cálculos
+// horneados, el cielo mediano y las canciones de la intro y de los viajes). Todo lo demás —las canciones de los destinos y
+// sus estancias, el cielo grande, fuentes, módulos tardíos— va a una cola que solo descarga en los momentos libres
+// después de la intro: nunca durante el clip, un vuelo o un gesto (ocupado()).
 try {
   await cargarContenido();
   if (location.hash === '#borrador') { const borrador = localStorage.getItem('xiomara:contenido-borrador'); if (borrador) aplicarContenido(JSON.parse(borrador)); }
@@ -54,6 +54,10 @@ const progreso = crearProgreso(almacen, texto => interfaz?.avisar(texto));
 const estrellas = estrellasDisponibles(CONFIG.fechaInicio);
 const viaje = crearViaje(almacen);
 const entrada = crearEntrada(CONFIG, { viaje, banda }), musica = crearMusica(CONFIG, banda), mensajes = crearMensajes(CONFIG), efectos = crearEfectos();
+// La carga (y el clip) ocupan la cola hasta que la intro termina; entonces se encola el resto y empieza a bajar en reposo.
+// (La lista se pide ya, en la carga: es pequeña, y así no sale nada a la red si se entra enseguida.)
+const listaReposo = precargarEnReposo({ cieloAlto: !texturasLigeras, cuando: new Promise(r => entrada.trasIntro(r)) });
+entrada.trasIntro(() => listaReposo.finally(() => ocupado('carga', false)));
 crearContador(CONFIG, inicio); crearCarta(CONFIG);
 document.getElementById('saludo-entrada').textContent = saludoMomento();
 const numero = estrellas.filter(s => progreso.tiene('estrellas', s.id)).length;
@@ -80,6 +84,13 @@ try {
   etapa = 'carga de módulos 3D'; entrada.progreso(0.03, 0.08);
   const { crearEscena } = await import('./escena/index.js'); entrada.progreso(0.08);
   etapa = 'creación de la escena 3D';
+  // Un viaje corta lo que la cola esté bajando y la para hasta que aterriza (también el segundo tramo hacia el sistema solar).
+  let mirandoVuelo = 0;
+  const vueloOcupa = () => {
+    ocupado('vuelo', true); clearTimeout(mirandoVuelo);
+    const mirar = () => { if (escena && !escena.viajando && !(escena.restanteViaje > 0)) ocupado('vuelo', false); else mirandoVuelo = setTimeout(mirar, 250); };
+    mirandoVuelo = setTimeout(mirar, 1500);
+  };
   escena = await crearEscena(document.getElementById('galaxia'), {
     config: CONFIG, cantidadSecretas: estrellas.length,
     encontradas: estrellas.flatMap((s, i) => progreso.tiene('estrellas', s.id) ? [i] : []),
@@ -90,12 +101,20 @@ try {
     // La banda sonora funde a la música de los viajes al despegar y a la del destino (o al reposo) al llegar. (Un viaje que
     // cruza al sistema solar sigue siéndolo también en el fundido entre sus dos tramos, restanteViaje: si en ese instante no
     // hay vuelo, la banda no lo da por terminado ni suena la del destino antes de tiempo.)
-    alViajar: id => { interfaz?.situar(id); contemplacion?.despertar(); viaje.anotarDestino(id); banda.viajar(id, { viajando: () => !!escena?.viajando || (escena?.restanteViaje ?? 0) > 0, restante: () => escena?.restanteViaje ?? 0, ceremoniaPendiente: d => d === 'supernova' }); },
+    alViajar: id => { vueloOcupa(); interfaz?.situar(id); contemplacion?.despertar(); viaje.anotarDestino(id); banda.viajar(id, { viajando: () => !!escena?.viajando || (escena?.restanteViaje ?? 0) > 0, restante: () => escena?.restanteViaje ?? 0, ceremoniaPendiente: d => d === 'supernova' }); },
     // El viaje terminó (en este cuadro): la canción del destino y la escena del gigante empiezan a la vez.
     alLlegar: id => { banda.llegada(id); interfaz?.llegada(id); }, alProblema: problema,
     alProgreso: (f, techo) => entrada.progreso(0.08 + 0.92 * f, 0.08 + 0.92 * techo)
   });
-  escenaCreada();   // (sus módulos ya están pedidos: la precarga sigue con lo que no son canciones)
+  // Un vuelo y un gesto (arrastre, pellizco, rueda, con su inercia) ocupan la cola de descargas: nada baja mientras.
+  ocupadoSi(() => !!escena.viajando || escena.restanteViaje > 0);
+  {
+    const lienzo = document.getElementById('galaxia'), dedos = new Set(); let suelta = 0;
+    const soltarLuego = ms => { clearTimeout(suelta); suelta = setTimeout(() => { if (!dedos.size) ocupado('gesto', false); }, ms); };
+    lienzo.addEventListener('pointerdown', e => { dedos.add(e.pointerId); clearTimeout(suelta); ocupado('gesto', true); }, { passive: true });
+    for (const ev of ['pointerup', 'pointercancel']) addEventListener(ev, e => { dedos.delete(e.pointerId); if (!dedos.size) soltarLuego(1500); }, { passive: true });   // (1,5 s: la inercia del giro)
+    lienzo.addEventListener('wheel', () => { ocupado('gesto', true); soltarLuego(1000); }, { passive: true });
+  }
   etapa = 'recuerdos e interfaz';
   const recuerdos = crearRecuerdos(CONFIG, estrellas, progreso, {
     alEncontrar: i => { escena.marcarEstrella(i); navigator.vibrate?.(40); },
@@ -155,8 +174,7 @@ try {
   //  · la carga se da por buena (sin cierre por memoria): si iOS cierra la página en el clip o en la entrada (el pico de
   //    memoria llega ahí, con todo ya en la GPU), la siguiente carga arranca en el modo ligero (dispositivo.js) en lugar de
   //    cerrarse otra vez igual;
-  //  · (nada más que descargar: la precarga ya lo bajó todo durante la carga; antes las canciones de los destinos y el
-  //    resto de paquetes se descargaban aquí, ya dentro, y un viaje podía toparse con su canción aún en camino.)
+  //  · (lo que falta por descargar lo baja la cola en los momentos libres: util/descargas.js.)
   entrada.alEntrarTambien(() => {
     const mirar = () => { if (escena.viajando) { setTimeout(mirar, 500); return; } setTimeout(cargaTerminada, 3000); };
     setTimeout(mirar, 1500);
