@@ -278,6 +278,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   const proyectado = new THREE.Vector3();
   const camaraAntes = new THREE.Vector3();
   let distanciaAnterior = camera.position.distanceTo(controls.target), cuerposLente = null;
+  const rehacerNubesFoco = () => { const l = []; scene.traverse(o => { if (o.userData.volumen3D && !o.userData.brilloPropio && o.material.uniforms?.uBrillo) { o.userData.brilloBase ??= o.material.uniforms.uBrillo.value; l.push({ o, base: o.userData.brilloBase }); } }); nubesFoco = l; };
+  setInterval(() => (window.requestIdleCallback || setTimeout)(rehacerNubesFoco, { timeout: 1000 }), 1500);
   let nubesFoco = null, focoNubes = 1, focoAplicado = false, cieloEscena = 1, focoTon = 0; const tmpFoco = new THREE.Vector3();
   let cometaAntes = null, escalaTiempo = 1;   // escalaTiempo: cámara lenta solo para pruebas (#debug)
   const VELO = { gigante: 0.2, deneb: 0, pulsar: 0, cuasar: 0, ton618: 0, sagitario: 0, supernova: 0, hogar: 0, constelacion: 0.62, calma: 0.45, capsulas: 0.4, suenos: 0.4, cartas: 0.35, rosa: 0.3, azul: 0.32, cometa: 0.2 };
@@ -1322,7 +1324,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // destino y lo oscurecería), así que las nebulosas que no son parte del destino bajan un poco su
     // brillo con suavidad; siguen ahí, con su forma y su color, pero no compiten con el protagonista.
     // Las nebulosas del catálogo se crean al acercarse: la lista se rehace de vez en cuando.
-    if (!nubesFoco || cuadrosDibujados % 90 === 0) { nubesFoco = []; scene.traverse(o => { if (o.userData.volumen3D && !o.userData.brilloPropio && o.material.uniforms?.uBrillo) { o.userData.brilloBase ??= o.material.uniforms.uBrillo.value; nubesFoco.push({ o, base: o.userData.brilloBase }); } }); }
+    // (La lista se rehace fuera del bucle de dibujo, en los ratos libres: recorrer la escena entera cada 90 cuadros eran
+    // varios ms en un móvil, también en pleno viaje.)
+    if (!nubesFoco) rehacerNubesFoco();
     // Del estallido a la revelación de la supernova, el fondo se atenúa: las chispas que forman el corazón no se pierden
     // contra la telaraña ni las nebulosas de esa zona (vuelve a su luz antes de devolver el control).
     const sSN = document.body.classList.contains('supernova-en-escena') ? cosmos.supernova.segundoCancion : null;

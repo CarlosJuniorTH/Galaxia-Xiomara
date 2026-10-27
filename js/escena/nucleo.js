@@ -74,6 +74,7 @@ export function crearNucleo(canvas) {
   const soportaHDR = seleccion.api === 'webgl2'
     ? !!(seleccion.contexto.getExtension('EXT_color_buffer_float') || seleccion.contexto.getExtension('EXT_color_buffer_half_float'))
     : !!seleccion.contexto.getExtension('EXT_color_buffer_half_float');
+  let rtSolar = null, lecturaPrincipal = null, soltarSolar = 0;   // MSAA del sistema solar (fijarEscena)
   let muestrasAA = 0, post = null, bloom = { strength: BRILLO_BASE }, pasadaEscena = null, escenaActiva = scene, salida = null;
   // Lente y salto: ya no son pasadas (salida.js los aplica en la pasada final solo mientras están activos).
   const lente = crearPasadaLente(), salto = crearPasadaSalto();
@@ -166,6 +167,7 @@ export function crearNucleo(canvas) {
     if (!post) return;
     const w = Math.round(innerWidth * pr), h = Math.round(innerHeight * pr);
     for (const rt of [post.renderTarget1, post.renderTarget2]) fijarZona(rt, w, h);
+    seguirSolar();
   }
   function ajustarReserva() {
     if (!post) return;
@@ -204,13 +206,32 @@ export function crearNucleo(canvas) {
   }
 
   // Escena que se dibuja: la principal o la del sistema solar (index.js).
+  // Suavizado de bordes (MSAA) solo en el sistema solar, en un búfer propio que sustituye al de lectura mientras se está
+  // allí (en el sistema solar ninguna pasada intercambia los búferes). Antes se cambiaban las muestras del de lectura y se
+  // rehacía: al entrar se creaban sus búferes MSAA y al salir los normales otra vez, en pleno vuelo (bajo el fundido).
+  // Ahora los de la escena principal no se tocan (al volver no se crea nada) y el MSAA se reserva en el calentamiento de
+  // la carga; en el PC se conserva, en el móvil se suelta al salir (memoria de iOS) y se vuelve a crear al entrar.
   function fijarEscena(otra) {
     escenaActiva = otra; if (pasadaEscena) pasadaEscena.scene = otra;
-    // Suavizado de bordes solo fuera de la escena principal (el sistema solar); el cambio ocurre en el destello del salto.
-    const muestras = otra !== scene ? muestrasAA : 0;
-    // Solo en el búfer donde se dibuja la escena (el de lectura: en el sistema solar no hay pasadas que los intercambien);
-    // antes los dos, el doble de memoria (en un iPhone, del orden de 80 MB más de golpe al entrar).
-    if (post) for (const rt of [post.renderTarget1, post.renderTarget2]) { const m = rt === post.readBuffer ? muestras : 0; if (rt.samples !== m) { rt.samples = m; rt.dispose(); } }
+    if (!post) return;
+    const conAA = otra !== scene && muestrasAA > 0;
+    if (conAA && !lecturaPrincipal) {
+      clearTimeout(soltarSolar);
+      const base = post.readBuffer;
+      if (!rtSolar || rtSolar.width !== base.width || rtSolar.height !== base.height) { rtSolar?.dispose(); rtSolar = base.clone(); rtSolar.samples = muestrasAA; }
+      rtSolar.viewport.copy(base.viewport); rtSolar.scissor.copy(base.scissor); rtSolar.scissorTest = base.scissorTest;
+      lecturaPrincipal = base; post.readBuffer = rtSolar;
+    } else if (!conAA && lecturaPrincipal) {
+      post.readBuffer = lecturaPrincipal; lecturaPrincipal = null;
+      if (esMovil) soltarSolar = setTimeout(() => { if (!lecturaPrincipal) { rtSolar?.dispose(); rtSolar = null; } }, 20000);
+    }
+  }
+  // Tras cambiar el tamaño o la zona estando en el sistema solar, el búfer MSAA sigue al de lectura.
+  function seguirSolar() {
+    if (!lecturaPrincipal) return;
+    const base = lecturaPrincipal;
+    if (rtSolar.width !== base.width || rtSolar.height !== base.height) rtSolar.setSize(base.width, base.height);
+    rtSolar.viewport.copy(base.viewport); rtSolar.scissor.copy(base.scissor);
   }
   return { renderer, scene, camera, controls, composer, bloom, fijarEscena, get escenaActiva() { return escenaActiva; }, get lente() { return lente; }, get post() { return post; }, get salto() { return salto; }, uScale, uPR, uTamGalaxia, redimensionar, fijarResolucion,
     get resolucion() { return pr; }, prMaximo, get prTope() { return pr; }, get resolucionLienzo() { return prLienzo(); } };

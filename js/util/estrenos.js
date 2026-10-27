@@ -11,6 +11,7 @@ export const TIPOS_ESTRENO = Object.freeze(['compilacion', 'textura', 'subida', 
 
 export function vigilarEstrenos(gl) {
   const total = {}, enMovimiento = {}, ultimos = [];
+  const pila = typeof location !== 'undefined' && location.hash === '#debug';
   for (const t of TIPOS_ESTRENO) { total[t] = 0; enMovimiento[t] = 0; }
   const registro = { momento: '', total, enMovimiento, ultimos };
   const anotar = (tipo, bytes = 0) => {
@@ -18,6 +19,8 @@ export function vigilarEstrenos(gl) {
     const momento = registro.momento;
     if (momento) enMovimiento[tipo]++;
     const ev = { tipo, momento, bytes, t: Math.round(performance.now()) };
+    // Con #debug, de dónde viene cada estreno en movimiento (para encontrarlo): las primeras líneas de la pila propias.
+    if (momento && pila) ev.pila = (new Error().stack || '').split('\n').filter(l => /\/js\//.test(l) && !/estrenos\.js/.test(l)).slice(0, 4).map(l => l.trim().replace(/^at /, '').replace(/https?:\/\/[^/]+\//, '')).join(' < ');
     if (momento || ultimos.length < 400) { ultimos.push(ev); if (ultimos.length > 600) ultimos.splice(0, 200); }
     try { window.__medidor?.registrar?.(ev); } catch {}
   };

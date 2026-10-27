@@ -138,6 +138,24 @@ export function crearCampoGalaxias({ lista, texturas, descriptores, uPR }) {
   // Las estrellas ya creadas se guardan (las ~60 últimas galaxias): si se vuelve a acercar, reaparecen sin recalcular ni
   // crear memoria nueva (antes, girando cerca de un gigante se creaban y borraban miles de estrellas en cada cuadro).
   const guardadas = new Map(), GUARDAR = 60, pendientes = new Map();
+  // Reserva de geometrías para las estrellas de cerca (GUARDAR guardadas + las que se ven a la vez): se crean aquí y se
+  // suben a la GPU en la carga (están en la escena, ocultas, y la carga lo dibuja todo una vez). Al acercarse a una galaxia
+  // se rellena un hueco (bufferSubData) en vez de crear búferes nuevos durante el vuelo.
+  const N_ESTRELLAS = lista.reduce((m, g) => Math.max(m, g.puntos || 0), 0), RESERVA = N_ESTRELLAS ? GUARDAR + 24 : 0;
+  const nuevaGeometria = (n, pos, col, radio, tam, r) => {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
+    geo.setAttribute('aRadio', new THREE.BufferAttribute(radio, 1)); geo.setAttribute('aTam', new THREE.BufferAttribute(tam, 1));
+    geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), r * 1.2);
+    const pts = new THREE.Points(geo, mat); pts.renderOrder = -2; pts.matrixAutoUpdate = false; return pts;
+  };
+  const libres = [];
+  for (let k = 0; k < RESERVA; k++) {
+    const n = N_ESTRELLAS, pts = nuevaGeometria(n, new Float32Array(n * 3), new Float32Array(n * 3), new Float32Array(n), new Float32Array(n), 1);
+    for (const at of Object.values(pts.geometry.attributes)) at.setUsage(THREE.DynamicDrawUsage);
+    pts.userData.reserva = true; pts.visible = false; pts.frustumCulled = false; grupo.add(pts); libres.push(pts);
+  }
+  const hueco = n => { if (n > N_ESTRELLAS) return null; const pts = libres.pop() ?? null; if (pts) pts.frustumCulled = true; return pts; };
   // Generar las 1950 estrellas de una galaxia cuesta varios ms con la CPU de un móvil (decenas la primera vez, con el
   // código aún sin optimizar): en pleno viaje era un tirón cada vez que una galaxia cruzaba los 24 px. Ahora se generan a
   // trozos (un generador que cede cada 128 estrellas) repartidos en varios cuadros con un presupuesto fijo (actualizar);
@@ -145,7 +163,7 @@ export function crearCampoGalaxias({ lista, texturas, descriptores, uPR }) {
   function crearEstrellas(g) { return deUnTiron(generarEstrellas(g)); }
   function* generarEstrellas(g) {
     const vieja = guardadas.get(g.id);
-    if (vieja) { guardadas.delete(g.id); grupo.add(vieja); g.estrellas = vieja; activas.add(g); g.flujoEstrellas = vieja.userData.flujo; const ab = g.instancia.im.geometry.attributes.aBeta; ab.array[g.instancia.i] = vieja.userData.beta; ab.needsUpdate = true; return vieja; }
+    if (vieja) { guardadas.delete(g.id); if (vieja.parent !== grupo) grupo.add(vieja); vieja.visible = true; g.estrellas = vieja; activas.add(g); g.flujoEstrellas = vieja.userData.flujo; const ab = g.instancia.im.geometry.attributes.aBeta; ab.array[g.instancia.i] = vieja.userData.beta; ab.needsUpdate = true; return vieja; }
     const rnd = generador(semillaDe(`estrellas-${g.id}`)), n = g.puntos;
     const d = descriptores[g.textura ?? g.tipo] ?? descriptores[0], cols = (PALETAS_GALAXIA[d.paleta] || PALETAS_GALAXIA.clasica).map(x => new THREE.Color(...x));
     const pos = new Float32Array(n * 3), col = new Float32Array(n * 3), radio = new Float32Array(n).fill(g.radio), tam = new Float32Array(n);
@@ -169,20 +187,23 @@ export function crearCampoGalaxias({ lista, texturas, descriptores, uPR }) {
     if (beta > BETA_MAX) { const k = BETA_MAX / beta; for (let j = 0; j < col.length; j++) col[j] *= k; flujo *= k; beta = BETA_MAX; }
     const a = g.instancia.im.geometry.attributes.aBeta; a.array[g.instancia.i] = beta; a.needsUpdate = true;
     g.flujoEstrellas = flujo;
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
-    geo.setAttribute('aRadio', new THREE.BufferAttribute(radio, 1)); geo.setAttribute('aTam', new THREE.BufferAttribute(tam, 1));
-    geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), g.radio * 1.2);
-    const pts = new THREE.Points(geo, mat); pts.position.copy(g.pos); pts.renderOrder = -2; pts.userData.galaxia = g.id;
-    pts.matrixAutoUpdate = false; pts.updateMatrix();
-    grupo.add(pts); g.estrellas = pts; activas.add(g);
-    return pts;
+    // En un hueco de la reserva (búferes ya en la GPU desde la carga): solo se actualizan sus datos, sin crear geometría en
+    // pleno viaje (antes, cuatro bufferData por galaxia que crecía en pantalla). Sin hueco libre, una nueva (como antes).
+    const pts = hueco(n);
+    if (pts) { const at = pts.geometry.attributes; at.position.array.set(pos); at.aColor.array.set(col); at.aRadio.array.set(radio); at.aTam.array.set(tam);
+      for (const k of ['position', 'aColor', 'aRadio', 'aTam']) at[k].needsUpdate = true; pts.geometry.setDrawRange(0, n); pts.geometry.boundingSphere.radius = g.radio * 1.2; }
+    const usar = pts ?? nuevaGeometria(n, pos, col, radio, tam, g.radio);
+    usar.position.copy(g.pos); usar.userData.galaxia = g.id; usar.updateMatrix(); usar.visible = true;
+    if (usar.parent !== grupo) grupo.add(usar);
+    g.estrellas = usar; activas.add(g);
+    return usar;
   }
   function liberarEstrellas(g) {
-    if (!g.estrellas) return; const pts = g.estrellas; grupo.remove(pts); g.estrellas = null; activas.delete(g);
+    if (!g.estrellas) return; const pts = g.estrellas; g.estrellas = null; activas.delete(g);
+    if (pts.userData.reserva) pts.visible = false; else grupo.remove(pts);
     pts.userData.flujo = g.flujoEstrellas; pts.userData.beta = g.instancia.im.geometry.attributes.aBeta.array[g.instancia.i];
     guardadas.set(g.id, pts);
-    if (guardadas.size > GUARDAR) { const [id, viejo] = guardadas.entries().next().value; guardadas.delete(id); viejo.geometry.dispose(); }
+    if (guardadas.size > GUARDAR) { const [id, viejo] = guardadas.entries().next().value; guardadas.delete(id); if (viejo.userData.reserva) libres.push(viejo); else viejo.geometry.dispose(); }
   }
   // ── Muy lejos: luz no resuelta. Un punto por galaxia, en su centro, con el FLUJO de su propia
   // imagen (color medio × área proyectada, que crece con px² y con el coseno de su inclinación):
