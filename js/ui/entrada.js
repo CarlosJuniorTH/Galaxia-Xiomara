@@ -37,22 +37,23 @@ export function crearEntrada(config, { viaje, banda } = {}) {
   // Reloj del clip: el de la canción llevado al del clip (reescalar). Si la canción no avanza en 1,5 s de cuadros (no
   // arrancó, se cortó), sigue con un reloj propio desde ese punto. El propio avanza con los cuadros (tope 0,1 s): con
   // la pestaña oculta se para, igual que la canción.
-  let propio = null, ultimo = null, ultimoS = null, quieto = 0, ultimoT = 0, antes = 0, fijo = null;
+  // El clip no empieza a correr hasta que la canción suena DE VERDAD (en el móvil, sobre todo Safari, tarda unas décimas en
+  // arrancar): mientras, se queda en su primer cuadro (así se ve entero desde el principio, sin adelantarse a la música).
+  // Si la canción se para un rato, sigue con su propio reloj, pero en cuanto vuelve a avanzar se vuelve a pegar a ella
+  // (antes, una vez suelto, ya no volvía: el clip y la música quedaban descuadrados hasta el final).
+  let ultimo = null, ultimoS = null, quieto = 0, ultimoT = 0, antes = 0, fijo = null, arrancada = false, esperaArranque = 0;
   function relojClip() { return ultimo = relojAhora(); }
   function relojAhora() {
     if (fijo !== null) return fijo;
     if (!empezado) return null;
     const ahora = performance.now(), dt = Math.min(0.1, Math.max(0, (ahora - antes) / 1000)); antes = ahora;
-    if (propio === null && conCancion) {
+    if (conCancion) {
       const s = banda.tiempo('inicio');
-      if (s !== null) {
-        if (s !== ultimoS) { ultimoS = s; quieto = 0; } else quieto += dt;
-        if (quieto < 1.5) return ultimoT = reescalar(s, marcas, HITOS);
-      }
-      propio = ultimoT;
+      if (s !== null && s !== ultimoS) { if (ultimoS !== null && s > ultimoS) arrancada = true; ultimoS = s; quieto = 0; } else quieto += dt;
+      if (!arrancada) { esperaArranque += dt; if (esperaArranque < 3) return ultimoT = 0; }   // (como mucho 3 s esperando)
+      else if (s !== null && quieto < 0.5) return ultimoT = reescalar(s, marcas, HITOS);
     }
-    if (propio === null) propio = 0;
-    return propio += dt;
+    return ultimoT += dt;
   }
 
   function mostrarTarjeta() {

@@ -1119,6 +1119,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       camera.lookAt(OBJETIVO);
     } else if (vuelo) {
       if (!pausa) {
+        // El viaje va con el reloj de verdad (cuadros largos de hasta 0,25 s cuentan enteros): en un móvil a tirones dura lo
+        // previsto y la música de los viajes, que acaba en la llegada, no se queda corta (sin cambiar su velocidad).
+        const dt = modo === 'quieto' ? 0 : Math.min(0.25, dtReal) * escalaTiempo;
         vuelo.real = (vuelo.real ?? vuelo.transcurrido) + dt;
         // Saltar el viaje: el resto del crucero se recorre en unos segundos (vuelo.js, saltar).
         if (vuelo.saltoPedido && vuelo.plan && vuelo.transcurrido >= vuelo.plan.ruptura[0]) { vuelo.salto = vuelo.plan.saltar(vuelo.transcurrido, movimientoReducido ? 1.5 : 2.5); vuelo.salto0 = vuelo.real - dt; vuelo.saltoPedido = false; }   // salto0: el instante del cuadro anterior (sin un cuadro quieto)

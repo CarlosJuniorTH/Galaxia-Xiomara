@@ -52,9 +52,9 @@ export default async function ({ base, informe }) {
     informe.comprobar(R.saltos.length >= 1 && R.saltos.every(s => s.g < 0.1), 'al encadenar viajes salta de segundo en silencio (baja, salta y vuelve a subir), nunca a plena voz', R.saltos);
     // Sincronía: en cada viaje, del segundo 2 hasta medio segundo antes de llegar, suena y segundo + restante = 15.
     const malas = [], calladas = [];
-    for (const [a, b] of tramos) for (const m of R.muestras) {
+    for (const [k, [a, b]] of tramos.entries()) for (const m of R.muestras) {
       if (m.t < a + 2000 || m.t > b - 600 || !m.v || m.r < 0.6) continue;
-      if (!m.s || m.o !== 'viajes') calladas.push({ t: Math.round(m.t - a), o: m.o }); else if (Math.abs(m.tv + m.r - 15) > 0.4) malas.push(+(m.tv + m.r).toFixed(2));
+      if (!m.s || m.o !== 'viajes') calladas.push({ viaje: k, t: Math.round(m.t - a), o: m.o, r: +m.r.toFixed(1) }); else if (Math.abs(m.tv + m.r - 15) > 0.4) malas.push(+(m.tv + m.r).toFixed(2));
     }
     informe.comprobar(calladas.length === 0, 'durante todo el viaje suena la música de los viajes', calladas.slice(0, 5));
     informe.comprobar(malas.length === 0, 'y su segundo + lo que queda de viaje = 15 (acaba justo al llegar), con la CPU ×' + CPU, malas.slice(0, 8));
