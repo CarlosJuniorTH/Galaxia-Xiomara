@@ -25,6 +25,8 @@ const SILENCIO = (() => {
 // ahí (sin red) al viajar hacia su destino.
 const CON_LA_CARGA = new Set(['inicio', 'viajes']);
 const FUNDIDO_ESTANCIA = 3;   // de la canción de un lugar a su versión instrumental (estancia): más lento, sin que se note
+// WebKit (Safari y todo navegador de iOS): sin cambiar playbackRate sobre la marcha (da golpes en el audio).
+const SIN_RITMO = (() => { const n = globalThis.navigator, ua = n?.userAgent || ''; return /iP(hone|ad|od)/.test(ua) || (/Macintosh/.test(ua) && n.maxTouchPoints > 1) || (/AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg|Android/.test(ua)); })();
 
 export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
   const { carpeta, momentos } = configuracionActiva();
@@ -100,7 +102,14 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
     const el = p.el = new Audio(); el.preload = p.contar ? 'auto' : 'metadata'; el.loop = !!p.conf.bucle; el.setAttribute('playsinline', '');
     p.ganancia = ctx.createGain(); p.ganancia.gain.value = 0;
     ctx.createMediaElementSource(el).connect(p.ganancia); p.ganancia.connect(maestro);
-    el.addEventListener('ended', () => { p.sonando = false; p.fin = { t: duracionDe(p) || el.currentTime, en: performance.now() }; if (objetivo === p.nombre) despues(p); });
+    // (Un «ended» que llega tarde —la pista ya se volvió a situar y suena: la de los viajes acaba justo al llegar y el viaje
+    // siguiente la arranca en ese instante— no cuenta: antes llevaba al reposo y el viaje entero se quedaba sin su música.
+    // La de los viajes tampoco pasa sola al reposo: de su final se encarga la llegada.)
+    el.addEventListener('ended', () => {
+      if (!el.ended) return;
+      p.sonando = false; p.fin = { t: duracionDe(p) || el.currentTime, en: performance.now() };
+      if (objetivo === p.nombre && !p.conf.hastaLlegar) despues(p);
+    });
     el.addEventListener('error', () => { if (!p.conSilencio && p.estado === 'lista') { p.estado = 'fallo'; console.warn(`Banda sonora: «${p.nombre}» no se puede reproducir en este navegador.`); if (objetivo === p.nombre) ir('reposo'); } });
     if (p.blobUrl) el.src = p.blobUrl;
   }
@@ -200,20 +209,25 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
     }
     if (!alguna) { clearInterval(vigia); vigia = 0; }
   }
-  // La música de los viajes acaba en la llegada aunque el viaje no vaya al ritmo del reloj (el vuelo avanza por cuadros
-  // y un cuadro largo de más de 65 ms no cuenta entero: en un móvil a tirones el viaje puede llegar tarde y la canción
-  // se acabaría antes). Cada 120 ms se compara el segundo de la
-  // canción con el que debería llevar (duración − lo que le queda al viaje): una diferencia pequeña se corrige sin que se
-  // note cambiando un poco la velocidad (±6 %, sin cambiar el tono); una grande, con un salto bajo un fundido corto.
+  // La música de los viajes acaba en la llegada aunque el viaje no vaya al ritmo del reloj (un móvil a tirones). Cada
+  // 120 ms se compara el segundo de la canción con el que debería llevar (duración − lo que le queda al viaje): una
+  // diferencia pequeña se corrige sin que se note cambiando un poco la velocidad (±6 %, sin cambiar el tono); una grande,
+  // con un salto bajo un fundido corto. En Safari/iOS cambiar playbackRate mientras suena da golpes y cortes: allí la
+  // velocidad no se toca nunca y solo se salta bajo el fundido, como mucho cada 2,5 s.
   function acompasar(m, restante) {
     if (!m.el || m.el.paused || m.estado !== 'lista' || m.conSilencio || m.saltando) return;
     const dur = duracionDe(m) || 15, deberia = dur - restante, error = m.el.currentTime - deberia;
     if (restante <= 0.3 || deberia < 0) { ritmo(m, 1); return; }
+    if (SIN_RITMO) {
+      const ahora = performance.now();
+      if (Math.abs(error) > 0.3 && ahora - (m.ultimoSalto || 0) > 2500) { m.ultimoSalto = ahora; saltarConFundido(m, Math.max(0, deberia + 0.2)); }
+      return;
+    }
     if (Math.abs(error) > 1.2) { ritmo(m, 1); saltarConFundido(m, Math.max(0, deberia)); return; }
     ritmo(m, Math.abs(error) < 0.06 ? 1 : Math.max(0.94, Math.min(1.06, 1 - error * 0.2)));
   }
   function ritmo(p, r) {
-    if (!p.el || Math.abs(p.el.playbackRate - r) < 0.004) return;
+    if (!p.el || (SIN_RITMO && r !== 1) || Math.abs(p.el.playbackRate - r) < 0.004) return;
     p.ancla = null; p.el.preservesPitch = true; p.el.playbackRate = r;
   }
   // Al acabar un fragmento: su estancia, si la tiene (fundido de 3 s), y si no (o al acabar la estancia), el reposo.
