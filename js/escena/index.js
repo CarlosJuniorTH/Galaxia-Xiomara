@@ -30,7 +30,7 @@ import { matricesSoloVisibles, actualizarVisibles } from './matrices.js';
 import { crearRutas } from './camara/rutas.js';
 import { construirMaravillas } from './maravillas.js';
 import { crearPolvo } from './polvo.js';
-import { texturasListas, texturasTodas, subirAlLlegar } from './fabricaTexturas.js';
+import { texturasListas, texturasTodas, subirAlLlegar, texturasTardiasEnReposo } from './fabricaTexturas.js';
 import { hornoListo, soltarHorno } from '../util/horno.js';
 import { DESTINOS, LEJANOS, ZONAS_LUGARES } from '../data/universo.js';
 import { encuadreHogar, escalaSimbolos, desplazamientoZonaLibre, compensacionPuntos, distanciaDestino, correccionAlLlegar, cambioInterfazApreciable } from '../util/encuadre.js';
@@ -354,6 +354,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     await calentar();
     // Y a tamaño real, con todas las pasadas, en la pose de llegada de cada destino (carga/preparacion.js).
     pasos.paso = 'calentar destinos'; const ensayo = await calentarDestinos(); if (diagnosticar) canvas.dataset.calentamiento = JSON.stringify(ensayo);
+    // Lo que aún no ha llegado y no bloquea la carga (nebulosas de fondo, planetas del sistema solar) se rellena y se sube a
+    // la GPU en momentos libres tras la intro (cuandoLibre), nunca en un vuelo, un clip o un gesto.
+    texturasTardiasEnReposo();
     soltarHorno(); avance(1);
   })();
   let vuelo = null, tiempo = 0, tEntrada = null, prev = performance.now(), pulso = 0, suspendida = false, cercaUniverso = Infinity, estrellasLocales = -1;

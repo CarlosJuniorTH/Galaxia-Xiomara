@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { GENERADORES } from './texturasPlaneta.js';
 import { conDiagnostico } from '../util/diag.js';
 import { huellaTextura } from './huellaTextura.js';
-import { descargas } from '../util/descargas.js';
+import { descargas, cuandoLibre } from '../util/descargas.js';
 import { esMovil, texturasLigeras } from '../util/dispositivo.js';
 
 // Texturas HORNEADAS (scripts/hornear-texturas.mjs): las mismas, ya calculadas, en imágenes WebP sin pérdidas. Se descargan
@@ -158,7 +158,9 @@ function dataTextura(ancho, alto) {
 }
 // Quien sube las texturas a la GPU en cuanto llegan (index.js, con el renderizador): así las que sueltan su copia
 // (liberable) la sueltan ya en la carga, y no se acumulan todas en memoria hasta el final (pico de memoria del iPhone).
-let alLlegar = null;
+let alLlegar = null, tardias = false;
+// Desde aquí (fin de la carga y de su calentamiento, index.js), las texturas que no bloquean se aplican en momentos libres.
+export function texturasTardiasEnReposo() { tardias = true; }
 export function subirAlLlegar(fn) { alLlegar = fn; }
 const comoBytes = d => (d instanceof Uint8Array ? d : new Uint8Array(d.buffer, d.byteOffset, d.byteLength));
 
@@ -179,6 +181,12 @@ export function texturaPlaneta(tipo, opciones, { claves = ['pixeles'], relleno =
     let hecho = false;
     const pedido = { tipo, opciones, resolver: datos => {
       if (hecho) return; hecho = true;
+      // Una que no bloquea y llega cuando la carga ya terminó (el cielo de fondo, los planetas del sistema solar): se rellena
+      // y se sube a la GPU en un momento libre (cuandoLibre), nunca durante un vuelo, un clip o un gesto.
+      if (!bloquea && tardias) { cuandoLibre(() => aplicar(datos)).catch(() => aplicar(datos)); return; }
+      aplicar(datos);
+    } };
+    const aplicar = datos => {
       try {
         for (const c of claves) { const t = texturas[c], n = ancho * alto * 4; if (!datos?.[c] || datos[c].length !== n) throw new Error(`${clave}: datos que no encajan (${datos?.[c]?.length} para ${n})`);
           t.image.data = comoBytes(datos[c]); t.needsUpdate = true; t.userData.lista = performance.now(); if (liberable) t.onUpdate = soltarCopia; }
@@ -186,7 +194,7 @@ export function texturaPlaneta(tipo, opciones, { claves = ['pixeles'], relleno =
       for (const c of claves) if (!texturas[c].image.data) rellenar(texturas[c], relleno);   // (la que no llegó: su color de relleno)
       if (alLlegar) for (const c of claves) { try { alLlegar(texturas[c]); } catch (e) { console.warn('Textura', e); } }
       enCurso.delete(marca); resolve();
-    } };
+    };
     const enviar = () => { iniciarObreros(); (bloquea ? colaBloquea : colaResto).push(pedido); despachar(); };
     // Horneada si está (se descarga); si no, a la cola de cálculo (las que no bloquean, detrás de las imprescindibles).
     const h = huellaTextura(tipo, opciones);
