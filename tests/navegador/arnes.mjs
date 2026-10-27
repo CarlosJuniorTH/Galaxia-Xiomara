@@ -30,12 +30,16 @@ export const PERFILES = {
 };
 
 let servidor = null;
+// Registro de peticiones del servidor (una línea por petición, también las del service worker): alRegistroServidor(fn)
+// recibe cada trozo de texto tal cual llega (tests/navegador/recorrido.mjs cuenta así lo que se descarga y cuándo).
+const oyentesRegistro = new Set();
+export const alRegistroServidor = fn => { oyentesRegistro.add(fn); return () => oyentesRegistro.delete(fn); };
 export async function arrancarServidor(puerto = Number(process.env.PUERTO_PRUEBAS || 8091)) {
   if (process.env.BASE) return process.env.BASE;
   servidor = spawn('python3', [path.join(RAIZ, 'scripts/servir.py'), '--port', String(puerto)], { cwd: RAIZ, stdio: ['ignore', 'pipe', 'pipe'] });
   // El registro de peticiones sale por stderr: si nadie lo lee, al llenarse la tubería (~64 KB) el servidor se bloquea y
   // las páginas siguientes no cargan (pasaba tras varias visitas seguidas en la misma ejecución).
-  servidor.stderr.resume();
+  servidor.stderr.on('data', d => { const texto = String(d); for (const f of oyentesRegistro) f(texto); });
   await new Promise((ok, mal) => { const t = setTimeout(() => mal(new Error('el servidor de pruebas no arrancó')), 10000); servidor.stdout.on('data', d => { if (String(d).includes('Universo listo')) { clearTimeout(t); ok(); } }); servidor.on('exit', c => mal(new Error('servidor terminado: ' + c))); });
   return `http://127.0.0.1:${puerto}`;
 }

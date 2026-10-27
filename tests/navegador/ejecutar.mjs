@@ -9,7 +9,9 @@ const DIR = path.dirname(fileURLToPath(import.meta.url));
 process.chdir(path.resolve(DIR, '../..'));
 mkdirSync('.pruebas/capturas/navegador', { recursive: true });
 const pedidos = process.argv.slice(2);
-const casos = readdirSync(DIR).filter(f => f.endsWith('.mjs') && !['arnes.mjs', 'ejecutar.mjs'].includes(f)).map(f => f.replace('.mjs', '')).filter(c => !pedidos.length || pedidos.includes(c));
+// (recorrido y capturasRendimiento duran media hora: solo si se piden por su nombre)
+const A_PEDIDO = ['recorrido', 'capturasRendimiento'];
+const casos = readdirSync(DIR).filter(f => f.endsWith('.mjs') && !['arnes.mjs', 'ejecutar.mjs'].includes(f)).map(f => f.replace('.mjs', '')).filter(c => pedidos.length ? pedidos.includes(c) : !A_PEDIDO.includes(c));
 const base = await arrancarServidor();
 let fallos = [];
 try {

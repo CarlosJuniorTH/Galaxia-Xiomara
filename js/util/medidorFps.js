@@ -29,7 +29,7 @@ const loafs = [];          // { t, dur, bloqueo, script }
 const desfases = [];       // [t, ms, fuente]
 const tramos = [];         // { nombre, inicio, fin }
 let actual = null, ultimoDesfaseExterno = -Infinity;
-const ev = (tipo, datos) => { if (eventos.length < 300000) eventos.push({ t: +ahora().toFixed(1), tipo, ...datos }); };
+const ev = (tipo, datos) => { if (eventos.length < 300000) eventos.push({ t: ahora(), tipo, ...datos }); };
 
 // ── WebGL: dibujo, subidas, compilaciones y tiempos de GPU ──────────────────────────────────────────────────────────────
 let dibujado = false, llamadas = 0, triangulos = 0, puntos = 0, mejorVp = 0, mejorVpLlamadas = 0, vpLlamadas = 0, vpActual = 0;
@@ -118,7 +118,7 @@ function vigilarMedio(el) {
   const corte = motivo => { const n = nombrePista(el); if (sono && !el.paused && n !== 'silencio' && el.readyState < 3) ev('corte', { pista: n, motivo, segundo: +el.currentTime.toFixed(3) }); };
   el.addEventListener('waiting', () => corte('waiting'));
   el.addEventListener('stalled', () => corte('stalled'));
-  el.addEventListener('ended', () => ev('fin', { pista: nombrePista(el) }));
+  el.addEventListener('ended', () => { const n = nombrePista(el); if (n === 'viajes') finViajes = ahora(); ev('fin', { pista: n }); });
 }
 if (globalThis.HTMLMediaElement) {
   const P = HTMLMediaElement.prototype;
@@ -142,13 +142,15 @@ try {
 }
 
 // ── Bucle: un registro por cuadro dibujado ──────────────────────────────────────────────────────────────────────────────
-let escena = null, tUltimo = null, audioPrevio = null, viajandoAntes = false, finViajes = -Infinity, interna = '', lienzo = '';
+let escena = null, tUltimo = null, audioPrevio = null, introPrevio = null, viajandoAntes = false, finViajes = -Infinity, interna = '', lienzo = '';
 function desfaseAuto(t) {
   if (t - ultimoDesfaseExterno < 500) return;
   const I = window.__intro;
-  if (I?.empezado && I.conCancion && I.tiempo != null && document.getElementById('entrada')?.classList.contains('clip')) {
-    // El clip dibujó este valor en el cuadro anterior (su callback va después del nuestro): con el audio de entonces.
-    if (audioPrevio && audioPrevio[0] === 'inicio') desfases.push([t, +((I.tiempo - audioPrevio[1]) * 1000).toFixed(1), 'intro']);
+  if (I?.empezado && I.conCancion && I.tiempo != null && !document.body.classList.contains('dentro')) {
+    // El clip dibujó este valor en el cuadro anterior (su callback va después del nuestro): con el audio de entonces. Solo
+    // si de verdad dibujó (su reloj cambió): con la tarjeta ya quieta no hay imagen que comparar.
+    const nuevo = I.tiempo !== introPrevio; introPrevio = I.tiempo;
+    if (nuevo && audioPrevio && audioPrevio[0] === 'inicio') desfases.push([t, +((I.tiempo - audioPrevio[1]) * 1000).toFixed(1), 'intro']);
     const el = medios.get('inicio'); audioPrevio = el && !el.paused && !el.seeking ? ['inicio', el.currentTime] : null; return;
   }
   audioPrevio = null;
@@ -168,7 +170,6 @@ function vigilarLlegada(t) {
   }
   viajandoAntes = v;
 }
-addEventListener('ended', e => { if (e.target instanceof HTMLMediaElement && nombrePista(e.target) === 'viajes') finViajes = ahora(); }, true);
 function cuadro(t) {
   requestAnimationFrame(cuadro);
   leerGPU();
