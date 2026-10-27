@@ -75,7 +75,7 @@ const COMPONER = opaco => /* glsl */`
     gl_FragColor = suma / peso * uAtenuar;
   }`;
 
-export function crearCapaVolumen({ scene, renderer, uPR, hdr }) {
+export function crearCapaVolumen({ scene, renderer, uPR, hdr, sinProfundidad = false }) {
   const tipo = hdr ? THREE.HalfFloatType : THREE.UnsignedByteType;
   const lineal = t => { t.texture.minFilter = t.texture.magFilter = THREE.LinearFilter; t.texture.generateMipmaps = false; return t; };
   const rt = lineal(new THREE.WebGLRenderTarget(1, 1, { type: tipo, depthBuffer: true }));
@@ -95,11 +95,12 @@ export function crearCapaVolumen({ scene, renderer, uPR, hdr }) {
   const pieza = (opaco) => {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ uniforms: uC,
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 1.0, 1.0); }', fragmentShader: COMPONER(opaco),
-      transparent: true, depthTest: true, depthWrite: false, depthFunc: opaco ? THREE.GreaterDepth : THREE.LessEqualDepth,
+      transparent: true, depthTest: !sinProfundidad, depthWrite: false, depthFunc: opaco ? THREE.GreaterDepth : THREE.LessEqualDepth,
       blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendEquation: THREE.AddEquation }));
     m.frustumCulled = false; m.renderOrder = -3; return m;
   };
-  const compuesto = new THREE.Group(); compuesto.add(pieza(false), pieza(true));
+  // (Dibujando directamente en un lienzo sin profundidad, el último recurso, una sola pieza sin clases, como antes.)
+  const compuesto = new THREE.Group(); compuesto.add(pieza(false)); if (!sinProfundidad) compuesto.add(pieza(true));
   compuesto.name = 'Gas volumétrico (capa reducida y reconstruida)'; scene.add(compuesto);
 
   const muestra = new THREE.Mesh(new THREE.PlaneGeometry(1e-3, 1e-3)); muestra.frustumCulled = false;

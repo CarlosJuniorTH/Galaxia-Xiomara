@@ -22,7 +22,7 @@ export default async function ({ base, informe }) {
       mips.setSize(W, H); orig.setSize(W, H); orig.blendMaterial.colorWrite = false;
       const correr = () => { mips.render(renderer, null, fuente); orig.render(renderer, null, fuente, 0, false); return [leer(mips.salida), leer(orig.renderTargetsHorizontal[0])]; };
       // 1) Una estrella (un píxel muy brillante): perfil por anillos alrededor de ella.
-      dibujar([[W / 2, H / 2, 400]]);
+      dibujar([[W / 2, H / 2, 40]]);   // (por debajo del tope del HDR, 64, que el original de antes también aplicaba)
       const [a, b] = correr(), cx = a.w / 2, cy = a.h / 2, radios = [1, 2, 4, 8, 16, 32, 64, 128, 256];
       const anillos = ({ b: d, w, h }) => { const out = new Array(radios.length).fill(0); let total = 0;
         for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const v = d[(y * w + x) * 4 + 1], r = Math.hypot(x + 0.5 - cx, y + 0.5 - cy); total += v; const i = radios.findIndex(R => r < R); if (i >= 0) out[i] += v; }

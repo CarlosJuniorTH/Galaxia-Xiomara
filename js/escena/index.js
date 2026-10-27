@@ -34,7 +34,7 @@ import { texturasListas, texturasTodas, subirAlLlegar } from './fabricaTexturas.
 import { hornoListo, soltarHorno } from '../util/horno.js';
 import { DESTINOS, LEJANOS, ZONAS_LUGARES } from '../data/universo.js';
 import { encuadreHogar, escalaSimbolos, desplazamientoZonaLibre, compensacionPuntos, distanciaDestino, correccionAlLlegar, cambioInterfazApreciable } from '../util/encuadre.js';
-import { esMovil } from '../util/dispositivo.js';
+import { esMovil, modoCompatible } from '../util/dispositivo.js';
 import { crearPlanificador } from '../util/planificador.js';
 import { MUESTRAS as muestrasNube } from './nube.js';
 import { crearGiro } from '../util/giro.js';
@@ -298,8 +298,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   scene.traverse(o => { if (o.isLight && !o.isAmbientLight && o.parent !== scene) lucesFijas.push(o); });
   for (const luz of lucesFijas) { const ancla = new THREE.Object3D(); ancla.position.copy(luz.position); luz.parent.add(ancla); luz.removeFromParent(); scene.add(luz); luz.userData.ancla = ancla; }
   const seguirLuces = () => { for (const luz of lucesFijas) { const a = luz.userData.ancla; let o = a; while (o && o.visible) o = o.parent; if (!o) luz.position.setFromMatrixPosition(a.matrixWorld); } };
-  // Gas volumétrico a media resolución (capaVolumen.js): las nebulosas con volumen se pintan en su propia capa.
-  const capaVolumen = crearCapaVolumen({ scene, renderer, uPR: nucleo.uPR, prTope: nucleo.prTope, hdr: canvas.dataset.brillo3d === 'hdr' });
+  // Gas volumétrico a resolución reducida y reconstruido (capaVolumen.js): las nebulosas con volumen se pintan en su propia capa.
+  const capaVolumen = crearCapaVolumen({ scene, renderer, uPR: nucleo.uPR, hdr: canvas.dataset.brillo3d === 'hdr', sinProfundidad: canvas.dataset.brillo3d === 'directo' && !modoCompatible });
   const listo = (async () => {
     window.__pasoCarga = 'nebulosas'; await lejanas.prepararTodas((h, t) => avance(0.5 + 0.06 * h / t, 0.56));
     window.__pasoCarga = 'texturas'; await texturasTodas((h, t) => avance(0.56 + 0.28 * h / t, 0.84));

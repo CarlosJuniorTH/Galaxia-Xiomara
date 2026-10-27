@@ -13,7 +13,7 @@ function puntoEnEsfera(rMin, rMax) {
 
 export function crearEstrellas({ scene, uScale, uPR }) {
   const col = new THREE.Color();
-  const prU = uPR;   // compartido: sigue a la resolución dinámica
+  const prU = uPR;   // compartido: sigue a la resolución interna (la postal la sube un momento)
 
   // ── Campo de estrellas titilantes (tamaño en píxeles, no dependen de la distancia) ──
   const mat = new THREE.ShaderMaterial({

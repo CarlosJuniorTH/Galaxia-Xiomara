@@ -1,9 +1,7 @@
-// Resolución dinámica sin reasignar, como en las consolas: cada búfer se reserva UNA vez al tamaño máximo y la
-// resolución del cuadro solo cambia la zona (viewport) en la que se dibuja, siempre en la esquina inferior izquierda.
-// Quien lee el búfer escala sus coordenadas a esa zona (uZona.xy) y no pasa de su borde (uZona.zw: medio texel antes,
-// para que el filtrado no mezcle restos de cuadros anteriores dibujados con otra zona). Antes, cambiar de resolución
-// destruía y rehacía el compositor, los once búferes del resplandor y las capas: un cuadro de 30–100 ms en un móvil,
-// que caía justo al final de la inercia del giro.
+// Zonas sin reasignar, como en las consolas: cada búfer se reserva una vez y lo que se dibuja ocupa una zona (viewport)
+// en la esquina inferior izquierda. Quien lee el búfer escala sus coordenadas a esa zona (uZona.xy) y no pasa de su borde
+// (uZona.zw: medio texel antes, para que el filtrado no mezcle restos de cuadros anteriores con otra zona). La resolución
+// interna es fija (perfil ultra); la zona solo cambia un momento para la postal a más resolución, sin rehacer búferes.
 import { Vector4 } from 'three';
 
 // Fija la zona activa de un búfer (en píxeles del búfer, sin pasar de su tamaño).
