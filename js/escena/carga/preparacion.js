@@ -1,6 +1,8 @@
-// Preparación de la carga, como un videojuego (movido de index.js sin cambios): subir todas las texturas a la tarjeta
-// gráfica, compilar todos los programas de GPU (también lo que aún no se ve) y un cuadro de calentamiento con todo
-// visible, para que nada se prepare por primera vez al entrar o durante un viaje.
+// Preparación de la carga, como un videojuego: subir todas las texturas a la tarjeta gráfica, compilar todos los programas
+// de GPU (también lo que aún no se ve), un cuadro de calentamiento con todo visible y, al final, un cuadro a tamaño real
+// con todas las pasadas en la pose de llegada de cada destino (calentarPoses), para que nada se prepare por primera vez
+// al entrar, durante un viaje o al llegar. (Tras la carga, el final del clip de la intro dibuja además el 3D detrás de la
+// portada: index.js, precalentar.)
 import * as THREE from 'three';
 
 export function crearPreparacion({ renderer, camera, scene, nucleo, solar, telarana, composer, obtenerCapaVolumen }) {
@@ -92,5 +94,41 @@ export function crearPreparacion({ renderer, camera, scene, nucleo, solar, telar
     try { capaVolumen.dibujar(camera, 64); telarana.dibujarGalaxias(renderer, camera); composer.render(); } catch (e) { console.warn('Calentamiento', e); }
     pasadas.forEach((p, i) => { p.enabled = antes[i]; });
   };
-  return { subirTexturas, subirGeometrias, compilarTodo, calentar };
+  // Calentamiento A TAMAÑO REAL, como en los juegos: un cuadro completo (con todas las pasadas: lente, salto, resplandor,
+  // gas volumétrico, galaxias de la telaraña, salida) en cada destino, con la cámara en su pose de llegada, y también en el
+  // sistema solar (su escena y su suavizado MSAA). El de arriba dibuja todo en 128×128 (programas y subidas); este estrena
+  // lo que solo pasa a tamaño real (búferes intermedios, estados de la GPU con cada formato de imagen, el relleno de los
+  // gigantes de cerca) para que no ocurra en el primer cuadro de un vuelo o de una escena. Antes de cada pose se compila lo
+  // que se ve desde allí con el destino real (compileAsync con KHR_parallel_shader_compile: se espera sin bloquear) y entre
+  // pose y pose se cede (un cuadro por tarea: nada de un cuadro enorme que iOS tome por un cuelgue).
+  // poses: [{ escena: 'principal' | 'solar', pos, mira, near? }]. fijarEscena(cual) cambia de escena; dibujar() hace el
+  // cuadro con el mismo camino que el bucle de dibujo. Devuelve los programas nuevos que aparecieron (deberían ser 0).
+  const calentarPoses = async (poses, { fijarEscena, dibujar }) => {
+    const guardada = { pos: camera.position.clone(), q: camera.quaternion.clone(), near: camera.near, fov: camera.fov };
+    const pasadas = [nucleo.lente, nucleo.salto].filter(Boolean), antes = pasadas.map(p => p.enabled);
+    const programas = () => renderer.info.programs?.length ?? 0, p0 = programas();
+    let actual = null, nuevos = 0;
+    try {
+      for (const pose of poses) {
+        if (pose.escena !== actual) { fijarEscena(pose.escena); actual = pose.escena; }
+        camera.position.copy(pose.pos); camera.near = pose.near ?? guardada.near; camera.fov = guardada.fov; camera.updateProjectionMatrix();
+        camera.lookAt(pose.mira); camera.updateMatrixWorld();
+        for (const p of pasadas) p.enabled = true;
+        const esc = pose.escena === 'solar' ? solar.escena : scene, previo = renderer.getRenderTarget();
+        renderer.setRenderTarget(nucleo.post?.readBuffer ?? null);
+        try { if (paralela) await renderer.compileAsync(esc, camera); } catch {} finally { renderer.setRenderTarget(previo); }
+        const antesPose = programas();
+        try { dibujar(pose); } catch (e) { console.warn('Calentamiento a tamaño real', e); }
+        nuevos += programas() - antesPose;
+        await new Promise(r => setTimeout(r, 0));
+      }
+    } finally {
+      if (actual !== 'principal') fijarEscena('principal');
+      camera.position.copy(guardada.pos); camera.quaternion.copy(guardada.q); camera.near = guardada.near; camera.fov = guardada.fov;
+      camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+      pasadas.forEach((p, i) => { p.enabled = antes[i]; });
+    }
+    return { poses: poses.length, programasNuevos: nuevos, programasTotal: programas() - p0 };
+  };
+  return { subirTexturas, subirGeometrias, compilarTodo, calentar, calentarPoses };
 }

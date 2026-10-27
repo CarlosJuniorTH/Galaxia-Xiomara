@@ -148,6 +148,8 @@ try {
       } else { efectos.explosion(x, y, 14); efectos.texto(x, y, elegir(CONFIG.toques)); escena.besar(); }
     }
   });
+  // Al final del clip, el 3D se dibuja detrás de la portada en la pose inicial del vuelo de entrada (escena.precalentar).
+  entrada.alPrecalentar(n => escena.precalentar(n));
   entrada.alEntrar(({ continuar } = {}) => {
     // Continuar: el vuelo de entrada lleva directamente al lugar (o al paso del recorrido).
     banda.entrar(); musica.reproducir(true); mensajes.iniciar(); setTimeout(() => efectos.programarFugaces(() => !interfaz.enLasGrandes), 4000);

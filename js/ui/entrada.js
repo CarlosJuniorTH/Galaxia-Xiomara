@@ -42,7 +42,15 @@ export function crearEntrada(config, { viaje, banda } = {}) {
   // Si la canción se para un rato, sigue con su propio reloj, pero en cuanto vuelve a avanzar se vuelve a pegar a ella
   // (antes, una vez suelto, ya no volvía: el clip y la música quedaban descuadrados hasta el final).
   let ultimo = null, ultimoS = null, quieto = 0, ultimoT = 0, antes = 0, fijo = null, arrancada = false, esperaArranque = 0;
-  function relojClip() { return ultimo = relojAhora(); }
+  function relojClip() { ultimo = relojAhora(); if (nivelEnsayo === 0 && ultimo !== null && ultimo >= HITOS.tarjeta - 2) ensayar(1); return ultimo; }
+  // El 3D se dibuja detrás de la portada (opaca) en los últimos ~4 s del clip y mientras se ve la tarjeta, con la cámara en
+  // la pose inicial del vuelo de entrada (escena.precalentar): al pulsar «Entrar» el 3D ya lleva cuadros calientes. Mientras
+  // aún suena el clip, uno de cada 3 cuadros (no le quita fluidez); en el negro antes de la tarjeta y sus primeros 4 s, todos;
+  // luego, leyendo la tarjeta, de vez en cuando (y todos en cuanto se toca la pantalla, antes del clic en «Entrar»).
+  let nivelEnsayo = 0, alEnsayo = () => {}, esperaEnsayo = 0, dentro = false;
+  function ensayar(n) { if (dentro || n === nivelEnsayo) return; nivelEnsayo = n; alEnsayo(n); }
+  function ensayoCompleto(ms) { clearTimeout(esperaEnsayo); ensayar(2); esperaEnsayo = setTimeout(() => ensayar(3), ms); }
+  entrada.addEventListener('pointerdown', () => { if (nivelEnsayo >= 2) ensayoCompleto(3000); }, { capture: true, passive: true });
   function relojAhora() {
     if (fijo !== null) return fijo;
     if (!empezado) return null;
@@ -58,13 +66,14 @@ export function crearEntrada(config, { viaje, banda } = {}) {
 
   function mostrarTarjeta() {
     entrada.classList.add('formado', 'cielo'); frase.classList.remove('visible');
+    ensayoCompleto(4000);
     viaje?.marcarPortada();
     // Lo que espera al final del clip (descargas en segundo plano), cuando la tarjeta ya ha terminado de entrar.
     // (sin clip, ?sinIntro de las pruebas, en el acto: como antes de la intro)
     setTimeout(() => { introAcabada = true; for (const fn of trasIntro.splice(0)) fn(); }, sinIntro ? 0 : 2500);
   }
   const portada = crearPortada($('#portada-lienzo'), {
-    calma: reducido, reloj: relojClip, alFinal: mostrarTarjeta, alPrevio: () => entrada.classList.add('previa'), tarjeta: () => entrada.querySelector('.tarjeta'),
+    calma: reducido, reloj: relojClip, alFinal: mostrarTarjeta, alPrevio: () => { entrada.classList.add('previa'); ensayoCompleto(5000); }, tarjeta: () => entrada.querySelector('.tarjeta'),
     alFrase: texto => {
       frase.classList.remove('visible');
       clearTimeout(alFraseEspera);
@@ -127,6 +136,7 @@ export function crearEntrada(config, { viaje, banda } = {}) {
   function entrar(opciones) {
     if (!preparado || boton.disabled) return;
     boton.disabled = continuar.disabled = true;
+    clearTimeout(esperaEnsayo); ensayar(0); dentro = true;   // (desde aquí se dibuja todo: ya no es un ensayo)
     entrada.classList.add('oculto');
     // La animación de la portada se para ya (su último cuadro se queda en el fundido de 1,5 s): seguía dibujando a pantalla
     // completa encima de los primeros cuadros del vuelo de entrada, los más cargados.
@@ -213,6 +223,8 @@ export function crearEntrada(config, { viaje, banda } = {}) {
       alCompletar = completar; this.progreso(1);
     },
     alEntrar(fn) { alEntrar = fn; },
+    // fn(nivel): dibujar el 3D detrás de la portada (0 nada, 1 uno de cada 3 cuadros, 2 todos, 3 de vez en cuando).
+    alPrecalentar(fn) { alEnsayo = fn; if (nivelEnsayo) fn(nivelEnsayo); },
     alEntrarTambien(fn) { alEntrarMas.push(fn); },
     trasIntro(fn) { if (introAcabada) fn(); else trasIntro.push(fn); }
   };
