@@ -33,7 +33,7 @@ export function curvaSalida([r, g, b], brillo = [0, 0, 0]) {
 // Fuerza del enfoque adaptativo (RCAS, como en FSR 1) según cuánto se amplía la escena hasta la pantalla FÍSICA (escena →
 // lienzo en esta pasada y lienzo → pantalla en el navegador, que en el móvil va a DPR 2 como mucho): 1 = sin ampliar, sin
 // enfoque (PC a la nativa).
-export const nitidezPara = ampliacion => Math.min(1, Math.max(0, (ampliacion - 1.02) * 1.6));
+export const nitidezPara = ampliacion => Math.min(1, Math.max(0, (ampliacion - 1.02) * 2.5));
 export const LIMITE_RCAS = 0.25 - 1 / 16;
 
 // Réplica en JavaScript del enfoque (por canal): se usa en las pruebas. Como RCAS, el lóbulo negativo se adapta al contraste
