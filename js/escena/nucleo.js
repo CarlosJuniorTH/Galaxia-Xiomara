@@ -4,7 +4,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { BrilloEficiente } from './brillo.js';
+import { BrilloMips } from './brillo.js';
 import { SalidaPass, LIMITE_HDR } from './salida.js';
 import { crearPasadaLente } from './lente.js';
 import { crearPasadaSalto } from './salto.js';
@@ -29,20 +29,19 @@ export function crearNucleo(canvas) {
   // primarias reinterpretaba los colores: más saturados en unos móviles que en el PC.)
   const gl = renderer.getContext();
   if ('drawingBufferColorSpace' in gl) gl.drawingBufferColorSpace = 'srgb';
-  // Dos resoluciones, como en las consolas:
-  //  · Lienzo: siempre la nativa de la pantalla (1290×2325 en un iPhone de DPR 3).
-  //  · Escena 3D (pr): interna. Dibujarla entera a DPR 3 midió 25,7 FPS en un iPhone,
-  //    así que en móvil empieza en DPR 2 y la resolución dinámica de index.js la ajusta.
-  //    La pasada de salida la reescala a la nativa con un enfoque adaptativo (salida.js).
+  // Dos resoluciones, como en las consolas, fijas toda la visita (perfil ultra único, sin resolución dinámica):
+  //  · Lienzo de salida: la nativa en el PC; en el móvil, DPR 2 como mucho (pintar la pasada final a la nativa de un iPhone,
+  //    DPR 3, unos 3 Mpx, no añadía nada visible y costaba a la GPU y a la composición de iOS en cada cuadro).
+  //  · Escena 3D (pr): interna, por PRESUPUESTO DE PÍXELES (no por DPR): ≈ 1,3 Mpx en el móvil y ≈ 3,5 Mpx en el PC, nunca
+  //    más que el lienzo. La pasada de salida la reescala al lienzo con enfoque adaptativo (salida.js).
+  //    Tras un cierre por memoria (nivelSeguro 2, solo la visita siguiente), 1,25 como mucho en el móvil.
   const prMaximo = Math.min(devicePixelRatio, Q.pr);
-  // En el móvil, 2 (de nuevo; unas horas estuvo en 2,25): los búferes de la escena se reservan a este tamaño y a 2,25 eran
-  // ~25 MB más de memoria de la GPU, encima de un pico de carga que en el iPhone ya rozaba el límite (iOS cerraba la página
-  // y la recargaba sola, hasta tres veces). La pasada de salida reescala a la nativa con su enfoque.
-  let pr = esMovil ? Math.min(prMaximo, nivelSeguro >= 2 ? 1.25 : 2) : prMaximo;   // 2 en el móvil (a 1,75 se veía pixelado en una pantalla de DPR 3); la resolución dinámica sube hasta 2,5 si el aparato va sobrado y baja si se calienta
-  // Lo más alto que puede llegar la escena con la resolución dinámica (index.js, regulador): los búferes se reservan a
-  // este tamaño una sola vez y cambiar de resolución solo cambia la zona en la que se dibuja (zona.js).
-  // En el móvil, 2 como mucho (memoria de la GPU, ver arriba).
-  const prTope = esMovil ? Math.min(prMaximo, Math.max(pr, 2 - (nivelSeguro >= 2 ? 0.75 : 0))) : prMaximo;
+  const PRESUPUESTO = esMovil ? 1.3e6 : 3.5e6;
+  const prPresupuesto = () => {
+    const lienzo = esMovil ? Math.min(prMaximo, 2) : prMaximo, porPixeles = Math.sqrt(PRESUPUESTO / Math.max(1, innerWidth * innerHeight));
+    return Math.max(0.5, Math.min(lienzo, Math.floor(porPixeles * 32) / 32, esMovil && nivelSeguro >= 2 ? 1.25 : Infinity));
+  };
+  let pr = prPresupuesto();
   renderer.setPixelRatio(pr);
   canvas.dataset.resolucion3d = String(pr);
   renderer.setSize(innerWidth, innerHeight);
@@ -75,7 +74,9 @@ export function crearNucleo(canvas) {
   const soportaHDR = seleccion.api === 'webgl2'
     ? !!(seleccion.contexto.getExtension('EXT_color_buffer_float') || seleccion.contexto.getExtension('EXT_color_buffer_half_float'))
     : !!seleccion.contexto.getExtension('EXT_color_buffer_half_float');
-  let muestrasAA = 0, post = null, bloom = { strength: BRILLO_BASE }, lente = null, salto = null, pasadaEscena = null, escenaActiva = scene;
+  let muestrasAA = 0, post = null, bloom = { strength: BRILLO_BASE }, pasadaEscena = null, escenaActiva = scene, salida = null;
+  // Lente y salto: ya no son pasadas (salida.js los aplica en la pasada final solo mientras están activos).
+  const lente = crearPasadaLente(), salto = crearPasadaSalto();
   if (!modoCompatible && soportaHDR && nivelSeguro < 1) {   // tras un cierre por memoria, sin HDR (menos memoria de GPU)
     try {
       // Bordes suaves (MSAA ×4, WebGL 2) en el sistema solar (fijarEscena): sin él, sus órbitas, anillos y bordes de planetas
@@ -85,21 +86,18 @@ export function crearNucleo(canvas) {
       post = new EffectComposer(renderer, new THREE.WebGLRenderTarget(innerWidth * pr, innerHeight * pr, { type: THREE.HalfFloatType }));
       post.setPixelRatio(pr); post.setSize(innerWidth, innerHeight);
       pasadaEscena = new RenderPass(scene, camera); post.addPass(pasadaEscena);
-      lente = crearPasadaLente(); post.addPass(lente); salto = crearPasadaSalto(); post.addPass(salto);
-      const Brillo = location.hash === '#debug' && new URLSearchParams(location.search).get('comparar') === 'original' ? UnrealBloomPass : BrilloEficiente;
-      bloom = new Brillo(new THREE.Vector2(innerWidth, innerHeight), BRILLO_BASE, 0.3, 0.78);
-      // Resplandor a ½ de la escena en todos los aparatos (a ¼ se difuminaba más ancho y se derramaba sobre lo que tapa a
-      // los agujeros negros: la prueba de profundidad lo detecta). ?brillo=cuarto para compararlo.
-      bloom.escalaBrillo = new URLSearchParams(location.search).get('brillo') === 'cuarto' ? 0.25 : 0.5;
-      canvas.dataset.brilloMotor = Brillo === BrilloEficiente ? 'eficiente' : 'original';
-      // El brillo solo se calcula; la pasada de salida lo combina con la escena,
-      // limpia valores no válidos y comprime las altas luces en lugar de quemarlas.
-      // (BrilloEficiente ya limpia y limita lo que lee, y no hace la mezcla final: la pasada de salida suma el brillo.)
-      bloom.blendMaterial.colorWrite = false;
+      // Resplandor por cadena de mips (brillo.js), con el primer nivel a ½ de la escena (a ¼ se difuminaba más ancho y se
+      // derramaba sobre lo que tapa a los agujeros negros). #debug&comparar=original: el UnrealBloomPass de antes.
+      const original = location.hash === '#debug' && new URLSearchParams(location.search).get('comparar') === 'original';
+      bloom = original ? new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), BRILLO_BASE, 0.3, 0.78) : new BrilloMips(new THREE.Vector2(innerWidth, innerHeight), BRILLO_BASE, 0.3, 0.78);
+      canvas.dataset.brilloMotor = original ? 'original' : 'mips';
+      // El brillo solo se calcula; la pasada de salida lo combina con la escena, limpia valores no válidos y comprime las
+      // altas luces en lugar de quemarlas. (El original no mezcla: su última pasada no escribe color.)
+      if (original) bloom.blendMaterial.colorWrite = false;
       post.addPass(bloom);
-      post.addPass(new SalidaPass(bloom));
+      post.addPass(salida = new SalidaPass(bloom, { lente, salto }));
     } catch (error) {
-      post?.dispose(); post = null; lente = null; salto = null;
+      post?.dispose(); post = null; salida = null;
       console.warn('Se mantiene la escena 3D sin postprocesado:', error);
     }
   }
@@ -112,11 +110,10 @@ export function crearNucleo(canvas) {
       post = new EffectComposer(renderer, objetivo);
       post.setPixelRatio(pr); post.setSize(innerWidth, innerHeight);
       pasadaEscena = new RenderPass(scene, camera); post.addPass(pasadaEscena);
-      lente = crearPasadaLente(); post.addPass(lente); salto = crearPasadaSalto(); post.addPass(salto);
-      post.addPass(new SalidaPass(null));
+      post.addPass(salida = new SalidaPass(null, { lente, salto }));
       canvas.dataset.brillo3d = 'sin-brillo';
     } catch (error) {
-      post?.dispose(); post = null; lente = null; salto = null;
+      post?.dispose(); post = null; salida = null;
       console.warn('Se dibuja directamente, sin pasada de salida:', error);
       if (!modoCompatible) console.warn('El lienzo se creó sin profundidad: para dibujar directo con ocultación correcta, abre con ?calidad=compatible');
     }
@@ -128,12 +125,13 @@ export function crearNucleo(canvas) {
   // costaba mucho a la GPU en cada cuadro (y iOS tenía que componer esos 3 Mpx). El texto y la interfaz son HTML: nítidos igual.
   // El lienzo, a la resolución nativa de la pantalla: la escena se amplía una sola vez (en la pasada de salida, con su enfoque);
   // con el lienzo a 2 en una pantalla de DPR 3 se ampliaba dos veces (y el navegador sin enfoque) y se veía borroso.
-  // Lienzo del móvil a 2,5 como mucho (lo máximo que alcanza la escena con la resolución dinámica): la escena nunca se reduce
-  // para volver a ampliarse, y la pasada de salida (con su enfoque) hace la ampliación.
-  const prLienzo = () => post ? (esMovil ? Math.min(prMaximo, 2.5) : prMaximo) : pr;
+  // Lienzo del móvil a 2 como mucho (perfil ultra: lo que se ve lo pone el enfoque de la pasada de salida, que cuenta
+  // también con la ampliación que hace después el navegador hasta la pantalla física).
+  const prLienzo = () => post ? (esMovil ? Math.min(prMaximo, 2) : prMaximo) : pr;
   renderer.setPixelRatio(prLienzo());
   renderer.setSize(innerWidth, innerHeight);
   canvas.dataset.lienzo3d = String(prLienzo());
+  if (salida) salida.ampliacionNavegador = Math.max(1, devicePixelRatio / prLienzo());
   const composer = {
     render: () => post ? post.render() : renderer.render(escenaActiva, camera),
     setSize: (w,h) => post?.setSize(w,h),
@@ -148,14 +146,17 @@ export function crearNucleo(canvas) {
   // Compensación de tamaño de las estrellas de la galaxia según la distancia (index.js).
   const uTamGalaxia = { value: 1 };
 
-  // Reserva de los búferes del compositor (y del resplandor, que los sigue): al tamaño máximo de la escena (prTope), para
-  // que la resolución dinámica no obligue a rehacerlos. Solo se rehacen si la pantalla crece más allá (girar el móvil, agrandar la ventana del PC) o
-  // si se queda en menos de la mitad (para devolver la memoria).
+  // Reserva de los búferes del compositor (y del resplandor, que los sigue) al tamaño de la escena. Solo se rehacen si la
+  // pantalla crece más allá (girar el móvil, agrandar la ventana del PC), si se queda en menos de la mitad (para devolver la
+  // memoria) o para una postal a más resolución (fijarResolucion, temporal).
+  // Ninguna pasada intercambia los búferes (la lente va en la pasada final): el segundo búfer del compositor no se usa y se
+  // queda en 1×1 (en un iPhone, ~16 MB menos de memoria de la GPU).
+  if (post) { const tam = post.setSize.bind(post); post.setSize = (w, h) => { tam(w, h); post.writeBuffer.setSize(1, 1); }; }
   let reserva = { w: 0, h: 0, pr: 0 };
   // (Sin margen para las barras del navegador: la página no se desplaza, casi nunca cambian, y en un móvil ese margen eran
   // un 20 % más de memoria en los búferes más grandes.)
   const altoMaximo = () => innerHeight;
-  function reservar(prReserva = Math.max(prTope, pr)) {
+  function reservar(prReserva = pr) {
     reserva = { w: innerWidth, h: altoMaximo(), pr: prReserva };
     post?.setPixelRatio(prReserva); post?.setSize(reserva.w, reserva.h);
     canvas.dataset.reservas3d = String((Number(canvas.dataset.reservas3d) || 0) + 1);
@@ -179,12 +180,14 @@ export function crearNucleo(canvas) {
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
+    // El mismo presupuesto de píxeles con el nuevo tamaño (girar el móvil, cambiar la ventana): no es un cambio de calidad.
+    const nuevo = prPresupuesto(); if (nuevo !== pr) { pr = nuevo; if (!post) renderer.setPixelRatio(pr); uPR.value = pr; canvas.dataset.resolucion3d = String(pr); }
     ajustarReserva();
     uScale.value = alturaEscena();
   }
 
   // Cambia la resolución interna sin alterar el tamaño visual de nada: los puntos
-  // se limitan en píxeles CSS (uPR) y su escala sigue la altura del búfer (uScale).
+  // se limitan en píxeles CSS (uPR) y su escala sigue la altura del búfer (uScale). Solo para la postal (temporal).
   let cambios = 0;
   function fijarResolucion(valor) {
     const nuevo = Math.max(1, Math.min(prMaximo, Math.round(valor * 8) / 8));   // pasos de 1/8: ahora no cuestan nada
@@ -210,5 +213,5 @@ export function crearNucleo(canvas) {
     if (post) for (const rt of [post.renderTarget1, post.renderTarget2]) { const m = rt === post.readBuffer ? muestras : 0; if (rt.samples !== m) { rt.samples = m; rt.dispose(); } }
   }
   return { renderer, scene, camera, controls, composer, bloom, fijarEscena, get escenaActiva() { return escenaActiva; }, get lente() { return lente; }, get post() { return post; }, get salto() { return salto; }, uScale, uPR, uTamGalaxia, redimensionar, fijarResolucion,
-    get resolucion() { return pr; }, prMaximo, prTope, get resolucionLienzo() { return prLienzo(); } };
+    get resolucion() { return pr; }, prMaximo, get prTope() { return pr; }, get resolucionLienzo() { return prLienzo(); } };
 }
