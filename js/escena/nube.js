@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { nivelSeguro } from '../util/dispositivo.js';
 import { crearAtlasNebulosa } from '../util/volumenNebulosa.js';
+import { AZAR_VOLUMEN } from './ruidoAzul.js';
 const cache = new Map();
 // Tabla de ruido de valor 3D (32³ valores del retículo, con un borde repetido para el filtrado) en un atlas 2D de
 // 8×4 cortes de 33×33: cada ruido cuesta dos lecturas con filtrado lineal (en vez de ocho hashes con senos por
@@ -62,10 +63,10 @@ export function crearNube(textura, centro, tam, semilla, escala = 1, capas = 7, 
   const es3D = cache.get(clave).isData3DTexture;
   const inversa = new THREE.Matrix4(), camaraLocal = new THREE.Vector3();
   const m = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.ShaderMaterial({
-    uniforms: { uMapa: { value: textura }, uDensidad: { value: cache.get(clave) }, uRuido: { value: texturaRuido() }, uCamara: { value: camaraLocal }, uBrillo: { value: 1 }, uOpacidad: { value: 1 }, uMuestras: MUESTRAS },
+    uniforms: { uMapa: { value: textura }, uDensidad: { value: cache.get(clave) }, uRuido: { value: texturaRuido() }, uCamara: { value: camaraLocal }, uBrillo: { value: 1 }, uOpacidad: { value: 1 }, uMuestras: MUESTRAS, ...AZAR_VOLUMEN },
     vertexShader: 'varying vec3 vP;void main(){vP=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
     fragmentShader: /* glsl */`
-      uniform sampler2D uMapa; ${es3D ? 'uniform highp sampler3D uDensidad;' : 'uniform sampler2D uDensidad;'} uniform vec3 uCamara; uniform float uBrillo,uOpacidad,uMuestras; varying vec3 vP;
+      uniform sampler2D uMapa; ${es3D ? 'uniform highp sampler3D uDensidad;' : 'uniform sampler2D uDensidad;'} uniform vec3 uCamara; uniform float uBrillo,uOpacidad,uMuestras,uAzarVolumen; uniform sampler2D uRuidoAzul; varying vec3 vP;
       vec2 uvAtlas(vec3 p, float z){return (vec2(mod(z,8.0)*32.0,floor(z/8.0)*32.0)+0.5+p.xy*31.0)/vec2(256.0,128.0);}
       // Ruido de valor 3D anclado a la nube (detalle multiescala que rompe la extrusión de la imagen).
       // Ruido de valor desde la tabla (ver texturaRuido): el filtrado lineal hace la interpolación en x e y con los
@@ -81,8 +82,9 @@ export function crearNube(textura, centro, tam, semilla, escala = 1, capas = 7, 
         // Muestras según el recorrido del rayo dentro de la caja: los rayos largos (vistas oblicuas y
         // laterales, donde el error era mayor) reciben más; los cortos, menos.
         float n=uMuestras<0.0 ? -uMuestras : clamp(floor(uMuestras*(hasta-desde)/1.1+0.5), floor(uMuestras*0.6), floor(uMuestras*1.6)), paso=(hasta-desde)/n;
-        // Cuadratura estable en el volumen: no cambia la semilla con los píxeles de pantalla.
-        float azar=0.5;
+        // Desfase del primer paso: ruido azul por píxel que cambia cada cuadro (capaVolumen.js lo acumula en el tiempo: sin
+        // bandas y con menos muestras). Sin acumulación (uAzarVolumen < 0), la cuadratura estable de siempre (0,5).
+        float azar=uAzarVolumen<0.0 ? 0.5 : fract(texture2D(uRuidoAzul,gl_FragCoord.xy/32.0).r+uAzarVolumen);
         // El color de cada punto del volumen está ANCLADO a la nube: se lee en sus coordenadas
         // propias (la imagen proyectada a lo largo de su eje z, con una leve cizalla y una
         // deformación que dependen solo de la posición), nunca según desde dónde se mira. Al
@@ -91,6 +93,11 @@ export function crearNube(textura, centro, tam, semilla, escala = 1, capas = 7, 
         vec4 suma=vec4(0.0);
         for(int i=0;i<128;i++){ if(float(i)>=n) break;
           vec3 p=uCamara+dir*(desde+(float(i)+azar)*paso)+0.5;
+          ${corazon ? '' : `// Salto en vacío: lejos de la lámina de gas (más de 3 veces su grosor máximo aquí) la muestra no suma nada (lamina
+          // < e⁻⁹): se pasa a la siguiente sin leer la imagen ni el ruido (de frente, la mayor parte del rayo).
+          vec3 medio=densidad(vec3(p.xy,0.5));
+          float centro=0.5+(medio.y-0.5)*0.45+(medio.z-0.5)*0.2;
+          if(abs(p.z-centro)>3.0*(0.05+0.2*(0.5+medio.x))*${grueso.toFixed(2)}) continue;`}
           vec3 d=densidad(clamp(p,0.0,1.0));
           ${corazon ? `vec3 color=texture2D(uMapa,clamp(p.xy+(p.z-0.5)*vec2(0.035,-0.025),0.0,1.0)).rgb;` : `// Lejos del plano medio, cada capa se deforma distinto (ruido 3D anclado): de frente la imagen
           // sigue nítida y de lado no se repite la misma imagen en todas las capas (vetas).
@@ -106,8 +113,7 @@ export function crearNube(textura, centro, tam, semilla, escala = 1, capas = 7, 
           // Espesor propio: el gas es una lámina deformada (no una caja). Su plano medio se curva
           // según la densidad leída en el plano central y su grosor crece donde la nube es más
           // brillante (más columna de gas); de lado se ve su silueta, no la imagen estirada.
-          vec3 medio=densidad(vec3(p.xy,0.5));
-          float centro=0.5+(medio.y-0.5)*0.45+(medio.z-0.5)*0.2, grosor=(0.05+0.2*smoothstep(0.03,0.6,luz)*(0.5+medio.x))*${grueso.toFixed(2)};
+          float grosor=(0.05+0.2*smoothstep(0.03,0.6,luz)*(0.5+medio.x))*${grueso.toFixed(2)};
           float lamina=exp(-pow((p.z-centro)/grosor,2.0));
           // Detalle multiescala en 3D (dos octavas, más fino a lo largo del espesor): grumos y huecos
           // que cambian con la profundidad, en vez de repetir la imagen en cada capa.
