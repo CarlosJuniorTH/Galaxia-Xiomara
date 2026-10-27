@@ -196,9 +196,12 @@ const ordenar = a => Float64Array.from(a).sort();
 function rango(t0, t1) { let a = 0, b = C.t.length; while (a < b && C.t[a] < t0) a++; let c = a; while (c < b && C.t[c] <= t1) c++; return [a, c]; }
 function resumirTramo(tr) {
   const t1 = tr.fin ?? ahora(), [a, b] = rango(tr.inicio, t1);
-  // El primer intervalo de un tramo mide desde el último cuadro del anterior: cuenta (un tirón al empezar es del tramo).
-  const dt = C.dt.slice(a, b).filter(x => x < 1000), o = ordenar(dt), suma = dt.reduce((s, x) => s + x, 0);
-  const huecos = C.dt.slice(a, b).filter(x => x >= 1000).length;
+  // El primer intervalo de un tramo se mide desde que empieza el tramo (o desde el cuadro anterior, si es más tarde): un
+  // tirón al empezar es del tramo, pero el rato en que no se dibujaba nada antes (la pantalla de carga, que es HTML) no.
+  const brutos = C.dt.slice(a, b);
+  if (brutos.length && C.t[a] - brutos[0] < tr.inicio) brutos[0] = +Math.max(0, C.t[a] - tr.inicio).toFixed(2);
+  const dt = brutos.filter(x => x < 1000 && x > 0), o = ordenar(dt), suma = dt.reduce((s, x) => s + x, 0);
+  const huecos = brutos.filter(x => x >= 1000).length;
   const ll = ordenar(C.llamadas.slice(a, b)), tri = ordenar(C.triangulos.slice(a, b)), pu = ordenar(C.puntos.slice(a, b));
   const gpu = ordenar(C.gpu.slice(a, b).filter(x => x !== null));
   const pasadas = {};

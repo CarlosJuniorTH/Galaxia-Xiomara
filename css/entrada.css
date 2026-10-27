@@ -7,6 +7,9 @@
   transition:opacity 1.5s ease;
 }
 #entrada.oculto{opacity:0;pointer-events:none;will-change:opacity;}
+/* Su capa se crea ya con la tarjeta (quieta, antes del clic): crearla en el cuadro de «Entrar» costaba un cuadro de más en
+   el móvil (medido con ?fps: 33 ms en el tramo «empezar»). */
+#entrada.formado{will-change:opacity;}
 /* El fundido al entrar va en su propia capa (solo opacidad, en el compositor) encima de los primeros cuadros del vuelo:
    lo de dentro se queda quieto (nada que repintar en cada cuadro: ni el brillo del nombre ni el destello del botón, ni
    el filtro del botón desactivado, que antes se animaba sobre la escena en movimiento). */
