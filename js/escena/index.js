@@ -45,6 +45,7 @@ import { nivelSeguro } from '../util/dispositivo.js';
 import { esquivar, sinRepetidos } from '../util/ruta.js';
 import { planificarVuelo, crearObreroVuelo } from '../util/vuelo.js';
 import { relojMaestro } from '../util/relojMaestro.js';
+import { ocupado } from '../util/descargas.js';
 import { TIEMPOS_AMOR, faltaReal, desdeAnimacion } from '../util/supernovaAmor.js';
 import { pistaDe, normalizarPista, muestrearCamara, mezclarMuestras, crearMuestra, crearSuavizador, segundoAdelantado, siguienteCorte, esfericasACartesianas, cartesianasAEsfericas, ENTRADA, SALIDA, LIMITES, ENTRADA_LARGA, CALMA_ENTRADA, escalaMovil } from '../util/directorCamara.js';
 import { finEscena } from '../util/guionAgujeros.js';
@@ -1049,6 +1050,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     const marco = marcoClip(id), conPista = pista && !movimientoReducido ? pista : null;
     clip = { id, segundo, vivo, pista: conPista, marco, fase: 'clip', entrada: null, salida: null, arriba: conPista ? marco.y : EJE_Y };
     enClip = true; desplazamientoMeta = 0;   // (el centro de la proyección vuelve al centro con su suavizado)
+    ocupado('clip', true);   // mientras dura el videoclip de un gigante, la cola de descargas no empieza nada
     if (conPista) {
       // El filtro sale de donde está la cámara (si la pista empieza con un corte, del primer plano). El alabeo del primer
       // plano entra con un fundido propio (el filtro lo cambiaría demasiado despacio para llegar a él).
@@ -1102,7 +1104,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // completo: el clip terminó (encuadre normal y límites del zoom); si no, solo se devuelve lo bloqueado.
   function soltarClip(completo) {
     const c = clip; clip = null; if (!c) return;
-    enClip = false; clipEsperado = null; medirZonaLibre();   // la tarjeta vuelve: la franja libre manda otra vez
+    enClip = false; ocupado('clip', false); clipEsperado = null; medirZonaLibre();   // la tarjeta vuelve: la franja libre manda otra vez
     delete canvas.dataset.clip; delete canvas.dataset.clipFase;
     camera.up.copy(EJE_Y);
     if (camera.fov !== FOV_BASE) { camera.fov = FOV_BASE; camera.updateProjectionMatrix(); }

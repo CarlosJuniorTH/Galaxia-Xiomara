@@ -128,8 +128,8 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
     // «playback»: búfer de salida más grande (menos trabajo y menos cortes en el móvil); aquí nada necesita latencia baja.
     try { ctx = new Contexto({ latencyHint: 'playback' }); } catch { ctx = new Contexto(); }
     relojMaestro.usarContexto(ctx);
-    // Creado antes de un gesto (para decodificar en la carga): parado hasta el toque, aunque el navegador lo deje sonar.
-    if (globalThis.navigator?.userActivation && !navigator.userActivation.hasBeenActive && ctx.state === 'running') ctx.suspend().catch(() => {});
+    // Creado antes del toque (para decodificar en la carga): parado hasta él, aunque el navegador lo deje sonar.
+    if (!silencioDado && ctx.state === 'running') ctx.suspend().catch(() => {});
     maestro = ctx.createGain(); maestro.connect(ctx.destination); vigilarEstado();
     ambiente.ganancia = ctx.createGain(); ambiente.ganancia.gain.value = 0; ambiente.ganancia.connect(maestro);
     for (const p of pistas.values()) {

@@ -57,7 +57,8 @@ async function recorrer(base, informe, { perfil, consulta, conServicio }) {
     informe.comprobar([...veces.values()].every(n => n === 1), `${etiqueta}: la cola baja cada archivo una sola vez`, [...veces].filter(([, n]) => n > 1).slice(0, 6));
     informe.nota(`${etiqueta}: ${r.vuelos.length} vuelos · cola: ${r.registro.filter(x => x.como === 'reposo' && x.fin).length} descargas en reposo, ${r.registro.filter(x => x.cortada).length} cortadas al despegar, ${r.registro.filter(x => x.como === 'ahora').length} urgentes`);
     const banda = await pagina.evaluate(() => Object.fromEntries(Object.entries(window.__bandaSonora.estado().pistas).map(([n, p]) => [n, p.estado])));
-    const listas = Object.entries(banda).filter(([, e]) => e === 'lista').map(([n]) => n);
+    // («guardada»: descargada y ya sonada; su búfer decodificado se libera al irse del lugar —memoria del iPhone—.)
+    const listas = Object.entries(banda).filter(([, e]) => e === 'lista' || e === 'guardada').map(([n]) => n);
     informe.comprobar(['cuasar', 'supernova', 'pulsar', 'ton618', 'deneb', 'sagitario'].every(n => listas.includes(n)), `${etiqueta}: las canciones de los gigantes estaban (y sonaron)`, banda);
     if (conServicio) informe.comprobar(red.length === 0 || r.vuelos.length > 0, `${etiqueta}: el service worker guarda lo que pasa (${red.length} peticiones propias)`, red.slice(0, 8));
     informe.comprobar(errores.length === 0, `${etiqueta}: sin errores en la consola`, errores.slice(0, 5));
