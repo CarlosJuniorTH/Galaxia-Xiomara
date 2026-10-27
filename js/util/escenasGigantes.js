@@ -92,8 +92,9 @@ export function latidoPulso(s, { pulso, compas = 4, desfase = 0 }, e, reducido =
 function curva(s, p) {
   if (s <= p[0][0]) return p[0][1];
   for (let i = 1; i < p.length; i++) {
-    const [b, vb, tipo] = p[i];
-    if (s < b) { const [a, va] = p[i - 1], x = (s - a) / (b - a), k = tipo === 'r' ? 1 - (1 - x) * (1 - x) * (1 - x) : x * x * (3 - 2 * x); return va + (vb - va) * k; }
+    // (Por índice, sin desestructurar: se llama decenas de veces por cuadro y cada [a, b] = … creaba memoria.)
+    const q = p[i], b = q[0], vb = q[1], tipo = q[2];
+    if (s < b) { const a = p[i - 1][0], va = p[i - 1][1], x = (s - a) / (b - a), k = tipo === 'r' ? 1 - (1 - x) * (1 - x) * (1 - x) : x * x * (3 - 2 * x); return va + (vb - va) * k; }
   }
   return p[p.length - 1][1];
 }
@@ -152,7 +153,7 @@ const PULSOS_CUASAR = [[0, 'vi', 1.2], [0, 'pedi', 0.35], [0.1, 'pedi', 0.3], [0
   [0, 'golpe1', 0.6], [0, 'golpe2', 0.6], [0, 'golpe3', 0.6], [0, 'reir', 0.5], [0.18, 'reir', 0.5], [0.46, 'reir', 0.6], [0.7, 'reir', 0.5], [0, 'cima', 1.3], [0, 'estalla', 0.8]];
 function pulsosCuasar(s, m) {
   let v = 0;
-  for (const [d, marca, k] of PULSOS_CUASAR) { const x = s - m[marca] - d; if (x >= 0 && x < 1.2) v += k * Math.exp(-x / 0.18) * Math.min(1, x * 40); }
+  for (let i = 0; i < PULSOS_CUASAR.length; i++) { const q = PULSOS_CUASAR[i], d = q[0], marca = q[1], k = q[2], x = s - m[marca] - d; if (x >= 0 && x < 1.2) v += k * Math.exp(-x / 0.18) * Math.min(1, x * 40); }
   return v;
 }
 
@@ -190,7 +191,7 @@ export function estadoCuasar(s, config, e = {}, reducido = false) {
   e.nudos ??= [-1, -1, -1, -1]; e.nudosLuz ??= [0, 0, 0, 0];
   let n = 0;
   for (let i = NUDOS_CUASAR.length - 1; i >= 0 && n < 4; i--) {
-    const [t0, k] = NUDOS_CUASAR[i], x = s - t0;
+    const t0 = NUDOS_CUASAR[i][0], k = NUDOS_CUASAR[i][1], x = s - t0;
     if (x < 0 || x >= VIDA_NUDO) continue;
     e.nudos[n] = Math.min(x / VIAJE_NUDO, Math.max(0, e.alcance - 0.01)); e.nudosLuz[n] = k * Math.min(1, x * 25) * (1 - suave(x, VIAJE_NUDO, VIDA_NUDO)) * (reducido ? 0.5 : 1); n++;
   }
@@ -199,7 +200,7 @@ export function estadoCuasar(s, config, e = {}, reducido = false) {
   // La ola de la galaxia más reciente.
   e.olaR = 0; e.olaK = 0;
   for (let i = OLAS_CUASAR.length - 1; i >= 0; i--) {
-    const [t0, k, vel] = OLAS_CUASAR[i], x = s - t0;
+    const t0 = OLAS_CUASAR[i][0], k = OLAS_CUASAR[i][1], vel = OLAS_CUASAR[i][2], x = s - t0;
     if (x < 0) continue;
     const r = 300 + x * vel; if (r < 7000) { e.olaR = r; e.olaK = k * Math.min(1, x * 8) * (1 - suave(r, 4500, 7000)) * (reducido ? 0.4 : 1); }
     break;

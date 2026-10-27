@@ -533,13 +533,17 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   const nombreEncuentro = new Map(lejanas.universo.encuentros.map(e => [e.id, e.nombre]));
   const REGIONES_NOMBRE = { salida: 'Grupo de Xiomara', extragalactica: 'Primeras regiones extragalácticas', intermedia: 'Regiones intermedias', profunda: 'Universo profundo', llegada: 'Región de la supernova' };
   const dirTmp = new THREE.Vector3(), vEncuentro = new THREE.Vector3();   // (sin memoria nueva por galaxia: menos pausas del recolector en pleno viaje)
+  let encuentros = null;
   function informarViaje(e) {
-    const p = camera.position, mal = aMal(p.length()), aSupernova = aMal(p.distanceTo(cosmos.objetivo('supernova').centro));
+    const p = camera.position, mal = aMal(p.length());
     const region = mal < 3 ? 'salida' : (universoLocal.presencia.supernova ?? 0) > 0.5 ? 'llegada' : mal < 20 ? 'extragalactica' : mal < 80 ? 'intermedia' : 'profunda';
     canvas.dataset.region = REGIONES_NOMBRE[region]; canvas.dataset.distanciaMal = mal < 10 ? mal.toFixed(1) : String(Math.round(mal));
     // El encuentro que se ve ahora (el más reconocible delante).
     camera.getWorldDirection(dirTmp); let mejor = null, mw = 0.25;
-    for (const g of lejanas.universo.galaxias) { if (!g.encuentro) continue; const v = vEncuentro.subVectors(g.pos, p), d = v.length(), px = g.radio / d * 780, c = v.dot(dirTmp) / d; const w = THREE.MathUtils.smoothstep(px, 6, 30) * THREE.MathUtils.smoothstep(c, 0.5, 0.85); if (w > mw) { mw = w; mejor = g; } }
+    // (Solo las galaxias con encuentro, en una lista hecha una vez y recorrida por índice: el bucle con for…of sobre las miles
+    // de galaxias creaba memoria en cada paso —15 MB por viaje— porque esta función, llamada cada 6 cuadros, no se optimiza.)
+    encuentros ??= lejanas.universo.galaxias.filter(g => g.encuentro);
+    for (let i = 0; i < encuentros.length; i++) { const g = encuentros[i]; const v = vEncuentro.subVectors(g.pos, p), d = v.length(), px = g.radio / d * 780, c = v.dot(dirTmp) / d; const w = THREE.MathUtils.smoothstep(px, 6, 30) * THREE.MathUtils.smoothstep(c, 0.5, 0.85); if (w > mw) { mw = w; mejor = g; } }
     const nombre = mejor ? nombreEncuentro.get(mejor.encuentro) || '' : '';
     if (canvas.dataset.encuentro !== nombre) { if (nombre) canvas.dataset.encuentro = nombre; else delete canvas.dataset.encuentro; }
   }

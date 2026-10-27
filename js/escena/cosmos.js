@@ -321,6 +321,7 @@ export function* construirCosmos({ uScale, uPR }) {
     estado(id) { const d = directores[id]; return d ? { activa: d.activa, terminada: d.terminada, segundo: d.segundo, peso: d.peso, ...(id === 'pulsar' ? estadoP : id === 'cuasar' ? estadoC : estadoD) } : null; }
   };
   // Las dos lentes (Sagitario A* y TON 618), reutilizadas en cada cuadro (lentes()).
+  const opPulsar = { e: null, e0: null, w: 0, activa: false, s: 0, t: 0, dt: 0, camara: null, reducido: false };
   const lentesFijas = [{ id: 'sagitario', centro: new THREE.Vector3(), dentro: 0, fuerza: 0, alcance: 6 }, { id: 'ton618', centro: new THREE.Vector3(), dentro: 0, fuerza: 0, alcance: 3.2 }], lentesVisibles = [];
   return {
     escenas,
@@ -446,7 +447,8 @@ export function* construirCosmos({ uScale, uPR }) {
       // Púlsar: siempre gira; en su escena despierta con la canción y queda despierto mientras se le mira (persiste).
       tActual = t; camaraMundo = camera.position;
       const dP = directores.pulsar, sP = dP.avanzar(t, dt), wP = dP.peso; estadoPulsar(sP, dP.config, estadoP, reducido);
-      piezasPulsar.actualizar({ e: estadoP, e0: pulsarDormido, w: wP, activa: dP.activa, s: sP, t, dt, camara: camaraEnPulsar(), reducido });
+      opPulsar.e = estadoP; opPulsar.e0 = pulsarDormido; opPulsar.w = wP; opPulsar.activa = dP.activa; opPulsar.s = sP; opPulsar.t = t; opPulsar.dt = dt; opPulsar.camara = camaraEnPulsar(); opPulsar.reducido = reducido;
+      piezasPulsar.actualizar(opPulsar);   // (el mismo objeto en cada cuadro)
       // Las paredes de polvo del cielo profundo y las nebulosas cercanas (nubes moradas y naranjas de bordes blancos) se apagan
       // mientras se le mira: su nebulosa es la suya, de filamentos (js/util/fondoEscena.js). Al irse, vuelven.
       if (wP > 0.0005) { pulsar.getWorldPosition(centroPulsar); atenuandoPulsar = true; atenuarFondo(centroPulsar.x, centroPulsar.y, centroPulsar.z, 12 * 3850 * pulsar.getWorldScale(camPulsar).x, wP * 0.9 * THREE.MathUtils.smoothstep(estadoP.foco, 0, 0.3)); }

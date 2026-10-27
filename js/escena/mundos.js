@@ -9,6 +9,8 @@ import * as THREE from 'three';
 import { deUnTiron } from '../util/azarSemilla.js';
 import { DESTINOS, SUENOS, CONSTELACIONES, CAPSULAS } from '../data/universo.js';
 import { capsulaAbierta } from '../util/tiempo.js';
+const COLOR_ABIERTA = new THREE.Color('#ffe0a0'), COLOR_CERRADA = new THREE.Color('#cdb8e8');
+let abiertasEn = -Infinity;
 import { texBrillo, texDestello, texTexto, texSobre, texFlor, texFlorRedonda, lienzoLuz, texNebulosa } from './texturas.js';
 import { crearDestellos, materialPuntos, geometriaPuntos } from './materiales.js';
 import { texCrateres, crearDosEstrellas } from './planetas.js';
@@ -644,7 +646,10 @@ export function* construirMundos({ scene, uScale, uPR }, { alConstelar = () => {
         if (floracion >= 1) floracion = 0;
       }
       aros.forEach((g, i) => { g.rotation.y += dt * 0.05 * (i + 1) * (i % 2 ? -1 : 1); });
-      for (const s of relicarios) { const a = s.userData.angulo + t * 0.1, abierta = capsulaAbierta(s.userData.fecha); s.position.set(Math.cos(a) * 100, 0, Math.sin(a) * 100); s.material.color.set(abierta ? '#ffe0a0' : '#cdb8e8'); s.scale.setScalar(abierta ? 24 + Math.sin(t * 2.4) * 3 : 15); }
+      // Si cada cápsula está abierta (la fecha en la zona de Argentina) se mira cada 30 s, no dos veces por cuadro: cada consulta
+      // formateaba la fecha (Intl) y creaba memoria en cada cuadro (el recolector, en pleno viaje y al girar).
+      const ahoraMs = performance.now(); if (ahoraMs - abiertasEn > 30000) { abiertasEn = ahoraMs; for (const r of relicarios) r.userData.abierta = capsulaAbierta(r.userData.fecha); }
+      for (const s of relicarios) { const a = s.userData.angulo + t * 0.1, abierta = s.userData.abierta; s.position.set(Math.cos(a) * 100, 0, Math.sin(a) * 100); s.material.color.copy(abierta ? COLOR_ABIERTA : COLOR_CERRADA); s.scale.setScalar(abierta ? 24 + Math.sin(t * 2.4) * 3 : 15); }
       const latido = Math.pow(Math.max(0, Math.sin(t * 1.6)), 6);
       corazonCapsula.scale.setScalar(62 + latido * 22); nucleoCapsula.material.opacity = 0.28 + latido * 0.2;
       cristal.material.uniforms.uT.value = t; cristal.rotation.y += dt * 0.03;
@@ -656,7 +661,7 @@ export function* construirMundos({ scene, uScale, uPR }, { alConstelar = () => {
       for (const e of espirales) e.material.uniforms.uTime.value = t;
       facetas.rotation.y -= dt * 0.04; facetas.material.opacity = 0.16 + 0.08 * Math.sin(t * 1.1);
       anilloHoras.rotation.y = t * 0.2; horas.material.uniforms.uTime.value = t;
-      rayosCapsula.forEach((m, i) => { m.material.uniforms.uT.value = t; m.material.uniforms.uA.value = capsulaAbierta(relicarios[i].userData.fecha) ? 0.9 : 0; });
+      for (let i = 0; i < rayosCapsula.length; i++) { const m = rayosCapsula[i]; m.material.uniforms.uT.value = t; m.material.uniforms.uA.value = relicarios[i].userData.abierta ? 0.9 : 0; }
       disco.material.uniforms.uTime.value = t;
       for (const f of fugaces) f.material.uniforms.uTime.value = t;
       parCalma.actualizar(t);

@@ -75,7 +75,7 @@ export function guionTon618(t, M = MARCAS_TON618, { reducido = false } = {}, o =
   o.t = t;
   // Encendido a saltos en cada «yours» (cada salto se asienta en 0,9 s); antes, el disco dormido.
   let enc = 0.12;
-  for (const [s, v] of ENCENDIDO) enc += (v - enc) * muySuave(t, s - 0.15, s + 0.9);
+  for (let i = 0; i < ENCENDIDO.length; i++) { const s = ENCENDIDO[i][0], v = ENCENDIDO[i][1]; enc += (v - enc) * muySuave(t, s - 0.15, s + 0.9); }
   o.encendido = Math.min(1, enc + (1 - enc) * muySuave(t, M.fundido, M.fundido + 2));
   o.revelar = 0.5 + 0.5 * suave(t, M.esconder, M.quizas) + 0.25 * suave(t, M.tuyo - 0.6, M.tuyo + 1) - 0.25 * suave(t, M.cumbre + 0.5, M.fundido + 2);
   o.destello = 0; o.ola = -1; o.olaR0 = 6.8; o.olaF = 0;

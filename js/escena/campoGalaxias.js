@@ -279,15 +279,16 @@ export function crearCampoGalaxias({ lista, texturas, descriptores, uPR }) {
       turno = fin >= n ? 0 : fin;
       // Las pendientes avanzan con ~1,5 ms por cuadro entre todas; la que ya va a verse (34 px: el fundido empieza a 35) se
       // termina en el acto, y la que se ha alejado otra vez se abandona.
-      const t0 = performance.now();
-      for (const [g, it] of pendientes) {
-        const px = pxDe(g, cx, cy, cz, f);
-        if (px < 12) { pendientes.delete(g); continue; }
-        const urge = px > 34;
-        if (!urge && performance.now() - t0 > 1.5) continue;
-        let r; while (!(r = it.next()).done) if (!urge && performance.now() - t0 > 1.5) break;
-        if (r.done) pendientes.delete(g);
-      }
+      // (Sin recorrer el Map con [g, it] = …: cada entrada era un par nuevo en cada cuadro.)
+      if (pendientes.size) { const t0 = performance.now();
+        pendientes.forEach((it, g) => {
+          const px = pxDe(g, cx, cy, cz, f);
+          if (px < 12) { pendientes.delete(g); return; }
+          const urge = px > 34;
+          if (!urge && performance.now() - t0 > 1.5) return;
+          let r; while (!(r = it.next()).done) if (!urge && performance.now() - t0 > 1.5) break;
+          if (r.done) pendientes.delete(g);
+        }); }
       for (const g of activas) {   // borrar de un Set mientras se recorre es seguro
         const p = g.pos, dx = p.x - cx, dy = p.y - cy, dz = p.z - cz, z = -(e[2] * p.x + e[6] * p.y + e[10] * p.z + e[14]);
         if (g.radio * f / Math.max(1, Math.sqrt(dx * dx + dy * dy + dz * dz)) < 12) { liberarEstrellas(g); continue; }

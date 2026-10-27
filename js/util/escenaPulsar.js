@@ -75,7 +75,7 @@ const suave = (s, a, b) => { const x = sat((s - a) / Math.max(1e-6, b - a)); ret
 // Vueltas por pulso en el pulso (fraccionario) b.
 export function ritmoGiro(b, { giros }) {
   if (b <= giros[0][0]) return giros[0][1];
-  for (let i = 1; i < giros.length; i++) { const [b1, r1] = giros[i]; if (b <= b1) { const [b0, r0] = giros[i - 1]; return r0 + (r1 - r0) * (b - b0) / (b1 - b0); } }
+  for (let i = 1; i < giros.length; i++) { const b1 = giros[i][0], r1 = giros[i][1]; if (b <= b1) { const b0 = giros[i - 1][0], r0 = giros[i - 1][1]; return r0 + (r1 - r0) * (b - b0) / (b1 - b0); } }
   return giros.at(-1)[1];
 }
 // Vueltas dadas desde el segundo 0 hasta el segundo s (exacto: trapecios de los tramos rectos; antes del 0, al ritmo del
@@ -88,7 +88,7 @@ export function vueltasPulsar(s, config) {
 function vueltasEn(b, giros) {
   let v = 0;
   for (let i = 1; i < giros.length; i++) {
-    const [b0, r0] = giros[i - 1], [b1, r1] = giros[i];
+    const b0 = giros[i - 1][0], r0 = giros[i - 1][1], b1 = giros[i][0], r1 = giros[i][1];   // (por índice: sin memoria nueva por cuadro)
     if (b <= b0) return v;
     const h = Math.min(b, b1) - b0, r = r0 + (r1 - r0) * h / (b1 - b0);
     v += h * (r0 + r) / 2;
