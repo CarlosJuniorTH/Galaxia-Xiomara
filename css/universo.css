@@ -31,6 +31,8 @@ button{touch-action:manipulation;}
 #btn-musica{width:46px;height:46px;bottom:calc(var(--abajo) + 39px);right:30px;background:var(--grano),var(--brillo-vidrio),#20132be6;box-shadow:none;border-color:var(--linea);}
 .cometa-aviso{position:fixed;right:30px;bottom:calc(var(--abajo) + 116px);z-index:15;}.cometa-aviso button{border:1px solid #ffdca82e;background:var(--grano),var(--brillo-vidrio),#20192df0;color:#f5dec2;padding:12px 15px;border-radius:20px;font-family:'Cormorant Garamond',serif;font-size:1rem;cursor:pointer;}.cometa-aviso span{margin-left:10px;}
 .tarjeta{width:min(430px,100%);padding:24px 32px 28px;border-color:#ecd1e328;background:linear-gradient(160deg,#2c1a388c,#120c258c);box-shadow:0 30px 100px #0005;}
+/* En el PC la tarjeta se desenfocaba por detrás; sin backdrop-filter, algo más opaca y con el grano del cristal (en el móvil ya iba sin desenfoque). */
+@media (pointer:fine){.tarjeta{background:var(--grano),var(--brillo-vidrio),linear-gradient(160deg,#2c1a38cc,#120c25d0);}}
 .tarjeta-foto{aspect-ratio:16/10;margin-bottom:26px;border-radius:15px;box-shadow:none;border:1px solid #d6b4d01c;}
 .tarjeta-foto img{animation:none;}.tarjeta-foto::after{display:none;}
 .para{font-size:.53rem;letter-spacing:3.5px;color:var(--oro);}.nombre{font-size:4.3rem;margin-top:10px;}.cita{font-size:1.23rem;color:#e0cddd;margin:8px 0 24px;}

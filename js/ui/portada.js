@@ -608,7 +608,8 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     // (la línea base del texto dentro de su caja, medida una vez: la marca es un bloque en línea de alto 0 sobre ella)
     if (r.base < 0) r.base = r.marca.offsetTop;
     const y = py - r.base;
-    if (Math.abs(px - r.x) > 0.05 || Math.abs(y - r.y) > 0.05) { r.x = px; r.y = y; r.el.style.transform = `translate3d(${px.toFixed(2)}px,${y.toFixed(2)}px,0) translateX(-50%)`; }
+    if (!(Math.abs(px - r.x) <= 0.05 && Math.abs(y - r.y) <= 0.05)) {   // (al principio r.x es NaN: se escribe)
+      r.x = px; r.y = y; r.el.style.transform = `translate3d(${px.toFixed(2)}px,${y.toFixed(2)}px,0) translateX(-50%)`; }
     const a = Math.round(Math.min(1, alfa) * 500) / 500;
     if (a !== r.a) { r.a = a; r.el.style.opacity = a; }
   }
