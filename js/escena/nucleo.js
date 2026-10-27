@@ -210,7 +210,8 @@ export function crearNucleo(canvas) {
   // allí (en el sistema solar ninguna pasada intercambia los búferes). Antes se cambiaban las muestras del de lectura y se
   // rehacía: al entrar se creaban sus búferes MSAA y al salir los normales otra vez, en pleno vuelo (bajo el fundido).
   // Ahora los de la escena principal no se tocan (al volver no se crea nada) y el MSAA se reserva en el calentamiento de
-  // la carga; en el PC se conserva, en el móvil se suelta al salir (memoria de iOS) y se vuelve a crear al entrar.
+  // la carga y se conserva (≈ un búfer de escena ×4 muestras de memoria de GPU); solo tras un cierre por memoria de iOS
+  // (nivelSeguro) se suelta al salir y se vuelve a crear al entrar, como antes.
   function fijarEscena(otra) {
     escenaActiva = otra; if (pasadaEscena) pasadaEscena.scene = otra;
     if (!post) return;
@@ -223,7 +224,7 @@ export function crearNucleo(canvas) {
       lecturaPrincipal = base; post.readBuffer = rtSolar;
     } else if (!conAA && lecturaPrincipal) {
       post.readBuffer = lecturaPrincipal; lecturaPrincipal = null;
-      if (esMovil) soltarSolar = setTimeout(() => { if (!lecturaPrincipal) { rtSolar?.dispose(); rtSolar = null; } }, 20000);
+      if (nivelSeguro >= 1) soltarSolar = setTimeout(() => { if (!lecturaPrincipal) { rtSolar?.dispose(); rtSolar = null; } }, 20000);
     }
   }
   // Tras cambiar el tamaño o la zona estando en el sistema solar, el búfer MSAA sigue al de lectura.
