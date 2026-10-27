@@ -17,6 +17,11 @@
    (sin sombras ni halos). Durante el clip el fondo es negro; al final aparece el cielo del universo (#entrada::before,
    en universo.css) detrás del corazón y la tarjeta. */
 #portada-lienzo{position:absolute;inset:0;width:100%;height:100%;}
+/* Rótulos del clip (js/ui/portada.js): en HTML, nítidos; cada uno se coloca con transform (su línea base en el punto). */
+#portada-rotulos{position:absolute;inset:0;pointer-events:none;overflow:hidden;contain:strict;}
+#portada-rotulos span{position:absolute;left:0;top:0;white-space:nowrap;opacity:0;will-change:transform,opacity;line-height:1.3;}
+#portada-rotulos b{font:inherit;}
+#portada-rotulos i{display:inline-block;width:0;height:0;}
 #entrada::before{transition:opacity 1.6s ease;}
 /* (casi invisible y no 0: así la imagen ya está decodificada y pintada cuando aparece, sin un tirón a los 30 s) */
 #entrada:not(.cielo)::before{opacity:.002;}

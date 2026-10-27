@@ -246,7 +246,10 @@ function tierraEn(x, y) { const i = Math.floor((x + 180) * MR), j = Math.floor((
 export function crearPortada(lienzo, { reloj = () => null, calma = false, alFrase = () => {}, alPrevio = () => {}, alFinal = () => {}, tarjeta = () => null } = {}) {
   const x = lienzo.getContext('2d');
   const movil = matchMedia('(pointer:coarse)').matches;
-  const dpr = Math.min(devicePixelRatio || 1, 2);
+  // El lienzo 2D, a 1,5 píxeles por píxel CSS como mucho en el móvil (2 en el PC): sus motas son cuadrados de 1,5–3 px y se
+  // ven igual de nítidas, y cada cuadro rasteriza la mitad de píxeles que a DPR 2 (con DPR 3, un cuarto). Los rótulos van
+  // en HTML encima (a la resolución de la pantalla) y el mapa de motas, en su lienzo WebGL, a DPR 2.
+  const dpr = Math.min(devicePixelRatio || 1, movil ? 1.5 : 2), dprGL = Math.min(devicePixelRatio || 1, 2);
   let ancho = 0, alto = 0, m = 0, vertical = true, k0 = 1, activo = true, id = 0, frase = -1, finalDado = false, previoDado = false, saltoCuadro = false;
   let Fx = 0, Fy = 0, Sf = 1, medidaHueco = -1;
   if (!mascara) construirMascara();
@@ -256,6 +259,13 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
   lienzo.parentNode?.insertBefore(lienzoGL, lienzo);
   const mapaGL = lienzo.parentNode ? crearMapaGL(lienzoGL) : null;
   if (!mapaGL) lienzoGL.remove();
+  // Los rótulos (nombres, distancias, coordenadas), en HTML encima del lienzo: ver rotulosHTML más abajo.
+  const capaRotulos = document.createElement('div');
+  capaRotulos.id = 'portada-rotulos'; capaRotulos.setAttribute('aria-hidden', 'true');
+  lienzo.parentNode?.insertBefore(capaRotulos, lienzo.nextSibling);
+  const rotulosHTML = new Map();
+  let usoRotulos = 0;
+  function vaciarRotulos() { rotulosHTML.clear(); capaRotulos.replaceChildren(); }
 
   // ── Contenido fijo (sembrado): el mismo en el móvil y en el PC ──
   const azar = sembrado(15122025);
@@ -323,6 +333,9 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     }
     // (la longitud de cada mota se guarda en su vector: lon = atan2(z, x))
     globo = { n: gx.length, x: Float32Array.from(gx), y: Float32Array.from(gy), z: Float32Array.from(gz), t: Uint8Array.from(gt), r: Float32Array.from(gr) };
+    // (y su sitio en el mapa plano, para el paso del mapa al globo: calculado una vez y no en cada cuadro)
+    globo.lon = new Float32Array(globo.n); globo.my = new Float32Array(globo.n);
+    for (let i = 0; i < globo.n; i++) { globo.lon[i] = Math.atan2(globo.z[i], globo.x[i]) / RAD; globo.my[i] = -merc(Math.asin(globo.y[i]) / RAD); }
     const rx = [], ry = [], rz = [];
     for (let lon = -180; lon < 180; lon += 15) for (let la = -80; la <= 80; la += 3.5) { const c = Math.cos(la * RAD); rx.push(c * Math.cos(lon * RAD)); ry.push(Math.sin(la * RAD)); rz.push(c * Math.sin(lon * RAD)); }
     for (const la of [-60, -30, 0, 30, 60]) for (let lon = -180; lon < 180; lon += 3.5) { const c = Math.cos(la * RAD); rx.push(c * Math.cos(lon * RAD)); ry.push(Math.sin(la * RAD)); rz.push(c * Math.sin(lon * RAD)); }
@@ -358,7 +371,8 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     // El océano entre los dos (y algo más), con motas al doble de paso: solo en la GPU.
     if (mapaGL) niveles.push(nivel(p0 * 2, 0, -95, 35, -90, 80, false, true));
     construirGlobo(m * 0.4);
-    if (mapaGL) { mapaGL.medir(ancho, alto, dpr); mapaGL.subir(niveles); }
+    if (mapaGL) { mapaGL.medir(ancho, alto, dprGL); mapaGL.subir(niveles); }
+    vaciarRotulos();
     // Al final, el mundo pequeño arriba y la tarjeta debajo.
     huecoMundo();
     x.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -561,61 +575,50 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     if (dato) texto(qx + 1.5, qy + tp + 9, dato, tp, 'q', 'rgb(232,200,224)', alfa, '3px', true);
   }
   // «Carlos & Xiomara»: los nombres en Great Vibes y el «&» en Cormorant Garamond redonda (el de Great Vibes y el de
-  // la cursiva parecen una «E»; es el mismo de la cabecera del universo), un poco más pequeño y alzado, con su aire a cada lado. Anchos medidos una vez por tamaño.
-  // (las fuentes del lienzo se piden ya: si no, el primer texto saldría con la de respaldo y su ancho medido, mal)
-  if (document.fonts?.load) Promise.all(["40px 'Great Vibes'", "italic 40px 'Cormorant Garamond'", "40px 'Cormorant Garamond'", "600 12px Quicksand"].map(f => document.fonts.load(f))).then(() => sellos.clear(), () => {});
+  // la cursiva parecen una «E»; es el mismo de la cabecera del universo), un poco más pequeño y alzado, con su aire a cada lado.
   function pareja(cx, py, tam, alfa) {
     if (alfa <= 0.01) return;
-    const tn = Math.round(tam), clave = 'pareja' + tn;
-    let s = sellos.get(clave);
-    if (!s) {
-      const ta = Math.round(tam * 0.92), g = lienzoSello();
-      g.font = fuente(tn, 'v'); const a = g.measureText('Carlos').width, c = g.measureText('Xiomara').width; g.font = fuente(ta, 'r'); const y = g.measureText('&').width, aire = tn * 0.2;
-      s = nuevoSello(a + y + c + 2 * aire, tn, (g, x0, base) => {
-        g.fillStyle = 'rgb(255,209,230)'; g.font = fuente(tn, 'v'); g.fillText('Carlos', x0, base); g.fillText('Xiomara', x0 + a + y + 2 * aire, base);
-        g.fillStyle = 'rgb(255,226,240)'; g.font = fuente(ta, 'r'); g.fillText('&', x0 + a + aire, base - tn * 0.04);
-      });
-      sellos.set(clave, s);
+    const tn = Math.round(tam), r = rotuloHTML('pareja|' + tn, el => {
+      const ta = Math.round(tam * 0.92), y = document.createElement('em');
+      el.style.font = fuente(tn, 'v'); el.style.color = 'rgb(255,209,230)';
+      y.textContent = '&'; y.style.cssText = `font:${fuente(ta, 'r')};color:rgb(255,226,240);margin:0 ${(tn * 0.2).toFixed(1)}px;vertical-align:${(tn * 0.04).toFixed(1)}px`;
+      el.firstChild.append('Carlos', y, 'Xiomara');
+    });
+    ponerRotulo(r, cx, py, alfa);
+  }
+  // Texto: un elemento HTML por rótulo, colocado con transform en el compositor (su línea base en py, centrado en px).
+  // Antes se estampaba en el lienzo (sellos) y salía a la resolución de este; así va siempre nítido, a la de la pantalla.
+  // Los que cambian (km, coordenadas) son el mismo elemento con otro texto.
+  // (las fuentes de los rótulos se piden ya, que estén cuando salga el primero)
+  if (document.fonts?.load) for (const f of ["40px 'Great Vibes'", "italic 40px 'Cormorant Garamond'", "40px 'Cormorant Garamond'", "600 12px Quicksand"]) document.fonts.load(f).catch(() => {});
+  // (con las fuentes ya cargadas, la línea base se vuelve a medir: con la de respaldo sale en otro sitio)
+  document.fonts?.addEventListener?.('loadingdone', () => { for (const r of rotulosHTML.values()) r.base = -1; });
+  function rotuloHTML(clave, crear) {
+    let r = rotulosHTML.get(clave);
+    if (!r) {
+      const el = document.createElement('span'), txt = document.createElement('b'), marca = document.createElement('i');
+      el.append(txt, marca); capaRotulos.append(el);
+      r = { el, txt, marca, texto: null, base: -1, x: NaN, y: NaN, a: -1, uso: 0 };
+      crear(el, txt); rotulosHTML.set(clave, r);
     }
-    ponerSello(s, cx, py, alfa);
+    return r;
   }
-  // Texto. Con fijo, se dibuja una vez en un lienzo aparte (un «sello») y en cada cuadro solo se estampa: fillText con
-  // letterSpacing en cada cuadro costaba cuadros en el móvil. Los textos que cambian (km, coordenadas), sin espaciado.
-  const sellos = new Map();
-  let lienzoMedidas = null;
-  const lienzoSello = () => (lienzoMedidas ||= document.createElement('canvas').getContext('2d'));
-  // Un sello de ancho w y cuerpo tam: un lienzo con margen para los rasgos de la letra; dibujo(g, x0, base).
-  function nuevoSello(w, tam, dibujo) {
-    const mx = tam * 0.5, arriba = tam * 1.25, abajo = tam * 0.55, c = document.createElement('canvas');
-    c.width = Math.ceil((w + 2 * mx) * dpr); c.height = Math.ceil((arriba + abajo) * dpr);
-    const g = c.getContext('2d'); g.scale(dpr, dpr); g.textBaseline = 'alphabetic'; g.textAlign = 'left';
-    dibujo(g, mx, arriba);
-    return { c, w: (w + 2 * mx), h: arriba + abajo, arriba, mx };
+  function ponerRotulo(r, px, py, alfa) {
+    r.uso = usoRotulos;
+    // (la línea base del texto dentro de su caja, medida una vez: la marca es un bloque en línea de alto 0 sobre ella)
+    if (r.base < 0) r.base = r.marca.offsetTop;
+    const y = py - r.base;
+    if (Math.abs(px - r.x) > 0.05 || Math.abs(y - r.y) > 0.05) { r.x = px; r.y = y; r.el.style.transform = `translate3d(${px.toFixed(2)}px,${y.toFixed(2)}px,0) translateX(-50%)`; }
+    const a = Math.round(Math.min(1, alfa) * 500) / 500;
+    if (a !== r.a) { r.a = a; r.el.style.opacity = a; }
   }
-  function ponerSello(s, cx, py, alfa) {
-    x.globalCompositeOperation = 'source-over'; x.globalAlpha = alfa;
-    x.drawImage(s.c, cx - s.w / 2, py - s.arriba, s.w, s.h);
-    x.globalAlpha = 1; x.globalCompositeOperation = 'lighter';
-  }
+  // (al acabar el cuadro, los rótulos que no se han puesto se apagan)
+  function apagarRotulos() { for (const r of rotulosHTML.values()) if (r.uso !== usoRotulos && r.a !== 0) { r.a = 0; r.el.style.opacity = 0; } }
   function texto(px, py, cadena, tam, familia, color, alfa, espacio = '0px', fijo = false) {
     if (alfa <= 0.01) return;
-    const tn = Math.round(tam);
-    if (fijo) {
-      const clave = cadena + '|' + tn + familia + color + espacio;
-      let s = sellos.get(clave);
-      if (!s) {
-        if (sellos.size > 60) sellos.clear();
-        const g = lienzoSello(); g.font = fuente(tn, familia); if ('letterSpacing' in g) g.letterSpacing = espacio;
-        const w = g.measureText(cadena).width; if ('letterSpacing' in g) g.letterSpacing = '0px';
-        s = nuevoSello(w, tn, (h, x0, base) => { h.fillStyle = color; h.font = fuente(tn, familia); if ('letterSpacing' in h) h.letterSpacing = espacio; h.fillText(cadena, x0, base); });
-        sellos.set(clave, s);
-      }
-      ponerSello(s, px, py, alfa);
-      return;
-    }
-    x.globalCompositeOperation = 'source-over'; x.globalAlpha = alfa; x.textAlign = 'center'; x.textBaseline = 'alphabetic';
-    x.fillStyle = color; x.font = fuente(tn, familia); x.fillText(cadena, px, py);
-    x.globalAlpha = 1; x.globalCompositeOperation = 'lighter';
+    const tn = Math.round(tam), r = rotuloHTML((fijo ? cadena : '') + '|' + tn + familia + color + espacio, el => { el.style.font = fuente(tn, familia); el.style.color = color; el.style.letterSpacing = espacio; });
+    if (r.texto !== cadena) { r.texto = cadena; r.txt.textContent = cadena; }
+    ponerRotulo(r, px, py, alfa);
   }
 
   // Revelado del mapa: cada llamada descubre la orilla de quien llama hasta donde llega su onda.
@@ -734,7 +737,7 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
         }
         // (0,5 s antes, para el frente recién descubierto; el camino encendido hasta cada luz; el ecuador desde el encuentro)
         const t0 = t - 0.5, viaja = t > H.espera;
-        Object.assign(PGL, { cX, cY, S, cg, sg, ci, si, ca, sa, D, ax, ay, ancho, alto, dpr, e0, e1, t, CX, CY, XX, XY, MX, MY, revC, revX, revM, revC0: revelado(LLAMADAS.carlos, t0), revX0: revelado(LLAMADAS.xiomara, t0), revM0: revEncuentro(t0), revCalma, penumbra,
+        Object.assign(PGL, { cX, cY, S, cg, sg, ci, si, ca, sa, D, ax, ay, ancho, alto, dpr: dprGL, e0, e1, t, CX, CY, XX, XY, MX, MY, revC, revX, revM, revC0: revelado(LLAMADAS.carlos, t0), revX0: revelado(LLAMADAS.xiomara, t0), revM0: revEncuentro(t0), revCalma, penumbra,
           escala: Math.min(1.45, pasoBase / 5.4), ecuador: ecuador(t), tC: viaja ? tC : -1, tX: t > H.respuesta ? tX : 2, camino: viaja ? 1 : 0, luz: mapaVis * atenua, destello: destelloMapa, nO, nZ });
         mapaGL.dibujar(PGL, ACTIVOS, na);
       } else for (let nvl = 0; nvl < niveles.length; nvl++) {
@@ -917,7 +920,9 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
     }
 
     // 9. Rótulos: los nombres en los primeros planos, la distancia y las coordenadas en el viaje, «0 km» en el encuentro.
+    usoRotulos++;
     if (antes) rotulos(t, tC, tX);
+    apagarRotulos();
 
     // El texto de la historia y el final (tarjeta y cielo).
     let indice = -1; for (let i = 0; i < FRASES.length; i++) if (t >= FRASES[i].desde) indice = i;
@@ -1004,8 +1009,8 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
       const yb = Y0 * cp - za * sp, zb = Y0 * sp + za * cp;
       let px = gx + xa * R, py = gy - yb * R, a = zb;
       if (plano) {
-        const lon = Math.atan2(Z0, X0) / RAD, lat = Math.asin(Y0) / RAD, k = sat((forma - 0.25 * Math.min(1, Math.abs(lon - lon0) / 90)) / 0.75);
-        if (!proyectar(lon, -merc(lat))) { if (zb < 0) continue; }
+        const lon = globo.lon[i], k = sat((forma - 0.25 * Math.min(1, Math.abs(lon - lon0) / 90)) / 0.75);
+        if (!proyectar(lon, globo.my[i])) { if (zb < 0) continue; }
         else { px = QX + (px - QX) * suave(k); py = QY + (py - QY) * suave(k); }
         a = zb < 0 ? (1 - k) * 0.8 : 0.35 + 0.65 * Math.max(zb, 1 - k);
         if (forma < 0.25) a *= forma / 0.25;
@@ -1184,7 +1189,7 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
   const api = {
     // Para las pruebas: un cuadro en un instante dado (sin esperar al reloj).
     dibujar,
-    parar() { activo = false; cancelAnimationFrame(id); removeEventListener('resize', alCambiar); clearTimeout(esperaMedir); try { lienzoGL.getContext('webgl')?.getExtension('WEBGL_lose_context')?.loseContext(); } catch {} lienzoGL.remove(); },
+    parar() { activo = false; cancelAnimationFrame(id); removeEventListener('resize', alCambiar); clearTimeout(esperaMedir); try { lienzoGL.getContext('webgl')?.getExtension('WEBGL_lose_context')?.loseContext(); } catch {} lienzoGL.remove(); capaRotulos.remove(); },
     get finalDado() { return finalDado; },
     // (para las pruebas: dónde queda el pequeño mundo del final, en px CSS)
     get mundo() { return { x: Fx, y: Fy, r: Sf }; },
