@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { radioPxDisco } from '../data/escalaCosmica.js';
 import { Q } from '../util/dispositivo.js';
 import { gauss, azar } from '../util/dibujo.js';
-import { materialPuntos, puntosPorPasos } from './materiales.js';
+import { materialPuntos, puntosPorPasos, unirCapasPuntos } from './materiales.js';
 import { deUnTiron } from '../util/azarSemilla.js';
 import { texBrillo } from './texturas.js';
 import { texturaPlaneta } from './fabricaTexturas.js';
@@ -125,8 +125,11 @@ export function* construirGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia })
   grupo.add(gas);
 
   // ── Estrellas del disco ──
-  const matEstrellas = materialPuntos({ uScale, uPR, tam: uTamGalaxia, titileo: 0.12, silueta: true });
-  mats.push(matEstrellas);
+  // Las cinco capas de estrellas aditivas (disco, bulbo, rieles, resplandor y cúmulos) van en UNA orden de dibujo: el mismo
+  // sombreador con la opacidad, el titileo y el tamaño máximo de cada capa por punto (antes, cinco materiales y cinco
+  // dibujos). Con luz que se suma, el orden no cambia nada: la misma imagen.
+  const capasDisco = [], matDisco = materialPuntos({ uScale, uPR, tam: uTamGalaxia, titileo: 1, opacidad: 1, silueta: true, porVertice: true });
+  mats.push(matDisco);
   const estrellas = yield* puntosPorPasos(n(72000), (i, p) => {
     const enDisco = Math.random() < 0.12;    // pocas estrellas entre brazos, para que se noten los espacios oscuros
     const t = Math.pow(Math.random(), 0.55);
@@ -150,12 +153,10 @@ export function* construirGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia })
     p.r = col.r * atenuar; p.g = col.g * atenuar; p.b = col.b * atenuar;
     p.s = Math.random() < 0.012 ? azar(5, 7) : azar(2.4, 4.4);
   });
-  grupo.add(new THREE.Points(estrellas, matEstrellas));
+  capasDisco.push([estrellas, { opacidad: 1, titileo: 0.12, maximo: 6 }]);
 
   // ── Bulbo central dorado-rosado ──
-  const matBulbo = materialPuntos({ uScale, uPR, tam: uTamGalaxia, titileo: 0.1, opacidad: 0.9, silueta: true });
-  mats.push(matBulbo);
-  grupo.add(new THREE.Points(yield* puntosPorPasos(n(14000), (i, p) => {
+  capasDisco.push([yield* puntosPorPasos(n(14000), (i, p) => {
     const r = 75 + Math.pow(Math.random(), 1.5) * 230;
     const th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1);
     p.x = r * Math.sin(ph) * Math.cos(th);
@@ -164,20 +165,18 @@ export function* construirGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia })
     col.setHSL(azar(0.03, 0.1), 0.7, azar(0.66, 0.86));
     p.r = col.r; p.g = col.g; p.b = col.b;
     p.s = azar(2.6, 4.8);
-  }), matBulbo));
+  }), { opacidad: 0.9, titileo: 0.1, maximo: 6 }]);
 
   // ── Rieles brillantes de los brazos (el trazo característico del original, ahora más suave) ──
-  const matRieles = materialPuntos({ uScale, uPR, tam: uTamGalaxia, titileo: 0.25, opacidad: 0.85, silueta: true });
-  mats.push(matRieles);
   const nR = n(11000);
-  grupo.add(new THREE.Points(yield* puntosPorPasos(nR, (i, p) => {
+  capasDisco.push([yield* puntosPorPasos(nR, (i, p) => {
     // Columna brillante de cada brazo: sigue exactamente la misma espiral que las estrellas
     const t = 0.04 + (i / nR) * 0.96, c = enBrazo(i % BRAZOS, t, gauss() * 0.018);
     p.x = c.x; p.y = gauss() * 2.5; p.z = c.z;
     col.setHSL(0.94 + Math.random() * 0.04, 0.7, 0.8 + Math.random() * 0.12);
     p.r = col.r; p.g = col.g; p.b = col.b;
     p.s = azar(2.6, 4.2);
-  }), matRieles));
+  }), { opacidad: 0.85, titileo: 0.25, maximo: 6 }]);
 
   yield;
   // Ruido a lo largo del brazo: crea filamentos y grumos naturales en vez de una franja uniforme
@@ -194,9 +193,7 @@ export function* construirGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia })
 
   // ── Resplandor de los brazos: decenas de miles de estrellas diminutas y tenues ──
   // Juntas forman la luz suave y continua de una galaxia real (sin manchas ni burbujas)
-  const matResplandor = materialPuntos({ uScale, uPR, tam: uTamGalaxia, maximo: 5, titileo: 0, opacidad: 1, silueta: true });
-  mats.push(matResplandor);
-  grupo.add(new THREE.Points(yield* puntosPorPasos(n(28000), (i, p) => {
+  capasDisco.push([yield* puntosPorPasos(n(28000), (i, p) => {
     const b = i % BRAZOS, c = puntoFilamento(b, 0.11);
     p.x = c.x; p.z = c.z;
     p.y = gauss() * 9 * Math.exp(-c.rad / 500);
@@ -208,25 +205,24 @@ export function* construirGalaxia({ scene, renderer, uScale, uPR, uTamGalaxia })
     const k = 0.2 + 0.22 * c.r;
     p.r = col.r * k; p.g = col.g * k; p.b = col.b * k;
     p.s = azar(3, 5);
-  }), matResplandor));
+  }), { opacidad: 1, titileo: 0, maximo: 5 }]);
 
   // ── Regiones de estrellas nuevas: puntitos rosados finos a lo largo de los brazos ──
-  const matCumulos = materialPuntos({ uScale, uPR, tam: uTamGalaxia, titileo: 0.2, opacidad: 0.85, silueta: true });
-  mats.push(matCumulos);
   const cumulos = [];
   for (let c = 0; c < 220; c++) {
     const centro = puntoFilamento(c % BRAZOS, 0.045, 0.12);
     cumulos.push({ ...centro, azul: Math.random() < 0.3 });
   }
   const porCumulo = Math.max(8, Math.round(14 * Q.k));
-  grupo.add(new THREE.Points(yield* puntosPorPasos(cumulos.length * porCumulo, (i, p) => {
+  capasDisco.push([yield* puntosPorPasos(cumulos.length * porCumulo, (i, p) => {
     const c = cumulos[Math.floor(i / porCumulo)];
     p.x = c.x + gauss() * 5; p.y = gauss() * 2.5; p.z = c.z + gauss() * 5;
     if (c.azul) col.setHSL(0.6, 0.7, azar(0.78, 0.92));
     else col.setHSL(azar(0.93, 0.97), 1, azar(0.68, 0.82));
     p.r = col.r; p.g = col.g; p.b = col.b;
     p.s = azar(1.8, 3.2);
-  }), matCumulos));
+  }), { opacidad: 0.85, titileo: 0.2, maximo: 6 }]);
+  grupo.add(new THREE.Points(unirCapasPuntos(capasDisco), matDisco));
 
   yield;
   // Resplandor suave del centro (degradado limpio, sin forma de nube)

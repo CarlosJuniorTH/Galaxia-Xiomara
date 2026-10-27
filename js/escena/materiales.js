@@ -14,9 +14,10 @@ const FORMA_CORAZON = /* glsl */`
   gl_FragColor = vec4(vC * (a * 1.15 + nucleo * 0.6), a * uOp * vF);`;
 
 const FORMA_REDONDA = /* glsl */`
-  // Sin discard: fuera del círculo color y alfa ya son 0 (con depthWrite desactivado da lo mismo), y en las GPU de
-  // teselas del móvil (PowerVR, Apple) descartar fragmentos impide sus optimizaciones de relleno.
+  // Fuera del círculo (el 21 % del cuadrado del punto) la luz es exactamente 0: se descarta y no se mezcla (menos
+  // sobrepintado). Sin escribir profundidad (depthWrite desactivado) descartar no estorba a las GPU de teselas del móvil.
   float d = length(gl_PointCoord - 0.5);
+  if (d >= 0.5) discard;
   float a = pow(max(1.0 - d * 2.0, 0.0), 1.6);
   float nucleo = 1.0 - smoothstep(0.0, 0.18, d);
   gl_FragColor = vec4(vC * (a + nucleo * 0.8), a * uOp * vF);`;
@@ -25,9 +26,11 @@ const FORMA_REDONDA = /* glsl */`
 // entre la cámara y el agujero negro, se desvanecen para que la silueta quede limpia.
 export const RADIO_SILUETA = 58;
 
-export function materialPuntos({ uScale, uPR, maximo = 6, aditivo = true, opacidad = 1, titileo = 0.15, corazon = false, silueta = false, tam = { value: 1 } }) {
+// porVertice: opacidad, titileo y tamaño máximo de cada punto en atributos (aOpacidad, aTitileo, aMaximo); los uniformes
+// uOp y uTw los multiplican. Así varias capas de puntos aditivos con distinto ajuste van en UNA orden de dibujo.
+export function materialPuntos({ uScale, uPR, maximo = 6, aditivo = true, opacidad = 1, titileo = 0.15, corazon = false, silueta = false, tam = { value: 1 }, porVertice = false }) {
   return new THREE.ShaderMaterial({
-    defines: silueta ? { SILUETA: '' } : {},
+    defines: { ...(silueta ? { SILUETA: '' } : {}), ...(porVertice ? { POR_VERTICE: '' } : {}) },
     uniforms: {
       uTime: { value: 0 },
       uScale,
@@ -44,17 +47,28 @@ export function materialPuntos({ uScale, uPR, maximo = 6, aditivo = true, opacid
       uniform float uTime, uScale, uTw, uPR, uMaximo, uTam;
       varying vec3 vC;
       varying float vF;
+      #ifdef POR_VERTICE
+        attribute float aOpacidad, aTitileo, aMaximo;
+      #endif
       void main(){
         vec4 mv = modelViewMatrix * vec4(position, 1.0);
         gl_Position = projectionMatrix * mv;
-        float tw = 1.0 - uTw + uTw * sin(uTime * (1.0 + aPhase * 2.0) + aPhase * 40.0);
+        #ifdef POR_VERTICE
+          float titileo = uTw * aTitileo, maximo = aMaximo;
+        #else
+          float titileo = uTw, maximo = uMaximo;
+        #endif
+        float tw = 1.0 - titileo + titileo * sin(uTime * (1.0 + aPhase * 2.0) + aPhase * 40.0);
         float profundidad = max(0.1, -mv.z);
         float s = aSize * uTam * tw * uScale / profundidad;
         // Límite en píxeles CSS: los DPI del teléfono no agrandan el halo.
         // Como mínimo 2 píxeles, con la misma luz (el brillo baja con el área: (s/2)²): las estrellas de 1 px saltaban de un
         // píxel al siguiente al girar despacio (parpadeaban); repartidas en 2×2 se deslizan suaves.
-        gl_PointSize = clamp(s, 2.0, max(2.0, uMaximo * uPR));
+        gl_PointSize = clamp(s, 2.0, max(2.0, maximo * uPR));
         vF = min(s * s * 0.25, 1.0) * smoothstep(18.0, 85.0, profundidad);
+        #ifdef POR_VERTICE
+          vF *= aOpacidad;
+        #endif
         #ifdef SILUETA
           // El agujero negro está en el origen. Se mide la distancia del punto al eje
           // cámara-horizonte y se compara con el radio del cono de la silueta a esa profundidad.
@@ -68,7 +82,7 @@ export function materialPuntos({ uScale, uPR, maximo = 6, aditivo = true, opacid
         #endif
         vC = aColor;
       }`,
-    fragmentShader: /* glsl */`
+    fragmentShader: /* glsl */`precision mediump float; 
       uniform float uOp;
       varying vec3 vC;
       varying float vF;
@@ -79,6 +93,24 @@ export function materialPuntos({ uScale, uPR, maximo = 6, aditivo = true, opacid
     depthWrite: false,
     blending: aditivo ? THREE.AdditiveBlending : THREE.NormalBlending
   });
+}
+
+// Une varias geometrías de puntos (de puntosPorPasos) en una, con el ajuste de cada capa en atributos por punto, para
+// materialPuntos({ porVertice: true }). capas: [[geometría, { opacidad, titileo, maximo }], …]
+export function unirCapasPuntos(capas) {
+  const total = capas.reduce((n, [g]) => n + g.attributes.position.count, 0), g = new THREE.BufferGeometry();
+  for (const [nombre, k] of [['position', 3], ['aColor', 3], ['aSize', 1], ['aPhase', 1]]) {
+    const datos = new Float32Array(total * k); let o = 0;
+    for (const [c] of capas) { datos.set(c.attributes[nombre].array, o); o += c.attributes[nombre].array.length; }
+    g.setAttribute(nombre, new THREE.BufferAttribute(datos, k));
+  }
+  for (const [nombre, campo] of [['aOpacidad', 'opacidad'], ['aTitileo', 'titileo'], ['aMaximo', 'maximo']]) {
+    const datos = new Float32Array(total); let o = 0;
+    for (const [c, ajuste] of capas) { const n = c.attributes.position.count; datos.fill(ajuste[campo], o, o + n); o += n; }
+    g.setAttribute(nombre, new THREE.BufferAttribute(datos, 1));
+  }
+  for (const [c] of capas) c.dispose();
+  return g;
 }
 
 // Crea una geometría de puntos a partir de una función generadora
@@ -138,7 +170,7 @@ export function crearDestellos(lista, { map, uScale, uPR, maximoCss = 170, ondul
         gl_PointSize = clamp(px, 1.0, uMaximo * uPR);
         vC = aColor; vO = aOpacidad * min(1.0, px * px);
       }`,
-    fragmentShader: /* glsl */`
+    fragmentShader: /* glsl */`precision mediump float; 
       uniform sampler2D map; uniform float uOpacidad; varying vec3 vC; varying float vO;
       void main(){ gl_FragColor = vec4(texture2D(map, gl_PointCoord).rgb * vC * vO * uOpacidad, 1.0); }`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
