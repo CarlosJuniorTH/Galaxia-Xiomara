@@ -1,4 +1,4 @@
-import { descargas } from '../util/descargas.js';
+import { descargas, descargarAhora } from '../util/descargas.js';
 import { configuracionActiva, FUNDIDO } from '../data/bandaSonora.js';
 import { marcasCruzadas, momentoReposo } from '../util/sincronia.js';
 import { partesEnZona } from '../util/tiempo.js';
@@ -20,9 +20,9 @@ const SILENCIO = (() => {
   let s = ''; for (const x of new Uint8Array(b.buffer)) s += String.fromCharCode(x);
   return 'data:audio/wav;base64,' + btoa(s);
 })();
-// Se cuentan en la pantalla de carga (se descargan con ella y se dejan como blob, listos para sonar); los demás también
-// se descargan en la carga, pero sin pasar por aquí (js/util/precarga.js: al caché, sin blob ni <audio>) y se leen de
-// ahí (sin red) al viajar hacia su destino.
+// Se cuentan en la pantalla de carga (se descargan con ella y se dejan como blob, listos para sonar); los demás los baja
+// después la cola de descargas en los momentos libres (js/util/precarga.js, al caché, sin blob ni <audio>) y se leen de
+// ahí al elegir su destino (descargarAhora: si aún no habían llegado, se piden en ese momento).
 const CON_LA_CARGA = new Set(['inicio', 'viajes']);
 const FUNDIDO_ESTANCIA = 3;   // de la canción de un lugar a su versión instrumental (estancia): más lento, sin que se note
 // WebKit (Safari y todo navegador de iOS): sin cambiar playbackRate sobre la marcha (da golpes en el audio).
@@ -55,26 +55,22 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
       let contados = 0;
       try {
         await indice;
-        const r = await fetch(p.url, { priority: p.contar ? 'high' : 'low' });
-        if (!r.ok) throw Error(`HTTP ${r.status}`);
-        p.avisar(true);
-        // Sin entrada en el índice, al menos lo que diga el servidor (el total crece un poco al empezar).
-        if (p.contar && !p.previsto) { p.previsto = Number(r.headers.get('content-length')) || 0; if (p.previsto) descargas.previsto(p.previsto); }
-        const trozos = [];
-        // Las que no cuentan en la barra de carga (las de los destinos, que bajan en segundo plano justo cuando empieza la
-        // entrada tras la intro) se reciben enteras, sin leerlas a trozos: cada trozo despertaba al hilo principal
-        // (10–40 ms con la CPU ×4, encima de los cuadros del vuelo de entrada) y además se copiaba a la memoria de la página.
-        if (!p.contar) { trozos.push(await r.blob()); }
-        else if (r.body?.getReader) {
-          const lector = r.body.getReader();
-          for (;;) { const { done, value } = await lector.read(); if (done) break; trozos.push(value); const k = Math.min(value.byteLength, p.previsto - contados); if (k > 0) { contados += k; descargas.hecho(k); } }
-        } else { trozos.push(await r.arrayBuffer()); if (p.previsto) { descargas.hecho(p.previsto); contados = p.previsto; } }
+        // Por la cola de descargas (util/descargas.js): una sola descarga por archivo, aunque la cola de reposo ya lo
+        // estuviera bajando. Las de la carga (intro y viajes) cuentan sus bytes en la barra según llegan.
+        const blob = await descargarAhora(p.url, {
+          prioridad: p.contar ? 'high' : 'auto',
+          alResponder: r => {
+            p.avisar(true);
+            // Sin entrada en el índice, al menos lo que diga el servidor (el total crece un poco al empezar).
+            if (p.contar && !p.previsto) { p.previsto = Number(r.headers.get('content-length')) || 0; if (p.previsto) descargas.previsto(p.previsto); }
+          },
+          alAvance: p.contar ? k => { k = Math.min(k, p.previsto - contados); if (k > 0) { contados += k; descargas.hecho(k); } } : null
+        });
         if (contados < p.previsto) { descargas.previsto(contados - p.previsto); p.previsto = contados; }   // el contador siempre termina
-        p.blobUrl = URL.createObjectURL(new Blob(trozos, { type: /\.m4a$/i.test(p.url) ? 'audio/mp4' : r.headers.get('content-type') || '' }));
+        p.blobUrl = URL.createObjectURL(/\.m4a$/i.test(p.url) ? new Blob([blob], { type: 'audio/mp4' }) : blob);
         p.estado = 'lista';
         if (p.el) { p.conSilencio = false; p.el.src = p.blobUrl; }
-        // Su estancia (la instrumental para después), detrás y sin prisa.
-        const e = pistas.get(`${p.nombre}-estancia`); if (e) setTimeout(() => descargar(e), 1000);
+        // (Su estancia, la instrumental para después, la pide la llegada al lugar; antes, la cola de reposo.)
         if (objetivo === p.nombre) aplicar();
       } catch (e) {
         console.warn(`Banda sonora: sin «${p.nombre}» (${e.message}); suena el ambiente.`);
@@ -385,6 +381,8 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
   };
   function llegar(id, antes, espera) {
     lugar = id; viajeEnCurso = null;
+    // Su estancia (la instrumental que sigue a la canción), al llegar, si la cola de reposo aún no la había bajado.
+    const e = pistas.get(`${id}-estancia`); if (e?.estado === 'pendiente') descargar(e);
     const entrada = primeraLlegada; primeraLlegada = false;
     if (protegerInicio) { protegerInicio = false; if (objetivo === 'inicio') return; }
     // La canción de casa es la de volver: al terminar el vuelo de entrada, el reposo.
