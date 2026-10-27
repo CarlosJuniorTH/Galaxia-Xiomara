@@ -109,7 +109,7 @@ export function crearCampoGalaxias({ lista, texturas, descriptores, uPR }) {
           // Por debajo de ~3 px la galaxia es una luz no resuelta (luzNoResuelta): la imagen entra al crecer.
           vF = smoothstep(1.5, 3.5, px) * max(0.0, 1.0 - estrellas) / coseno;
           gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0); }`,
-      fragmentShader: 'uniform sampler2D uMapa; varying vec2 vUv; varying vec3 vC; varying float vF; void main(){ if (vF < 0.004) discard; gl_FragColor = vec4(texture2D(uMapa, vUv).rgb * vC * vF, 1.0); }',
+      fragmentShader: 'precision mediump float; uniform sampler2D uMapa; varying vec2 vUv; varying vec3 vC; varying float vF; void main(){ if (vF < 0.004) discard; gl_FragColor = vec4(texture2D(uMapa, vUv).rgb * vC * vF, 1.0); }',
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }), gs.length);
     gs.forEach((g, i) => { m.compose(g.pos, g.quaternion, esc.set(g.radio * 2, g.radio * 2, g.radio * 2)); im.setMatrixAt(i, m); im.setColorAt(i, color.setScalar(g.op)); g.instancia = { im, i, textura: texturas[t] }; });
     im.geometry.setAttribute('aBeta', new THREE.InstancedBufferAttribute(new Float32Array(gs.length).fill(0.45), 1));   // provisional hasta medir la textura
@@ -122,7 +122,7 @@ export function crearCampoGalaxias({ lista, texturas, descriptores, uPR }) {
         vA = smoothstep(35.0, 80.0, px); vC = aColor;
         gl_PointSize = vA > 0.004 ? aTam * uPR : 0.0;
         gl_Position = vA > 0.004 ? projectionMatrix * modelViewMatrix * vec4(position, 1.0) : vec4(2.0, 2.0, 2.0, 1.0); }`,
-    fragmentShader: 'varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; float a = pow(1.0 - d * 2.0, 1.6) * vA; gl_FragColor = vec4(vC * a, a); }',
+    fragmentShader: 'precision mediump float; varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; float a = pow(1.0 - d * 2.0, 1.6) * vA; gl_FragColor = vec4(vC * a, a); }',
     // premultipliedAlpha: el color ya lleva el alfa (vC·a); sin esto WebGL lo multiplicaba otra vez
     // por a y el fundido de las estrellas era a² (más apagado y más brusco que el de la imagen).
     transparent: true, premultipliedAlpha: true, depthWrite: false, blending: THREE.AdditiveBlending });
@@ -226,7 +226,7 @@ export function crearCampoGalaxias({ lista, texturas, descriptores, uPR }) {
         vC = aColor * (4.0 * px * px * estira / (0.1678 * ${(TAM_LUZ * TAM_LUZ).toFixed(1)})) * fundido * comprime;
         gl_PointSize = fundido > 0.001 ? ${TAM_LUZ.toFixed(1)} * uPR : 0.0;
         gl_Position = fundido > 0.001 ? projectionMatrix * mv : vec4(2.0, 2.0, 2.0, 1.0); }`,
-    fragmentShader: 'varying vec3 vC; void main(){ float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; float a = pow(1.0 - d * 2.0, 1.6); gl_FragColor = vec4(vC * a, a); }',
+    fragmentShader: 'precision mediump float; varying vec3 vC; void main(){ float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; float a = pow(1.0 - d * 2.0, 1.6); gl_FragColor = vec4(vC * a, a); }',
     transparent: true, premultipliedAlpha: true, depthWrite: false, blending: THREE.AdditiveBlending }));
   puntosLuz.frustumCulled = false; puntosLuz.renderOrder = -2; puntosLuz.userData.luzNoResuelta = true; grupo.add(puntosLuz);
   // Color medio REAL de cada imagen para su luz no resuelta (la misma galaxia, el mismo color).

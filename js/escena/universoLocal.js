@@ -48,7 +48,7 @@ const materialEstrellas = (uPR) => new THREE.ShaderMaterial({
     void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv;
       gl_PointSize = aTam * uPR; vBrillante = step(3.2, aTam);
       vA = uVisible * (0.75 + 0.25 * sin(uT * (0.6 + aFase * 1.8) + aFase * 40.0)); vC = aCol; }`,
-  fragmentShader: /* glsl */`varying vec3 vC; varying float vA, vBrillante;
+  fragmentShader: /* glsl */`precision mediump float; varying vec3 vC; varying float vA, vBrillante;
     void main(){ vec2 q = gl_PointCoord - 0.5; float d = length(q) * 2.0; if (d > 1.0) discard;
       float k = exp(-d * d * 7.0) + vBrillante * (exp(-d * 3.0) * 0.25 + (exp(-abs(q.x) * 40.0) + exp(-abs(q.y) * 40.0)) * exp(-d * 2.5) * 0.35);
       gl_FragColor = vec4(vC * k * vA, k * vA); }`,
@@ -147,7 +147,7 @@ export function* construirUniversoLocal({ scene, uPR, uScale, centros }) {
           float destello = exp(-pow(fract(aS - uT * 0.06) * 14.0, 2.0)) + exp(-pow((1.0 - fract(aS - uT * 0.06)) * 40.0, 2.0));
           vA = dibujado * (0.85 + 0.15 * sin(uT * 2.0 + aS * 90.0) + destello * 2.2) * min(1.0, uVis * 1.5);
           vA *= junto; vC = aCol; gl_PointSize = (aTam * mix(0.6, 1.0, junto) + destello * 1.6 * junto) * uPR; }`,
-      fragmentShader: /* glsl */`varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; if (d > 1.0) discard; float a = (exp(-d * d * 5.0) + exp(-d * 2.2) * 0.4) * vA; gl_FragColor = vec4(vC * a, a); }`,
+      fragmentShader: /* glsl */`precision mediump float; varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; if (d > 1.0) discard; float a = (exp(-d * d * 5.0) + exp(-d * 2.2) * 0.4) * vA; gl_FragColor = vec4(vC * a, a); }`,
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
     trazos.frustumCulled = false; trazos.renderOrder = -10; grupo.add(trazos);
     regiones.push({ id, centro, dentro, fuera, A, estrellas, estrellasC, velo, trazos, grupo });

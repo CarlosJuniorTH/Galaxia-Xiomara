@@ -95,7 +95,7 @@ export function* construirViaLactea({ scene, uPR }) {
   const uLuz = { value: 1 };
   const estrellas = new THREE.Points(g, new THREE.ShaderMaterial({ uniforms: { uLuz, uPR },
     vertexShader: 'attribute vec3 aColor; attribute float aTam; uniform float uLuz, uPR; varying vec3 vC; void main(){ vC = aColor * uLuz; gl_PointSize = aTam * uPR; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    fragmentShader: 'varying vec3 vC; void main(){ float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; float a = pow(1.0 - d * 2.0, 1.6); gl_FragColor = vec4(vC * a, a); }',
+    fragmentShader: 'precision mediump float; varying vec3 vC; void main(){ float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; float a = pow(1.0 - d * 2.0, 1.6); gl_FragColor = vec4(vC * a, a); }',
     transparent: true, premultipliedAlpha: true, depthWrite: false, blending: THREE.AdditiveBlending }));
   estrellas.frustumCulled = false; estrellas.renderOrder = 2; grupo.add(estrellas);
 
@@ -136,7 +136,7 @@ export function* construirViaLactea({ scene, uPR }) {
         float tam = clamp(px, 1.0, 320.0), cerca = smoothstep(aR * 1.5, aR * 4.0, z);
         vC = aColor * ${K_DIFUSA} * uDifusa * min(1.0, (px * px) / (tam * tam)) * cerca;
         gl_PointSize = z > 0.0 && cerca > 0.001 ? tam * uPR : 0.0; gl_Position = projectionMatrix * mv; }`,
-    fragmentShader: 'varying vec3 vC; void main(){ vec2 q = gl_PointCoord - 0.5; float d2 = dot(q, q) * 4.0; if (d2 > 1.0) discard; float a = exp(-d2 * 3.5) * (1.0 - d2); gl_FragColor = vec4(vC * a, a); }',
+    fragmentShader: 'precision mediump float; varying vec3 vC; void main(){ vec2 q = gl_PointCoord - 0.5; float d2 = dot(q, q) * 4.0; if (d2 > 1.0) discard; float a = exp(-d2 * 3.5) * (1.0 - d2); gl_FragColor = vec4(vC * a, a); }',
     transparent: true, premultipliedAlpha: true, depthWrite: false, blending: THREE.AdditiveBlending }));
   difusa.frustumCulled = false; difusa.renderOrder = 0; grupo.add(difusa);
 
@@ -158,7 +158,7 @@ export function* construirViaLactea({ scene, uPR }) {
       void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); float z = -mv.z, px = 2.0 * aR * uFocal / max(1.0, z);
         vA = smoothstep(4.0, 14.0, px) * smoothstep(aR * 1.5, aR * 4.0, z);
         gl_PointSize = z > 0.0 && vA > 0.001 ? clamp(px, 1.0, 360.0) * uPR : 0.0; gl_Position = projectionMatrix * mv; }`,
-    fragmentShader: 'uniform float uPolvo; varying float vA; void main(){ vec2 q = gl_PointCoord - 0.5; float d2 = dot(q, q) * 4.0; if (d2 > 1.0) discard; gl_FragColor = vec4(0.02, 0.008, 0.012, exp(-d2 * 3.0) * (1.0 - d2) * 0.22 * uPolvo * vA); }',
+    fragmentShader: 'precision mediump float; uniform float uPolvo; varying float vA; void main(){ vec2 q = gl_PointCoord - 0.5; float d2 = dot(q, q) * 4.0; if (d2 > 1.0) discard; gl_FragColor = vec4(0.02, 0.008, 0.012, exp(-d2 * 3.0) * (1.0 - d2) * 0.22 * uPolvo * vA); }',
     transparent: true, depthWrite: false }));
   polvo.frustumCulled = false; polvo.renderOrder = 1; grupo.add(polvo);
 
@@ -168,7 +168,7 @@ export function* construirViaLactea({ scene, uPR }) {
   const uPunto = { value: 0 }, uTamPunto = { value: 3 };
   const punto = new THREE.Points(gl, new THREE.ShaderMaterial({ uniforms: { uPunto, uTamPunto, uPR },
     vertexShader: 'uniform float uTamPunto, uPR; void main(){ gl_PointSize = uTamPunto * uPR; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    fragmentShader: 'uniform float uPunto; void main(){ float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; float a = pow(1.0 - d * 2.0, 1.6) * uPunto; gl_FragColor = vec4(vec3(1.0, 0.9, 0.82) * a, a); }',
+    fragmentShader: 'precision mediump float; uniform float uPunto; void main(){ float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; float a = pow(1.0 - d * 2.0, 1.6) * uPunto; gl_FragColor = vec4(vec3(1.0, 0.9, 0.82) * a, a); }',
     transparent: true, premultipliedAlpha: true, depthWrite: false, blending: THREE.AdditiveBlending }));
   punto.frustumCulled = false; grupo.add(punto);
   const v = new THREE.Vector3();

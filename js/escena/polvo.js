@@ -31,7 +31,7 @@ export function crearPolvo({ scene, uPR }) {
         vC = mix(vec3(1.0, 0.9, 0.95), vec3(0.85, 0.88, 1.0), aSemilla.w);
         gl_PointSize = clamp((1.6 + aSemilla.w * 2.2) * uPR * (240.0 / max(60.0, -mv.z)), 1.0, 4.5 * uPR);
       }`,
-    fragmentShader: 'varying float vA; varying vec3 vC; void main(){ float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; float k = pow(1.0 - d * 2.0, 1.5) * vA; gl_FragColor = vec4(vC * k, k); }',
+    fragmentShader: 'precision mediump float; varying float vA; varying vec3 vC; void main(){ float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; float k = pow(1.0 - d * 2.0, 1.5) * vA; gl_FragColor = vec4(vC * k, k); }',
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
   }));
 
@@ -61,7 +61,7 @@ export function crearPolvo({ scene, uPR }) {
         vA = visible(p) * smoothstep(220.0, 900.0, uRapidez) * (0.16 + aSemilla.w * 0.18);
         vLado = aEsquina.y; vLargo = aEsquina.x;
       }`,
-    fragmentShader: 'varying float vA, vLado, vLargo; void main(){ float a = vA * max(0.0, 1.0 - vLado * vLado) * pow(max(0.0, 1.0 - vLargo), 1.4); gl_FragColor = vec4(vec3(1.0, 0.94, 0.97) * a, a); }',
+    fragmentShader: 'precision mediump float; varying float vA, vLado, vLargo; void main(){ float a = vA * max(0.0, 1.0 - vLado * vLado) * pow(max(0.0, 1.0 - vLargo), 1.4); gl_FragColor = vec4(vec3(1.0, 0.94, 0.97) * a, a); }',
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide
   }));
   for (const o of [puntos, lineas]) { o.frustumCulled = false; o.renderOrder = 3; scene.add(o); }

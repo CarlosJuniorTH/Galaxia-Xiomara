@@ -82,7 +82,7 @@ export function crearCielo({ scene, camera, uScale }) {
         float e = aLuz * uPxRad * uPxRad, s = clamp(sqrt(e / (${PERFIL} * 2.5)), 2.0, 48.0);
         gl_PointSize = s; vC = aColor * uI * e / (s * s * ${PERFIL});
       }`,
-    fragmentShader: 'varying vec3 vC; void main(){ float d = length(gl_PointCoord - 0.5); gl_FragColor = vec4(vC * pow(max(1.0 - d * 2.0, 0.0), 1.6), 1.0); }',
+    fragmentShader: 'precision mediump float; varying vec3 vC; void main(){ float d = length(gl_PointCoord - 0.5); gl_FragColor = vec4(vC * pow(max(1.0 - d * 2.0, 0.0), 1.6), 1.0); }',
     // Con prueba de profundidad (están en el plano lejano, como el fondo de three.js): solo donde no hay nada delante. Se
     // dibujan con lo transparente, después de lo opaco: sin ella salían encima de planetas y sombras.
     transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending

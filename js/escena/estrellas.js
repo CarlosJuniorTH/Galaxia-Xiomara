@@ -27,7 +27,7 @@ export function crearEstrellas({ scene, uScale, uPR }) {
         gl_PointSize = aSize * uPR * (0.7 + 0.5 * vTw);
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }`,
-    fragmentShader: /* glsl */`
+    fragmentShader: /* glsl */`precision mediump float; 
       uniform float uOpacidad; varying vec3 vC; varying float vTw;
       void main(){
         float d = length(gl_PointCoord - 0.5);
