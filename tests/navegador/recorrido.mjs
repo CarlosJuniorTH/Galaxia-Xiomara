@@ -107,7 +107,8 @@ async function recorrer(base, nombre, { destinos = TODOS, log = console.log } = 
       await pagina.waitForFunction(() => window.__intro?.empezado, null, { timeout: 300000, polling: 50 });
     });
     await tramo('clip de la intro');
-    if (process.env.HASTA === 'toque') return { configuracion: nombre, perfil: conf.perfil, viewport: vp0(conf), dpr: PERFILES[conf.perfil].deviceScaleFactor, cpu: conf.cpu, red: { antesDelToque: resumirRed(red.peticiones.filter(p => p.t < tToque)), archivos: red.peticiones.filter(p => p.t < tToque && p.estado === 200).map(p => [p.ruta, p.bytes, p.disco]) }, tramos: [], errores: [] };
+    const tClip = Date.now();
+    if (process.env.HASTA === 'toque') return { configuracion: nombre, perfil: conf.perfil, viewport: vp0(conf), dpr: PERFILES[conf.perfil].deviceScaleFactor, cpu: conf.cpu, red: { antesDelToque: resumirRed(red.peticiones.filter(p => p.t < tToque)), antesDelClip: resumirRed(red.peticiones.filter(p => p.t < tClip)), archivos: red.peticiones.filter(p => p.t < tToque && p.estado === 200).map(p => [p.ruta, p.bytes, p.disco]) }, tramos: [], errores: [] };
     await pagina.waitForFunction(() => document.getElementById('entrada').classList.contains('formado'), null, { timeout: 200000, polling: 100 });
     await tramo('tarjeta');
     await pagina.waitForFunction(() => document.getElementById('btn-entrar')?.classList.contains('preparado'), null, { timeout: 200000, polling: 100 });
@@ -123,6 +124,13 @@ async function recorrer(base, nombre, { destinos = TODOS, log = console.log } = 
 
     // Gestos: un giro con arrastre y suelta rápida (inercia) y un zoom (pellizco en el móvil, rueda en el PC).
     const vp = PERFILES[conf.perfil].viewport, cx = vp.width / 2, cy = vp.height / 2;
+    // Un gesto dura hasta que la vista se para del todo (su inercia incluida: escena.enGesto); entonces empieza la calma
+    // (lo que se haga en reposo ya no es «durante un gesto»).
+    const quieto = async () => {
+      await pagina.waitForTimeout(200);
+      await pagina.waitForFunction(() => !(window.__galaxia.escena.enGesto ?? false), null, { timeout: 8000, polling: 'raf' }).catch(() => log('    (la vista no se paró en 8 s)'));
+      const n = await pagina.evaluate(() => window.__medidor.tramoActual); await tramo(`quieto tras ${n}`); await pagina.waitForTimeout(1500);
+    };
     const giro = async () => {
       if (conf.tactil) {
         let x = cx - 120, y = cy; await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
@@ -133,20 +141,20 @@ async function recorrer(base, nombre, { destinos = TODOS, log = console.log } = 
         for (let k = 0; k < 24; k++) { x += k < 16 ? 12 : 30; await pagina.mouse.move(x, y + (k % 2 ? 1 : -1)); await pagina.waitForTimeout(16); }
         await pagina.mouse.up();
       }
-      await pagina.waitForTimeout(3500);   // la inercia hasta pararse
+      await quieto();   // la inercia hasta pararse
     };
     const zoom = async () => {
       if (conf.tactil) {
         for (const sentido of [1, -1]) {
           let d = sentido > 0 ? 60 : 200; await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: cx - d / 2, y: cy, id: 1 }, { x: cx + d / 2, y: cy, id: 2 }] });
           for (let k = 0; k < 20; k++) { d += sentido * 7; await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: cx - d / 2, y: cy, id: 1 }, { x: cx + d / 2, y: cy, id: 2 }] }); await pagina.waitForTimeout(16); }
-          await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await pagina.waitForTimeout(1200);
+          await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await pagina.waitForTimeout(300);
         }
       } else {
         await pagina.mouse.move(cx, cy);
-        for (const s of [-240, 240]) { for (let k = 0; k < 10; k++) { await pagina.mouse.wheel(0, s); await pagina.waitForTimeout(40); } await pagina.waitForTimeout(1200); }
+        for (const s of [-240, 240]) { for (let k = 0; k < 10; k++) { await pagina.mouse.wheel(0, s); await pagina.waitForTimeout(40); } await pagina.waitForTimeout(300); }
       }
-      await pagina.waitForTimeout(1000);
+      await quieto();
     };
     // El tramo de un gesto empieza con el primer contacto (pointerdown o rueda), en la página: no antes.
     const alGesto = n => pagina.evaluate(n => { const f = () => { removeEventListener('pointerdown', f, true); removeEventListener('wheel', f, true); window.__medidor.tramo(n); }; addEventListener('pointerdown', f, true); addEventListener('wheel', f, true); }, n).then(() => { marcasNodo.push([Date.now(), n]); log(`  · ${n}`); });
@@ -189,7 +197,7 @@ async function recorrer(base, nombre, { destinos = TODOS, log = console.log } = 
     const antes = resumirRed(red.peticiones.filter(p => p.t < tToque));
     return {
       configuracion: nombre, perfil: conf.perfil, viewport: vp, dpr: PERFILES[conf.perfil].deviceScaleFactor, cpu: conf.cpu, consulta, gpuDisponible: r.gpu, lienzo: r.lienzo,
-      red: { antesDelToque: { MB: antes.MB, MBdisco: antes.MBdisco, bytes: antes.bytes, descargas: antes.descargas, archivos: red.peticiones.filter(p => p.t < tToque && p.estado === 200).map(p => [p.ruta, p.bytes, p.disco]) }, total: resumirRed(red.peticiones), repetidos: [...veces].filter(([, n]) => n > 1).map(([ruta, n]) => ({ ruta, veces: n })) },
+      red: { antesDelClip: (({ MB, MBdisco, descargas }) => ({ MB, MBdisco, descargas }))(resumirRed(red.peticiones.filter(p => p.t < tClip))), antesDelToque: { MB: antes.MB, MBdisco: antes.MBdisco, bytes: antes.bytes, descargas: antes.descargas, archivos: red.peticiones.filter(p => p.t < tToque && p.estado === 200).map(p => [p.ruta, p.bytes, p.disco]) }, total: resumirRed(red.peticiones), repetidos: [...veces].filter(([, n]) => n > 1).map(([ruta, n]) => ({ ruta, veces: n })) },
       tramos, errores: errores.slice(0, 10)
     };
   } finally { red.quitar(); await navegador.close(); }
@@ -200,7 +208,9 @@ export function evaluar(res) {
   const conf = CONFIGURACIONES[res.configuracion];
   for (const t of res.tramos) {
     const mal = [];
+    // Con menos de 10 cuadros (un clic, un toque) p95 y p99 son el peor: se le pide lo mismo que al p99.
     const medible = t.cuadros >= 10;
+    if (!medible && t.cuadros > 0 && t.tipo !== 'carga' && t.max >= 20) mal.push(`un tramo corto con un cuadro de ${t.max} ms (≥ 20 ms)`);
     if (medible && t.tipo !== 'carga') {
       if (t.p95 > VSYNC) mal.push(`p95 ${t.p95} > 16,7 ms`);
       if (t.p99 >= 20) mal.push(`p99 ${t.p99} ≥ 20 ms`);
@@ -232,7 +242,7 @@ export function evaluar(res) {
 
 function tabla(res) {
   const filas = res.tramos.map(t => `${t.nombre.padEnd(26)} ${String(t.fps).padStart(5)} ${String(t.p50).padStart(6)} ${String(t.p95).padStart(6)} ${String(t.p99).padStart(6)} ${String(t.sobre25).padStart(4)} ${String(t.sobre50).padStart(4)} ${String(t.loaf.n).padStart(4)} ${String(t.dibujo.llamadasP50).padStart(5)} ${String(t.gpu.p50 ?? '-').padStart(6)} ${String(t.red.MB).padStart(6)}  ${t.incumple.join('; ')}`);
-  return [`${res.configuracion} (${res.viewport.width}×${res.viewport.height}, DPR ${res.dpr}, CPU ×${res.cpu}) · antes del toque ${res.red.antesDelToque.MB} MB por la red (${res.red.antesDelToque.MBdisco} MB en disco) · repetidos ${res.red.repetidos.length}`,
+  return [`${res.configuracion} (${res.viewport.width}×${res.viewport.height}, DPR ${res.dpr}, CPU ×${res.cpu}) · antes del toque ${res.red.antesDelToque.MB} MB por la red (${res.red.antesDelToque.MBdisco} MB en disco) · antes del clip ${res.red.antesDelClip.MB} MB · repetidos ${res.red.repetidos.length}`,
     'tramo                        FPS    p50    p95    p99  >25  >50 LoAF  draw  GPUms   red MB  incumple', ...filas, ...(res.incumpleGlobal.length ? ['GLOBAL: ' + res.incumpleGlobal.join('; ')] : [])].join('\n');
 }
 
@@ -247,7 +257,7 @@ async function todo(base, nombres, log) {
       try { r = await recorrer(base, n, { destinos, log }); if (!process.env.HASTA) r = evaluar(r); }
       catch (e) { log(`  ${n}: el recorrido falló (${e.message.split('\n')[0]})${intento < 2 ? ', se repite' : ''}`); if (intento === 2) salida.configuraciones[n] = { error: e.message.split('\n')[0] }; }
     }
-    if (r && process.env.HASTA) { salida.configuraciones[n] = r; log(`${n}: antes del toque ${r.red.antesDelToque.MB} MB (${r.red.antesDelToque.MBdisco} MB en disco)`); continue; }
+    if (r && process.env.HASTA) { salida.configuraciones[n] = r; log(`${n}: antes del toque ${r.red.antesDelToque.MB} MB (${r.red.antesDelToque.MBdisco} MB en disco) · antes del clip ${r.red.antesDelClip.MB} MB (${r.red.antesDelClip.MBdisco} en disco)`); continue; }
     if (r) { salida.configuraciones[n] = r; log(tabla(r)); }
   }
   return salida;
