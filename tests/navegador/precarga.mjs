@@ -22,7 +22,7 @@ async function recorrer(base, informe, { perfil, consulta, conServicio }) {
     // los viajes, más la página y sus módulos, estilos y fuentes (lo que pesen comprimidos); nada de los destinos.
     const tex = JSON.parse(readFileSync('assets/texturas/indice.json', 'utf8')), grupo = perfil === 'pc' ? 'pc-0' : 'movil-0';
     const esperado = tex.grupos[grupo].reduce((a, n) => a + tex.archivos[n], 0) + tex.cielo.media + tex.horno + indice['inicio.m4a'].bytes + indice['viajes.m4a'].bytes;
-    informe.comprobar(carga.total > esperado - 200000 && carga.total < esperado + 2.5 * 1048576, `${etiqueta}: la carga cuenta solo lo imprescindible (${(carga.total / 1048576).toFixed(1)} MB; sin los ${(bytesDestinos / 1048576).toFixed(1)} MB de canciones de destinos y estancias)`, { total: carga.total, esperado });
+    informe.comprobar(carga.total > esperado - 200000 && carga.total < esperado + 3.5 * 1048576 /* (sin gzip, los módulos pesan ~3 MB) */, `${etiqueta}: la carga cuenta solo lo imprescindible (${(carga.total / 1048576).toFixed(1)} MB; sin los ${(bytesDestinos / 1048576).toFixed(1)} MB de canciones de destinos y estancias)`, { total: carga.total, esperado });
     if (conServicio) informe.comprobar(carga.controlada, `${etiqueta}: la página está controlada por el service worker`, carga);
     // En la página: los intervalos de vuelo (cada cuadro) y todo lo que pide (PerformanceObserver: módulos, fuentes, imágenes…).
     await pagina.evaluate(() => {
