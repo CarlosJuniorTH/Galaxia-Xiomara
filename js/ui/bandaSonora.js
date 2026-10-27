@@ -347,7 +347,7 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
     aplicar(1.2);
   }
   const reanudar = () => {
-    if (!ctx || document.hidden) return;
+    if (!ctx || document.hidden || !activa) return;   // (sin música pedida —antes del toque— el contexto sigue parado)
     clearTimeout(suspension);
     const despues = () => { if (ctx.state === 'running') { if (!volviendo) return; volviendo = false; volver(); } else reanudarConToque(); };
     if (ctx.state === 'running') { if (volviendo) { volviendo = false; volver(); } else aplicar(1.2); return; }
