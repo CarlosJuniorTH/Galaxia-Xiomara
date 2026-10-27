@@ -1,0 +1,276 @@
+{
+ "fecha": "2026-10-27T13:48:26.540Z",
+ "commit": "482d026",
+ "formato": "jpeg",
+ "intro": [
+  2,
+  8,
+  20.5,
+  25.5,
+  28.5
+ ],
+ "gigantes": [
+  [
+   "pulsar",
+   18.5
+  ],
+  [
+   "cuasar",
+   29.8
+  ],
+  [
+   "deneb",
+   21.5
+  ],
+  [
+   "ton618",
+   32.8
+  ],
+  [
+   "sagitario",
+   33.4
+  ],
+  [
+   "supernova",
+   44,
+   "supernova-estallido"
+  ],
+  [
+   "supernova",
+   54,
+   "supernova-corazon"
+  ]
+ ],
+ "configuraciones": {
+  "movil": {
+   "config": "movil",
+   "ventana": "movil430",
+   "capturas": [
+    {
+     "nombre": "intro-1",
+     "archivo": "movil-intro-1.jpg",
+     "segundo": 2
+    },
+    {
+     "nombre": "intro-2",
+     "archivo": "movil-intro-2.jpg",
+     "segundo": 8
+    },
+    {
+     "nombre": "intro-3",
+     "archivo": "movil-intro-3.jpg",
+     "segundo": 20.5
+    },
+    {
+     "nombre": "intro-4",
+     "archivo": "movil-intro-4.jpg",
+     "segundo": 25.5
+    },
+    {
+     "nombre": "intro-5",
+     "archivo": "movil-intro-5.jpg",
+     "segundo": 28.5
+    },
+    {
+     "nombre": "casa",
+     "archivo": "movil-casa.jpg",
+     "pose": {
+      "pos": [
+       590.538524698107,
+       1892.9723385868267,
+       2598.369508671671
+      ],
+      "objetivo": [
+       0,
+       70,
+       0
+      ],
+      "fov": 60
+     }
+    },
+    {
+     "nombre": "pulsar",
+     "archivo": "movil-pulsar.jpg",
+     "segundoPrevisto": 18.5,
+     "segundoDibujado": 18.498,
+     "segundoAlCongelar": 18.515
+    },
+    {
+     "nombre": "cuasar",
+     "archivo": "movil-cuasar.jpg",
+     "segundoPrevisto": 29.8,
+     "segundoDibujado": 29.79,
+     "segundoAlCongelar": 29.805
+    },
+    {
+     "nombre": "deneb",
+     "archivo": "movil-deneb.jpg",
+     "segundoPrevisto": 21.5,
+     "segundoDibujado": 21.489,
+     "segundoAlCongelar": 21.506
+    },
+    {
+     "nombre": "ton618",
+     "archivo": "movil-ton618.jpg",
+     "segundoPrevisto": 32.8,
+     "segundoDibujado": 32.795,
+     "segundoAlCongelar": 32.812
+    },
+    {
+     "nombre": "sagitario",
+     "archivo": "movil-sagitario.jpg",
+     "segundoPrevisto": 33.4,
+     "segundoDibujado": 33.4,
+     "segundoAlCongelar": 33.417
+    },
+    {
+     "nombre": "supernova-estallido",
+     "archivo": "movil-supernova-estallido.jpg",
+     "segundoPrevisto": 44,
+     "segundoDibujado": 43.998,
+     "segundoAlCongelar": 44.015
+    },
+    {
+     "nombre": "supernova-corazon",
+     "archivo": "movil-supernova-corazon.jpg",
+     "segundoPrevisto": 54,
+     "segundoDibujado": 53.998,
+     "segundoAlCongelar": 54.014
+    },
+    {
+     "nombre": "sistema-solar",
+     "archivo": "movil-sistema-solar.jpg",
+     "pose": {
+      "pos": [
+       1332.962130885792,
+       388.0266750823764,
+       -1081.036866772418
+      ],
+      "objetivo": [
+       1550.0000000000002,
+       145,
+       -400
+      ],
+      "fov": 60
+     }
+    }
+   ],
+   "errores": []
+  },
+  "pc": {
+   "config": "pc",
+   "ventana": "pc",
+   "capturas": [
+    {
+     "nombre": "intro-1",
+     "archivo": "pc-intro-1.jpg",
+     "segundo": 2
+    },
+    {
+     "nombre": "intro-2",
+     "archivo": "pc-intro-2.jpg",
+     "segundo": 8
+    },
+    {
+     "nombre": "intro-3",
+     "archivo": "pc-intro-3.jpg",
+     "segundo": 20.5
+    },
+    {
+     "nombre": "intro-4",
+     "archivo": "pc-intro-4.jpg",
+     "segundo": 25.5
+    },
+    {
+     "nombre": "intro-5",
+     "archivo": "pc-intro-5.jpg",
+     "segundo": 28.5
+    },
+    {
+     "nombre": "casa",
+     "archivo": "pc-casa.jpg",
+     "pose": {
+      "pos": [
+       211.11111111111111,
+       513.3333333333334,
+       928.8888888888889
+      ],
+      "objetivo": [
+       0,
+       70,
+       0
+      ],
+      "fov": 60
+     }
+    },
+    {
+     "nombre": "pulsar",
+     "archivo": "pc-pulsar.jpg",
+     "segundoPrevisto": 18.5,
+     "segundoDibujado": 18.498,
+     "segundoAlCongelar": 18.515
+    },
+    {
+     "nombre": "cuasar",
+     "archivo": "pc-cuasar.jpg",
+     "segundoPrevisto": 29.8,
+     "segundoDibujado": 29.787,
+     "segundoAlCongelar": 29.804
+    },
+    {
+     "nombre": "deneb",
+     "archivo": "pc-deneb.jpg",
+     "segundoPrevisto": 21.5,
+     "segundoDibujado": 21.49,
+     "segundoAlCongelar": 21.507
+    },
+    {
+     "nombre": "ton618",
+     "archivo": "pc-ton618.jpg",
+     "segundoPrevisto": 32.8,
+     "segundoDibujado": 32.792,
+     "segundoAlCongelar": 32.809
+    },
+    {
+     "nombre": "sagitario",
+     "archivo": "pc-sagitario.jpg",
+     "segundoPrevisto": 33.4,
+     "segundoDibujado": 33.396,
+     "segundoAlCongelar": 33.413
+    },
+    {
+     "nombre": "supernova-estallido",
+     "archivo": "pc-supernova-estallido.jpg",
+     "segundoPrevisto": 44,
+     "segundoDibujado": 43.998,
+     "segundoAlCongelar": 44.015
+    },
+    {
+     "nombre": "supernova-corazon",
+     "archivo": "pc-supernova-corazon.jpg",
+     "segundoPrevisto": 54,
+     "segundoDibujado": 53.998,
+     "segundoAlCongelar": 54.015
+    },
+    {
+     "nombre": "sistema-solar",
+     "archivo": "pc-sistema-solar.jpg",
+     "pose": {
+      "pos": [
+       1417.2535370516862,
+       318.4,
+       -892.4209343384092
+      ],
+      "objetivo": [
+       1550.0000000000002,
+       145,
+       -400
+      ],
+      "fov": 60
+     }
+    }
+   ],
+   "errores": []
+  }
+ }
+}
