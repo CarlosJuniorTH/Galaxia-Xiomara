@@ -1606,7 +1606,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     get viajando() { return !!vuelo; },
     // Segundos que le quedan al viaje en curso, de principio a fin (también el que cruza al sistema solar en dos tramos):
     // la música de los viajes empieza en 15 − esto para terminar justo al llegar.
-    get restanteViaje() { if (compuesto) return Math.max(0, compuesto.fin - relojMaestro.ahora()); return vuelo && !vuelo.fija ? Math.max(0, vuelo.duracion - vuelo.transcurrido) : 0; },
+    get restanteViaje() { if (compuesto) return Math.max(0, compuesto.fin - relojMaestro.ahora()); if (vuelo?.finSalto) return Math.max(0, this.finViaje - relojMaestro.ahora()); return vuelo && !vuelo.fija ? Math.max(0, vuelo.duracion - vuelo.transcurrido) : 0; },   // (tras saltar el crucero, el tiempo del plan ya no es el real)
     // Instante del reloj maestro en que aterriza el viaje en curso (null sin viaje): la música de los viajes tiene ahí su
     // final. Fijo durante todo el viaje (solo cambia si se salta el crucero o en la pausa).
     get finViaje() {

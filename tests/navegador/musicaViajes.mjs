@@ -30,7 +30,7 @@ export default async function ({ base, informe }) {
       Object.defineProperty(P, 'currentTime', { get: dT.get, set(v) { if (!this.paused) R.saltos.push({ de: +this.currentTime.toFixed(2), a: +(+v).toFixed(2) }); dT.set.call(this, v); } });
       Object.defineProperty(P, 'playbackRate', { get: dR.get, set(v) { if (v !== this.playbackRate) R.ritmos++; dR.set.call(this, v); } });
       // Cada cuadro: lo que lleva la música + lo que le queda al viaje (debe ser su duración), si suena, y el desfase.
-      const f = () => { const v = e.viajando || e.restanteViaje > 0; if (v) R.cuadros.push({ t: performance.now(), tv: b.tiempo('viajes'), r: e.restanteViaje, s: b.suena('viajes'), o: b.objetivo, d: reloj.desfase(), dur: b.duracion('viajes') }); requestAnimationFrame(f); };
+      const f = () => { const v = e.viajando || e.restanteViaje > 0; if (v) R.cuadros.push({ t: performance.now(), f: e.finViaje, tv: b.tiempo('viajes'), r: e.restanteViaje, s: b.suena('viajes'), o: b.objetivo, d: reloj.desfase(), dur: b.duracion('viajes') }); requestAnimationFrame(f); };
       requestAnimationFrame(f);
     });
     const cdp = await pagina.context().newCDPSession(pagina);
@@ -56,12 +56,12 @@ export default async function ({ base, informe }) {
     await ir('sagitario'); await pagina.waitForTimeout(3000); await pagina.evaluate(() => window.__galaxia.escena.cancelarViaje()); await pagina.waitForTimeout(1200);
     await viaje('supernova', 'tras cancelar');
     // 5. Saltar el crucero (el botón «Saltar»): la llegada se adelanta y la música se recoloca con un solo fundido cruzado.
-    { const t = await marca(); await ir('cuasar'); await pagina.waitForTimeout(4000); const ok = await pagina.evaluate(() => window.__galaxia.escena.saltarViaje()); await llegar(); tramos.push([t, await marca(), ok ? 'saltado' : 'sin saltar', t]); }
+    { const t = await marca(); await ir('cuasar'); await pagina.waitForTimeout(4000); const ok = await pagina.evaluate(() => { window.__saltoEn = performance.now(); return window.__galaxia.escena.saltarViaje(); }); await llegar(); tramos.push([t, await marca(), ok ? 'saltado' : 'sin saltar', t]); }
     // 6. Un viaje que cruza al sistema solar (dos tramos y un fundido), justo al llegar.
     await viaje('rosa', 'sistema solar');
     await pagina.waitForTimeout(2500);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
-    const R = await pagina.evaluate(() => window.__duvet), est = await pagina.evaluate(() => window.__bandaSonora.estado());
+    const salto = await pagina.evaluate(() => window.__saltoEn ?? -1e9), R = await pagina.evaluate(() => window.__duvet), est = await pagina.evaluate(() => window.__bandaSonora.estado());
 
     informe.comprobar(R.ritmos === 0, 'cero cambios de playbackRate', R.ritmos);
     informe.comprobar(R.saltos.length === 0, 'cero saltos de segundo en un <audio> que suena', R.saltos.slice(0, 5));
@@ -72,10 +72,13 @@ export default async function ({ base, informe }) {
     const cruces = tramos.filter(x => x[2] === 'encadenado' || x[2] === 'saltado'), frescos = R.arranques.filter(a => !cruces.some(c => a.t >= c[0] - 50 && a.t <= c[1]) || a === R.arranques.find(b => b.t >= cruces.at(-1)[0] - 50)).map(a => a.g);
     informe.comprobar(frescos.every(g => g === undefined || g < 0.35), 'cada vez que vuelve a sonar entra desde el silencio (también al viajar justo tras llegar)', frescos);
     // Sincronía cuadro a cuadro: desde 0,5 s de viaje hasta 0,1 s antes de llegar suena y segundo + restante = duración.
+    // Cuadros en que la llegada del viaje acaba de cambiar (este o el anterior).
+    const cambio = m => { const i = R.cuadros.indexOf(m), a = R.cuadros[i - 1], b = R.cuadros[i - 2]; return (a && Math.abs(a.f - m.f) > 1e-3) || (a && b && Math.abs(b.f - a.f) > 1e-3); };
+    void salto;
     const malas = [], calladas = [];
     let peor = 0;
     for (const [a, b, n, d] of tramos) for (const m of R.cuadros) {
-      if (m.t < d + 500 || m.t > b - 150 || m.r < 0.15) continue;
+      if (m.t < d + 500 || m.t > b - 150 || m.r < 0.15 || cambio(m)) continue;   // (al saltar el crucero, el cuadro en que cambia la llegada y el siguiente: la música se recoloca)
       if (!m.s || m.o !== 'viajes') { calladas.push({ viaje: n, t: Math.round(m.t - a), o: m.o, r: +m.r.toFixed(2) }); continue; }
       const e = Math.abs(m.tv + m.r - m.dur) * 1000; peor = Math.max(peor, e); if (e > 20) malas.push({ viaje: n, ms: +e.toFixed(1) });
     }

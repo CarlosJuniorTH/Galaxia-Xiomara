@@ -183,7 +183,7 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
     fuente.start(T, desde);
     const voz = { fuente, g, ancla: p.ancla, inicio: T, desde };
     fuente.onended = () => { try { fuente.disconnect(); g.disconnect(); } catch {} if (p.voz === voz) { p.voz = null; p.usada = true; liberar(); } };
-    if (p.voz) apagarVoz(p.voz, cruce || 0.05);
+    if (p.voz) { apagarVoz(p.voz, cruce || 0.05); voz.previa = { hasta: T + (cruce || 0.05) }; }
     p.voz = voz; p.previo = relojMaestro.deContexto(T) - p.ancla - 1e-3;
     if (!cruce) {
       // Primera voz: la pista sube con su fundido desde el instante en que empieza a sonar (no antes, en silencio).
@@ -274,7 +274,7 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
     if (oida) globalThis.__medidor?.desfase?.(relojMaestro.desfase(), oida);
     const v = viajeEnCurso;
     if (v) {
-      const enVuelo = v.viajando();
+      const enVuelo = v.viajando(), finAhora = v.fin(); if (Number.isFinite(finAhora)) v.ultimoFin = finAhora;
       if (enVuelo && !v.visto) {
         v.visto = true;
         const m = pistas.get('viajes');
@@ -284,8 +284,8 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
         // cruzado para seguir acabando en la llegada. En un viaje normal la llegada no cambia y la música no se toca.
         // (Mientras la llegada se mueve —el viaje en pausa— se espera a que se quede quieta: un solo fundido.)
         const m = pistas.get('viajes'), fin = v.fin();
-        if (!Number.isFinite(v.finAntes) || Math.abs(fin - v.finAntes) > 1e-3) { v.finAntes = fin; v.finDesde = t; }
-        else if (m?.conf.hastaLlegar && Number.isFinite(fin) && t - v.finDesde > 0.25) recolocar(m, fin - duracionDe(m));
+        if (!Number.isFinite(v.finAntes) || Math.abs(fin - v.finAntes) > 1e-3) v.finAntes = fin;
+        else if (m?.conf.hastaLlegar && Number.isFinite(fin)) recolocar(m, fin - duracionDe(m));   // (quieta desde el cuadro anterior)
       }
       if ((v.visto && !enVuelo) || (!v.visto && t - v.t0 > 1.5)) v.terminar();
     }
@@ -439,7 +439,7 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
       return p.el && !p.conSilencio && p.estado === 'lista' ? p.el.currentTime : 0;
     },
     // ¿Suena ahora mismo la canción de ese momento? (sin memoria nueva: lo pregunta una escena en cada cuadro)
-    suena(nombre) { const p = pistas.get(nombre); if (!p || !activa) return false; return p.bufer ? !!p.voz && enMarcha() && segundoDe(p) >= p.voz.desde : !!p.el && !p.el.paused && !p.conSilencio && p.estado === 'lista'; },
+    suena(nombre) { const p = pistas.get(nombre); if (!p || !activa) return false; return p.bufer ? !!p.voz && enMarcha() && (segundoDe(p) >= p.voz.desde || relojMaestro.aContexto(relojMaestro.ahora()) < (p.voz.previa?.hasta ?? -1)) : !!p.el && !p.el.paused && !p.conSilencio && p.estado === 'lista'; },
     pasada(nombre, marca) { const s = pistas.get(nombre)?.conf.marcas?.[marca], t = this.tiempo(nombre); return Number.isFinite(s) && t !== null && t >= s; },
     // fn({ momento, marca, segundo }) al cruzar cada marca; devuelve cómo dejar de escuchar.
     alMarca(fn) { oyentes.add(fn); return () => oyentes.delete(fn); },
@@ -463,7 +463,7 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
     llegada(id) {
       const v = viajeEnCurso; if (!v || v.id !== id) return;
       const m = pistas.get('viajes');
-      if (m?.ancla !== null && m?.ancla !== undefined && objetivo === 'viajes') { const t = relojMaestro.ahora(), finMusica = m.ancla + duracionDe(m), prevista = v.fin(); const r = { id, cuadro: +((t - finMusica) * 1000).toFixed(1), programado: Number.isFinite(prevista) ? +((prevista - finMusica) * 1000).toFixed(1) : null }; aterrizajes.push(r); if (aterrizajes.length > 50) aterrizajes.shift(); globalThis.__medidor?.llegada?.({ destino: id, finMusicaMs: r.programado ?? r.cuadro }); }
+      if (m?.ancla !== null && m?.ancla !== undefined && objetivo === 'viajes') { const t = relojMaestro.ahora(), finMusica = m.ancla + duracionDe(m), prevista = v.fin() ?? v.ultimoFin; const r = { id, cuadro: +((t - finMusica) * 1000).toFixed(1), programado: Number.isFinite(prevista) ? +((prevista - finMusica) * 1000).toFixed(1) : null }; aterrizajes.push(r); if (aterrizajes.length > 50) aterrizajes.shift(); globalThis.__medidor?.llegada?.({ destino: id, finMusicaMs: r.programado ?? r.cuadro }); }
       v.terminar();
     },
     // Para las pruebas (?pruebaAudio) y el diagnóstico.
