@@ -21,19 +21,19 @@ const NIVELES = {
 
 export const Q = modoCompatible ? { pr: 1, k: 0.42, cielo: 512, galaxiasLejanas: 9 } : NIVELES[calidad];
 
-// Protección contra cierres: si una carga no llegó a terminar (iOS cierra la página cuando le falta memoria), la siguiente
-// arranca en un modo más ligero en memoria (nivelSeguro 1: sin HDR y con menos puntos; 2: además menos resolución y
-// texturas). Tras varias cargas buenas seguidas se vuelve a probar el nivel anterior. Así nunca se queda en un cierre.
+// Protección contra cierres (la única excepción al perfil ultra único, y nunca en caliente): si una carga no llegó a
+// terminar (iOS cierra la página cuando le falta memoria), SOLO la visita siguiente arranca en un modo más ligero en memoria
+// (nivelSeguro 1: sin HDR y con menos puntos; 2: además menos resolución y texturas; si vuelve a cerrarse, un nivel más).
+// En cuanto una carga termina bien, la visita siguiente vuelve a la calidad completa.
 // (v2: se reinicia el contador. Las cargas atascadas por un fallo ya corregido se contaron como cierres y dejaron algunos
 // aparatos en modo seguro, sin resplandor y con texturas reducidas.)
 const CLAVE_CARGA = 'xiomara:carga-v2';
-let estadoCarga = { enCurso: false, nivel: 0, buenas: 0 };
+let estadoCarga = { enCurso: false, nivel: 0 };
 try { estadoCarga = { ...estadoCarga, ...JSON.parse(localStorage.getItem(CLAVE_CARGA) || '{}') }; } catch {}
 const forzado = new URLSearchParams(location.search).get('seguro');
 export const nivelSeguro = forzado !== null ? Math.max(0, Math.min(2, Number(forzado) || 0))
-  : estadoCarga.enCurso ? Math.min(2, (estadoCarga.nivel || 0) + 1) : (estadoCarga.nivel || 0);
-const buenasPrevias = estadoCarga.enCurso ? 0 : estadoCarga.buenas || 0;
-const marcarCarga = enCurso => { try { localStorage.setItem(CLAVE_CARGA, JSON.stringify({ enCurso, nivel: nivelSeguro, buenas: buenasPrevias })); } catch {} };
+  : estadoCarga.enCurso ? Math.min(2, (estadoCarga.nivel || 0) + 1) : 0;
+const marcarCarga = enCurso => { try { localStorage.setItem(CLAVE_CARGA, JSON.stringify({ enCurso, nivel: nivelSeguro })); } catch {} };
 marcarCarga(true);
 // Solo cuenta como cierre una página que muere VISIBLE en plena carga (iOS sin memoria). Si se oculta o se cierra mientras
 // carga (recargar, cambiar de app, cerrar la pestaña, bloquear el móvil), la marca se retira y vuelve al mostrarse otra vez.
@@ -49,10 +49,5 @@ if (typeof addEventListener === 'function') {
 export const texturasLigeras = nivelSeguro >= 1;
 export function cargaTerminada() {
   cargando = false;
-  try {
-    const buenas = (estadoCarga.enCurso ? 0 : estadoCarga.buenas || 0) + 1;
-    const nivel = nivelSeguro > 0 && buenas >= 4 ? nivelSeguro - 1 : nivelSeguro;
-    localStorage.setItem(CLAVE_CARGA, JSON.stringify({ enCurso: false, nivel, buenas: nivel !== nivelSeguro ? 0 : buenas }));
-  } catch {}
+  try { localStorage.setItem(CLAVE_CARGA, JSON.stringify({ enCurso: false, nivel: 0 })); } catch {}
 }
-

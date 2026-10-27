@@ -1,5 +1,5 @@
 // Diagnóstico de renderizado para ejecutar EN el dispositivo.
-//  ?diag=render    ligero: ritmo real (interacción y contemplación), motivo por el que se
+//  ?diag=render    ligero: ritmo real (con y sin tocar), motivo por el que se
 //                  dibuja, resolución del lienzo y de la escena. No congela el teléfono.
 //  ?diag=completo  además lee el búfer HDR de la escena antes del brillo y cuenta píxeles
 //                  no válidos (NaN/infinito), negativos, muy altos y quemados, aislando cada
@@ -51,7 +51,7 @@ function entorno(renderer) {
 }
 
 // Mide los fotogramas DIBUJADOS (no los rAF de la pantalla). Con `activo` se simula
-// interacción para medir el ritmo de 60 FPS; sin él, el ritmo de contemplación.
+// interacción; sin él, sin tocar (sigue a 60 mientras algo se anima; quieto 15 s, no dibuja).
 async function medirFps(escena, segundos = 6, activo = true) {
   const lienzo = escena.interno.renderer.domElement;
   const tiempos = [], motivos = {}; let anterior = performance.now(), cuadros = escena.cuadrosDibujados;
@@ -69,12 +69,6 @@ async function medirFps(escena, segundos = 6, activo = true) {
   return { fps: +(1000 / media).toFixed(1), p95ms: +(tiempos[Math.floor(tiempos.length * 0.95)] ?? 0).toFixed(1), cuadros: tiempos.length, motivos };
 }
 
-// Espera, sin tocar nada, a que el planificador pase a contemplación (máximo `ms`).
-async function esperarContemplacion(escena, ms = 9000) {
-  const lienzo = escena.interno.renderer.domElement, fin = performance.now() + ms;
-  while (lienzo.dataset.ritmo !== 'contemplacion' && performance.now() < fin) await new Promise(r => setTimeout(r, 250));
-  return lienzo.dataset.ritmo === 'contemplacion';
-}
 
 // Sube a WebGL un degradado de brillo dibujado en canvas y lo lee de vuelta desde la GPU.
 // Cuenta píxeles con color falso: con fondo transparente (método anterior) el navegador
@@ -112,7 +106,6 @@ export async function diagnosticarRender(escena, { enviar = true, completo = fal
   const { scene, camera, controls, renderer } = escena.interno;
   const informe = { v: 2, ...entorno(renderer) };
   informe.medida = await medirFps(escena, 6, true);
-  informe.llegaContemplacion = await esperarContemplacion(escena);
   informe.contemplacion = await medirFps(escena, 6, false);
   informe.canvas = pruebaCanvas(renderer);
   informe.camara = Math.round(camera.position.distanceTo(controls.target));   // distancia al centro: detecta si se alejó con el gesto
@@ -196,9 +189,9 @@ export function mostrarPanel(escena, informe) {
   const panel = document.createElement('div');
   panel.style.cssText = 'position:fixed;z-index:9999;left:8px;right:8px;top:calc(env(safe-area-inset-top) + 8px);max-height:45vh;overflow:auto;padding:10px;border-radius:12px;background:rgba(10,0,14,.88);color:#fde;font:11px/1.4 ui-monospace,monospace;-webkit-user-select:text;user-select:text';
   const lineas = [`GPU ${informe.gpu} · WebGL${informe.gl} · DPR ${informe.dpr} · búfer ${informe.buf.join('×')}`,
-    `FPS interacción ${informe.medida.fps} (p95 ${informe.medida.p95ms} ms) · contemplación ${informe.contemplacion.fps}${informe.llegaContemplacion ? '' : ' (no llegó)'}`,
+    `FPS interacción ${informe.medida.fps} (p95 ${informe.medida.p95ms} ms) · sin tocar ${informe.contemplacion.fps}`,
     `resolución lienzo ${informe.resolucion.lienzo} · escena ${informe.resolucion.escena} · cambios ${informe.resolucion.cambios}`,
-    `motivos en contemplación: ${Object.entries(informe.contemplacion.motivos).map(([m, n]) => `${m} ${n}`).join(' · ')}`,
+    `motivos sin tocar: ${Object.entries(informe.contemplacion.motivos).map(([m, n]) => `${m} ${n}`).join(' · ')}`,
     `precisión ${informe.prec.join('/')} · punto máx ${informe.punto} · ext ${informe.ext} · ${informe.perfil}`,
     `canvas con color falso: antes ${informe.canvas.transparente} px · ahora ${informe.canvas.opaco} px`];
   for (const [v, r] of Object.entries(informe.vistas || {})) {

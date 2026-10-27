@@ -27,7 +27,6 @@ import { crearTelaranaCosmica, pedirDatosTelarana } from './telarana.js';
 import { crearCieloProfundo } from './cieloProfundo.js';
 import { crearPreparacion } from './carga/preparacion.js';
 import { matricesSoloVisibles, actualizarVisibles } from './matrices.js';
-import { crearGestorCalidad } from './calidad/gestor.js';
 import { crearRutas } from './camara/rutas.js';
 import { construirMaravillas } from './maravillas.js';
 import { crearPolvo } from './polvo.js';
@@ -318,12 +317,11 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   const centroVia = cosmos.objetivo('sagitario')?.centro?.clone() ?? new THREE.Vector3();
   let destinoActual = 'hogar', pausa = false, captura = null, retornoGiro = 0;
   let cuadros = 0, acumulado = 0, entradaResuelta = false, coste = 0;
-  // Calidad automática: resolución dinámica y escalones (calidad/gestor.js).
-  const { regular, regularResolucion } = crearGestorCalidad({ canvas, nucleo, telarana, muestrasNube });
+  // Perfil ultra único: la calidad y la resolución interna son fijas toda la visita (nucleo.js); no hay resolución dinámica
+  // ni escalones que bajen la calidad en plena experiencia (cada cambio era un tirón).
 
-  // Ritmo de dibujo (ver util/planificador.js). En el móvil, igual que en el PC: siempre a 60 FPS, también en
-  // reposo (a 30 los gigantes animados se veían a saltos). ?ritmo=ahorro vuelve a 30 en reposo en pantallas táctiles.
-  const tactil = esMovil || matchMedia('(pointer:coarse)').matches;
+  // Ritmo de dibujo (ver util/planificador.js): dentro, siempre 60 FPS en el móvil y el ritmo de la pantalla (tope 120) en
+  // el PC; con la vista quieta, nada animado y sin tocar 15 s, no se dibuja; vuelve en el mismo cuadro del toque.
   // Movimiento reducido: el universo sigue en 3D, pero la cámara no gira sola.
   const movimientoReducido = matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (movimientoReducido) controls.autoRotateSpeed = 0;
@@ -333,21 +331,12 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   const giroBase = controls.autoRotateSpeed;
   let giroSuave = 0, respira = 0;
   const camaraGuardada = { pos: new THREE.Vector3(), rot: new THREE.Quaternion() }, haciaObjetivo = new THREE.Vector3();
-  // En pantallas táctiles, tras un rato largo sin tocar se dibuja a 30 FPS y al tocar vuelve a 60: medido en un iPhone, a 60
-  // continuos el teléfono se calentaba y a los pocos minutos bajaba su GPU a la mitad (28 FPS con TODO). ?ritmo=fluido: siempre 60.
-  // El rato era de 4 s: al mirar un gigante (su disco, sus chorros, sus haces), la galaxia de Xiomara o el sistema solar sin
-  // tocar, a los 4 s todo pasaba a 30 y las animaciones se veían pesadas, a saltitos (Carlos, en su iPhone: «se sienten
-  // lentas»). Luego se subió a 30 s, pero el iPhone se calentaba igual (60 continuos) y bajaba a ~28 FPS. Ahora, 10 s: las
-  // animaciones (clips de los gigantes, viajes, la entrada, la inercia del giro) cuentan como movimiento y van a 60 siempre;
-  // solo mirando quieto sin tocar más de 10 s se pasa a 30.
-  const ritmoAhorro = tactil && new URLSearchParams(location.search).get('ritmo') !== 'fluido';
-  // En el PC con pantalla rápida, ~120 por segundo (planificador.js); en el móvil, 60 (calor y batería).
-  const planificador = crearPlanificador({ interaccion: 60, contemplacion: ritmoAhorro ? 30 : 60, alto: esMovil ? 0 : 120, esperaMs: ritmoAhorro ? 10000 : 4000 });
+  const planificador = crearPlanificador({ objetivo: 60, alto: esMovil ? 0 : 120, esperaMs: 15000 });
   let gesto = false, modoAnterior = null, cuadrosDibujados = 0, finGesto = -Infinity;
   const AMORTIGUACION = controls.dampingFactor;   // la de 60 FPS (nucleo.js)
   const marcarActividad = () => planificador.actividad(performance.now());
   for (const evento of ['pointerdown', 'wheel', 'keydown']) document.addEventListener(evento, marcarActividad, { passive: true });
-  const capturador = crearCapturador({ obtener: () => nucleo.resolucion, fijar: v => { nucleo.fijarResolucion(v); regular.reiniciar(); } });
+  const capturador = crearCapturador({ obtener: () => nucleo.resolucion, fijar: v => { nucleo.fijarResolucion(v); } });
   let leyendo = false;
   const ventanas = [...document.querySelectorAll('dialog, .ventana')];
   const lectura = new MutationObserver(() => {
@@ -1068,7 +1057,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   const giro = crearGiro({ canvas, camera, controls, sensibilidad: controls.rotateSpeed, alEmpezar: empezarGesto, alTerminar: terminarGesto });
   // La rueda del ratón acerca y aleja con suavidad (util/zoom.js): antes cada paso se aplicaba de golpe en un cuadro.
   const zoom = crearZoom({ canvas, camera, controls, alGesto: () => { empezarGesto(); terminarGesto(); } });
-  addEventListener('resize', () => { clearTimeout(esperaAjuste); esperaAjuste = setTimeout(reencuadrar, 220); nucleo.redimensionar(); regular.reiniciar(); planificador.pedirCuadro(); if (camera.view?.enabled) camera.setViewOffset(vista.ancho, vista.alto, 0, desplazamiento, vista.ancho, vista.alto); medirZonaLibre(); });
+  addEventListener('resize', () => { clearTimeout(esperaAjuste); esperaAjuste = setTimeout(reencuadrar, 220); nucleo.redimensionar(); planificador.pedirCuadro(); if (camera.view?.enabled) camera.setViewOffset(vista.ancho, vista.alto, 0, desplazamiento, vista.ancho, vista.alto); medirZonaLibre(); });
   document.addEventListener('visibilitychange', () => { prev = performance.now(); });
   canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); delete canvas.dataset.viaje; suspendida = true; vuelo?.resolver(false); vuelo = null; alProblema('El navegador ha pausado los gráficos. Tu viaje está guardado. Podemos volver a encender las estrellas.'); });
   // Al recuperar el contexto hay que recargar (las texturas que soltaron su copia en memoria no podrían volver a subirse),
@@ -1097,12 +1086,13 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // sin tocar se pasaba a 30 aunque la vista siguiera deslizándose y el final del giro iba a frenitos.
     const motivo = vuelo ? 'vuelo' : gesto ? 'gesto' : giro.moviendo || zoom.moviendo ? 'inercia' : mirada && mirada.t < 1 ? 'mirada' : pulso > 0.02 ? 'pulso' : captura ? 'captura'
       : document.body.classList.contains('celebrando') || document.body.classList.contains('reuniendo') ? 'celebracion' : cosmos.escenas.animando ? 'escena' : tEntrada !== null && tiempo - tEntrada < 12 ? 'entrada'
-      : Math.abs(desplazamientoMeta - desplazamiento) > 0.5 ? 'encuadre' : cosmos.enEscenaAgujero || clip ? 'escena' : '';
+      : Math.abs(desplazamientoMeta - desplazamiento) > 0.5 ? 'encuadre' : cosmos.enEscenaAgujero || clip ? 'escena'
+      : controls.autoRotate || giroSuave > 0.002 ? 'giro' : mundos.cometaVisible ? 'cometa' : '';
     const activo = !!motivo;
     const modo = planificador.decidir(ahora, { reposo, quieto: pausa && !vuelo && !captura, activo });
     if (modo === null) { if (reposo) prev = ahora; return; }
-    if (modo !== modoAnterior) { regular.reiniciar(); modoAnterior = modo; canvas.dataset.ritmo = modo; }
-    const motivoActual = modo === 'interaccion' ? motivo || 'reciente' : '';
+    if (modo !== modoAnterior) { modoAnterior = modo; canvas.dataset.ritmo = modo; }
+    const motivoActual = modo === 'activo' ? motivo || 'reciente' : '';
     if (canvas.dataset.motivo !== motivoActual) canvas.dataset.motivo = motivoActual;
     const dtReal = Math.max(0, (ahora - prev) / 1000); prev = ahora;
     // En pausa completa el tiempo se congela: solo se redibuja la imagen.
@@ -1456,12 +1446,6 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     restaurarCasa();
     if (temporal) { camera.position.copy(camaraGuardada.pos); camera.quaternion.copy(camaraGuardada.rot); camera.updateMatrixWorld(); }
     if (captura) { const pendiente = captura; captura = null; clearTimeout(pendiente.timer); pendiente.resolver(renderer.domElement); }
-    // La resolución dinámica mide a 60 FPS: en interacción y, ahora que el reposo también va a 60, en reposo.
-    // También en el vuelo de entrada (tras su primer medio segundo): es el tramo más cargado y llega justo tras la intro, con
-    // el teléfono ya caliente. Antes no se medía hasta llegar, y un móvil que no llegaba hacía toda la entrada a tirones,
-    // «muy lenta»; ahí el cambio se aplica en el acto (en pleno vuelo de entrada no se nota, los parones sí).
-    const enEntrada = !entradaResuelta && vuelo && tEntrada !== null && tiempo - tEntrada > 0.5;
-    if ((modo === 'interaccion' || (modo === 'contemplacion' && !ritmoAhorro)) && tEntrada !== null && (entradaResuelta || enEntrada) && dtReal < 0.5 && (window.top !== window || document.hasFocus())) regularResolucion(dtReal * 1000, enEntrada || !(vuelo || gesto || giro.moviendo || zoom.moviendo));   // sin foco (ventana tapada o detrás), el navegador frena los cuadros: no es que el aparato no llegue
     if (medir && tEntrada !== null && entradaResuelta) {
       cuadros++; acumulado += dtReal; coste += performance.now() - inicioCuadro;
       if (acumulado > 4) {
