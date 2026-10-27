@@ -4,13 +4,14 @@
 //  1. Limpieza: NaN, infinitos y negativos no llegan a la pantalla ni al brillo.
 //  2. Hombro de altas luces: lo que antes se recortaba a blanco se comprime con
 //     suavidad conservando el matiz, así el núcleo mantiene textura y color.
-//  3. Reescalado con enfoque: cuando la escena se dibuja a menos resolución que la
-//     pantalla (móvil), se amplía a la nativa y se recupera nitidez con un enfoque
-//     adaptativo limitado al mínimo y máximo de los vecinos: afina estrellas y bordes
-//     sin halos ni brillos nuevos. Con la misma resolución (PC) no se aplica.
+//  3. Reescalado con enfoque: la escena se dibuja a una resolución interna fija por presupuesto de píxeles (nucleo.js);
+//     se amplía al lienzo (bicúbica) y se recupera nitidez con un enfoque adaptativo (RCAS, como FSR 1) limitado al mínimo y
+//     máximo de los vecinos: afina estrellas y bordes sin halos ni brillos nuevos. Sin ampliación (PC a la nativa), nada.
+//  4. Lente gravitacional y penumbra del salto (antes dos pasadas con su copia de la imagen), solo si están activas.
 import { ShaderMaterial, Vector2, Vector4 } from 'three';
 import { zonaDe, GLSL_ZONA } from './zona.js';
 import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
+import { GLSL_LENTE, crearPasadaLente as crearEstadoLente } from './lente.js';
 
 export const CODO = 0.8;           // a partir de este valor (espacio de pantalla) empieza el hombro
 export const LIMITE_HDR = 64;      // tope de seguridad del búfer HDR
@@ -29,14 +30,20 @@ export function curvaSalida([r, g, b], brillo = [0, 0, 0]) {
   return c.map(v => v * (s / m) * (1 - w) + s * w);
 }
 
-// Intensidad del enfoque según cuánto se amplía la escena (1 = sin ampliar).
-export const nitidezPara = escala => Math.min(0.35, Math.max(0, (escala - 1) * 0.6));
+// Fuerza del enfoque adaptativo (RCAS, como en FSR 1) según cuánto se amplía la escena hasta la pantalla FÍSICA (escena →
+// lienzo en esta pasada y lienzo → pantalla en el navegador, que en el móvil va a DPR 2 como mucho): 1 = sin ampliar, sin
+// enfoque (PC a la nativa).
+export const nitidezPara = ampliacion => Math.min(1, Math.max(0, (ampliacion - 1.02) * 1.4));
+export const LIMITE_RCAS = 0.25 - 1 / 16;
 
-// Réplica en JavaScript del enfoque (por canal): se usa en las pruebas.
+// Réplica en JavaScript del enfoque (por canal): se usa en las pruebas. RCAS: el lóbulo negativo se limita para no salirse
+// de [0, pico] y se escala con k; después, sin halos: nunca fuera del rango del centro y sus cuatro vecinos.
 export function enfocar(centro, vecinos, k) {
-  const mn = Math.min(centro, ...vecinos), mx = Math.max(centro, ...vecinos);
-  const v = centro + (4 * centro - vecinos.reduce((a, b) => a + b, 0)) * k;
-  return Math.min(mx, Math.max(mn, v));
+  const mn = Math.min(...vecinos), mx = Math.max(...vecinos), pico = Math.max(1, 1.25 * mx);   // (con margen: en HDR no hay tope que respetar)
+  const hitMin = (mn / pico) / (4 * (mx / pico) + 1e-5), hitMax = (1 - mx / pico) / (4 * (mn / pico) - 4 - 1e-5);
+  const lobulo = Math.max(-LIMITE_RCAS, Math.min(Math.max(-hitMin, hitMax), 0)) * k;
+  const v = (lobulo * vecinos.reduce((a, b) => a + b, 0) + centro) / (4 * lobulo + 1);
+  return Math.min(Math.max(mx, centro), Math.max(Math.min(mn, centro), v));
 }
 
 // Píxel no válido (NaN o infinito). isnan/isinf existen desde GLSL ES 3.00; en WebGL 1, la comparación consigo mismo y el
@@ -54,10 +61,12 @@ const fragmentShader = /* glsl */`
   uniform sampler2D tBrillo;
   uniform float uBrillo;
   uniform vec2 uTexel;
-  uniform float uNitidez;
+  uniform float uNitidez, uEscalar, uLente, uPenumbra;
+  uniform vec2 uCentro;
   uniform vec4 uZona, uZonaBrillo;   // zonas activas de la escena y del resplandor (zona.js)
   varying vec2 vUv;
   ${GLSL_ZONA}
+  ${GLSL_LENTE}
   float h12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }   // hash de Hoskins
   // max/min devuelven el operando válido ante un NaN en las GPU habituales (Metal, NVIDIA, Mali).
   vec3 limpiar(vec3 c) { return min(max(c, vec3(0.0)), vec3(${LIMITE_HDR.toFixed(1)})); }
@@ -65,7 +74,7 @@ const fragmentShader = /* glsl */`
   ${GLSL_VALIDO}
   vec3 cruda(vec2 uv) { return texture2D(tDiffuse, min(uv, uZona.zw)).rgb; }
   // Un NaN o un infinito suelto en la escena (p. ej. un pow de un negativo en el borde de un triángulo con MSAA) no se pinta
-  // negro: se rellena con la media de sus vecinos válidos. Con el reescalado del móvil (bicúbica + enfoque, 9 lecturas) un solo
+  // negro: se rellena con la media de sus vecinos válidos. Con el reescalado (bicúbica + enfoque, 9 lecturas) un solo
   // píxel así ennegrecía un bloque de 4×4 en la pantalla. La rama solo se toma en esos píxeles: no cuesta nada.
   vec3 muestra(vec2 uv) {
     vec3 c = cruda(uv);
@@ -92,15 +101,26 @@ const fragmentShader = /* glsl */`
     return c / (w12.x * w0.y + w0.x * w12.y + w12.x * w12.y + w3.x * w12.y + w12.x * w3.y);
   }
   void main() {
-    vec2 uv = vUv * uZona.xy;
-    vec3 c = uNitidez > 0.0 ? max(bicubica(uv), vec3(0.0)) : muestra(uv);
+    // Lente gravitacional (lente.js), solo mientras está activa: desvía de dónde se lee la escena y su resplandor.
+    vec2 uvPantalla = uLente > 0.5 ? lente(vUv) : vUv;
+    vec2 uv = uvPantalla * uZona.xy;
+    vec3 c = uEscalar > 0.5 ? max(bicubica(uv), vec3(0.0)) : muestra(uv);
+    // Enfoque adaptativo en el mismo pase (estilo FSR 1, RCAS): el lóbulo se adapta al contraste local para no salirse del
+    // rango, y nunca fuera del mínimo/máximo de los vecinos (sin halos ni brillos nuevos en estrellas y bordes).
     if (uNitidez > 0.0) {
       vec3 n = muestra(uv + vec2(0.0, uTexel.y)), s = muestra(uv - vec2(0.0, uTexel.y));
       vec3 e = muestra(uv + vec2(uTexel.x, 0.0)), o = muestra(uv - vec2(uTexel.x, 0.0));
-      vec3 mn = min(c, min(min(n, s), min(e, o))), mx = max(c, max(max(n, s), max(e, o)));
-      c = clamp(c + (4.0 * c - (n + s + e + o)) * uNitidez, mn, mx);
+      vec3 mn4 = min(min(n, s), min(e, o)), mx4 = max(max(n, s), max(e, o));
+      float pico = max(1.0, 1.25 * max(max(mx4.r, mx4.g), mx4.b));   // (con margen: en HDR no hay tope que respetar)
+      vec3 a = mn4 / pico, z = mx4 / pico;
+      vec3 l3 = max(-a / (4.0 * z + 1e-5), (1.0 - z) / (4.0 * a - 4.0 - 1e-5));
+      float lobulo = clamp(max(max(l3.r, l3.g), l3.b), -${LIMITE_RCAS.toFixed(4)}, 0.0) * uNitidez;
+      vec3 r = (lobulo * (n + s + e + o) + c) / (4.0 * lobulo + 1.0);
+      c = clamp(r, min(mn4, c), max(mx4, c));
     }
-    vec3 brillo = texture2D(tBrillo, enZona(vUv, uZonaBrillo)).rgb;
+    // Penumbra de la ceremonia (salto.js), solo mientras está activa.
+    if (uPenumbra > 0.0) c *= 1.0 - uPenumbra * smoothstep(0.12, 0.65, length((vUv - uCentro) * vec2(uAspecto, 1.0)));
+    vec3 brillo = texture2D(tBrillo, enZona(uvPantalla, uZonaBrillo)).rgb;
     c += (noValido(brillo) ? vec3(0.0) : limpiar(brillo)) * uBrillo;
     float m = max(max(c.r, c.g), c.b);
     if (m > ${CODO.toFixed(3)}) {
@@ -114,28 +134,41 @@ const fragmentShader = /* glsl */`
     gl_FragColor = vec4(c + t / 255.0, 1.0);
   }`;
 
+// Pasada final única: lente + penumbra del salto + composición del resplandor + reescalado con enfoque + color de salida.
+// La lente y el salto (lente.js, salto.js) ya no son pasadas: si no están activos no cuestan nada (ni una copia de la imagen).
 export class SalidaPass extends Pass {
-  constructor(brillo) {
+  constructor(brillo, { lente = null, salto = null } = {}) {
     super();
-    this.brillo = brillo;                 // UnrealBloomPass que deja su resultado sin mezclar (o null: sin brillo)
+    this.brillo = brillo;                 // resplandor que deja su resultado sin mezclar (o null: sin brillo)
+    this.lente = lente; this.salto = salto;
     this.needsSwap = false;
+    const ul = (lente ?? crearEstadoLente()).uniforms;
     this.material = new ShaderMaterial({
-      uniforms: { tDiffuse: { value: null }, tBrillo: { value: null }, uBrillo: { value: 1 }, uTexel: { value: new Vector2() }, uNitidez: { value: 0 }, uZona: { value: new Vector4(1, 1, 1, 1) }, uZonaBrillo: { value: new Vector4(1, 1, 1, 1) } },
+      uniforms: { tDiffuse: { value: null }, tBrillo: { value: null }, uBrillo: { value: 1 }, uTexel: { value: new Vector2() }, uNitidez: { value: 0 }, uEscalar: { value: 0 }, uZona: { value: new Vector4(1, 1, 1, 1) }, uZonaBrillo: { value: new Vector4(1, 1, 1, 1) },
+        uLente: { value: 0 }, uAspecto: ul.uAspecto, uL: ul.uL, uF: ul.uF, uPenumbra: { value: 0 }, uCentro: { value: new Vector2(0.5, 0.5) } },
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
       fragmentShader, depthTest: false, depthWrite: false
     });
     this.quad = new FullScreenQuad(this.material);
     this.pantalla = new Vector2();
+    // Ampliación del lienzo a la pantalla física que hace después el navegador (DPR del lienzo < DPR de la pantalla).
+    this.ampliacionNavegador = 1;
   }
   render(renderer, writeBuffer, readBuffer) {
     const u = this.material.uniforms;
     u.tDiffuse.value = readBuffer.texture;
-    u.tBrillo.value = this.brillo ? this.brillo.renderTargetsHorizontal[0].texture : null;
-    zonaDe(readBuffer, u.uZona.value); if (this.brillo) zonaDe(this.brillo.renderTargetsHorizontal[0], u.uZonaBrillo.value);
+    const rtBrillo = this.brillo ? this.brillo.salida ?? this.brillo.renderTargetsHorizontal[0] : null;
+    u.tBrillo.value = rtBrillo ? rtBrillo.texture : null;
+    zonaDe(readBuffer, u.uZona.value); if (rtBrillo) zonaDe(rtBrillo, u.uZonaBrillo.value);
     u.uBrillo.value = this.brillo?.enabled ? 1 : 0;
-    // Enfoque solo al presentar en pantalla y si la escena es más pequeña que el lienzo.
+    u.uLente.value = this.lente?.enabled ? 1 : 0;
+    u.uPenumbra.value = this.salto?.enabled ? this.salto.uniforms.uPenumbra.value : 0;
+    if (this.salto?.enabled) u.uCentro.value.copy(this.salto.uniforms.uCentro.value);
     u.uTexel.value.set(1 / readBuffer.width, 1 / readBuffer.height);
-    u.uNitidez.value = this.renderToScreen ? nitidezPara(renderer.getDrawingBufferSize(this.pantalla).x / readBuffer.viewport.z) : 0;   // ampliación real: pantalla / zona dibujada
+    // Ampliación en esta pasada: lienzo / zona dibujada; el enfoque, según la ampliación total hasta la pantalla.
+    const escala = this.renderToScreen ? renderer.getDrawingBufferSize(this.pantalla).x / readBuffer.viewport.z : 1;
+    u.uEscalar.value = escala > 1.001 ? 1 : 0;
+    u.uNitidez.value = this.renderToScreen ? nitidezPara(escala * this.ampliacionNavegador) : 0;
     renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
     this.quad.render(renderer);
   }

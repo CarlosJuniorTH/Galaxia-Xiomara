@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Scene, PerspectiveCamera, Vector2 } from 'three';
 import { curvaSalida, CODO, SalidaPass, enfocar, nitidezPara } from '../js/escena/salida.js';
-import { BrilloEficiente } from '../js/escena/brillo.js';
+import { BrilloMips } from '../js/escena/brillo.js';
 import { crearAgujeroNegro } from '../js/escena/agujeroNegro.js';
 import { RADIO_SILUETA } from '../js/escena/materiales.js';
 import { encuadreHogar, distanciaGalaxia, escalaSimbolos, desplazamientoZonaLibre, RADIO_GALAXIA, compensacionPuntos, distanciaDestino } from '../js/util/encuadre.js';
@@ -38,7 +38,7 @@ test('las altas luces del núcleo se comprimen sin quemarse en blanco ni perder 
 });
 
 test('el brillo se calcula sin mezclar y la salida lo compone con la escena', () => {
-  const brillo = new BrilloEficiente(new Vector2(390, 844), 0.45, 0.3, 0.78);
+  const brillo = new BrilloMips(new Vector2(390, 844), 0.45, 0.3, 0.78);
   const salida = new SalidaPass(brillo);
   try {
     assert.equal(salida.needsSwap, false);
@@ -109,11 +109,12 @@ test('los lugares se adaptan a la franja libre del móvil y en PC no cambian', (
 
 test('el reescalado enfoca sin halos: nunca sale del rango de los vecinos', () => {
   assert.equal(nitidezPara(1), 0, 'en PC (misma resolución) no se enfoca');
-  assert.ok(nitidezPara(1.5) > 0 && nitidezPara(3) <= 0.35);
+  assert.ok(nitidezPara(1.5) > 0 && nitidezPara(3) <= 1);
   const k = nitidezPara(1.5);
   assert.equal(enfocar(1, [0.1, 0.1, 0.1, 0.1], k), 1, 'una estrella no se vuelve más brillante');
   assert.equal(enfocar(0, [0.8, 0.8, 0.8, 0.8], k), 0, 'el negro no se vuelve negativo');
   const borde = enfocar(0.5, [0.2, 0.8, 0.5, 0.5], k);
   assert.ok(borde >= 0.2 && borde <= 0.8);
   assert.ok(enfocar(0.6, [0.2, 0.2, 0.2, 0.9], k) > 0.6, 'un detalle claro gana contraste');
+  assert.ok(enfocar(6, [2, 2, 2, 9], k) > 6 && enfocar(6, [2, 2, 2, 9], k) <= 9, 'también en HDR (por encima de 1)');
 });
