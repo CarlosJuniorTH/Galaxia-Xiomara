@@ -111,7 +111,7 @@ try {
     alProgreso: (f, techo) => entrada.progreso(0.08 + 0.92 * f, 0.08 + 0.92 * techo)
   });
   // Un vuelo y un gesto (arrastre, pellizco, rueda, con su inercia) ocupan la cola de descargas: nada baja mientras.
-  ocupadoSi(() => !!escena.viajando || escena.restanteViaje > 0);
+  ocupadoSi(() => !!escena.viajando || escena.restanteViaje > 0 || escena.enGesto);
   {
     const lienzo = document.getElementById('galaxia'), dedos = new Set(); let suelta = 0;
     const soltarLuego = ms => { clearTimeout(suelta); suelta = setTimeout(() => { if (!dedos.size) ocupado('gesto', false); }, ms); };

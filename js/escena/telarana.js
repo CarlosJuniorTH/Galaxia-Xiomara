@@ -295,7 +295,14 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   const C = 60000, muestras = [];
   for (const f of web.filamentos) for (let k = 0; k <= 24; k++) muestras.push({ p: puntoFilamento(k / 24, web.nudos, f, V), g: f.grosor * 0.45, n: 1 });
   for (const nudo of web.nudos) muestras.push({ p: nudo.pos, g: nudo.r * 0.6, n: 3 });
-  const cercano = new THREE.Points(new THREE.BufferGeometry(), matGalaxias); cercano.frustumCulled = false; cercano.renderOrder = -1.5; cercano.position.copy(web.centro); capaGalaxias.add(cercano);
+  // Su geometría se reserva una vez, con capacidad fija, y al rehacerse solo se reescriben sus datos (bufferSubData): crear
+  // una geometría nueva en cada cambio de celda era subir búferes nuevos a la GPU en pleno videoclip o vuelo (Deneb, la
+  // telaraña). CAP_CERCANO galaxias de sobra para un cúmulo (las que no caben, rarísimo, se quedan fuera).
+  const CAP_CERCANO = 65536, gCercano = new THREE.BufferGeometry();
+  for (const [n, w] of [['position', 3], ['aCol', 3], ['aBrillo', 1]]) gCercano.setAttribute(n, new THREE.BufferAttribute(new Float32Array(CAP_CERCANO * w), w).setUsage(THREE.DynamicDrawUsage));
+  gCercano.setDrawRange(0, 0);
+  const cercanoVacio = () => gCercano.drawRange.count === 0;
+  const cercano = new THREE.Points(gCercano, matGalaxias); cercano.frustumCulled = false; cercano.renderOrder = -1.5; cercano.position.copy(web.centro); capaGalaxias.add(cercano);
   const celda = [NaN, NaN, NaN], pendiente = [NaN, NaN, NaN]; let desdePendiente = 0;
   function rehacerCercano(cam) {
     const ci = Math.floor(cam.x / C), cj = Math.floor(cam.y / C), ck = Math.floor(cam.z / C);
@@ -310,7 +317,7 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
     // rehacer: se comprueba sin crear memoria nueva.
     const zx = (ci + 0.5) * C, zy = (cj + 0.5) * C, zz = (ck + 0.5) * C;
     let alguna = false; for (const m of muestras) { const dx = m.p.x - zx, dy = m.p.y - zy, dz = m.p.z - zz, lim = C * 2.2 + m.g * 2; if (dx * dx + dy * dy + dz * dz < lim * lim) { alguna = true; break; } }
-    if (!alguna && !cercano.geometry.attributes.position?.count) return;
+    if (!alguna && cercanoVacio()) return;
     // Rehacerlo eran decenas de miles de galaxias (con memoria nueva por cada una) en un solo cuadro: en pleno viaje, al
     // cruzar la telaraña, un tirón cada vez que se cambiaba de celda. Ahora se calcula a trozos en los cuadros siguientes
     // (≈1,5 ms por cuadro, sin memoria nueva por galaxia) y la geometría se cambia cuando está entera. Las mismas galaxias.
@@ -336,9 +343,15 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
     }
     // Lejos de la telaraña (en los gigantes, al girar la cámara cambia de celda en cada cuadro) la lista sale vacía: no se
     // rehace la geometría vacía una y otra vez (creaba y borraba búferes de la GPU en cada cuadro).
-    if (!pos.length && !cercano.geometry.attributes.position?.count) return;
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3)); g.setAttribute('aCol', new THREE.BufferAttribute(new Float32Array(col), 3)); g.setAttribute('aBrillo', new THREE.BufferAttribute(new Float32Array(tam), 1));
-    cercano.geometry.dispose(); cercano.geometry = g;
+    if (!pos.length && cercanoVacio()) return;
+    const n = Math.min(CAP_CERCANO, tam.length);
+    for (const [nombre, datos] of [['position', pos], ['aCol', col], ['aBrillo', tam]]) {
+      const a = gCercano.attributes[nombre], w = a.itemSize;
+      a.array.set(datos.length > n * w ? datos.slice(0, n * w) : datos);
+      if (a.addUpdateRange) { a.clearUpdateRanges(); a.addUpdateRange(0, Math.max(1, n * w)); } else a.updateRange = { offset: 0, count: Math.max(1, n * w) };
+      a.needsUpdate = true;
+    }
+    gCercano.setDrawRange(0, n);
   }
   function avanzarCercano() {
     if (!trabajoCercano) return;

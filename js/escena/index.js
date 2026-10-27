@@ -1589,6 +1589,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     precalentar(nivel) { nivelEnsayo = nivel; planificador.pedirCuadro(); },
     // Estrenos en la GPU con su momento (util/estrenos.js; solo con diagnóstico o el medidor): { total, enMovimiento, ultimos }.
     get estrenos() { return estrenos; },
+    // Un gesto en curso o su inercia (la cola de descargas y las subidas en momentos libres esperan).
+    get enGesto() { return gesto || giro.moviendo || zoom.moviendo; },
     viajar,
     cancelarViaje() { delete canvas.dataset.viaje; vuelo?.resolver(false); vuelo = null; limpiarVuelo(); controls.enabled = true; controls.autoRotate = false; },
     // Saltar el resto del crucero (se recorre en unos segundos y se llega con la aproximación normal).

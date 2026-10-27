@@ -2,7 +2,7 @@
 // mientras el resto del universo se prepara: { parte: 'filamentos' | 'segunda' | 'menores', puertos } (un puerto hacia
 // cada uno de los otros obreros) o, sin parte, todo. three.js se carga por su ruta (los obreros no usan el mapa de
 // importaciones).
-import * as THREE from '../../assets/vendor/three/three.module.js';
+import * as THREE from '../../assets/vendor/three/three.module.min.js';
 import { generarDatosTelarana, parteFilamentos, parteSegunda, parteMenores, transferibles } from './telaranaDatos.js';
 
 const PARTES = { filamentos: parteFilamentos, segunda: parteSegunda, menores: parteMenores };

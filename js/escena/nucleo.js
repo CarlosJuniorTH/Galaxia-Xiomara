@@ -237,6 +237,9 @@ export function crearNucleo(canvas) {
     } else if (!conAA && lecturaPrincipal) {
       post.readBuffer = lecturaPrincipal; lecturaPrincipal = null;
       rtSolar?.dispose(); rtSolar = null;
+      // Ya, bajo el fundido (o en el calentamiento): si nadie lo reservó en el clic (prepararEscena), el búfer de la escena
+      // principal se crearía en su primer cuadro (tras el calentamiento, en mitad del clip de la intro).
+      reservarYa(post.readBuffer);
     }
   }
   // Tras cambiar el tamaño o la zona estando en el sistema solar, el búfer MSAA sigue al de lectura.

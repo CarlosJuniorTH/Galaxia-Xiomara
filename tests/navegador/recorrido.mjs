@@ -12,7 +12,8 @@
 // o como caso de ejecutar.mjs (node tests/navegador/ejecutar.mjs recorrido; SALIDA por defecto .pruebas/recorrido.json):
 // entonces cada criterio de aceptación de docs/PROMPT-ULTRA-FLUIDO.md es una comprobación.
 // Variables: CPU (×4), CALIDAD (alta; vacío = sin ?calidad), DESTINOS=cuasar,deneb… (por defecto todos), CONFIGS=movil,pc.
-import { writeFileSync, mkdirSync, statSync, existsSync } from 'fs';
+import { writeFileSync, mkdirSync, statSync, existsSync, readFileSync } from 'fs';
+import { gzipSync } from 'zlib';
 import { execSync, spawnSync } from 'child_process';
 import { fileURLToPath, pathToFileURL } from 'url';
 import path from 'path';
@@ -33,8 +34,18 @@ const CONFIGURACIONES = {
 // p95 < 16,7 ms = ningún cuadro del 95 % pierde la sincronía vertical. Los intervalos entre cuadros a 60 Hz miden 16,7 ± 0,1:
 // se admite esa variación (17,5 ms sigue siendo un solo periodo de pantalla).
 const VSYNC = 17.5;
+const vp0 = conf => PERFILES[conf.perfil].viewport;
 const tipoDe = n => /^vuelo|^viaje|vuelta a casa/.test(n) ? 'vuelo' : /^giro|^zoom/.test(n) ? 'gesto' : /^clip|^escena (cuasar|pulsar|deneb|ton618|sagitario|supernova)/.test(n) ? 'clip' : /^carga/.test(n) ? 'carga' : 'resto';
 
+// Bytes por la red como los sirve GitHub Pages (la web publicada): el texto (módulos, estilos, JSON, SVG, HTML) con gzip, lo
+// demás tal cual. Se calcula igual sea cual sea el servidor de pruebas (el de antes no comprimía; scripts/servir.py ahora
+// sí): así antes y después se comparan con la misma vara. `disco` guarda el tamaño sin comprimir.
+const COMPRIMIBLES = new Set(['.js', '.mjs', '.css', '.json', '.svg', '.html', '.webmanifest', '.txt']), gz = new Map();
+function transferidos(f, disco) {
+  if (!COMPRIMIBLES.has(path.extname(f))) return disco;
+  const clave = f + ':' + disco; if (!gz.has(clave)) gz.set(clave, gzipSync(readFileSync(f), { level: 6 }).length);
+  return gz.get(clave);
+}
 // ── Red: cada petición que llega al servidor (página, módulos, obreros y service worker) ─────────────────────────────────
 function vigilarRed() {
   const peticiones = []; let resto = '';
@@ -42,15 +53,17 @@ function vigilarRed() {
     const lineas = (resto + texto).split('\n'); resto = lineas.pop();
     for (const l of lineas) { const m = l.match(/"(GET|HEAD|POST) ([^ ]+) HTTP\/[\d.]+" (\d{3})/); if (!m) continue;
       const ruta = decodeURIComponent(m[2].split('?')[0].split('#')[0]); let bytes = 0;
-      if (m[1] === 'GET' && m[3] === '200') { try { bytes = statSync(path.join(RAIZ, ruta === '/' ? 'index.html' : ruta.slice(1))).size; } catch {} }
-      peticiones.push({ t: Date.now(), metodo: m[1], ruta, estado: +m[3], bytes }); }
+      let disco = 0;
+      if (m[1] === 'GET' && m[3] === '200') { const f = path.join(RAIZ, ruta === '/' || ruta.endsWith('/') ? ruta.slice(1) + 'index.html' : ruta.slice(1)); try { disco = statSync(f).size; bytes = transferidos(f, disco); } catch {} }
+      peticiones.push({ t: Date.now(), metodo: m[1], ruta, estado: +m[3], bytes, disco }); }
   });
   return { peticiones, quitar };
 }
 const MB = b => +(b / 1048576).toFixed(2);
 function resumirRed(lista) {
   const descargas = lista.filter(p => p.metodo === 'GET' && p.estado === 200);
-  return { peticiones: lista.length, descargas: descargas.length, bytes: descargas.reduce((s, p) => s + p.bytes, 0), MB: MB(descargas.reduce((s, p) => s + p.bytes, 0)),
+  const disco = descargas.reduce((s, p) => s + (p.disco ?? p.bytes), 0);
+  return { peticiones: lista.length, descargas: descargas.length, bytes: descargas.reduce((s, p) => s + p.bytes, 0), MB: MB(descargas.reduce((s, p) => s + p.bytes, 0)), MBdisco: MB(disco),
     archivos: descargas.slice(0, 30).map(p => `${p.ruta} (${(p.bytes / 1024).toFixed(0)} KB)`) };
 }
 
@@ -65,7 +78,15 @@ async function recorrer(base, nombre, { destinos = TODOS, log = console.log } = 
     const tramo = async n => { const t = await pagina.evaluate(n => { window.__medidor.tramo(n); return performance.timeOrigin + performance.now(); }, n); marcasNodo.push([t, n]); log(`  · ${n}`); };
     // Cambia de tramo en el cuadro exacto en que termina el viaje en curso (o el vuelo de entrada).
     const alLlegar = async n => {
-      await pagina.evaluate(n => { const e = window.__galaxia.escena; const f = () => { if (e.viajando || e.restanteViaje > 0) return requestAnimationFrame(f); window.__medidor.tramo(n); window.__llegadaEn = performance.timeOrigin + performance.now(); }; window.__llegadaEn = 0; requestAnimationFrame(f); }, n);
+      // En el cuadro de la llegada: el aviso de la escena a la banda sonora (banda.llegada, el mismo instante en que empiezan
+      // la canción y la escena del destino) o, si no llega, cuando ya no queda viaje.
+      await pagina.evaluate(n => {
+        const e = window.__galaxia.escena, b = window.__bandaSonora; window.__llegadaEn = 0;
+        const cambiar = () => { if (window.__llegadaEn) return; window.__medidor.tramo(n); window.__llegadaEn = performance.timeOrigin + performance.now(); };
+        if (b && !b.__medido) { b.__medido = true; const o = b.llegada; b.llegada = function (...a) { window.__alLlegarBanda?.(); return o.apply(this, a); }; }
+        window.__alLlegarBanda = () => { window.__alLlegarBanda = null; cambiar(); };
+        const f = () => { if (window.__llegadaEn) return; if (e.viajando || e.restanteViaje > 0) return requestAnimationFrame(f); cambiar(); }; requestAnimationFrame(f);
+      }, n);
       await pagina.waitForFunction(() => window.__llegadaEn > 0, null, { timeout: 200000, polling: 100 });
       marcasNodo.push([await pagina.evaluate(() => window.__llegadaEn), n]); log(`  · ${n}`);
     };
@@ -79,8 +100,14 @@ async function recorrer(base, nombre, { destinos = TODOS, log = console.log } = 
     const tToque = Date.now();
     await tramo('toque');
     if (conf.tactil) await pagina.tap('#toque'); else await pagina.click('#toque');
-    await pagina.waitForFunction(() => window.__intro?.empezado, null, { timeout: 300000, polling: 50 });
+    // El toque en sí (su respuesta: el botón se va) y, si la carga aún no ha terminado, la pantalla de carga hasta el 100 %
+    // (tipo carga: es la misma carga, que empieza al abrir la página y sigue aunque se toque antes).
+    await pagina.waitForFunction(() => window.__intro?.empezado, null, { timeout: 1000, polling: 50 }).catch(async () => {
+      await tramo('carga tras el toque');
+      await pagina.waitForFunction(() => window.__intro?.empezado, null, { timeout: 300000, polling: 50 });
+    });
     await tramo('clip de la intro');
+    if (process.env.HASTA === 'toque') return { configuracion: nombre, perfil: conf.perfil, viewport: vp0(conf), dpr: PERFILES[conf.perfil].deviceScaleFactor, cpu: conf.cpu, red: { antesDelToque: resumirRed(red.peticiones.filter(p => p.t < tToque)), archivos: red.peticiones.filter(p => p.t < tToque && p.estado === 200).map(p => [p.ruta, p.bytes, p.disco]) }, tramos: [], errores: [] };
     await pagina.waitForFunction(() => document.getElementById('entrada').classList.contains('formado'), null, { timeout: 200000, polling: 100 });
     await tramo('tarjeta');
     await pagina.waitForFunction(() => document.getElementById('btn-entrar')?.classList.contains('preparado'), null, { timeout: 200000, polling: 100 });
@@ -121,24 +148,30 @@ async function recorrer(base, nombre, { destinos = TODOS, log = console.log } = 
       }
       await pagina.waitForTimeout(1000);
     };
-    await tramo('giro en casa'); await giro();
-    await tramo('zoom en casa'); await zoom();
+    // El tramo de un gesto empieza con el primer contacto (pointerdown o rueda), en la página: no antes.
+    const alGesto = n => pagina.evaluate(n => { const f = () => { removeEventListener('pointerdown', f, true); removeEventListener('wheel', f, true); window.__medidor.tramo(n); }; addEventListener('pointerdown', f, true); addEventListener('wheel', f, true); }, n).then(() => { marcasNodo.push([Date.now(), n]); log(`  · ${n}`); });
+    // Un viaje: el clic (lo que se prepara antes de despegar: plan, búferes de la escena de destino) y, desde el primer
+    // cuadro en movimiento, el vuelo.
+    const viajar = async (id, nombre) => {
+      await tramo(`clic hacia ${id}`);
+      await pagina.evaluate(n => { const e = window.__galaxia.escena; window.__despegue = 0; const f = () => { if (!(e.viajando || e.restanteViaje > 0)) return requestAnimationFrame(f); window.__medidor.tramo(n); window.__despegue = 1; }; requestAnimationFrame(f); }, nombre);
+      await pagina.evaluate(id => { const i = window.__galaxia.interfaz; i.terminarEscena(); i.visitar(id); }, id);
+      await pagina.waitForFunction(() => window.__despegue, null, { timeout: 8000, polling: 30 }).then(() => log(`  · ${nombre}`), () => log(`    (${id}: no despegó)`));
+    };
+    await alGesto('giro en casa'); await giro();
+    await alGesto('zoom en casa'); await zoom();
 
     for (const id of destinos) {
-      await tramo(`viaje a ${id}`);
-      await pagina.evaluate(id => { const i = window.__galaxia.interfaz; i.terminarEscena(); i.visitar(id); }, id);
-      await pagina.waitForFunction(() => window.__galaxia.escena.viajando || window.__galaxia.escena.restanteViaje > 0, null, { timeout: 8000, polling: 30 }).catch(() => {});
+      await viajar(id, `viaje a ${id}`);
       await alLlegar(`escena ${id}`);
       if (GIGANTES.includes(id)) {
         await pagina.waitForFunction(id => window.__galaxia.escena.clip?.id === id || document.body.classList.contains('escena-gigante'), id, { timeout: 20000, polling: 100 }).catch(() => log(`    (${id}: no empezó su clip)`));
         await pagina.waitForFunction(() => !window.__galaxia.escena.clip && !document.body.classList.contains('escena-gigante') && (document.getElementById('supernova-amor')?.hidden ?? true), null, { timeout: 200000, polling: 250 });
         await pagina.waitForTimeout(1000);
       } else await pagina.waitForTimeout(4000);
-      if (id === 'rosa') { await tramo('sistema solar'); await pagina.waitForTimeout(3000); await tramo('giro en el sistema solar'); await giro(); }
+      if (id === 'rosa') { await tramo('sistema solar'); await pagina.waitForTimeout(3000); await alGesto('giro en el sistema solar'); await giro(); }
     }
-    await tramo('vuelta a casa');
-    await pagina.evaluate(() => { const i = window.__galaxia.interfaz; i.terminarEscena(); i.visitar('hogar'); });
-    await pagina.waitForFunction(() => window.__galaxia.escena.viajando || window.__galaxia.escena.restanteViaje > 0, null, { timeout: 8000, polling: 30 }).catch(() => {});
+    await viajar('hogar', 'vuelta a casa');
     await alLlegar('casa al volver');
     await pagina.waitForTimeout(4000);
     await tramo(null);
@@ -156,7 +189,7 @@ async function recorrer(base, nombre, { destinos = TODOS, log = console.log } = 
     const antes = resumirRed(red.peticiones.filter(p => p.t < tToque));
     return {
       configuracion: nombre, perfil: conf.perfil, viewport: vp, dpr: PERFILES[conf.perfil].deviceScaleFactor, cpu: conf.cpu, consulta, gpuDisponible: r.gpu, lienzo: r.lienzo,
-      red: { antesDelToque: { MB: antes.MB, bytes: antes.bytes, descargas: antes.descargas }, total: resumirRed(red.peticiones), repetidos: [...veces].filter(([, n]) => n > 1).map(([ruta, n]) => ({ ruta, veces: n })) },
+      red: { antesDelToque: { MB: antes.MB, MBdisco: antes.MBdisco, bytes: antes.bytes, descargas: antes.descargas, archivos: red.peticiones.filter(p => p.t < tToque && p.estado === 200).map(p => [p.ruta, p.bytes, p.disco]) }, total: resumirRed(red.peticiones), repetidos: [...veces].filter(([, n]) => n > 1).map(([ruta, n]) => ({ ruta, veces: n })) },
       tramos, errores: errores.slice(0, 10)
     };
   } finally { red.quitar(); await navegador.close(); }
@@ -199,7 +232,7 @@ export function evaluar(res) {
 
 function tabla(res) {
   const filas = res.tramos.map(t => `${t.nombre.padEnd(26)} ${String(t.fps).padStart(5)} ${String(t.p50).padStart(6)} ${String(t.p95).padStart(6)} ${String(t.p99).padStart(6)} ${String(t.sobre25).padStart(4)} ${String(t.sobre50).padStart(4)} ${String(t.loaf.n).padStart(4)} ${String(t.dibujo.llamadasP50).padStart(5)} ${String(t.gpu.p50 ?? '-').padStart(6)} ${String(t.red.MB).padStart(6)}  ${t.incumple.join('; ')}`);
-  return [`${res.configuracion} (${res.viewport.width}×${res.viewport.height}, DPR ${res.dpr}, CPU ×${res.cpu}) · antes del toque ${res.red.antesDelToque.MB} MB · repetidos ${res.red.repetidos.length}`,
+  return [`${res.configuracion} (${res.viewport.width}×${res.viewport.height}, DPR ${res.dpr}, CPU ×${res.cpu}) · antes del toque ${res.red.antesDelToque.MB} MB por la red (${res.red.antesDelToque.MBdisco} MB en disco) · repetidos ${res.red.repetidos.length}`,
     'tramo                        FPS    p50    p95    p99  >25  >50 LoAF  draw  GPUms   red MB  incumple', ...filas, ...(res.incumpleGlobal.length ? ['GLOBAL: ' + res.incumpleGlobal.join('; ')] : [])].join('\n');
 }
 
@@ -211,9 +244,10 @@ async function todo(base, nombres, log) {
     log(`▸ ${n}`);
     let r = null;
     for (let intento = 1; intento <= 2 && !r; intento++) {
-      try { r = evaluar(await recorrer(base, n, { destinos, log })); }
+      try { r = await recorrer(base, n, { destinos, log }); if (!process.env.HASTA) r = evaluar(r); }
       catch (e) { log(`  ${n}: el recorrido falló (${e.message.split('\n')[0]})${intento < 2 ? ', se repite' : ''}`); if (intento === 2) salida.configuraciones[n] = { error: e.message.split('\n')[0] }; }
     }
+    if (r && process.env.HASTA) { salida.configuraciones[n] = r; log(`${n}: antes del toque ${r.red.antesDelToque.MB} MB (${r.red.antesDelToque.MBdisco} MB en disco)`); continue; }
     if (r) { salida.configuraciones[n] = r; log(tabla(r)); }
   }
   return salida;
