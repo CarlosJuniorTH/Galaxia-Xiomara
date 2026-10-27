@@ -117,7 +117,8 @@ try {
     const soltarLuego = ms => { clearTimeout(suelta); suelta = setTimeout(() => { if (!dedos.size) ocupado('gesto', false); }, ms); };
     lienzo.addEventListener('pointerdown', e => { dedos.add(e.pointerId); clearTimeout(suelta); ocupado('gesto', true); }, { passive: true });
     for (const ev of ['pointerup', 'pointercancel']) addEventListener(ev, e => { dedos.delete(e.pointerId); if (!dedos.size) soltarLuego(1500); }, { passive: true });   // (1,5 s: la inercia del giro)
-    lienzo.addEventListener('wheel', () => { ocupado('gesto', true); soltarLuego(1000); }, { passive: true });
+    // (En la fase de captura de la ventana: el zoom de la rueda, util/zoom.js, la detiene en el lienzo para los demás.)
+    addEventListener('wheel', e => { if (e.target !== lienzo) return; ocupado('gesto', true); soltarLuego(1000); }, { passive: true, capture: true });
   }
   etapa = 'recuerdos e interfaz';
   const recuerdos = crearRecuerdos(CONFIG, estrellas, progreso, {

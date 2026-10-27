@@ -174,6 +174,10 @@ async function recorrer(base, nombre, { destinos = TODOS, log = console.log } = 
       await alLlegar(`escena ${id}`);
       if (GIGANTES.includes(id)) {
         await pagina.waitForFunction(id => window.__galaxia.escena.clip?.id === id || document.body.classList.contains('escena-gigante'), id, { timeout: 20000, polling: 100 }).catch(() => log(`    (${id}: no empezó su clip)`));
+        // El videoclip termina (escena.clip vuelve a null): lo que sigue (la cámara vuelve con un fundido, la interfaz) ya no
+        // es el clip.
+        await pagina.evaluate(n => { const e = window.__galaxia.escena; window.__finClip = 0; let visto = false; const f = () => { if (e.clip) visto = true; if (visto && !e.clip) { window.__medidor.tramo(n); window.__finClip = 1; return; } requestAnimationFrame(f); }; requestAnimationFrame(f); }, `tras la escena ${id}`);
+        await pagina.waitForFunction(() => window.__finClip, null, { timeout: 200000, polling: 250 }).then(() => log(`  · tras la escena ${id}`), () => {});
         await pagina.waitForFunction(() => !window.__galaxia.escena.clip && !document.body.classList.contains('escena-gigante') && (document.getElementById('supernova-amor')?.hidden ?? true), null, { timeout: 200000, polling: 250 });
         await pagina.waitForTimeout(1000);
       } else await pagina.waitForTimeout(4000);

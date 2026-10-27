@@ -1,0 +1,254 @@
+[
+ {
+  "captura": "movil-casa.jpg",
+  "difMedia": 10.01,
+  "psnr": 20.6,
+  "ssim": 0.702,
+  "brilloAntes": 34.5,
+  "brilloDespues": 33.1,
+  "nitidezDespuesSobreAntes": 0.89
+ },
+ {
+  "captura": "movil-cuasar.jpg",
+  "difMedia": 9.75,
+  "psnr": 20.8,
+  "ssim": 0.736,
+  "brilloAntes": 31.4,
+  "brilloDespues": 31.0,
+  "nitidezDespuesSobreAntes": 1.03
+ },
+ {
+  "captura": "movil-deneb.jpg",
+  "difMedia": 2.4,
+  "psnr": 27.8,
+  "ssim": 0.945,
+  "brilloAntes": 24.8,
+  "brilloDespues": 24.5,
+  "nitidezDespuesSobreAntes": 0.99
+ },
+ {
+  "captura": "movil-intro-1.jpg",
+  "difMedia": 0.2,
+  "psnr": 39.4,
+  "ssim": 0.997,
+  "brilloAntes": 6.8,
+  "brilloDespues": 6.8,
+  "nitidezDespuesSobreAntes": 1.48
+ },
+ {
+  "captura": "movil-intro-2.jpg",
+  "difMedia": 0.24,
+  "psnr": 41.0,
+  "ssim": 0.997,
+  "brilloAntes": 6.7,
+  "brilloDespues": 6.7,
+  "nitidezDespuesSobreAntes": 1.11
+ },
+ {
+  "captura": "movil-intro-3.jpg",
+  "difMedia": 0.56,
+  "psnr": 37.0,
+  "ssim": 0.994,
+  "brilloAntes": 9.4,
+  "brilloDespues": 9.5,
+  "nitidezDespuesSobreAntes": 1.1
+ },
+ {
+  "captura": "movil-intro-4.jpg",
+  "difMedia": 0.56,
+  "psnr": 41.3,
+  "ssim": 0.994,
+  "brilloAntes": 8.9,
+  "brilloDespues": 8.9,
+  "nitidezDespuesSobreAntes": 0.91
+ },
+ {
+  "captura": "movil-intro-5.jpg",
+  "difMedia": 0.25,
+  "psnr": 42.5,
+  "ssim": 0.997,
+  "brilloAntes": 4.8,
+  "brilloDespues": 4.8,
+  "nitidezDespuesSobreAntes": 0.51
+ },
+ {
+  "captura": "movil-pulsar.jpg",
+  "difMedia": 7.29,
+  "psnr": 20.7,
+  "ssim": 0.795,
+  "brilloAntes": 8.6,
+  "brilloDespues": 8.4,
+  "nitidezDespuesSobreAntes": 1.02
+ },
+ {
+  "captura": "movil-sagitario.jpg",
+  "difMedia": 3.9,
+  "psnr": 24.7,
+  "ssim": 0.893,
+  "brilloAntes": 11.7,
+  "brilloDespues": 12.0,
+  "nitidezDespuesSobreAntes": 1.0
+ },
+ {
+  "captura": "movil-sistema-solar.jpg",
+  "difMedia": 5.58,
+  "psnr": 21.8,
+  "ssim": 0.897,
+  "brilloAntes": 23.9,
+  "brilloDespues": 24.5,
+  "nitidezDespuesSobreAntes": 1.0
+ },
+ {
+  "captura": "movil-supernova-corazon.jpg",
+  "difMedia": 7.55,
+  "psnr": 22.1,
+  "ssim": 0.841,
+  "brilloAntes": 27.4,
+  "brilloDespues": 26.4,
+  "nitidezDespuesSobreAntes": 0.95
+ },
+ {
+  "captura": "movil-supernova-estallido.jpg",
+  "difMedia": 15.55,
+  "psnr": 17.8,
+  "ssim": 0.69,
+  "brilloAntes": 59.0,
+  "brilloDespues": 55.2,
+  "nitidezDespuesSobreAntes": 0.87
+ },
+ {
+  "captura": "movil-ton618.jpg",
+  "difMedia": 7.19,
+  "psnr": 21.8,
+  "ssim": 0.806,
+  "brilloAntes": 16.1,
+  "brilloDespues": 16.4,
+  "nitidezDespuesSobreAntes": 1.05
+ },
+ {
+  "captura": "pc-casa.jpg",
+  "difMedia": 8.23,
+  "psnr": 22.5,
+  "ssim": 0.648,
+  "brilloAntes": 37.7,
+  "brilloDespues": 37.6,
+  "nitidezDespuesSobreAntes": 0.99
+ },
+ {
+  "captura": "pc-cuasar.jpg",
+  "difMedia": 23.26,
+  "psnr": 16.4,
+  "ssim": 0.403,
+  "brilloAntes": 72.2,
+  "brilloDespues": 72.0,
+  "nitidezDespuesSobreAntes": 1.02
+ },
+ {
+  "captura": "pc-deneb.jpg",
+  "difMedia": 2.51,
+  "psnr": 27.5,
+  "ssim": 0.924,
+  "brilloAntes": 24.4,
+  "brilloDespues": 24.3,
+  "nitidezDespuesSobreAntes": 0.98
+ },
+ {
+  "captura": "pc-intro-1.jpg",
+  "difMedia": 0.06,
+  "psnr": 46.2,
+  "ssim": 0.999,
+  "brilloAntes": 6.2,
+  "brilloDespues": 6.2,
+  "nitidezDespuesSobreAntes": 1.08
+ },
+ {
+  "captura": "pc-intro-2.jpg",
+  "difMedia": 0.04,
+  "psnr": 51.1,
+  "ssim": 1.0,
+  "brilloAntes": 5.7,
+  "brilloDespues": 5.7,
+  "nitidezDespuesSobreAntes": 1.01
+ },
+ {
+  "captura": "pc-intro-3.jpg",
+  "difMedia": 0.08,
+  "psnr": 47.0,
+  "ssim": 1.0,
+  "brilloAntes": 15.9,
+  "brilloDespues": 15.9,
+  "nitidezDespuesSobreAntes": 1.0
+ },
+ {
+  "captura": "pc-intro-4.jpg",
+  "difMedia": 0.02,
+  "psnr": 63.8,
+  "ssim": 1.0,
+  "brilloAntes": 8.2,
+  "brilloDespues": 8.2,
+  "nitidezDespuesSobreAntes": 1.0
+ },
+ {
+  "captura": "pc-intro-5.jpg",
+  "difMedia": 0.01,
+  "psnr": 66.9,
+  "ssim": 1.0,
+  "brilloAntes": 4.2,
+  "brilloDespues": 4.2,
+  "nitidezDespuesSobreAntes": 1.0
+ },
+ {
+  "captura": "pc-pulsar.jpg",
+  "difMedia": 15.71,
+  "psnr": 16.6,
+  "ssim": 0.676,
+  "brilloAntes": 18.5,
+  "brilloDespues": 18.8,
+  "nitidezDespuesSobreAntes": 0.96
+ },
+ {
+  "captura": "pc-sagitario.jpg",
+  "difMedia": 5.83,
+  "psnr": 23.4,
+  "ssim": 0.827,
+  "brilloAntes": 16.8,
+  "brilloDespues": 17.6,
+  "nitidezDespuesSobreAntes": 1.02
+ },
+ {
+  "captura": "pc-sistema-solar.jpg",
+  "difMedia": 3.07,
+  "psnr": 24.3,
+  "ssim": 0.922,
+  "brilloAntes": 14.3,
+  "brilloDespues": 14.8,
+  "nitidezDespuesSobreAntes": 0.99
+ },
+ {
+  "captura": "pc-supernova-corazon.jpg",
+  "difMedia": 6.66,
+  "psnr": 22.5,
+  "ssim": 0.841,
+  "brilloAntes": 27.1,
+  "brilloDespues": 27.0,
+  "nitidezDespuesSobreAntes": 1.0
+ },
+ {
+  "captura": "pc-supernova-estallido.jpg",
+  "difMedia": 13.01,
+  "psnr": 16.8,
+  "ssim": 0.635,
+  "brilloAntes": 31.1,
+  "brilloDespues": 30.8,
+  "nitidezDespuesSobreAntes": 1.0
+ },
+ {
+  "captura": "pc-ton618.jpg",
+  "difMedia": 19.33,
+  "psnr": 17.7,
+  "ssim": 0.573,
+  "brilloAntes": 50.8,
+  "brilloDespues": 49.9,
+  "nitidezDespuesSobreAntes": 1.02
+ }
+]
