@@ -154,3 +154,21 @@ test('las llegadas frenan hasta parar sin frenazo: velocidad que baja hasta cero
       assert.ok(Math.abs(paso[i] - 2 * paso[i - 1] + paso[i - 2]) / ref < 0.16, `${nombre}${reducido ? ' (reducido)' : ''}: salto de velocidad a ${(T - plan.ruptura[0] - i / 60).toFixed(2)} s del final`); }
   }
 });
+
+test('con obrero, el perfil se calcula fuera (enReposo, sin trozos de más de unos ms) y da exactamente el mismo vuelo', async () => {
+  const { calcularPerfil } = await import('../js/util/perfilVuelo.js');
+  const entero = planear('casa → supernova (100 Mal)');
+  let pedidos = 0; const obrero = args => { pedidos++; return new Promise(r => setTimeout(() => r(calcularPerfil(args)), 5)); };
+  const fuera = planear('casa → supernova (100 Mal)', { obrero });
+  // Mientras el obrero calcula, preparar() no se queda esperando (vuelve en el acto).
+  const t0 = performance.now(); fuera.preparar(50); while (!fuera.listo && performance.now() - t0 < 30) fuera.preparar(5);
+  assert.ok(performance.now() - t0 < 200, 'preparar no espera al obrero');
+  assert.equal(await fuera.enReposo(), true);
+  assert.equal(pedidos, 1);
+  assert.deepEqual(fuera.tiempos, entero.tiempos);
+  for (let i = 0; i <= 50; i++) { const t = entero.duracion * i / 50, a = entero.evaluar(t), b = fuera.evaluar(t);
+    assert.ok(a.pos.distanceTo(b.pos) === 0 && a.mira.distanceTo(b.mira) === 0 && a.fase === b.fase, `instante ${t}`); }
+  // Evaluar reutilizando el mismo objeto da lo mismo que uno nuevo (el bucle de dibujo no crea memoria en cada cuadro).
+  const mismo = { pos: v(0, 0, 0), mira: v(0, 0, 0) };
+  for (const t of [0.1, fuera.duracion * 0.5, fuera.duracion]) { const a = fuera.evaluar(t), b = fuera.evaluar(t, mismo); assert.ok(b === mismo && a.pos.equals(b.pos) && a.mira.equals(b.mira) && a.fase === b.fase && a.corriente === b.corriente); }
+});

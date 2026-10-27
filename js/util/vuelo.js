@@ -100,14 +100,14 @@ export function crearObreroVuelo() {
 // inclinación, como gira la cabeza una persona.
 // sentido (±1): si el giro es de casi media vuelta, se da en ese sentido (el que ya traía la mirada), no por el más corto:
 // cerca de 180° el más corto podía cambiar de un cuadro a otro o ir al revés que el movimiento anterior (un tirón).
-function girarMirada(a, b, k, sentido = 0) {
+function girarMirada(a, b, k, sentido = 0, out = new THREE.Vector3()) {
   const gu = v => Math.atan2(v.x, v.z), in_ = v => Math.asin(THREE.MathUtils.clamp(v.y, -1, 1));
   let dg = gu(b) - gu(a); dg -= Math.PI * 2 * Math.round(dg / (Math.PI * 2));
   if (sentido && Math.abs(dg) > Math.PI * 0.6 && Math.sign(dg) !== sentido) dg += sentido * Math.PI * 2;
   // Mirando casi en vertical la guiñada no está definida: ahí basta el giro directo.
-  if (Math.abs(a.y) > 0.985 || Math.abs(b.y) > 0.985) return a.clone().lerp(b, k).normalize();
+  if (Math.abs(a.y) > 0.985 || Math.abs(b.y) > 0.985) return out.copy(a).lerp(b, k).normalize();
   const g = gu(a) + dg * k, i = THREE.MathUtils.lerp(in_(a), in_(b), k), c = Math.cos(i);
-  return new THREE.Vector3(Math.sin(g) * c, Math.sin(i), Math.cos(g) * c);
+  return out.set(Math.sin(g) * c, Math.sin(i), Math.cos(g) * c);
 }
 
 // duracionTotal: lo que dura TODO el viaje, del clic a la llegada (por defecto, la regla de duracionViaje: 10–15 s según
@@ -242,23 +242,27 @@ export function planificarVuelo({ desde, miraDesde, hasta, mira, centro = mira, 
   const distMira = Math.max(200, miraDesde.distanceTo(desde));
   const recorridoEn = tv => { const x = Math.max(0, tv) / perfil.dt, i = Math.min(perfil.tabla.length - 2, Math.floor(x)), f = Math.min(1, x - i); return perfil.tabla[i] + (perfil.tabla[i + 1] - perfil.tabla[i]) * f; };
 
-  function evaluar(t) {
-    const pos = V(), m = V();
+  // Temporales de evaluar (sin memoria nueva en cada cuadro del vuelo: menos pausas del recolector).
+  const qArco = arcoSalida ? new THREE.Quaternion().setFromUnitVectors(arcoSalida.d0, arcoSalida.d1) : null, qTmp = new THREE.Quaternion(), dTmp = V(), mTmp = V();
+  // rellenar (opcional): el objeto que se rellena y se devuelve ({ pos, mira, … }); sin él, uno nuevo (las pruebas guardan
+  // varios a la vez). El bucle de dibujo pasa siempre el mismo.
+  function evaluar(t, rellenar = null) {
+    const r = rellenar ?? { pos: V(), mira: V() }, pos = r.pos, m = r.mira;
     let fase, corriente = 0, ruptura = 0, avance = 0, velocidad = 0;
     if (t < inicioViaje) {
       // A/B/C: selección, maniobra y alineación (sin estelas de velocidad).
       const ks = tManiobra > 0 ? suave(THREE.MathUtils.clamp((t - inicioManiobra) / tManiobra, 0, 1)) : 0;
       if (arcoSalida) {   // vuelve a su distancia y rodea, solapados (si ya está a su distancia, rodea desde el primer instante)
         const fr = 0.4 * radial, kr = fr > 0 ? suave(THREE.MathUtils.clamp(ks / (fr + 0.2), 0, 1)) : 1, kg = suave(THREE.MathUtils.clamp((ks - fr * 0.5) / (1 - fr * 0.5), 0, 1));
-        const q = new THREE.Quaternion().setFromUnitVectors(arcoSalida.d0, arcoSalida.d1), dir = arcoSalida.d0.clone().applyQuaternion(new THREE.Quaternion().slerp(q, kg));
+        const dir = dTmp.copy(arcoSalida.d0).applyQuaternion(qTmp.identity().slerp(qArco, kg));
         pos.copy(arcoSalida.c).addScaledVector(dir, THREE.MathUtils.lerp(arcoSalida.r0, arcoSalida.r1, kr)); }
       else pos.copy(desde).lerp(salida, ks);
       const ka = suave(THREE.MathUtils.clamp((t - inicioAlinear) / Math.max(1e-3, finAlinear - inicioAlinear), 0, 1));
       // Al rodear un gigante se le mira (sigue en el centro de la pantalla); luego se gira hacia el destino.
-      const mirarDesde = arcoSalida ? arcoSalida.c.clone().sub(pos).normalize() : dirInicial;
+      const mirarDesde = arcoSalida ? mTmp.subVectors(arcoSalida.c, pos).normalize() : dirInicial;
       // Giro de la mirada de lado (alrededor del eje vertical) y la inclinación a la vez: nunca da la vuelta por
       // abajo ni por arriba aunque haya que girar media vuelta (con un cuaternión, 180° elegía un eje cualquiera).
-      const dir = girarMirada(mirarDesde, dirCorredor, ka, sentidoGiro);
+      const dir = girarMirada(mirarDesde, dirCorredor, ka, sentidoGiro, dTmp);
       m.copy(pos).addScaledVector(dir, THREE.MathUtils.lerp(distMira, pos.distanceTo(centro), ka));
       fase = t < tSeleccion && ks < 0.02 ? 'seleccion' : (tManiobra > 0 && t < finManiobra && t < inicioAlinear) ? 'maniobra' : 'alineacion';
     } else {
@@ -273,7 +277,8 @@ export function planificarVuelo({ desde, miraDesde, hasta, mira, centro = mira, 
       // (por distancia, a toda velocidad se apagaban en unos cuadros).
       corriente = Math.min(THREE.MathUtils.smoothstep(tv, 0, 1.5), 1 - THREE.MathUtils.smoothstep(t, tAprox, Math.max(tAprox + 1.2, tLlegada)));
     }
-    return { pos, mira: m, fase, corriente: reducido ? 0 : corriente, ruptura, avance, velocidad };
+    r.fase = fase; r.corriente = reducido ? 0 : corriente; r.ruptura = ruptura; r.avance = avance; r.velocidad = velocidad;
+    return r;
   }
   return {
     // Mientras se prepara, la duración es la pedida (la búsqueda del perfil la clava: difiere en menos de un cuadro).

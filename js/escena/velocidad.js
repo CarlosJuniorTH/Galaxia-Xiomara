@@ -88,7 +88,7 @@ export function crearVelocidad(camera, { reducido = false } = {}) {
   foco.renderOrder = 5; foco.visible = false; mesh.add(foco);   // un único objeto colgado de la cámara
   if (typeof addEventListener === 'function') addEventListener('resize', () => u.uViewport.value.set(vista.ancho, vista.alto));
 
-  const antes = new THREE.Vector3(), vel = new THREE.Vector3(), dirCam = new THREE.Vector3(), inversa = new THREE.Matrix4();
+  const antes = new THREE.Vector3(), vel = new THREE.Vector3(), dirCam = new THREE.Vector3(), inversa = new THREE.Matrix4(), ejeTmp = new THREE.Vector3();
   const giroAnterior = new THREE.Quaternion(), delta = new THREE.Quaternion(), flujo = new THREE.Vector2();
   let primero = true, empuje = 0, ruptura = 0, anillo = 0, dirFija = null;
   return {
@@ -132,7 +132,7 @@ export function crearVelocidad(camera, { reducido = false } = {}) {
       u.uGiro.value.lerp(giro > 0 && !maniobrando ? flujo : flujo.set(0, 0), Math.min(1, dt * 9));
       u.uFuerza.value += (objetivo - u.uFuerza.value) * Math.min(1, dt * (objetivo > u.uFuerza.value ? 8 : 4));
       // Hacia delante: las estrellas vienen del punto de fuga. Hacia atrás: se alejan hacia él.
-      const atras = dirCam.z > 0.35, eje = atras ? dirCam.clone().negate() : dirCam.clone();   // de lado no cambia de sentido a cada cuadro
+      const atras = dirCam.z > 0.35, eje = atras ? ejeTmp.copy(dirCam).negate() : ejeTmp.copy(dirCam);   // de lado no cambia de sentido a cada cuadro
       // Al arrancar, el punto de fuga nace ya donde se va (en el centro): no viene de un lado.
       if (dirFija) u.uDir.value.copy(dirFija);
       else if (rapidez > 1) { if (u.uFuerza.value < 0.08) u.uDir.value.copy(eje).normalize(); else u.uDir.value.lerp(eje, Math.min(1, dt * 6)).normalize(); }

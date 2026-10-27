@@ -320,6 +320,8 @@ export function* construirCosmos({ uScale, uPR }) {
     // Para las pruebas y el diagnóstico: segundo, peso y estado de cada una.
     estado(id) { const d = directores[id]; return d ? { activa: d.activa, terminada: d.terminada, segundo: d.segundo, peso: d.peso, ...(id === 'pulsar' ? estadoP : id === 'cuasar' ? estadoC : estadoD) } : null; }
   };
+  // Las dos lentes (Sagitario A* y TON 618), reutilizadas en cada cuadro (lentes()).
+  const lentesFijas = [{ id: 'sagitario', centro: new THREE.Vector3(), dentro: 0, fuerza: 0, alcance: 6 }, { id: 'ton618', centro: new THREE.Vector3(), dentro: 0, fuerza: 0, alcance: 3.2 }], lentesVisibles = [];
   return {
     escenas,
     sobreGas: [],
@@ -331,12 +333,14 @@ export function* construirCosmos({ uScale, uPR }) {
     supernova: sn,
     get supernovaActiva() { const e = sn.desdeEstallido; return e !== null && e < 130; },
     // Agujeros con lente: centro (espacio de la raíz), radio que no se deforma, fuerza y alcance.
+    // Se llama en cada cuadro: devuelve siempre la misma lista y los mismos objetos (sin memoria nueva por cuadro).
     lentes() {
-      const k = raiz.scale.x;
+      const k = raiz.scale.x; lentesVisibles.length = 0;
       // (La de Sagitario A* se atenúa mientras sus órbitas dibujan corazones: no los deforma. La de TON 618 empieza por
       // fuera de su disco de motas, que ya se curva por sí mismo.)
-      return [[sagitario, RS * sagitario.scale.x * 1.95, RS * sagitario.scale.x * 2.4 * piezasSgr.atenuacionLente, 6], [gigantesco, R * gigantesco.scale.x * 7, R * gigantesco.scale.x * 3.2, 3.2]].filter(([o]) => o.visible)
-        .map(([o, dentro, fuerza, alcance]) => ({ id: o === sagitario ? 'sagitario' : 'ton618', centro: o.position.clone().multiplyScalar(k).add(raiz.position), dentro: dentro * k, fuerza: fuerza * k, alcance }));
+      if (sagitario.visible) { const l = lentesFijas[0]; l.centro.copy(sagitario.position).multiplyScalar(k).add(raiz.position); l.dentro = RS * sagitario.scale.x * 1.95 * k; l.fuerza = RS * sagitario.scale.x * 2.4 * piezasSgr.atenuacionLente * k; lentesVisibles.push(l); }
+      if (gigantesco.visible) { const l = lentesFijas[1]; l.centro.copy(gigantesco.position).multiplyScalar(k).add(raiz.position); l.dentro = R * gigantesco.scale.x * 7 * k; l.fuerza = R * gigantesco.scale.x * 3.2 * k; lentesVisibles.push(l); }
+      return lentesVisibles;
     },
     // Medidas reales (geometría × escalas de todos los padres), para contrastar la tabla de
     // escalas con lo que se dibuja (diagnóstico y pruebas).

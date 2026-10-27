@@ -160,7 +160,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // La telaraña cósmica: filamentos y cúmulos de galaxias por todo el universo (se ve desde cualquier destino).
   await ceder();
   const telarana = await capaPorPasos('telarana', async () => crearTelaranaCosmica(nucleo, await datosTelarana));
-  const { subirTexturas, subirGeometrias, compilarTodo, calentar } = crearPreparacion({ renderer, camera, scene, nucleo, solar, telarana, composer, obtenerCapaVolumen: () => capaVolumen });   // carga/preparacion.js
+  const { subirTexturas, subirGeometrias, compilarTodo, calentar, calentarPoses } = crearPreparacion({ renderer, camera, scene, nucleo, solar, telarana, composer, obtenerCapaVolumen: () => capaVolumen });   // carga/preparacion.js
   // Sus puntos (decenas de MB) a la GPU ya: sueltan su copia en memoria antes de que se creen las capas siguientes.
   subirGeometrias([telarana.raiz, telarana.capaGalaxias]);
   // También Deneb (no está entre los cuerpos de navegación): la telaraña que queda detrás de su estrella no se ve encima.
@@ -311,6 +311,33 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   obreroVuelo?.({ dist: new Float64Array(17).fill(10), longitud: 1000, duracion: 5, tRampa: 1, tFrenada: 1, lRecta: 1000, tArco: 0 }).catch(() => {});
   // Gas volumétrico a resolución reducida y reconstruido (capaVolumen.js): las nebulosas con volumen se pintan en su propia capa.
   const capaVolumen = crearCapaVolumen({ scene, renderer, uPR: nucleo.uPR, hdr: canvas.dataset.brillo3d === 'hdr', sinProfundidad: canvas.dataset.brillo3d === 'directo' && !modoCompatible });
+  // Poses de llegada para el calentamiento a tamaño real: casa, cada gigante lejano (desde casa, a su distancia de llegada,
+  // como en viajarLejos) y el sistema solar. Un cuadro de ensayo por pose, con el mismo camino de dibujo que animar().
+  function posesDeLlegada() {
+    const aspecto = vista.ancho / vista.alto, poses = [], casa = v3(DESTINOS.find(d => d.id === 'hogar').posicion);
+    const { distancia, elevacion } = encuadreHogar(aspecto);
+    const off = aspecto >= 0.8 ? new THREE.Vector3(distancia * 0.2, distancia * 0.42, distancia * 0.88) : new THREE.Vector3(0.2, 0, 0.88).normalize().multiplyScalar(Math.cos(elevacion) * distancia).setY(Math.sin(elevacion) * distancia);
+    poses.push({ id: 'hogar', escena: 'principal', pos: casa.clone().add(off), mira: casa });
+    for (const { id } of LEJANOS) {
+      const o = id === 'gigante' ? null : cosmos.objetivo(id); if (!o) continue;
+      const c = o.centro.clone().multiplyScalar(ESCALA_CIELO), d = o.distancia * ESCALA_CIELO * Math.max(1, Math.min(1.6, 0.95 / aspecto));
+      poses.push({ id, escena: 'principal', pos: c.clone().addScaledVector(c.clone().negate().normalize(), d), mira: c, near: Math.max(0.5, d * 0.002) });
+    }
+    const rosa = DESTINOS.find(d => d.id === 'rosa');
+    if (rosa) { const c = v3(rosa.posicion), d = rosa.distancia || 530; poses.push({ id: 'rosa', escena: 'solar', pos: c.clone().add(new THREE.Vector3(0.6, 0.25, 0.75).normalize().multiplyScalar(d)), mira: c }); }
+    return poses;
+  }
+  function cuadroDeEnsayo() {
+    acompanar();
+    if (escenaActiva !== 'solar') { scene.updateMatrixWorld(); capaVolumen.dibujar(camera); telarana.dibujarGalaxias(renderer, camera); }
+    seguirLuces(); composer.render();
+  }
+  async function calentarDestinos() {
+    const gigantes = listaGigantes(), visibles = gigantes.map(({ g }) => g.visible);
+    for (const { g } of gigantes) g.visible = true;   // (de lejos se ocultan; aquí se ven todos de cerca)
+    try { return await calentarPoses(posesDeLlegada(), { fijarEscena: cambiarEscena, dibujar: cuadroDeEnsayo }); }
+    finally { gigantes.forEach(({ g }, i) => { g.visible = visibles[i]; }); acompanar(); }
+  }
   const listo = (async () => {
     pasos.paso = 'nebulosas'; await lejanas.prepararTodas((h, t) => avance(0.5 + 0.06 * h / t, 0.56));
     pasos.paso = 'texturas'; await texturasTodas((h, t) => avance(0.56 + 0.28 * h / t, 0.84));
@@ -322,7 +349,10 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     avance(0.96, 0.99);
     pasos.paso = 'subir'; await subirTexturas(); await subirTexturas(solar.escena); solarPreparado = true;
     await new Promise(r => setTimeout(r, 0));
-    await calentar(); soltarHorno(); avance(1);
+    await calentar();
+    // Y a tamaño real, con todas las pasadas, en la pose de llegada de cada destino (carga/preparacion.js).
+    pasos.paso = 'calentar destinos'; const ensayo = await calentarDestinos(); if (diagnosticar) canvas.dataset.calentamiento = JSON.stringify(ensayo);
+    soltarHorno(); avance(1);
   })();
   let vuelo = null, tiempo = 0, tEntrada = null, prev = performance.now(), pulso = 0, suspendida = false, cercaUniverso = Infinity, estrellasLocales = -1;
   const centroVia = cosmos.objetivo('sagitario')?.centro?.clone() ?? new THREE.Vector3();
@@ -521,6 +551,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   const ORIGEN_CASA = new THREE.Vector3();
   const raicesLejanas = scene.children.filter(o => o.userData.capa === 'galaxiasLejanas');
   let gruposGigantes = null;
+  const listaGigantes = () => { const raizC = scene.children.find(o => o.userData.capa === 'cosmos'), w = new THREE.Vector3(), l = [];
+    for (const g of raizC?.children ?? []) { if (!g.isGroup) continue; g.getWorldPosition(w); const c = cosmos.cuerpos().find(c => c.id !== 'xiomara' && c.centro.distanceTo(w) < c.radio * 4); if (c) l.push({ g, c }); }
+    return l; };
   const raicesCasa = scene.children.filter(o => ['frases', 'amor', 'mundos', 'secretas', 'agujeroNegro'].includes(o.userData.capa));
   // «Mirar hacia casa» desde un gigante: los gigantes están casi en el plano de la galaxia de Xiomara y se veía de canto (una
   // raya). Mientras se mira, casa se inclina hacia la cámara (como una foto desde arriba, ~45°) solo al dibujar: antes del
@@ -573,11 +606,12 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     } else if (mirada) { mirada = { ...mirada, t: 0, saliendo: true, desdeFov: camera.fov, desdeQ: camera.quaternion.clone() }; }
     planificador.pedirCuadro(); return true;
   }
+  const qVuelta = new THREE.Quaternion(), mVuelta = new THREE.Matrix4();   // (temporales de actualizarMirada)
   function actualizarMirada(dt) {
     if (!mirada) return;
     mirada.t = Math.min(1, mirada.t + dt / (movimientoReducido ? 0.6 : 1.6)); const k = THREE.MathUtils.smootherstep(mirada.t, 0, 1);
     if (!mirada.saliendo) { camera.quaternion.slerpQuaternions(mirada.desdeQ, mirada.aQ, Math.min(1, k * 1.6)); camera.fov = mirada.desdeFov + (mirada.aFov - mirada.desdeFov) * THREE.MathUtils.smootherstep(mirada.t, 0.25, 1); }
-    else { const vuelta = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(camera.position, mirada.objetivo, camera.up)); camera.quaternion.slerpQuaternions(mirada.desdeQ, vuelta, k); camera.fov = mirada.desdeFov + (FOV_BASE - mirada.desdeFov) * Math.min(1, k * 1.4); }
+    else { const vuelta = qVuelta.setFromRotationMatrix(mVuelta.lookAt(camera.position, mirada.objetivo, camera.up)); camera.quaternion.slerpQuaternions(mirada.desdeQ, vuelta, k); camera.fov = mirada.desdeFov + (FOV_BASE - mirada.desdeFov) * Math.min(1, k * 1.4); }
     camera.updateProjectionMatrix();
     // El fondo infinito (cubemap) no se amplía: con un campo de visión tan estrecho sus texeles se
     // verían como una niebla gris. Se atenúa con la ampliación (vuelve al terminar).
@@ -1096,6 +1130,11 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     if (!yaRecargo) location.reload();
   });
 
+  const opcionesVelocidad = { vuelo: null, radial: 0, ceremonia: false, entrada: false };   // (el mismo objeto en cada cuadro)
+  let materialesDecor = null;
+  const evaluado = { pos: new THREE.Vector3(), mira: new THREE.Vector3() };   // el estado del vuelo de cada cuadro (siempre el mismo objeto)
+  let nivelEnsayo = 0, cuentaEnsayo = 0, ultimoEnsayo = -Infinity;   // 3D detrás de la portada (precalentar)
+  const tmpPunto = new THREE.Vector3(), tmpDesvioVuelo = new THREE.Vector3(), tmpMirada = new THREE.Vector3();
   const tmpDir = new THREE.Vector3(), tmpProy = new THREE.Vector3();   // temporales del bucle (sin crear objetos en cada cuadro)
   function animar(ahora) {
     requestAnimationFrame(animar);
@@ -1106,11 +1145,18 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     const estadoDibujo = lecturaActiva ? 'lectura' : 'activo';
     if (diagnosticar && canvas.dataset.dibujo !== estadoDibujo) canvas.dataset.dibujo = estadoDibujo;   // (diagnóstico: #debug, ?diag, ?hud)
     // Mientras se ve la portada (opaca) el 3D no se dibuja: menos trabajo y calor al empezar.
-    const reposo = document.hidden || suspendida || lecturaActiva || (tEntrada === null && !document.body.classList.contains('dentro') && !captura);
+    // Salvo al final del clip de la intro (precalentar): el 3D completo se dibuja detrás de la portada opaca con la cámara en
+    // la pose inicial del vuelo de entrada, para que al pulsar «Empezar» lleve ya cuadros calientes (nada se estrena en el
+    // primer cuadro del vuelo, tras 32 s de 3D dormido). Nivel 1: uno de cada 3 cuadros (aún suena el clip); 2: todos;
+    // 3: uno cada 250 ms (la tarjeta, leyendo: lo justo para que la GPU no se duerma).
+    const portada = tEntrada === null && !document.body.classList.contains('dentro') && !captura;
+    const ensayo = portada && !document.hidden && nivelEnsayo > 0 && (nivelEnsayo === 2 || (nivelEnsayo === 1 ? ++cuentaEnsayo % 3 === 0 : ahora - ultimoEnsayo >= 250));
+    if (ensayo) ultimoEnsayo = ahora;
+    const reposo = document.hidden || suspendida || lecturaActiva || (portada && !ensayo);
     // Motivo por el que se dibuja a ritmo de interacción (se informa en el diagnóstico).
     // La inercia del giro (y el final de un zoom) también son movimiento: a 60 hasta que se paran del todo. Antes, a los 4 s
     // sin tocar se pasaba a 30 aunque la vista siguiera deslizándose y el final del giro iba a frenitos.
-    const motivo = vuelo ? 'vuelo' : gesto ? 'gesto' : giro.moviendo || zoom.moviendo ? 'inercia' : mirada && mirada.t < 1 ? 'mirada' : pulso > 0.02 ? 'pulso' : captura ? 'captura'
+    const motivo = ensayo ? 'portada' : vuelo ? 'vuelo' : gesto ? 'gesto' : giro.moviendo || zoom.moviendo ? 'inercia' : mirada && mirada.t < 1 ? 'mirada' : pulso > 0.02 ? 'pulso' : captura ? 'captura'
       : document.body.classList.contains('celebrando') || document.body.classList.contains('reuniendo') ? 'celebracion' : cosmos.escenas.animando ? 'escena' : tEntrada !== null && tiempo - tEntrada < 12 ? 'entrada'
       : Math.abs(desplazamientoMeta - desplazamiento) > 0.5 ? 'encuadre' : cosmos.enEscenaAgujero || clip ? 'escena'
       : controls.autoRotate || giroSuave > 0.002 ? 'giro' : mundos.cometaVisible ? 'cometa' : '';
@@ -1144,12 +1190,12 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
         if (vuelo.saltoPedido && vuelo.plan && vuelo.transcurrido >= vuelo.plan.ruptura[0]) { vuelo.salto = vuelo.plan.saltar(vuelo.transcurrido, movimientoReducido ? 1.5 : 2.5); vuelo.salto0 = vuelo.real - dt; vuelo.saltoPedido = false; }   // salto0: el instante del cuadro anterior (sin un cuadro quieto)
         vuelo.transcurrido = vuelo.salto ? vuelo.salto(vuelo.real - vuelo.salto0) : vuelo.transcurrido + dt;
       }
-      const porcentaje = String(Math.min(100, Math.floor(vuelo.transcurrido / vuelo.duracion * 100))); if (!vuelo.fija && canvas.dataset.avance !== porcentaje) canvas.dataset.avance = porcentaje;
+      const porcentaje = Math.min(100, Math.floor(vuelo.transcurrido / vuelo.duracion * 100)); if (!vuelo.fija && porcentaje !== vuelo.avanceDicho) { vuelo.avanceDicho = porcentaje; canvas.dataset.avance = String(porcentaje); }   // (sin un texto nuevo en cada cuadro)
       const k = Math.min(1, vuelo.transcurrido / vuelo.duracion), lejos = vuelo.distanciaTotal > 20000 && !vuelo.fija;   // fija: recorrido contemplativo a ritmo uniforme
       if (vuelo.plan) {
         // Vuelo por fases: posición y mirada planificadas; las estelas siguen la fase. El perfil del viaje se prepara fuera
         // de los cuadros (obrero y ratos libres, desde el clic: plan.enReposo); ningún cuadro lo calcula.
-        const e = vuelo.plan.evaluar(vuelo.transcurrido);
+        const e = vuelo.plan.evaluar(vuelo.transcurrido, evaluado);
         camera.position.copy(e.pos); controls.target.copy(e.mira); camera.lookAt(controls.target);
         vuelo.corriente = e.corriente; vuelo.fase = e.fase; if (canvas.dataset.fase !== e.fase) canvas.dataset.fase = e.fase; if (diagnosticar) canvas.dataset.recorrido = e.avance.toFixed(3);   // (solo para diagnóstico: cambiaba un atributo del lienzo en cada cuadro)
         // Dónde estamos: región, encuentro a la vista y distancia recorrida (para la interfaz y las pruebas).
@@ -1163,11 +1209,11 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       // y las estelas se curvan con él.
       const giro = lejos && vuelo.corriente >= 1 ? Math.min(0.2, 2.4 / vuelo.duracion) : 0, kv = giro ? Math.max(0, (k - giro) / (1 - giro)) : k;
       const e = vuelo.avance ? vuelo.avance(k) : lejos ? avanceLogaritmico(kv, vuelo.distanciaTotal, vuelo.salida, vuelo.llegada) : vuelo.perfil ? PERFIL(k) : suave(k);
-      const punto = vuelo.curva.getPointAt(Math.min(1, Math.max(0, e)));
-      const desvio = vuelo.seguir ? vuelo.seguir().sub(vuelo.seguirInicio) : null;
+      const punto = vuelo.curva.getPointAt(Math.min(1, Math.max(0, e)), tmpPunto);
+      const desvio = vuelo.seguir ? tmpDesvioVuelo.copy(vuelo.seguir()).sub(vuelo.seguirInicio) : null;
       if (desvio) punto.addScaledVector(desvio, e);
       if (Number.isFinite(punto.x)) camera.position.copy(punto);
-      const destinoMirada = desvio ? vuelo.objetivo.clone().add(desvio) : vuelo.objetivo;
+      const destinoMirada = desvio ? tmpMirada.copy(vuelo.objetivo).add(desvio) : vuelo.objetivo;
       controls.target.lerpVectors(vuelo.centroDesde, destinoMirada, Math.min(1, e * vuelo.mirarAntes));
       if (vuelo.perfil) {
         // La mirada pasa con suavidad al destino en el primer tercio y lo mantiene centrado
@@ -1304,7 +1350,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     if (enClip && !vuelo) ctx.velocidadPolvo.set(0, 0, 0);
     camaraAntes.copy(camera.position);
     camera.updateMatrixWorld();
-    campoVelocidad.actualizar(dt,{vuelo,radial,ceremonia:(enClip && !vuelo) || (document.body.classList.contains('supernova-en-escena') && cosmos.supernova.estado!=='remanente' && !(cosmos.supernova.desdeEstallido>=TIEMPOS_AMOR.revelar)),entrada:tEntrada!==null});
+    opcionesVelocidad.vuelo = vuelo; opcionesVelocidad.radial = radial; opcionesVelocidad.entrada = tEntrada !== null;
+    opcionesVelocidad.ceremonia = (enClip && !vuelo) || (document.body.classList.contains('supernova-en-escena') && cosmos.supernova.estado !== 'remanente' && !(cosmos.supernova.desdeEstallido >= TIEMPOS_AMOR.revelar));
+    campoVelocidad.actualizar(dt, opcionesVelocidad);
     velo.visible = u.value > 0.004;
     // El fondo (nebulosas, galaxias, estrellas lejanas) acompaña siempre a la cámara: está
     // infinitamente lejos y se ve igual desde cualquier punto. Solo lo que se visita (cosmos:
@@ -1348,7 +1396,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       estrellas.intensidad(f); scene.backgroundIntensity = 0.5 * (0.3 + 0.7 * locales);
       // Los soles del cielo son masivos: siguen viéndose (algo más tenues) desde el cuásar, el púlsar o la supernova.
       const fs = 0.55 + 0.45 * locales;
-      cosmos.decor.traverse(o => { for (const m of [].concat(o.material || [])) { if (m.uniforms?.uOpacidad) { m.userData.base ??= m.uniforms.uOpacidad.value; m.uniforms.uOpacidad.value = m.userData.base * fs; } else if (m.opacity !== undefined) { m.userData.base ??= m.opacity; m.opacity = m.userData.base * fs; } } });
+      materialesDecor ??= (() => { const l = []; cosmos.decor.traverse(o => { for (const m of [].concat(o.material || [])) l.push(m); }); return l; })();   // (una vez: antes se recorría en cada cuadro del viaje)
+      for (const m of materialesDecor) { if (m.uniforms?.uOpacidad) { m.userData.base ??= m.uniforms.uOpacidad.value; m.uniforms.uOpacidad.value = m.userData.base * fs; } else if (m.opacity !== undefined) { m.userData.base ??= m.opacity; m.opacity = m.userData.base * fs; } }
       cosmos.decor.visible = true; if (diagnosticar) canvas.dataset.estrellasLocales = locales.toFixed(2);   // (cambiaba en cada cuadro de un viaje)
     }
     // En el sistema solar (Rosa, Azul, las cartas) solo se dibuja su escena: las piezas del universo principal no trabajan
@@ -1362,9 +1411,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // Los gigantes que no se visitan y desde aquí miden menos de ~3 px no dibujan su detalle (en un móvil cada uno costaba
     // varios FPS siendo un puntito); sus luces en el cielo se quedan. Al acercarse, vuelven enteros.
     if (cuadrosDibujados % 10 === 0) {
-      gruposGigantes ??= (() => { const raizC = scene.children.find(o => o.userData.capa === 'cosmos'), w = new THREE.Vector3(), l = [];
-        for (const g of raizC?.children ?? []) { if (!g.isGroup) continue; g.getWorldPosition(w); const c = cosmos.cuerpos().find(c => c.id !== 'xiomara' && c.centro.distanceTo(w) < c.radio * 4); if (c) l.push({ g, c }); }
-        return l; })();
+      gruposGigantes ??= listaGigantes();
       const focal = vista.alto / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
       // Con histéresis (aparece a 3,5 px y se oculta a 2,5): en el umbral parpadeaba y la GPU daba saltos.
       for (const { g, c } of gruposGigantes) { const px = c.visible * focal / Math.max(1, camera.position.distanceTo(c.centro)); g.visible = c.id === destinoActual || !!mirada || px > (g.visible ? 2.5 : 3.5); }
@@ -1415,7 +1462,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       // dibujada (sin profundidad): si un cuerpo más cercano se solapa con esa zona, se suspende
       // para no curvar el primer plano (límite documentado en docs/ESCALA-Y-ESPACIO.md).
       if (!cuerposLente || tiempo - cuerposLente.t > 1) cuerposLente = { t: tiempo, lista: cosmos.cuerpos() };
-      cosmos.lentes().forEach((l, i) => {
+      const lentes = cosmos.lentes();
+      for (let i = 0; i < lentes.length; i++) { const l = lentes[i];
         const dist = l.centro.distanceTo(camera.position); proyectado.copy(l.centro).project(camera);
         const rDentro = l.dentro / (2 * dist * tanMedio), alcance = rDentro * l.alcance;
         // Cuánto queda libre la zona curvada: 1 sin nada delante; baja con suavidad hasta 0 a
@@ -1434,7 +1482,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
         const visible = peso > 0.001 && proyectado.z < 1;
         if (visible) { u.uL.value[i].set((proyectado.x + 1) / 2, (proyectado.y + 1) / 2, rDentro, peso * l.fuerza / (2 * dist * tanMedio)); u.uF.value[i].set(alcance, alcance * 0.55); alguna = true; }
         else u.uL.value[i].set(0, 0, 0, 0);
-      });
+      }
       // (En el sistema solar no hay agujeros a la vista: sin lente, que además intercambiaba los búferes y el suavizado MSAA,
       // que fijarEscena pone solo en el de la escena, se quedaba en cuadros alternos.)
       u.uAspecto.value = camera.aspect; nucleo.lente.enabled = alguna && escenaActiva !== 'solar';
@@ -1493,6 +1541,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // Para el medidor ?hud: programas de GPU compilados, geometrías y texturas en la GPU y frecuencia medida de la pantalla.
     get rendimiento() { const i = renderer.info; return { programas: i.programs?.length ?? 0, geometrias: i.memory.geometries, texturas: i.memory.textures, hz: planificador.hz }; },
     get cuadrosDibujados() { return cuadrosDibujados; },
+    // Final del clip de la intro: dibujar el 3D detrás de la portada (0 nada, 1 uno de cada 3 cuadros, 2 todos, 3 de vez en
+    // cuando). Lo pide js/ui/entrada.js; al entrar deja de importar (ya se dibuja todo).
+    precalentar(nivel) { nivelEnsayo = nivel; planificador.pedirCuadro(); },
     // Estrenos en la GPU con su momento (util/estrenos.js; solo con diagnóstico o el medidor): { total, enMovimiento, ultimos }.
     get estrenos() { return estrenos; },
     viajar,
