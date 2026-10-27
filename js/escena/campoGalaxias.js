@@ -150,12 +150,16 @@ export function crearCampoGalaxias({ lista, texturas, descriptores, uPR }) {
     const pts = new THREE.Points(geo, mat); pts.renderOrder = -2; pts.matrixAutoUpdate = false; return pts;
   };
   const libres = [];
+  // Sin copia en la memoria de la página: todos los huecos apuntan a los mismos arreglos de ceros (su tamaño basta a
+  // three.js) y, al rellenar uno, su atributo apunta a los datos recién generados hasta que se suben; luego vuelve a los
+  // compartidos (onUpload). Así la reserva no ocupa ~5 MB de JS además de los de la GPU.
+  const n0 = N_ESTRELLAS, CEROS = { position: new Float32Array(n0 * 3), aColor: new Float32Array(n0 * 3), aRadio: new Float32Array(n0), aTam: new Float32Array(n0) };
   for (let k = 0; k < RESERVA; k++) {
-    const n = N_ESTRELLAS, pts = nuevaGeometria(n, new Float32Array(n * 3), new Float32Array(n * 3), new Float32Array(n), new Float32Array(n), 1);
-    for (const at of Object.values(pts.geometry.attributes)) at.setUsage(THREE.DynamicDrawUsage);
+    const n = N_ESTRELLAS, pts = nuevaGeometria(n, CEROS.position, CEROS.aColor, CEROS.aRadio, CEROS.aTam, 1);
+    for (const [nombre, at] of Object.entries(pts.geometry.attributes)) { at.setUsage(THREE.DynamicDrawUsage); at.onUpload(() => { at.array = CEROS[nombre]; }); }
     pts.userData.reserva = true; pts.visible = false; pts.frustumCulled = false; grupo.add(pts); libres.push(pts);
   }
-  const hueco = n => { if (n > N_ESTRELLAS) return null; const pts = libres.pop() ?? null; if (pts) pts.frustumCulled = true; return pts; };
+  const hueco = n => { if (n !== N_ESTRELLAS) return null; const pts = libres.pop() ?? null; if (pts) pts.frustumCulled = true; return pts; };
   // Generar las 1950 estrellas de una galaxia cuesta varios ms con la CPU de un móvil (decenas la primera vez, con el
   // código aún sin optimizar): en pleno viaje era un tirón cada vez que una galaxia cruzaba los 24 px. Ahora se generan a
   // trozos (un generador que cede cada 128 estrellas) repartidos en varios cuadros con un presupuesto fijo (actualizar);
@@ -190,7 +194,7 @@ export function crearCampoGalaxias({ lista, texturas, descriptores, uPR }) {
     // En un hueco de la reserva (búferes ya en la GPU desde la carga): solo se actualizan sus datos, sin crear geometría en
     // pleno viaje (antes, cuatro bufferData por galaxia que crecía en pantalla). Sin hueco libre, una nueva (como antes).
     const pts = hueco(n);
-    if (pts) { const at = pts.geometry.attributes; at.position.array.set(pos); at.aColor.array.set(col); at.aRadio.array.set(radio); at.aTam.array.set(tam);
+    if (pts && n === N_ESTRELLAS) { const at = pts.geometry.attributes; at.position.array = pos; at.aColor.array = col; at.aRadio.array = radio; at.aTam.array = tam;
       for (const k of ['position', 'aColor', 'aRadio', 'aTam']) at[k].needsUpdate = true; pts.geometry.setDrawRange(0, n); pts.geometry.boundingSphere.radius = g.radio * 1.2; }
     const usar = pts ?? nuevaGeometria(n, pos, col, radio, tam, g.radio);
     usar.position.copy(g.pos); usar.userData.galaxia = g.id; usar.updateMatrix(); usar.visible = true;
