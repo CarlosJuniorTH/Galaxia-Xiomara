@@ -7,13 +7,11 @@
 import * as THREE from 'three';
 import { vista } from './vista.js';   // tamaño guardado: leer clientHeight en cada movimiento del dedo forzaba a recalcular la maquetación
 
-// Retraso con el que se lee el dedo (ms): lo justo para tener siempre un aviso a cada lado del instante del cuadro. Se
-// adapta al ritmo real de los avisos del aparato (pantallas de 120 Hz: ~8 ms; ratones, paneles táctiles o un navegador
-// ocupado: 16–30 ms). Con uno fijo de 12 ms, si los avisos llegaban cada 30 ms la vista se paraba esperando el siguiente
-// y avanzaba a tirones (frenones).
-// Mínimo 6 ms (antes 12): con un ratón (125–1000 avisos por segundo) bastan; el retraso real lo marca el ritmo medido de
-// los avisos (con el dedo a 60 Hz siguen siendo ~24 ms), así que no vuelve el avance a saltitos.
-const RETRASO = 6, RETRASO_MAX = 45;
+// Retraso con el que se lee el dedo (ms): lo justo para tener un aviso a cada lado del instante del cuadro, según el ritmo
+// real de los avisos del aparato (pantallas de 120 Hz: ~9 ms; dedo a 60 Hz: un cuadro), y nunca más de un cuadro: la
+// imagen va como mucho un cuadro por detrás del dedo (como en los juegos). Con avisos más lentos que los cuadros (algunos
+// ratones o un navegador ocupado) se usa el último aviso.
+const RETRASO = 6, RETRASO_MAX = 17;
 
 export function crearGiro({ canvas, camera, controls, sensibilidad = 1, alEmpezar = () => {}, alTerminar = () => {} }) {
   const esfera = new THREE.Spherical(), desp = new THREE.Vector3();
@@ -103,16 +101,17 @@ export function crearGiro({ canvas, camera, controls, sensibilidad = 1, alEmpeza
         // Con el dedo: la posición del dedo en ESTE instante (un poco en el pasado), interpolada entre sus avisos con su hora
         // real. Los avisos llegan a otro ritmo que los cuadros (1, 2 o 3 por cuadro en una pantalla de 120 Hz) y seguirlos
         // tal cual daba un avance a saltitos («raspaba»); así cada cuadro avanza lo que el dedo avanzó en ese tiempo.
-        const t = ahora - Math.min(RETRASO_MAX, Math.max(RETRASO, intervalo * 1.3 + 2)); let rT = objT, rP = objP;
+        // Como mucho un cuadro de retraso (latencia dedo→imagen ≤ 1 cuadro): lo justo para tener un aviso a cada lado del
+        // instante con el ritmo real de los avisos (120 Hz: ~9 ms; 60 Hz: un cuadro). Antes hasta 45 ms más un suavizado
+        // encima (~2 cuadros por detrás del dedo); si los avisos llegan más despacio que los cuadros, se usa el último.
+        const marco = Math.min(RETRASO_MAX, Math.max(RETRASO, dt * 1000)), t = ahora - Math.min(marco, intervalo + 1); let rT = objT, rP = objP;
         for (let i = muestras.length - 1; i > 0; i--) {
           const a = muestras[i - 1], b = muestras[i];
           if (a[0] <= t) { if (t < b[0]) { const f = (t - a[0]) / Math.max(1e-3, b[0] - a[0]); rT = a[1] + (b[1] - a[1]) * f; rP = a[2] + (b[2] - a[2]) * f; } break; }
           if (i === 1) { rT = a[1]; rP = a[2]; }
         }
-        // Un suavizado mínimo encima (casi directo: responde al instante). Con 11 ms en vez de 17 el dedo a 60 Hz avanzaba
-        // menos parejo (medido): se queda.
-        const s = 1 - Math.exp(-dt * 60);
-        camT += (rT - camT) * s; camP += (rP - camP) * s;
+        // Directo, sin suavizado encima (la interpolación entre avisos ya quita el temblor): la imagen va con el dedo.
+        camT = rT; camP = rP;
       } else {
         // Deslizamiento (inercia): la vista sigue con la velocidad que llevaba el dedo y frena de forma pareja y continua
         // (la misma proporción por segundo), sin escalones: lo que faltaba por alcanzar se suma poco a poco al principio.
