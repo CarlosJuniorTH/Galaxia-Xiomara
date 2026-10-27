@@ -159,7 +159,7 @@ function desfaseAuto(t) {
   desfases.push([t, +((c.segundo - el.currentTime) * 1000).toFixed(1), c.id]);
 }
 function vigilarLlegada(t) {
-  if (!escena) return;
+  if (!escena || ultimoDesfaseExterno > -Infinity) return;   // (con el reloj maestro, él informa de cada llegada: llegada())
   const v = escena.viajando || (escena.restanteViaje ?? 0) > 0;
   if (viajandoAntes && !v) {
     const el = medios.get('viajes');
