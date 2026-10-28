@@ -593,6 +593,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // dibujo se gira alrededor de su centro y después vuelve a su sitio (la lógica de cada parte no lo nota).
   const todaCasa = scene.children.filter(o => ['mundos', 'galaxia', 'amor', 'agujeroNegro', 'corazon', 'nombre', 'frases', 'secretas', 'polvo', 'marcaSolar'].includes(o.userData.capa) || o === marcaSolar);
   const giroCasa = new THREE.Quaternion(), guardadoCasa = todaCasa.map(() => [new THREE.Vector3(), new THREE.Quaternion()]), ejeCasa = new THREE.Vector3(), haciaCamCasa = new THREE.Vector3();
+  const ajenosCasa = [];
   let casaInclinada = false; const cosmosVisible = [true, true, true, true], camaraTele = { pos: new THREE.Vector3(), fov: 60, escala: 1, activa: false };
   function inclinarCasa() {
     if (!mirada) return;
@@ -607,6 +608,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     // la vista de gris. Mientras gira hacia casa siguen ahí; vuelven al salir.
     cosmosVisible[0] = cosmos.raiz.visible; cosmosVisible[1] = cosmos.decor.visible; cosmosVisible[2] = telarana.raiz.visible; cosmosVisible[3] = capaVolumen.compuesto.visible;
     if (s > 0.6) cosmos.raiz.visible = cosmos.decor.visible = false;
+    // Y nada que no sea casa (la Vía Láctea, las estrellas del cielo, los universos de llegada…): en la línea de visión se
+    // ampliaban miles de veces y tapaban casa con manchas blancas enormes.
+    if (s > 0.6) for (const o of scene.children) if (o.visible && !todaCasa.includes(o) && o !== cosmos.raiz && o !== cosmos.decor && o !== telarana.raiz && o !== capaVolumen.compuesto) { o.visible = false; ajenosCasa.push(o); }
     // Sin temblor: con el teleobjetivo cerrado, casa queda a decenas de millones de unidades y la GPU (precisión simple) solo
     // sitúa cada estrella en pasos de ~1 unidad; con la galaxia girando y un aumento de miles de veces, temblaba. Para este
     // dibujo la cámara se acerca a casa en la misma dirección y el campo de visión se abre en la misma proporción: la misma
@@ -624,17 +628,17 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     if (!casaInclinada) return;
     todaCasa.forEach((o, i) => { o.position.copy(guardadoCasa[i][0]); o.quaternion.copy(guardadoCasa[i][1]); });
     cosmos.raiz.visible = cosmosVisible[0]; cosmos.decor.visible = cosmosVisible[1];
+    for (const o of ajenosCasa) o.visible = true; ajenosCasa.length = 0;
     if (camaraTele.activa) { camera.position.copy(camaraTele.pos); camera.fov = camaraTele.fov; camera.updateProjectionMatrix(); camera.updateMatrixWorld(); uScaleCasa.value = camaraTele.escala; telarana.raiz.visible = cosmosVisible[2]; capaVolumen.compuesto.visible = cosmosVisible[3]; camaraTele.activa = false; }
     casaInclinada = false;
   }
+  // La galaxia de casa llena la vista: ~85 % del ancho en una pantalla vertical, ~62 % del alto en una horizontal.
+  const fovCasa = d => Math.min(FOV_BASE, Math.max(0.004, THREE.MathUtils.radToDeg(2 * Math.atan(980 / (d * Math.min(0.62, 0.85 * camera.aspect))))));
   function mirarCasa(activar = !mirada || mirada.saliendo) {
     if (vuelo || tEntrada === null) return false;
     if (activar) {
       const d = camera.position.length(); if (d < 15000) return false;
-      // La galaxia de casa llena la vista: ~85 % del ancho en una pantalla vertical, ~62 % del alto en una horizontal (antes,
-      // 22 % del alto y un tope de campo de visión: desde Deneb era un puntito en una pantalla negra).
-      const fov = Math.max(0.004, THREE.MathUtils.radToDeg(2 * Math.atan(980 / (d * Math.min(0.62, 0.85 * camera.aspect)))));
-      mirada = { t: 0, desdeFov: camera.fov, aFov: Math.min(FOV_BASE, fov), desdeQ: camera.quaternion.clone(), aQ: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(camera.position, ORIGEN_CASA, camera.up)), objetivo: controls.target.clone(), saliendo: false, distanciaMal: aMal(d) };
+      mirada = { t: 0, desdeFov: camera.fov, aFov: fovCasa(d), desdeQ: camera.quaternion.clone(), aQ: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(camera.position, ORIGEN_CASA, camera.up)), objetivo: controls.target.clone(), saliendo: false, distanciaMal: aMal(d) };
       controls.enabled = false; controls.autoRotate = false; canvas.dataset.mirandoCasa = 'si';
     } else if (mirada) { mirada = { ...mirada, t: 0, saliendo: true, desdeFov: camera.fov, desdeQ: camera.quaternion.clone() }; }
     planificador.pedirCuadro(); return true;
@@ -643,6 +647,10 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   function actualizarMirada(dt) {
     if (!mirada) return;
     mirada.t = Math.min(1, mirada.t + dt / (movimientoReducido ? 0.6 : 1.6)); const k = THREE.MathUtils.smootherstep(mirada.t, 0, 1);
+    // Hacia casa desde donde esté la cámara AHORA: con el teleobjetivo cerrado (miles de aumentos) cualquier deriva mínima de
+    // la cámara sacaba la galaxia del encuadre (parecía girar rapidísimo). Así queda siempre centrada.
+    // (Y su tamaño, con la distancia de ahora: si la cámara deriva, casa no crece ni mengua.)
+    if (!mirada.saliendo) { mirada.aQ.setFromRotationMatrix(mVuelta.lookAt(camera.position, ORIGEN_CASA, camera.up)); mirada.aFov = fovCasa(camera.position.length()); }
     if (!mirada.saliendo) { camera.quaternion.slerpQuaternions(mirada.desdeQ, mirada.aQ, Math.min(1, k * 1.6)); camera.fov = mirada.desdeFov + (mirada.aFov - mirada.desdeFov) * THREE.MathUtils.smootherstep(mirada.t, 0.25, 1); }
     else { const vuelta = qVuelta.setFromRotationMatrix(mVuelta.lookAt(camera.position, mirada.objetivo, camera.up)); camera.quaternion.slerpQuaternions(mirada.desdeQ, vuelta, k); camera.fov = mirada.desdeFov + (FOV_BASE - mirada.desdeFov) * Math.min(1, k * 1.4); }
     camera.updateProjectionMatrix();
