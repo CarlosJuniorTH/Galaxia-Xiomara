@@ -14,6 +14,7 @@
 // Variables: CPU (×4), CALIDAD (alta; vacío = sin ?calidad), DESTINOS=cuasar,deneb… (por defecto todos), CONFIGS=movil,pc.
 import { writeFileSync, mkdirSync, statSync, existsSync, readFileSync } from 'fs';
 import { gzipSync } from 'zlib';
+import { loadavg, cpus } from 'os';
 import { execSync, spawnSync } from 'child_process';
 import { fileURLToPath, pathToFileURL } from 'url';
 import path from 'path';
@@ -70,6 +71,9 @@ function resumirRed(lista) {
 async function recorrer(base, nombre, { destinos = TODOS, log = console.log } = {}) {
   const conf = CONFIGURACIONES[nombre];
   const red = vigilarRed();
+  // La máquina de pruebas se comparte: la carga media del sistema durante el recorrido se guarda con el resultado (si otros
+  // procesos ocupan la CPU, los cuadros salen peores sin que sea la página).
+  const cargas = [], vigiaCarga = setInterval(() => cargas.push(loadavg()[0]), 5000);
   const { navegador, pagina, errores } = await lanzar(conf.perfil, { musica: true });
   const marcasNodo = [];   // [epoch, tramo] para repartir la red
   try {
@@ -202,9 +206,10 @@ async function recorrer(base, nombre, { destinos = TODOS, log = console.log } = 
     return {
       configuracion: nombre, perfil: conf.perfil, viewport: vp, dpr: PERFILES[conf.perfil].deviceScaleFactor, cpu: conf.cpu, consulta, gpuDisponible: r.gpu, lienzo: r.lienzo,
       red: { antesDelClip: (({ MB, MBdisco, descargas }) => ({ MB, MBdisco, descargas }))(resumirRed(red.peticiones.filter(p => p.t < tClip))), antesDelToque: { MB: antes.MB, MBdisco: antes.MBdisco, bytes: antes.bytes, descargas: antes.descargas, archivos: red.peticiones.filter(p => p.t < tToque && p.estado === 200).map(p => [p.ruta, p.bytes, p.disco]) }, total: resumirRed(red.peticiones), repetidos: [...veces].filter(([, n]) => n > 1).map(([ruta, n]) => ({ ruta, veces: n })) },
-      tramos, errores: errores.slice(0, 10)
+      tramos, errores: errores.slice(0, 10),
+      cargaMaquina: { nucleos: cpus().length, media: +(cargas.reduce((a, b) => a + b, 0) / Math.max(1, cargas.length)).toFixed(2), max: +Math.max(0, ...cargas).toFixed(2) }
     };
-  } finally { red.quitar(); await navegador.close(); }
+  } finally { clearInterval(vigiaCarga); red.quitar(); await navegador.close(); }
 }
 
 // ── Criterios de aceptación (docs/PROMPT-ULTRA-FLUIDO.md, «Medición y criterios de aceptación», punto 4) ─────────────────
@@ -246,7 +251,7 @@ export function evaluar(res) {
 
 function tabla(res) {
   const filas = res.tramos.map(t => `${t.nombre.padEnd(26)} ${String(t.fps).padStart(5)} ${String(t.p50).padStart(6)} ${String(t.p95).padStart(6)} ${String(t.p99).padStart(6)} ${String(t.sobre25).padStart(4)} ${String(t.sobre50).padStart(4)} ${String(t.loaf.n).padStart(4)} ${String(t.dibujo.llamadasP50).padStart(5)} ${String(t.gpu.p50 ?? '-').padStart(6)} ${String(t.red.MB).padStart(6)}  ${t.incumple.join('; ')}`);
-  return [`${res.configuracion} (${res.viewport.width}×${res.viewport.height}, DPR ${res.dpr}, CPU ×${res.cpu}) · antes del toque ${res.red.antesDelToque.MB} MB por la red (${res.red.antesDelToque.MBdisco} MB en disco) · antes del clip ${res.red.antesDelClip.MB} MB · repetidos ${res.red.repetidos.length}`,
+  return [`${res.configuracion} (${res.viewport.width}×${res.viewport.height}, DPR ${res.dpr}, CPU ×${res.cpu}) · antes del toque ${res.red.antesDelToque.MB} MB por la red (${res.red.antesDelToque.MBdisco} MB en disco) · antes del clip ${res.red.antesDelClip.MB} MB · repetidos ${res.red.repetidos.length} · carga de la máquina ${res.cargaMaquina?.media} (máx. ${res.cargaMaquina?.max}, ${res.cargaMaquina?.nucleos} núcleos)`,
     'tramo                        FPS    p50    p95    p99  >25  >50 LoAF  draw  GPUms   red MB  incumple', ...filas, ...(res.incumpleGlobal.length ? ['GLOBAL: ' + res.incumpleGlobal.join('; ')] : [])].join('\n');
 }
 
