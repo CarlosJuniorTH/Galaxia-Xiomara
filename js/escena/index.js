@@ -399,7 +399,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   const giroBase = controls.autoRotateSpeed;
   let giroSuave = 0, respira = 0;
   const camaraGuardada = { pos: new THREE.Vector3(), rot: new THREE.Quaternion() }, haciaObjetivo = new THREE.Vector3();
-  const planificador = crearPlanificador({ objetivo: 60, alto: esMovil ? 0 : 120, esperaMs: 15000 });
+  // Dentro del universo nunca se duerme: el cuásar gira, el gas se mueve, las estrellas titilan… aunque nadie toque la
+  // pantalla (antes, a los 15 s sin tocar, se quedaba en una imagen fija). Solo se para con la página oculta o la lectura.
+  const planificador = crearPlanificador({ objetivo: 60, alto: esMovil ? 0 : 120, esperaMs: Infinity });
   let gesto = false, modoAnterior = null, cuadrosDibujados = 0, finGesto = -Infinity;
   const AMORTIGUACION = controls.dampingFactor;   // la de 60 FPS (nucleo.js)
   const marcarActividad = () => planificador.actividad(performance.now());
