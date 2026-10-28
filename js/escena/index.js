@@ -1447,20 +1447,29 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     }
     // En el sistema solar (Rosa, Azul, las cartas) solo se dibuja su escena: las piezas del universo principal no trabajan
     // (antes se actualizaban en cada cuadro sin verse). Los mundos sí: el correo de la luna vive allí.
+    // Los gigantes que no se visitan y desde aquí miden menos de ~3 px no dibujan su detalle (en un móvil cada uno costaba
+    // varios FPS siendo un puntito); sus luces en el cielo se quedan. Al acercarse, vuelven enteros. Se decide antes de
+    // actualizar las partes y solo apaga (o devuelve lo que apagó él): la escena de un gigante oculta a su vecino (el cuásar
+    // en el clip del púlsar, TON 618 junto a Sagitario A*) y antes esto lo volvía a encender cada 10 cuadros: parpadeaba.
+    if (cuadrosDibujados % 10 === 0) {
+      gruposGigantes ??= listaGigantes();
+      const focal = vista.alto / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
+      // Con histéresis (aparece a 3,5 px y se oculta a 2,5): en el umbral parpadeaba y la GPU daba saltos.
+      for (const { g, c } of gruposGigantes) {
+        const px = c.visible * focal / Math.max(1, camera.position.distanceTo(c.centro));
+        const lejos = !(c.id === destinoActual || !!mirada || px > (g.userData.lejos ? 3.5 : 2.5));
+        if (!lejos && g.userData.lejos) g.visible = true;
+        g.userData.lejos = lejos;
+      }
+    }
     for (const p of partes) if (escenaActiva !== 'solar' || p === mundos) p.actualizar(tiempo, dt, ctx);
     // Lejos de casa (en los gigantes y en los viajes largos) lo de casa es un punto invisible: frases, el corazón de luz,
     // los lugares y el agujero negro de casa no se dibujan (la galaxia de Xiomara se queda como su punto de luz). Con
     // «Mirar hacia casa» (teleobjetivo) se vuelven a ver.
     const casaVisible = camera.position.length() < 600000 || !!mirada;
     for (const o of raicesCasa) o.visible = casaVisible;
-    // Los gigantes que no se visitan y desde aquí miden menos de ~3 px no dibujan su detalle (en un móvil cada uno costaba
-    // varios FPS siendo un puntito); sus luces en el cielo se quedan. Al acercarse, vuelven enteros.
-    if (cuadrosDibujados % 10 === 0) {
-      gruposGigantes ??= listaGigantes();
-      const focal = vista.alto / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
-      // Con histéresis (aparece a 3,5 px y se oculta a 2,5): en el umbral parpadeaba y la GPU daba saltos.
-      for (const { g, c } of gruposGigantes) { const px = c.visible * focal / Math.max(1, camera.position.distanceTo(c.centro)); g.visible = c.id === destinoActual || !!mirada || px > (g.visible ? 2.5 : 3.5); }
-    }
+    // (Y los gigantes lejanos de pocos píxeles, apagados: después de las partes, que no los vuelven a encender.)
+    for (const { g } of gruposGigantes ?? []) if (g.userData.lejos) g.visible = false;
     cieloProfundo.actualizar?.();
     planetas.actualizar(tiempo, dt, ctx); solar.actualizar(tiempo, camera);
     {
