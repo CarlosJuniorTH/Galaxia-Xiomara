@@ -270,7 +270,6 @@ export function* construirCosmos({ uScale, uPR }) {
   const sagitario = new THREE.Group(); sagitario.position.copy(direccionCielo(...SITIO.sagitario)); sagitario.scale.setScalar(0.7 * ESCALA_SGR); raiz.add(sagitario);
   const RS = 170;
   const piezasSgr = yield* construirSagitario({ uScale, uPR, RS, grupo: sagitario });
-  const tmpSgr = new THREE.Vector3(), tmpTon = new THREE.Vector3();
   yield;
   // ── La estrella que va a estallar (supernova.js), en una zona libre del cielo ──
   const sn = yield* construirSupernova({ uScale, uPR, escala: ESCALA_CIELO * ESCALA_SUPERNOVA });
@@ -486,8 +485,7 @@ export function* construirCosmos({ uScale, uPR }) {
       if (dC.activa && (estadoC.acento >= 0 || acentoEscena)) { piezasCuasar.acento(estadoC.acento); acentoEscena = estadoC.acento >= 0; }
       else if (!dC.activa && acentoEscena) { piezasCuasar.acento(-1); acentoEscena = false; }
       // El cuásar no cambia de orientación (antes precesaba y al volver se veía distinto).
-      // Mientras se mira el púlsar (su clip y después), el cuásar vecino no entra en plano: sus chorros rosa y azul le robaban el cielo.
-      cuasar.visible = directores.pulsar.peso < 0.001;
+      // (El cuásar vecino se ve también desde el púlsar, en su clip y después.)
       cuasar.quaternion.copy(rotacionCuasar);   // orientación fija: se ve igual siempre (lo que gira es su gas, en los shaders)
       for (const { superficie, late, fase } of superficies) { superficie.material.uniforms.uT.value = t; if (late) superficie.scale.setScalar(1 + 0.03 * Math.sin(t * 0.25 + fase)); }   // las rojas laten despacio
       for (const e of envolturas) e.material.uniforms.uT.value = t;
@@ -500,12 +498,7 @@ export function* construirCosmos({ uScale, uPR }) {
         (escenaG.id === 'ton618' ? guionTon618 : guionSagitario)(escenaG.t, escenaG.marcas, escenaG, escenaG.guion);
         if (!escenaG.viva && escenaG.presencia <= 0) escenaG = null;
       }
-      // Junto a Sagitario A* (a menos de 3 encuadres: el zoom llega a 2,5, y mucho más cerca de él que de TON 618), TON 618
-      // no se dibuja: allí se veía como una galaxia diminuta pero muy brillante que quemaba el brillo (un «cuadrito»
-      // incómodo al alejar la cámara) y costaba dibujarla.
-      sagitario.getWorldPosition(tmpSgr); gigantesco.getWorldPosition(tmpTon);
-      const rSgr = RS * sagitario.matrixWorld.getMaxScaleOnAxis() * (1500 / 119), dSgr = camera.position.distanceTo(tmpSgr);
-      gigantesco.visible = !(dSgr < 3 * rSgr && dSgr < 0.6 * camera.position.distanceTo(tmpTon));
+      // (TON 618 se ve también desde Sagitario A*.)
       piezasTon.actualizar(t, dt, camera, escenaG?.id === 'ton618' ? escenaG : null);
       piezasSgr.actualizar(t, dt, camera, escenaG?.id === 'sagitario' ? escenaG : null);
     }
