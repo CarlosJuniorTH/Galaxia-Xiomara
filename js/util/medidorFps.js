@@ -213,7 +213,7 @@ function resumirTramo(tr) {
   const ls = loafs.filter(l => l.t >= tr.inicio && l.t <= t1), ds = desfases.filter(d => d[0] >= tr.inicio && d[0] <= t1), dabs = ordenar(ds.map(d => Math.abs(d[1])));
   const audio = evs.filter(e => ['ritmo', 'salto', 'posicion', 'pausa', 'play', 'corte', 'fin', 'inicioBuffer'].includes(e.tipo));
   return {
-    nombre: tr.nombre, inicio: +tr.inicio.toFixed(0), duracion: +((t1 - tr.inicio) / 1000).toFixed(2),
+    nombre: tr.nombre, inicio: +tr.inicio.toFixed(0), pared: tr.pared, duracion: +((t1 - tr.inicio) / 1000).toFixed(2),
     cuadros: dt.length, fps: suma ? +(dt.length * 1000 / suma).toFixed(1) : 0, p50: pct(o, 0.5), p95: pct(o, 0.95), p99: pct(o, 0.99), max: pct(o, 1),
     sobre25: dt.filter(x => x > 25).length, sobre50: dt.filter(x => x > 50).length, huecosSinDibujo: huecos,
     peores: Array.from(o.slice(-5)).reverse().map(x => +x.toFixed(1)),
@@ -231,7 +231,7 @@ function resumirTramo(tr) {
 
 // ── API ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 const api = {
-  tramo(nombre) { const t = ahora(); if (actual) actual.fin = t; actual = nombre ? { nombre, inicio: t, fin: null } : null; if (actual) tramos.push(actual); return t; },
+  tramo(nombre) { const t = ahora(); if (actual) actual.fin = t; actual = nombre ? { nombre, inicio: t, pared: Date.now(), fin: null } : null; if (actual) tramos.push(actual); return t; },
   get tramoActual() { return actual?.nombre ?? null; },
   resumen(nombre) { const lista = tramos.filter(t => !nombre || t.nombre === nombre).map(resumirTramo); return nombre ? lista.at(-1) ?? null : { tramos: lista, gpu: !!GPU.ext, lienzo, interna, version: 1 }; },
   // El reloj maestro (cuando exista) informa del desfase entre lo que se ve y lo que se oye, en ms (con signo).

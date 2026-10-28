@@ -197,7 +197,9 @@ async function recorrer(base, nombre, { destinos = TODOS, log = console.log } = 
     const origen = await pagina.evaluate(() => performance.timeOrigin);
     // Red por tramo (por la hora de cada petición) y la global.
     const tramos = r.tramos.map((t, k) => {
-      const a = k === 0 ? tCarga : origen + t.inicio, b = origen + t.inicio + t.duracion * 1000;
+      // (Por la hora de pared de la página al empezar cada tramo: el reloj monótono de la página se desvía del de pared en
+      // una visita larga y una petición hecha justo al cambiar de tramo caía en el anterior.)
+      const ini = t.pared ?? origen + t.inicio, a = k === 0 ? tCarga : ini, b = ini + t.duracion * 1000;
       return { ...t, tipo: tipoDe(t.nombre), red: resumirRed(red.peticiones.filter(p => p.t >= a && p.t < b)) };
     });
     const descargas = red.peticiones.filter(p => p.metodo === 'GET' && p.estado === 200), veces = new Map();
