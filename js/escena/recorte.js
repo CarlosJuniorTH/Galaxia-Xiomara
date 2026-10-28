@@ -31,7 +31,7 @@ function crearRecorte(escena, { alto = () => innerHeight } = {}) {
     const porPx = 2 / (camera.projectionMatrix.elements[5] * alto());
     for (let i = 0; i < lista.length; i++) {
       const e = lista[i], o = e.objeto;
-      if (!o.visible) continue;
+      if (!o.visible || (e.cuando && !e.cuando())) continue;
       esfera.center.copy(e.centro).applyMatrix4(o.matrixWorld);
       const r = e.radio * o.matrixWorld.getMaxScaleOnAxis();
       esfera.radius = r + Math.max(0, esfera.center.distanceTo(camPos) - r) * MARGEN_PX * porPx;
@@ -46,7 +46,8 @@ function crearRecorte(escena, { alto = () => innerHeight } = {}) {
   };
   return {
     // radio y centro en las coordenadas locales del objeto (sin su escala: se aplica la del mundo en cada dibujo).
-    anadir(objeto, radio, centro = new THREE.Vector3()) { lista.push({ objeto, radio, centro: centro.clone() }); },
+    // cuando: si se da, el grupo solo se recorta mientras devuelve true.
+    anadir(objeto, radio, centro = new THREE.Vector3(), cuando = null) { lista.push({ objeto, radio, centro: centro.clone(), cuando }); },
     // fn(cámara) antes de que three.js decida qué dibujar en cada dibujo de la escena (tramos de la telaraña).
     alDibujar(fn) { antesDeDibujar.push(fn); },
     // Apagado mientras se calienta la GPU (carga/preparacion.js dibuja todo para estrenarlo: nada se debe quedar fuera).

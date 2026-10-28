@@ -378,6 +378,9 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
     const orden = [objetivo, lugar, viajeEnCurso?.id].map(n => n && pistas.get(`${n}-estancia`));
     const p = orden.find(e => e?.el && !e.desbloqueada) || [...pistas.values()].find(e => e.el && !e.desbloqueada);
     if (!p) { for (const n of ['pointerdown', 'pointerup', 'keydown']) removeEventListener(n, desbloquearUna, true); return; }
+    desbloquearEstancia(p);
+  }
+  function desbloquearEstancia(p) {
     p.desbloqueada = true;
     if (!p.el.src) { p.conSilencio = true; p.el.src = SILENCIO; }
     p.el.play()?.then(() => { if (p.nivel <= 0 || p.conSilencio) { p.el.pause(); if (p.conSilencio && p.blobUrl) { p.conSilencio = false; p.el.src = p.blobUrl; } } }).catch(() => {});
@@ -418,6 +421,9 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
       if (!crearContexto()) return false;
       if (ctx.state !== 'running') ctx.resume().catch(() => {});
       if (!silencioDado) { silencioDado = true; const f = ctx.createBufferSource(); f.buffer = ctx.createBuffer(1, 1, ctx.sampleRate); f.connect(ctx.destination); f.start(0); }
+      // Y todas las estancias (sus <audio>) en este mismo toque: en iOS uno que no se ha tocado en un gesto no suena nunca, y
+      // pointerup no siempre cuenta como gesto (así, al acabar cada videoclip, su melodía entra siempre).
+      for (const p of pistas.values()) if (p.el && !p.desbloqueada) desbloquearEstancia(p);
       return true;
     },
     // El botón de música (y el toque de la portada): con ella apagada nada suena ni se descarga de más.

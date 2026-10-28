@@ -166,9 +166,11 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   await ceder();
   const cosmos = await capaPorPasos('cosmos', async () => { const c = await porTramos(construirCosmos(nucleo)); nucleo.scene.add(c.raiz, c.decor); return c; });
   await ceder();
+  let enClip = false;   // un videoclip en curso
   // Los gigantes, igual (recorte.js): fuera de la vista, ninguno de sus puntos se dibuja. Esfera de sus geometrías ×2,5: sus
-  // chorros, haces y motas se estiran en el sombreador (y TON 618 recoloca su cuadrado delante del disco en cada dibujo).
-  for (const g of Object.values(cosmos.gruposGigantes)) { const { centro, radio } = esferaDe(g); recorteDe(scene).anadir(g, radio * 2.5, centro); }
+  // chorros, haces y lentes se estiran en el sombreador mucho más allá de su geometría. Durante un videoclip no se recortan:
+  // con su cámara cerca del borde de la vista, un gigante vecino aparecía y desaparecía (parpadeaba).
+  for (const g of Object.values(cosmos.gruposGigantes)) { const { centro, radio } = esferaDe(g); recorteDe(scene).anadir(g, radio * 2.5, centro, () => !enClip); }
   const lejanas = await capaPorPasos('galaxiasLejanas', () => crearGalaxiasLejanas(nucleo));
   // El cielo del «más allá»: otro universo lleno de vida detrás de todo, lejos de casa.
   await ceder();
@@ -418,7 +420,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // proyección se desplaza a la franja libre (solo en la vista de inicio).
   let desplazamiento = 0, desplazamientoMeta = 0, fraccionZona = 1;
   // Videoclip de un gigante en curso (director de cámara, más abajo): sin tarjeta ni panel, la proyección no se desplaza.
-  let enClip = false;
+  // (enClip: declarado antes de los gigantes, que lo miran al recortarse)
   // Gigante al que se viaja y que abrirá su clip al llegar: la vista se va centrando durante el vuelo (sin deslizarse al empezar).
   let clipEsperado = null;
   const cajas = selectores => selectores.flatMap(s => [...document.querySelectorAll(s)])
