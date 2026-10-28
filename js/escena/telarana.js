@@ -298,10 +298,13 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   // Su geometría se reserva una vez, con capacidad fija, y al rehacerse solo se reescriben sus datos (bufferSubData): crear
   // una geometría nueva en cada cambio de celda era subir búferes nuevos a la GPU en pleno videoclip o vuelo (Deneb, la
   // telaraña). CAP_CERCANO galaxias de sobra para un cúmulo (las que no caben, rarísimo, se quedan fuera).
+  // La primera es siempre una galaxia negra (color 0: con mezcla aditiva no suma nada): así se dibuja desde el calentamiento
+  // y su estado de la GPU (el formato de sus vértices) no se estrena en el primer cuadro en que hay galaxias cerca (medido:
+  // 21 ms de GPU de golpe en el primer viaje del móvil).
   const CAP_CERCANO = 65536, gCercano = new THREE.BufferGeometry();
   for (const [n, w] of [['position', 3], ['aCol', 3], ['aBrillo', 1]]) gCercano.setAttribute(n, new THREE.BufferAttribute(new Float32Array(CAP_CERCANO * w), w).setUsage(THREE.DynamicDrawUsage));
-  gCercano.setDrawRange(0, 0);
-  const cercanoVacio = () => gCercano.drawRange.count === 0;
+  gCercano.setDrawRange(0, 1);
+  const cercanoVacio = () => gCercano.drawRange.count <= 1;
   const cercano = new THREE.Points(gCercano, matGalaxias); cercano.frustumCulled = false; cercano.renderOrder = -1.5; cercano.position.copy(web.centro); capaGalaxias.add(cercano);
   const celda = [NaN, NaN, NaN], pendiente = [NaN, NaN, NaN]; let desdePendiente = 0;
   function rehacerCercano(cam) {
@@ -344,14 +347,14 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
     // Lejos de la telaraña (en los gigantes, al girar la cámara cambia de celda en cada cuadro) la lista sale vacía: no se
     // rehace la geometría vacía una y otra vez (creaba y borraba búferes de la GPU en cada cuadro).
     if (!pos.length && cercanoVacio()) return;
-    const n = Math.min(CAP_CERCANO, tam.length);
+    const n = Math.min(CAP_CERCANO - 1, tam.length);
     for (const [nombre, datos] of [['position', pos], ['aCol', col], ['aBrillo', tam]]) {
       const a = gCercano.attributes[nombre], w = a.itemSize;
-      a.array.set(datos.length > n * w ? datos.slice(0, n * w) : datos);
-      if (a.addUpdateRange) { a.clearUpdateRanges(); a.addUpdateRange(0, Math.max(1, n * w)); } else a.updateRange = { offset: 0, count: Math.max(1, n * w) };
+      a.array.set(datos.length > n * w ? datos.slice(0, n * w) : datos, w);   // (desde la segunda: la primera es la negra)
+      if (a.addUpdateRange) { a.clearUpdateRanges(); a.addUpdateRange(w, Math.max(1, n * w)); } else a.updateRange = { offset: w, count: Math.max(1, n * w) };
       a.needsUpdate = true;
     }
-    gCercano.setDrawRange(0, n);
+    gCercano.setDrawRange(0, n + 1);
   }
   function avanzarCercano() {
     if (!trabajoCercano) return;
