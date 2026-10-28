@@ -22,7 +22,7 @@ export const CONFIG = {
 
   // ── Tarjeta de entrada ──
   // Puedes poner una foto de ustedes en assets/fotos/ y escribir aquí 'assets/fotos/nosotros.jpg'
-  foto: 'assets/fotos/portada.svg',
+  foto: 'assets/fotos/portada.webp',
   fotoRespaldo: 'assets/fotos/portada.svg',
   cita: 'Contigo encontré el lugar donde quiero quedarme para siempre 🪐',
 
