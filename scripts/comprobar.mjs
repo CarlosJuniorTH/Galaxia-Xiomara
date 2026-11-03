@@ -23,7 +23,8 @@ for (const html of ['index.html','editor.html']) {
   for (const m of texto.matchAll(/(?:href|src)="([^"#]+)"/g)) if (!/^(https?:|\/)/.test(m[1])) await stat(m[1]);
 }
 for (const css of (await archivos('css')).filter(p => p.endsWith('.css'))) {
-  const texto = await readFile(css,'utf8');
-  for (const m of texto.matchAll(/url\(([^)]+)\)/g)) if (!/^https?:/.test(m[1])) await stat(path.resolve(path.dirname(css),m[1]));
+  const texto = (await readFile(css,'utf8')).replace(/url\(\s*(['"])data:.*?\1\s*\)/g, '');   // (sin las imágenes escritas dentro del CSS: llevan sus propios url(#…))
+  // (Las rutas de archivo; las imágenes escritas dentro del CSS, url("data:…"), no son archivos.)
+  for (const m of texto.matchAll(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g)) if (!/^(https?:|data:|#)/.test(m[2])) await stat(path.resolve(path.dirname(css),m[2]));
 }
 console.log(`${fuentes.length} archivos JavaScript comprobados. Importaciones, hojas de estilo, fuentes e imágenes locales presentes.`);

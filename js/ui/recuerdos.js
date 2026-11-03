@@ -39,7 +39,7 @@ export function crearRecuerdos(config, estrellas, progreso, { alEncontrar, alCom
   function mostrarCelebracion() {
     const meses = estrellas.length - 1;
     const reemplazar = t => t.replaceAll('{n}', meses);
-    $('celebracion-titulo').textContent = meses ? reemplazar(config.celebracionTitulo) : 'Nuestra primera estrella';
+    $('celebracion-titulo').textContent = meses ? reemplazar(config.celebracionTituloMes?.[meses] || config.celebracionTitulo) : 'Nuestra primera estrella';
     $('celebracion-etiqueta').textContent = `${estrellas.length} recuerdos · un mismo cielo`;
     $('celebracion-firma').textContent = config.firma;
     progreso.anotar('celebraciones', estrellas.at(-1).id);

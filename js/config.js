@@ -94,8 +94,19 @@ export const CONFIG = {
       'Gracias por tu paciencia, por tu risa y por cada momento en el que me haces sentir en casa, aunque estemos lejos.',
       'Ahora este universo se prepara para algo especial. Dentro de un mes, nuestras estrellas van a buscarse entre ellas… y yo quiero estar ahí contigo para verlo.',
       'Feliz mes once, mi amor. Te amo con todo lo que soy. 💖'
+    ],
+    // BORRADOR: revisar Carlos (nuestro primer año, el 15/12/2026: las trece estrellas ya forman su constelación)
+    12: [
+      'Mi Xiomara:',
+      'Un año. Doce meses, trece estrellas, y mira lo que hacen esta noche: se buscan entre ellas y se dan la mano, como nosotros, hasta formar nuestra primera vuelta entera al Sol.',
+      'Hace un año empezó todo con una sola luz. Hoy este cielo está lleno de días que vivimos juntos, de los buenos y de los difíciles, y en todos hay algo en común: tú.',
+      'Gracias por este año, por quedarte, por reírte conmigo y por cuidar lo nuestro incluso con un océano en medio. Nada de lo que hay aquí existiría sin ti.',
+      'No sé cuántas vueltas al Sol nos esperan, pero sé con quién quiero darlas todas.',
+      'Feliz primer año, mi amor. Te amo con todo lo que soy. 💖'
     ]
   },
+  // Título de la celebración de un mes concreto (si no, celebracionTitulo).
+  celebracionTituloMes: { 12: '¡Feliz primer año, mi amor!' },
 
   // ── Carta (cada elemento es un párrafo) ──
   cartaTitulo: 'Para ti, Xiomara',
