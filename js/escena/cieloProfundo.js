@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { Q, texturasLigeras } from '../util/dispositivo.js';
 import { descargas, enReposo, cuandoLibre } from '../util/descargas.js';   // MB en la pantalla de carga; la cola de reposo
 import { FONDO_ESCENA } from '../util/fondoEscena.js';
-import { subirCuboPorTrozos } from './subidaPorTrozos.js';   // el videoclip de un gigante apaga sus paredes de polvo
+import { subirCuboPorTrozos, enSeguida } from './subidaPorTrozos.js';   // el videoclip de un gigante apaga sus paredes de polvo
 
 const CARAS = ['px', 'nx', 'py', 'ny', 'pz', 'nz'];
 
@@ -39,7 +39,13 @@ export function crearCieloProfundo({ renderer, scene }) {
   // mientras se presenta el universo: ningún congelón al decodificarlas.
   const cargado = Promise.all(CARAS.map(c => fetch(`assets/cielo/${c}-media.webp`).then(r => { if (!r.ok) throw Error(r.status); const n = Number(r.headers.get('content-length')) || 0; return r.blob().then(b => { descargas.hecho(n); return b; }); })
     .then(decodificar)))
-    .then(caras => { subir(textura, caras); listo = performance.now(); })
+    // Por franjas también (cada una en su tarea, sin esperar a la intro: hace falta antes del clip): las seis de una vez eran
+    // ~60 ms seguidos en plena carga (móvil, CPU ×4). Sin WebGL 2, como antes.
+    .then(async caras => {
+      const ok = await subirCuboPorTrozos(renderer, textura, caras[0].width, i => Promise.resolve(caras[i]), { programar: enSeguida }).catch(e => { console.warn('Cielo profundo por franjas', e); return false; });
+      if (ok === null) subir(textura, caras);   // (null: sin WebGL 2, las caras siguen abiertas)
+      listo = performance.now();
+    })
     .catch(e => console.warn('No se pudo cargar el cielo profundo', e));
   // Las de 2048, en reposo (se encolan ya; la cola no empieza hasta después de la intro).
   if (final === 'alta') cargado.then(async () => {

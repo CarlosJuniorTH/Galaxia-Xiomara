@@ -11,6 +11,11 @@ import { cuandoLibre } from '../util/descargas.js';
 
 const FILAS_BYTES = 1 << 20;   // ~1 MB por franja
 
+// Para la carga (cuando la cola de momentos libres está parada hasta la intro): cada franja en su propia tarea, cediendo
+// antes el hilo un momento (sin la espera mínima de setTimeout: scheduler.yield o un mensaje).
+export const cederUnMomento = () => globalThis.scheduler?.yield ? globalThis.scheduler.yield() : new Promise(r => { const c = new MessageChannel(); c.port1.onmessage = () => { c.port1.close(); r(); }; c.port2.postMessage(0); });
+export const enSeguida = async fn => { await cederUnMomento(); return fn(); };
+
 function parametros(gl, renderer, objetivo, t, niveles) {
   const filtro = f => f === THREE.NearestFilter ? gl.NEAREST : f === THREE.LinearMipmapLinearFilter ? gl.LINEAR_MIPMAP_LINEAR : f === THREE.LinearMipmapNearestFilter ? gl.LINEAR_MIPMAP_NEAREST : f === THREE.NearestMipmapNearestFilter ? gl.NEAREST_MIPMAP_NEAREST : f === THREE.NearestMipmapLinearFilter ? gl.NEAREST_MIPMAP_LINEAR : gl.LINEAR;
   const envolver = w => w === THREE.RepeatWrapping ? gl.REPEAT : w === THREE.MirroredRepeatWrapping ? gl.MIRRORED_REPEAT : gl.CLAMP_TO_EDGE;
@@ -75,8 +80,9 @@ export async function subirDatosPorTrozos(renderer, t) {
 // Una textura de cubo de `lado`, con sus seis caras pedidas de una en una (obtenerCara(i) → Promise<ImageBitmap>): cada
 // una se decodifica, se sube por franjas y se cierra antes de pedir la siguiente (en un iPhone las seis decodificadas a la
 // vez eran 96 MB de memoria). Devuelve la CubeTexture ya en la GPU, o null si no se pudo (sin WebGL 2).
-export async function subirCuboPorTrozos(renderer, t, lado, obtenerCara) {
-  const s = await cuandoLibre(() => empezar(renderer, t, renderer.getContext().TEXTURE_CUBE_MAP, lado, lado));
+// programar(fn): cuándo se hace cada franja (por defecto, en un momento libre tras la intro; en la carga, enSeguida).
+export async function subirCuboPorTrozos(renderer, t, lado, obtenerCara, { programar = cuandoLibre } = {}) {
+  const s = await programar(() => empezar(renderer, t, renderer.getContext().TEXTURE_CUBE_MAP, lado, lado));
   if (!s) return null;
   t.images = Array.from({ length: 6 }, () => ({ width: lado, height: lado }));   // (three solo mira su tamaño)
   try {
@@ -85,7 +91,7 @@ export async function subirCuboPorTrozos(renderer, t, lado, obtenerCara) {
       try {
         for (let y = 0; y < lado; y += s.filas) {
           const h = Math.min(s.filas, lado - y);
-          await cuandoLibre(() => {
+          await programar(() => {
             const { gl } = s; renderer.state.bindTexture(gl.TEXTURE_CUBE_MAP, s.tex); desempaquetar(gl, t, cara);
             gl.pixelStorei(gl.UNPACK_SKIP_ROWS, y);
             gl.texSubImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, 0, y, lado, h, gl.RGBA, gl.UNSIGNED_BYTE, cara);
@@ -95,6 +101,6 @@ export async function subirCuboPorTrozos(renderer, t, lado, obtenerCara) {
       } finally { cara.close?.(); }
     }
   } catch (e) { s.gl.deleteTexture(s.tex); throw e; }
-  await cuandoLibre(() => terminar(renderer, s, t));
+  await programar(() => terminar(renderer, s, t));
   return t;
 }
