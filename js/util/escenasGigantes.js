@@ -25,9 +25,9 @@ export { ESCENA_PULSAR, estadoPulsar };
 //  increible  «…es simplemente increíble» (10,58; «increíble» en 13,32): el disco se acelera y se CALIENTA (blanco azulado),
 //             el anillo de luz del horizonte crece; en «increíble», otro estirón con su nudo y su ola;
 //  otras 14,52 las otras mujeres (impresionantes; bellas 18,6, exitosas): 48 estrellas con su cruz de luz por la galaxia… y los
-//             chorros quietos: ni un nudo (no los encienden);
-//  pero 21,02 «pero ella…»: las estrellas se apagan de golpe; en los tres golpes de la música (21,85, 23,13, 24,43) un nudo
-//             recorre los chorros y crecen otro poco;
+//             chorros quietos: ni un nudo (no los encienden); el disco se enfría, se apaga un poco y gira más despacio;
+//  pero 21,02 «pero ella…»: las estrellas se apagan de golpe y el disco revive (calor, luz y giro); en los tres golpes de
+//             la música (21,85, 23,13, 24,43) un nudo recorre los chorros y crecen otro poco;
 //  reir 25,06 «…me hace reír»: el disco ríe: ondas de luz rápidas que salen del centro, con latidos en las sílabas;
 //  disfrutar 25,98 disfrutar estar con ella: el disco se templa y todo se entibia, rosa y oro;
 //  ideal 27,58 «es mi mujer…»: la luz de la galaxia se recoge en el núcleo; cima 28,64 «…ideal»: los chorros se disparan hasta
@@ -47,17 +47,21 @@ export const ESCENA_CUASAR = {
   marcas: { inicio: 0, recogido: 1.3, vi: 3.18, pedi: 4.36, salir: 4.9, excusa: 5.74, pedir: 8, novios: 9.3, increible: 10.58, simple: 12.1, wow: 13.32,
     otras: 14.52, bellas: 18.6, pero: 21.02, golpe1: 21.85, golpe2: 23.13, golpe3: 24.43, reir: 25.06, disfrutar: 25.98, ideal: 27.58, cima: 28.64,
     estalla: 29.4, fin: 31 },
+  // Distancia: un acercamiento corto al empezar (el disco que se enciende, de cerca) y desde ahí un único alejamiento,
+  // lento y continuo, hasta la galaxia entera con la ola final (antes iba y venía cinco veces). Lo que antes eran primeros
+  // planos (el disco que se calienta, la risa) lo da ahora el campo de visión, que se cierra un poco sin que la cámara
+  // vuelva atrás; la elevación sube y baja menos (sin pasar de mirar el disco desde arriba a verlo casi de canto).
   camara: [
     { t: 0, pos: [4, 44, 1.0], mira: [0, 0, 0], fov: 50, curva: 'suave', giro: -135 },     // el encuadre de llegada
-    { t: 4.8, pos: [-2, 46, 0.9], fov: 49, curva: 'lineal', giro: -131 },                  // desde arriba: el disco se enciende por anillos
-    { t: 8.5, pos: [-12, 22, 1.15], fov: 50, curva: 'lineal', giro: -123 },                // baja de lado: los chorros salen disparados
-    { t: 11.5, pos: [-20, 12, 1.35], fov: 50, curva: 'lineal', giro: -119 },               // novios: los dos chorros enteros, con sus nudos
-    { t: 14.5, pos: [-28, 30, 0.95], fov: 48, curva: 'lineal', giro: -116 },               // «increíble»: el disco se calienta
-    { t: 19.0, pos: [-40, 52, 1.65], fov: 54, curva: 'lineal', giro: -103 },               // las otras: la galaxia entera, desde arriba
-    { t: 21.5, pos: [-48, 44, 1.55], fov: 54, curva: 'lineal', giro: -101 },
-    { t: 25.0, pos: [-58, 16, 1.3], fov: 50, curva: 'lineal', giro: -111 },                // «pero ella»: de lado, los nudos en los golpes
-    { t: 27.5, pos: [-64, 30, 1.05], fov: 48, curva: 'lineal', giro: -101 },               // la risa y lo cálido
-    { t: 28.6, pos: [-68, 34, 1.25], fov: 50, curva: 'lineal', giro: -96 },                // «es mi mujer…»: se abre para la ola
+    { t: 4.8, pos: [-2, 44, 0.9], fov: 49, curva: 'lineal', giro: -131 },                  // desde arriba: el disco se enciende por anillos
+    { t: 8.5, pos: [-12, 28, 1.05], fov: 50, curva: 'lineal', giro: -123 },                // baja de lado: los chorros salen disparados
+    { t: 11.5, pos: [-20, 18, 1.2], fov: 50, curva: 'lineal', giro: -119 },                // novios: los dos chorros enteros, con sus nudos
+    { t: 14.5, pos: [-28, 26, 1.28], fov: 44, curva: 'lineal', giro: -116 },               // «increíble»: el disco se calienta (más cerrado)
+    { t: 19.0, pos: [-40, 40, 1.45], fov: 52, curva: 'lineal', giro: -106 },               // las otras: la galaxia entera, desde arriba
+    { t: 21.5, pos: [-48, 38, 1.52], fov: 52, curva: 'lineal', giro: -104 },
+    { t: 25.0, pos: [-58, 24, 1.6], fov: 50, curva: 'lineal', giro: -108 },                // «pero ella»: de lado, los nudos en los golpes
+    { t: 27.5, pos: [-64, 28, 1.66], fov: 46, curva: 'lineal', giro: -102 },               // la risa y lo cálido (más cerrado)
+    { t: 28.6, pos: [-68, 30, 1.72], fov: 50, curva: 'lineal', giro: -98 },                // «es mi mujer…»: se abre para la ola
     { t: 31, pos: [-78, 24, 1.9], fov: 52, curva: 'suave', giro: -103 }                    // «…ideal»: la ola por la galaxia y los lóbulos
   ]
 };
@@ -116,10 +120,12 @@ function curvasCuasar(m) {
     // galaxia a ~6200; ≥ 7000, entero).
     enc: [[0, 9000], [0.05, 6800], [m.recogido, 0], [m.vi, 0], [m.vi + 2.8, 7000], [m.fin - 0.5, 7000], [m.fin, 9000]],
     // Con «simplemente increíble» el disco se calienta: blanco azulado; se templa con las otras y vuelve con «pero ella».
-    tono: [[0, 0], [m.simple, 0], [m.wow + 0.3, 1], [m.otras + 1.5, 0.55], [m.pero, 0.45], [m.disfrutar, 0]],
+    // Con las otras mujeres (sin nudos en los chorros) el disco se va ENFRIANDO poco a poco, del blanco azulado a su color
+    // de siempre, y gira más despacio (curva giro): no le encienden; con «pero ella» se recupera y se templa con la risa.
+    tono: [[0, 0], [m.simple, 0], [m.wow + 0.3, 1], [m.otras + 1, 0.7], [m.bellas, 0.32], [m.pero, 0.2], [m.pero + 0.6, 0.45, 'r'], [m.disfrutar, 0]],
     disco: [[0, 1], [m.recogido, 0.5], [m.vi, 0.5], [m.vi + 0.3, 0.75, 'r'], [m.salir, 0.6], [m.salir + 0.5, 0.65], [m.excusa, 0.65], [m.pedir - 0.3, 0.85], [m.novios, 0.85], [m.novios + 0.4, 0.95, 'r'],
-      [m.wow, 0.95], [m.wow + 0.4, 1.05, 'r'], [m.cima, 1.05], [m.cima + 0.4, 1.3, 'r'], [m.estalla + 0.4, 1.3], [m.fin, 1]],
-    giro: [[0, 1], [m.recogido, 0.4], [m.vi, 0.4], [m.vi + 0.6, 0.7], [m.novios, 0.8], [m.simple, 1.1], [m.wow, 2.2], [m.wow + 1.2, 1.4], [m.pero, 1.2], [m.reir, 1.7], [m.disfrutar + 0.5, 1.3],
+      [m.wow, 0.95], [m.wow + 0.4, 1.05, 'r'], [m.otras + 1, 1.05], [m.pero, 0.9], [m.pero + 0.6, 1.05, 'r'], [m.cima, 1.05], [m.cima + 0.4, 1.3, 'r'], [m.estalla + 0.4, 1.3], [m.fin, 1]],
+    giro: [[0, 1], [m.recogido, 0.4], [m.vi, 0.4], [m.vi + 0.6, 0.7], [m.novios, 0.8], [m.simple, 1.1], [m.wow, 2.2], [m.wow + 1.2, 1.4], [m.bellas, 0.95], [m.pero, 0.85], [m.pero + 0.6, 1.25, 'r'], [m.reir, 1.7], [m.disfrutar + 0.5, 1.3],
       [m.ideal, 1.4], [m.cima, 2.4], [m.cima + 0.4, 3, 'r'], [m.estalla + 0.3, 3], [m.fin, 1]],
     gas: [[0, 1], [m.pedir, 1], [m.otras, 0.9], [m.otras + 1.5, 1], [m.pero, 1], [m.pero + 0.8, 0.8], [m.ideal, 0.85], [m.cima, 0.7], [m.estalla + 0.3, 1.1, 'r'], [m.fin, 1]],
     caida: [[0, 1], [m.recogido, 0.3], [m.excusa, 0.3], [m.excusa + 0.8, 1.8], [m.pedir - 0.3, 1.8], [m.pedir + 0.5, 1], [m.ideal, 1], [m.cima, 1.8], [m.estalla + 0.5, 1.4], [m.fin, 1]],
