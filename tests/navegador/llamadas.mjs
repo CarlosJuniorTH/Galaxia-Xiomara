@@ -18,15 +18,18 @@ const poses = {};
 async function instrumentar(pagina) {
   return pagina.evaluate(() => {
     const i = window.__galaxia.escena.interno, { renderer, scene } = i, gl = renderer.getContext(), ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
-    const M = window.__ll = { cuadros: [], gpu: [], pend: [], desglose: null, pedirDesglose: 0, porLlamada: [], gpuLlamada: {}, cuadrosDesglose: 0 };
+    const M = window.__ll = { cuadros: [], gpu: [], pend: [], desglose: null, pedirDesglose: 0, porLlamada: [], gpuLlamada: {}, cuadrosDesglose: 0, actual: [], peor: null, peorN: 0 };
     renderer.info.autoReset = false;
     // Desglose: qué objeto produce cada llamada (solo en el cuadro en que se pide).
     const rbd = renderer.renderBufferDirect.bind(renderer);
     const capaDe = o => { let x = o; while (x) { if (x.userData?.capa) return x.userData.capa; if (x.name && x.parent === scene) return x.name; x = x.parent; } return '?'; };
+    const claveDe = (obj, mat) => !obj.parent ? 'pasada ' + (mat.name || mat.type) : `${capaDe(obj)} · ${obj.name || obj.type}${obj.isPoints ? ' (puntos)' : obj.isSprite ? ' (sprite)' : ''} · ${mat.blending === 2 ? 'aditivo' : mat.transparent ? 'transparente' : 'opaco'}`;
+    M.claveDe = claveDe;
     renderer.renderBufferDirect = (cam, esc, geo, mat, obj, grupo) => {
+      // Peor cuadro: se apunta cada llamada (solo referencias; las claves se construyen si el cuadro resulta el peor).
+      M.actual.push(obj, mat, renderer.getRenderTarget());
       if (M.desglose) {
-        const pasada = !obj.parent;
-        const clave = pasada ? 'pasada ' + (mat.name || mat.type) : `${capaDe(obj)} · ${obj.name || obj.type}${obj.isPoints ? ' (puntos)' : obj.isSprite ? ' (sprite)' : ''} · ${mat.blending === 2 ? 'aditivo' : mat.transparent ? 'transparente' : 'opaco'}`;
+        const clave = claveDe(obj, mat);
         M.desglose[clave] = (M.desglose[clave] || 0) + 1;
         // Tiempo de GPU de cada llamada (consulta propia; sin la del cuadro entero, que no se pueden anidar).
         if (ext) { const q = gl.createQuery(); gl.beginQuery(ext.TIME_ELAPSED_EXT, q); const r = rbd(cam, esc, geo, mat, obj, grupo); gl.endQuery(ext.TIME_ELAPSED_EXT); M.porLlamada.push([clave, q]); return r; }
@@ -43,6 +46,19 @@ async function instrumentar(pagina) {
       M.pend = M.pend.filter(p => { if (!gl.getQueryParameter(p, gl.QUERY_RESULT_AVAILABLE)) return true; if (!gl.getParameter(ext.GPU_DISJOINT_EXT)) M.gpu.push(gl.getQueryParameter(p, gl.QUERY_RESULT) / 1e6); gl.deleteQuery(p); return false; });
       const r = renderer.info.render;
       if (r.calls) M.cuadros.push([r.calls, r.triangles, r.points]);
+      if (M.actual.length / 3 > M.peorN) {
+        // Desglose del peor cuadro: por objeto y por destino (lienzo o render target de cada capa/pasada).
+        const d = {}, porDestino = {}, a = M.actual, detalle = {};
+        // Detalle: la rama (nombres de los padres), la geometría y la textura de cada llamada, para saber QUÉ la provoca.
+        const rama = o => { const n = []; for (let x = o.parent; x && x !== scene; x = x.parent) n.unshift(x.name || x.userData?.capa || x.type); return n.slice(-3).join('/'); };
+        for (let k = 0; k < a.length; k += 3) {
+          const c = claveDe(a[k], a[k + 1]); d[c] = (d[c] || 0) + 1;
+          if (a[k].parent) { const o = a[k], mt = a[k + 1], cd = `${rama(o)} · ${o.name || o.type} · ${o.geometry?.type || ''}${mt.map ? ' tex ' + mt.map.uuid.slice(0, 4) : ''}`; detalle[cd] = (detalle[cd] || 0) + 1; }
+          const rt = a[k + 2], n = rt ? `RT ${rt.width}×${rt.height}${rt.texture?.name ? ' ' + rt.texture.name : ''}` : 'lienzo'; porDestino[n] = (porDestino[n] || 0) + 1;
+        }
+        M.peorN = a.length / 3; M.peor = { llamadas: M.peorN, cuadro: M.cuadros.length, porDestino, desglose: Object.fromEntries(Object.entries(d).sort((x, y) => y[1] - x[1])), detalle: Object.fromEntries(Object.entries(detalle).sort((x, y) => y[1] - x[1])) };
+      }
+      M.actual.length = 0;
       if (desglosar) { M.ultimoDesglose = M.desglose; M.desglose = null; }
     });
     return !!ext;
@@ -50,15 +66,15 @@ async function instrumentar(pagina) {
 }
 const mediana = a => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : null; };
 async function medir(pagina, segundos) {
-  await pagina.evaluate(() => { const M = window.__ll; M.cuadros = []; M.gpu = []; window.__galaxia.escena.pedirCuadro(); });
+  await pagina.evaluate(() => { const M = window.__ll; M.cuadros = []; M.gpu = []; M.peor = null; M.peorN = 0; window.__galaxia.escena.pedirCuadro(); });
   await pagina.waitForTimeout(segundos * 1000);
-  const { cuadros, gpu } = await pagina.evaluate(() => ({ cuadros: window.__ll.cuadros, gpu: window.__ll.gpu }));
+  const { cuadros, gpu, peor } = await pagina.evaluate(() => ({ cuadros: window.__ll.cuadros, gpu: window.__ll.gpu, peor: window.__ll.peor }));
   // Después, 20 cuadros con el desglose por objeto y su tiempo de GPU (ms por cuadro, media).
   await pagina.evaluate(() => { const M = window.__ll; M.gpuLlamada = {}; M.cuadrosDesglose = 0; M.pedirDesglose = 20; });
   await pagina.waitForTimeout(1500);
   const { desglose, gpuLlamada, n } = await pagina.evaluate(() => ({ desglose: window.__ll.ultimoDesglose, gpuLlamada: window.__ll.gpuLlamada, n: window.__ll.cuadrosDesglose }));
   const col = k => cuadros.map(c => c[k]);
-  return { cuadros: cuadros.length, llamadas: mediana(col(0)), llamadasMax: Math.max(0, ...col(0)), triangulos: mediana(col(1)), puntos: mediana(col(2)), gpuMs: gpu.length ? +mediana(gpu).toFixed(2) : null,
+  return { cuadros: cuadros.length, llamadas: mediana(col(0)), llamadasMax: Math.max(0, ...col(0)), peorCuadro: peor, triangulos: mediana(col(1)), puntos: mediana(col(2)), gpuMs: gpu.length ? +mediana(gpu).toFixed(2) : null,
     desglose: Object.fromEntries(Object.entries(desglose || {}).sort((a, b) => b[1] - a[1])),
     gpuPorObjeto: Object.fromEntries(Object.entries(gpuLlamada || {}).map(([k, v]) => [k, +(v / Math.max(1, n)).toFixed(3)]).sort((a, b) => b[1] - a[1]).slice(0, 25)) };
 }
