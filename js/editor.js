@@ -21,7 +21,14 @@ function render() {
     for (const [k, titulo] of [['nombre','Su nombre'],['firma','Tu firma'],['fechaInicio','El día que empezó todo'],['cita','Frase de bienvenida'],['foto','Foto o ilustración de entrada'],['cancion','Canción opcional (vacío = ambiente original)']]) campo(g, titulo, datos.config[k], v => datos.config[k] = v, { tipo: k === 'fechaInicio' ? 'date' : 'text' });
     g.append(nodo('small','Para las fotos y la canción, copia los archivos en assets/ y escribe su ruta. Por ejemplo: assets/fotos/nosotros.jpg.'));
     const c = grupo('La carta principal'); campo(c, 'Título', datos.config.cartaTitulo, v => datos.config.cartaTitulo = v); campo(c, 'Carta (separa los párrafos con una línea vacía)', datos.config.carta, v => datos.config.carta = v.split(/\n\s*\n/), { largo: true });
-    const fin = grupo('La carta al encontrar todas las estrellas'); campo(fin, 'Título ({n} se sustituye por los meses)', datos.config.celebracionTitulo, v => datos.config.celebracionTitulo = v); campo(fin, 'Carta especial', datos.config.cartaMeses, v => datos.config.cartaMeses = v.split(/\n\s*\n/), { largo: true });
+    const fin = grupo('La carta al encontrar todas las estrellas'); campo(fin, 'Título ({n} se sustituye por los meses)', datos.config.celebracionTitulo, v => datos.config.celebracionTitulo = v);
+    // Una carta general y, si quieres, una propia para algún mes (la del formato antiguo, una lista sola, pasa a ser la general).
+    if (Array.isArray(datos.config.cartaMeses)) datos.config.cartaMeses = { general: datos.config.cartaMeses };
+    const cartas = datos.config.cartaMeses, parrafos = v => v.split(/\n\s*\n/);
+    campo(fin, 'Carta para cualquier mes', cartas.general, v => cartas.general = parrafos(v), { largo: true });
+    for (const k of Object.keys(cartas).filter(k => k !== 'general').sort((a, b) => a - b)) campo(fin, `Carta propia del mes ${k} (vacía = se usa la de cualquier mes)`, cartas[k], v => { if (v.trim()) cartas[k] = parrafos(v); else delete cartas[k]; }, { largo: true });
+    const mesNuevo = Math.max(datos.config.recuerdos.length - 1, ...Object.keys(cartas).filter(k => k !== 'general').map(Number)) + 1;
+    const otra = nodo('button', `+ Carta propia para el mes ${mesNuevo}`); otra.type = 'button'; otra.onclick = () => { cartas[mesNuevo] = ['']; render(); }; fin.append(otra);
   } else if (seccion === 'recuerdos') {
     datos.config.recuerdos.forEach((r, i) => {
       const inicio = leerFecha(datos.config.fechaInicio);

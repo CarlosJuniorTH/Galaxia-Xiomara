@@ -67,20 +67,35 @@ export const CONFIG = {
     { titulo: 'Siete meses', texto: 'Gracias por quedarte, por entenderme y por elegirme cada día.' },
     { titulo: 'Ocho meses', texto: 'Mis planes favoritos son todos los que te incluyen.' },
     { titulo: 'Nueve meses', texto: 'No importa dónde esté: si estás tú, estoy en casa.' },
-    { titulo: 'Diez meses', texto: 'Diez meses y te amo más que el primer día. Y mañana te amaré más que hoy.' }
+    { titulo: 'Diez meses', texto: 'Diez meses y te amo más que el primer día. Y mañana te amaré más que hoy.' },
+    // BORRADOR: revisar Carlos
+    { titulo: 'Once meses', texto: 'Once meses, y ya casi completamos nuestra primera vuelta al Sol. De todo lo que me ha regalado este año, lo más bonito sigues siendo tú.' }
   ],
 
   // ── Carta especial que aparece al encontrar TODAS las estrellas ──
   // {n} se reemplaza solo por los meses que llevamos juntos.
+  // 'general' sirve para cualquier mes; un número (11: [...]) es la carta propia de ese mes y tiene prioridad.
+  // (También vale una lista sola de párrafos, como antes: entonces es la carta de todos los meses.)
   celebracionTitulo: '¡Feliz mes {n}, mi amor!',
-  cartaMeses: [
-    'Mi Xiomara:',
-    'Encontraste todas nuestras estrellas, y cada una guarda un pedacito de lo que hemos vivido. {n} meses que, puestos uno junto al otro, forman el cielo más bonito que he visto en mi vida.',
-    'Gracias por cada buenos días, por cada risa que me regalas, por tu paciencia en mis días difíciles y por esa forma tan tuya de mirarme, como si yo también fuera tu universo.',
-    'Contigo aprendí que el amor no es encontrar a alguien perfecto, sino elegir cada día a la persona que hace que todo valga la pena. Y yo te elijo a ti: hoy, mañana y todos los días que vengan.',
-    'Esto es solo el comienzo. Todavía nos quedan muchísimas estrellas por encender juntos.',
-    'Feliz mes {n}, mi amor. Te amo con todo lo que soy. 💖'
-  ],
+  cartaMeses: {
+    general: [
+      'Mi Xiomara:',
+      'Encontraste todas nuestras estrellas, y cada una guarda un pedacito de lo que hemos vivido. {n} meses que, puestos uno junto al otro, forman el cielo más bonito que he visto en mi vida.',
+      'Gracias por cada buenos días, por cada risa que me regalas, por tu paciencia en mis días difíciles y por esa forma tan tuya de mirarme, como si yo también fuera tu universo.',
+      'Contigo aprendí que el amor no es encontrar a alguien perfecto, sino elegir cada día a la persona que hace que todo valga la pena. Y yo te elijo a ti: hoy, mañana y todos los días que vengan.',
+      'Esto es solo el comienzo. Todavía nos quedan muchísimas estrellas por encender juntos.',
+      'Feliz mes {n}, mi amor. Te amo con todo lo que soy. 💖'
+    ],
+    // BORRADOR: revisar Carlos
+    11: [
+      'Mi Xiomara:',
+      'Encontraste todas nuestras estrellas. Once meses encendidos, uno al lado del otro, y solo falta una luz para que este cielo dé su primera vuelta entera al Sol.',
+      'Once meses dan para mucho: para conocernos mejor, para echarnos de menos con un océano en medio y para descubrir que, aun así, siempre encontramos la forma de estar cerca.',
+      'Gracias por tu paciencia, por tu risa y por cada momento en el que me haces sentir en casa, aunque estemos lejos.',
+      'Ahora este universo se prepara para algo especial. Dentro de un mes, nuestras estrellas van a buscarse entre ellas… y yo quiero estar ahí contigo para verlo.',
+      'Feliz mes once, mi amor. Te amo con todo lo que soy. 💖'
+    ]
+  },
 
   // ── Carta (cada elemento es un párrafo) ──
   cartaTitulo: 'Para ti, Xiomara',

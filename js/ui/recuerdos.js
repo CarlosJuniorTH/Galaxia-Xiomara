@@ -1,6 +1,7 @@
 import { crearVentana } from './ventana.js';
 import { crearEscritura } from './escritura.js';
 import { fechaBonita } from '../util/tiempo.js';
+import { cartaDelMes } from '../data/contenido.js';
 
 export function crearRecuerdos(config, estrellas, progreso, { alEncontrar, alCompletar, alCerrar = () => {} }) {
   const $ = id => document.getElementById(id);
@@ -21,7 +22,8 @@ export function crearRecuerdos(config, estrellas, progreso, { alEncontrar, alCom
   }
   function abrir(i, { album = false } = {}) {
     const estrella = estrellas[i]; if (!estrella || (album && !progreso.tiene('estrellas', estrella.id))) return;
-    const r = config.recuerdos[i] || { titulo: `Nuestra estrella ${i}`, texto: 'Este mes ya tiene su lugar en nuestro cielo. Su historia está esperando a que Carlos la escriba.' };
+    // Un mes sin texto todavía (la estrella nace sola cada día 15) también se abre con algo bonito.
+    const r = config.recuerdos[i]?.texto ? config.recuerdos[i] : { titulo: config.recuerdos[i]?.titulo || 'Una estrella más en nuestro cielo', texto: 'Este mes también encontró su lugar entre nuestras luces. Brilla por todo lo que vivimos en él y por todo lo que todavía nos queda por vivir juntos.' };
     $('recuerdo-mes').textContent = `${i === 0 ? 'El comienzo' : `Mes ${i}`} · ${fechaBonita(estrella.id)}`;
     $('recuerdo-titulo').textContent = r.titulo; $('recuerdo-texto').textContent = r.texto;
     const foto = $('recuerdo-foto'); foto.classList.toggle('visible', !!r.foto); foto.alt = r.titulo;
@@ -41,7 +43,7 @@ export function crearRecuerdos(config, estrellas, progreso, { alEncontrar, alCom
     $('celebracion-etiqueta').textContent = `${estrellas.length} recuerdos · un mismo cielo`;
     $('celebracion-firma').textContent = config.firma;
     progreso.anotar('celebraciones', estrellas.at(-1).id);
-    celebracion.abrir(); escritura.escribir(reemplazar(config.cartaMeses.join('\n\n')), 200);
+    celebracion.abrir(); escritura.escribir(reemplazar(cartaDelMes(config.cartaMeses, meses).join('\n\n')), 200);
   }
   actualizar();
   return { abrir, actualizar, mostrarCelebracion, encontradas };

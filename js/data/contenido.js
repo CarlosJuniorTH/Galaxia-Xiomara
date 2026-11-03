@@ -17,6 +17,23 @@ function lista(datos, normalizar) {
   });
 }
 const parrafos = v => lista(v, p => texto(p));
+// Carta de los meses: una lista de párrafos (la misma carta cada mes) o { general: [...], 11: [...], … } con cartas propias.
+const CLAVE_MES = /^(?:general|[1-9]\d{0,2})$/;
+function cartaMeses(v) {
+  if (Array.isArray(v)) return parrafos(v);
+  if (!v || typeof v !== 'object') throw Error('La carta de los meses no tiene un formato válido.');
+  const claves = Object.keys(v);
+  if (!claves.includes('general')) throw Error('La carta de los meses necesita una carta general para los meses sin carta propia.');
+  if (claves.length > 1500 || claves.some(k => !CLAVE_MES.test(k))) throw Error('La carta de los meses solo admite «general» o el número de un mes.');
+  const limpio = {};
+  for (const k of claves) { limpio[k] = parrafos(v[k]); if (!limpio[k].length) throw Error(`La carta ${k === 'general' ? 'general' : `del mes ${k}`} necesita al menos un párrafo.`); }
+  return limpio;
+}
+// Párrafos de la carta del mes n: la propia de ese mes si la hay; si no, la general (o la lista única del formato antiguo).
+export function cartaDelMes(carta, n) {
+  if (Array.isArray(carta)) return carta;
+  return (carta && (carta[n]?.some(p => p.trim()) ? carta[n] : carta.general)) || [];
+}
 export function validarContenido(valor) {
   if (!valor || valor.version !== 1) throw Error('El archivo de contenido no tiene la versión esperada.');
   const limpio = { version: 1 };
@@ -25,7 +42,8 @@ export function validarContenido(valor) {
     for (const k of ['nombre','firma','cita','titulo','cartaTitulo','celebracionTitulo']) if (k in originales) c[k] = texto(originales[k], 1000);
     if ('fechaInicio' in originales) c.fechaInicio = fecha(originales.fechaInicio);
     for (const k of ['foto','fotoRespaldo','cancion']) if (k in originales) c[k] = recurso(originales[k]);
-    for (const k of ['carta','cartaMeses','frases','mensajes','toques']) if (k in originales) c[k] = parrafos(originales[k]);
+    for (const k of ['carta','frases','mensajes','toques']) if (k in originales) c[k] = parrafos(originales[k]);
+    if ('cartaMeses' in originales) c.cartaMeses = cartaMeses(originales.cartaMeses);
     if ('recuerdos' in originales) c.recuerdos = lista(originales.recuerdos, r => ({ titulo: texto(r.titulo, 300), texto: texto(r.texto), ...(r.foto ? { foto: recurso(r.foto) } : {}) }));
     limpio.config = c;
   }
@@ -33,7 +51,7 @@ export function validarContenido(valor) {
   if ('capsulas' in valor) limpio.capsulas = lista(valor.capsulas, c => ({ id: texto(c.id, 100), fecha: fecha(c.fecha), titulo: texto(c.titulo, 300), texto: texto(c.texto) }));
   if ('suenos' in valor) limpio.suenos = lista(valor.suenos, c => ({ id: texto(c.id, 100), titulo: texto(c.titulo, 300), texto: texto(c.texto) }));
   if (limpio.suenos && !limpio.suenos.length) throw Error('El jardín necesita al menos un sueño.');
-  if (limpio.config) for (const k of ['carta','cartaMeses','frases','mensajes','toques','recuerdos']) if (k in limpio.config && !limpio.config[k].length) throw Error(`La lista ${k} necesita al menos un elemento.`);
+  if (limpio.config) for (const k of ['carta','cartaMeses','frases','mensajes','toques','recuerdos']) if (k in limpio.config && Array.isArray(limpio.config[k]) && !limpio.config[k].length) throw Error(`La lista ${k} necesita al menos un elemento.`);
   return limpio;
 }
 export function aplicarContenido(datos) {

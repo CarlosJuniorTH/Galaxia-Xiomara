@@ -316,7 +316,7 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
         }
         const encontrada = progreso.tiene('estrellas', s.id), r = config.recuerdos[i];
         const b = boton('', `recuerdo-item tarjeta-mes${encontrada ? ' encontrada' : ''}`, () => { cerrarPanel(); recuerdos.abrir(i, { album: true }); }); b.disabled = !encontrada;
-        const texto = el('div'); texto.append(el('em', 'mes-etiqueta', i ? `Mes ${i}` : 'El comienzo'), el('strong', '', encontrada ? (r?.titulo || `Nuestra estrella ${i}`) : 'Por descubrir'), el('small', '', fechaBonita(s.id)));
+        const texto = el('div'); texto.append(el('em', 'mes-etiqueta', i ? `Mes ${i}` : 'El comienzo'), el('strong', '', encontrada ? (r?.titulo || 'Una estrella más en nuestro cielo') : 'Por descubrir'), el('small', '', fechaBonita(s.id)));
         b.append(el('span', '', encontrada ? '✦' : '✧'), texto); rejilla.append(b);
       }
       separar();
@@ -513,7 +513,7 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     for (const i of indices) {
       if (!sigue()) return;
       const r = config.recuerdos[i];
-      mostrarReunion(i ? `MES ${i} · ${fechaBonita(estrellas[i].id)}` : `EL COMIENZO · ${fechaBonita(estrellas[i].id)}`, r?.titulo || `Nuestra estrella ${i}`);
+      mostrarReunion(i ? `MES ${i} · ${fechaBonita(estrellas[i].id)}` : `EL COMIENZO · ${fechaBonita(estrellas[i].id)}`, r?.titulo || 'Una estrella más en nuestro cielo');
       escena.encenderEstrella(i);
       await esperar(paso);
     }
