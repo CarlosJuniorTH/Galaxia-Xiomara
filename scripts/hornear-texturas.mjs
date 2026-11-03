@@ -8,6 +8,11 @@ import path from 'path';
 import { GENERADORES } from '../js/escena/texturasPlaneta.js';
 import { huellaTextura } from '../js/escena/huellaTextura.js';
 
+// Colores de planetas y de una galaxia (solo el color: su relieve, en -a, sigue sin pérdidas) que con pérdida a calidad 95
+// no se distinguen (PSNR 47–48,5 dB, capturas en escena iguales) y pesan 5–7 veces menos: ~1,3 MB menos en la carga del PC
+// y ~0,6 MB en la del móvil. La Tierra (73400671-superficie) no: sus costas quedaban a 39,6 dB. Si cambia la huella (otro
+// generador u opciones), el nombre deja de estar aquí y vuelve a hornearse sin pérdidas.
+const CON_PERDIDA = new Set(['7963c927-pixeles.webp', '2123544e-pixeles.webp', 'e60152f0-pixeles.webp', '93ff29f3-pixeles.webp', '9dd7582d-pixeles.webp']);
 const pedidos = JSON.parse(readFileSync(process.argv[2], 'utf8')), dir = path.resolve('assets/texturas'), tmp = path.resolve('.pruebas/horno-texturas');
 mkdirSync(dir, { recursive: true }); mkdirSync(tmp, { recursive: true });
 // Cada pedido trae su grupo (móvil/PC × normal/modo seguro): el índice guarda qué imágenes descarga cada uno, para que la
@@ -18,7 +23,7 @@ for (const [n, { tipo, opciones, grupo = 'todos' }] of pedidos.entries()) {
   if (hechas.has(h)) { (grupos[grupo] ||= new Set()); for (const x of hechas.get(h)) grupos[grupo].add(x); continue; }
   const r = GENERADORES[tipo](opciones), datos = r instanceof Uint8ClampedArray ? { pixeles: r } : r, propias = [];
   for (const [clave, px] of Object.entries(datos)) {
-    // Sin pérdidas (los datos se usan tal cual: relieve en el alfa, máscaras, brillo medio de las galaxias). Si hay alfa, va
+    // Sin pérdidas, salvo CON_PERDIDA (los datos se usan tal cual: relieve en el alfa, máscaras, brillo medio de las galaxias). Si hay alfa, va
     // en una segunda imagen (-a, en gris): al decodificar, un lienzo multiplica el color por el alfa y perdería precisión.
     let conAlfa = false; for (let i = 3; i < px.length; i += 4) if (px[i] !== 255) { conAlfa = true; break; }
     const opaco = Uint8Array.from(px); if (conAlfa) for (let i = 3; i < opaco.length; i += 4) opaco[i] = 255;
@@ -27,7 +32,8 @@ for (const [n, { tipo, opciones, grupo = 'todos' }] of pedidos.entries()) {
     for (const [nombre, datosImg] of imagenes) {
       const crudo = path.join(tmp, 'x.rgba'); writeFileSync(crudo, Buffer.from(datosImg.buffer, datosImg.byteOffset, datosImg.byteLength));
       const destino = path.join(dir, nombre);
-      execFileSync('magick', ['-size', `${opciones.ancho}x${opciones.alto}`, '-depth', '8', `rgba:${crudo}`, '-define', 'webp:lossless=true', '-define', 'webp:exact=true', '-quality', '100', destino]);
+      const formato = CON_PERDIDA.has(nombre) ? ['-quality', '95', '-define', 'webp:method=6', '-define', 'webp:use-sharp-yuv=true'] : ['-define', 'webp:lossless=true', '-define', 'webp:exact=true', '-quality', '100'];
+      execFileSync('magick', ['-size', `${opciones.ancho}x${opciones.alto}`, '-depth', '8', `rgba:${crudo}`, ...formato, destino]);
       const b = statSync(destino).size; indice[nombre] = b; total += b; propias.push(nombre);
     }
   }
