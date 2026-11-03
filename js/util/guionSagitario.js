@@ -14,8 +14,8 @@
 // La idea (lo que hace un agujero negro: tragar lo que cae) y su imagen final: la del Telescopio del Horizonte de Sucesos
 // (EHT, 2022), un anillo de plasma naranja y dorado alrededor de una sombra negra, con tres zonas más brillantes. Sgr A*
 // es un agujero hambriento, el más tranquilo que conocemos: el clip empieza con él casi invisible (la sombra, el anillo de
-// fotones y un rescoldo tenue). Mientras ella dice que nada más importa, un grumo de gas se suelta y empieza a caer en
-// espiral; con la certeza («lo tengo») la marea lo estira en un hilo y S2, la estrella que más se le acerca, cae también.
+// fotones y un rescoldo tenue). Desde el primer cuadro un grumo de gas ya se ha soltado y cae en
+// espiral mientras ella dice que nada más importa; con la certeza («lo tengo») la marea lo estira en un hilo y S2, la estrella que más se le acerca, cae también.
 // En cada «sí» un grumo llega al anillo y el agujero lo acepta: una llamarada real de Sgr A* (una mancha caliente que da
 // la vuelta pegada a la sombra, como las que vio GRAVITY en 2018) y el plasma se enciende a partir del punto donde cayó,
 // extendiéndose por el anillo. Con el primer «sí» S2 roza el agujero (pericentro), se sonroja (corrimiento al rojo
@@ -40,6 +40,9 @@ export const COMPAS_SAGITARIO = 4 * PULSO_SAGITARIO.periodo;
 // Marcas (segundos del fragmento). Las mismas que js/data/bandaSonora.js (allí mandan si cambian).
 //  primera  1.ª frase · tengo  la certeza · si1…si4  cada «sí» · cielo / mi  las palabras que cierran cada frase · fundido
 export const MARCAS_SAGITARIO = Object.freeze({ primera: 3.16, tengo: 12.68, si1: 18.82, cielo: 20.07, si2: 23.52, mi: 24.87, si3: 28.46, si4: 33.15, fundido: 35.6 });
+// El primer grumo ya se ha soltado cuando empieza el clip (sale GRUMO_PREVIO s antes del 0: su brillo, que tarda 1,6 s en
+// aparecer, ya está entero en el primer cuadro): desde el principio algo cae hacia el agujero, no solo con la 1.ª frase.
+const GRUMO_PREVIO = 1.8;
 const SIES = ['si1', 'si2', 'si3', 'si4'], FUERZA_SI = [1, 1.25, 1, 1.45], ALIMENTO_SI = [0.26, 0.16, 0.09, 0.09];
 
 // Estrellas S (Gillessen et al. 2017, GRAVITY 2020): semieje (″), excentricidad, inclinación, nodo y argumento del
@@ -91,7 +94,7 @@ export function guionSagitario(t, Mm, { reducido = false } = {}, o = {}) {
     o.mancha += f * golpe(dt, 3.2, 0.15) * (reducido ? 0.5 : 1);
     o.ecos[i] = dt >= 0 ? dt : -1; o.ecosF[i] = f * (reducido ? 0.4 : 1);
     o.alimento += ALIMENTO_SI[i] * muySuave(t, s - 0.1, s + 1.4);
-    o.grumosIni[i] = i === 0 ? M.primera : i === 1 ? M.tengo : M[SIES[i - 2]]; o.grumosFin[i] = s;
+    o.grumosIni[i] = i === 0 ? -GRUMO_PREVIO : i === 1 ? M.tengo : M[SIES[i - 2]]; o.grumosFin[i] = s;
   }
   // La mancha es siempre la misma (una vuelta cada 3,66 s, la del gas a 1,35 radios junto a la sombra, en el sentido del flujo): cada «sí» la reaviva.
   o.manchaAng = 2 * Math.PI * Math.max(0, t - M.si1 + 1) / 3.66;
@@ -116,19 +119,20 @@ export function posicionPista([az, el, d]) {
   return [Math.sin(a) * Math.cos(e) * d, Math.sin(e) * d, Math.cos(a) * Math.cos(e) * d];
 }
 const M0 = MARCAS_SAGITARIO;
-// Movimientos LENTOS y suaves: un arco continuo de ~40° que respira con la canción. Empieza lejos (el agujero casi
-// invisible entre las órbitas de las estrellas S), se acerca despacio hasta tener el anillo grande y centrado durante el
-// estribillo (los «sí» lo encienden) y al final se aleja un poco para ver la imagen completa con sus órbitas. Planos
-// intermedios 'lineal' (Catmull-Rom: la curva no se para en cada uno); solo el primero y el último se posan.
+// Movimientos LENTOS y suaves: un solo arco de 40° en un sentido (de −10° a 30°, ~1°/s, sin volver atrás) que respira
+// con la canción. Empieza lejos (el agujero casi invisible entre las órbitas de las estrellas S, con el primer grumo ya
+// cayendo), se acerca despacio hasta tener el anillo grande y centrado durante el estribillo (los «sí» lo encienden) y al
+// final se aleja un poco para ver la imagen completa con sus órbitas: un acercamiento y un alejamiento, nada más. Planos
+// intermedios 'lineal' (la curva no se para en cada uno); solo el primero y el último se posan.
 export const CAMARA_SAGITARIO = Object.freeze([
-  { t: 0, pos: [8, 10, 1.0], mira: [0, 0, 0], fov: 50, curva: 'suave' },
-  { t: 7.03, pos: [4, 11, 0.9], mira: [0, 0, 0], fov: 48, curva: 'lineal' },
-  { t: M0.tengo, pos: [-2, 9, 0.74], mira: [0, 0, 0], fov: 46, curva: 'lineal' },
-  { t: M0.si1 - 0.8, pos: [-8, 6, 0.56], mira: [0, 0, 0], fov: 42, curva: 'lineal' },
-  { t: M0.si2, pos: [-10, 5, 0.5], mira: [0, 0, 0], fov: 40, curva: 'lineal' },
-  { t: M0.si3, pos: [-4, 7, 0.5], mira: [0, 0, 0], fov: 40, curva: 'lineal' },
-  { t: M0.si4, pos: [6, 10, 0.56], mira: [0, 0, 0], fov: 42, curva: 'lineal' },
-  { t: 38.1, pos: [16, 14, 0.82], mira: [0, 0, 0], fov: 46, curva: 'suave' }
+  { t: 0, pos: [-10, 10, 1.0], mira: [0, 0, 0], fov: 50, curva: 'suave' },
+  { t: 7.03, pos: [-6, 11, 0.9], mira: [0, 0, 0], fov: 48, curva: 'lineal' },
+  { t: M0.tengo, pos: [-1, 9, 0.74], mira: [0, 0, 0], fov: 46, curva: 'lineal' },
+  { t: M0.si1 - 0.8, pos: [5, 6, 0.56], mira: [0, 0, 0], fov: 42, curva: 'lineal' },
+  { t: M0.si2, pos: [10, 5, 0.5], mira: [0, 0, 0], fov: 40, curva: 'lineal' },
+  { t: M0.si3, pos: [15, 7, 0.5], mira: [0, 0, 0], fov: 40, curva: 'lineal' },
+  { t: M0.si4, pos: [21, 10, 0.56], mira: [0, 0, 0], fov: 42, curva: 'lineal' },
+  { t: 38.1, pos: [30, 14, 0.82], mira: [0, 0, 0], fov: 46, curva: 'suave' }
 ]);
 
 export const ESCENA_SAGITARIO = Object.freeze({ id: 'sagitario', duracion: 38.1, pulso: PULSO_SAGITARIO.periodo, compas: 4, marcas: MARCAS_SAGITARIO, camara: CAMARA_SAGITARIO });
