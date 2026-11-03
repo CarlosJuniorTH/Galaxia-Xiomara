@@ -60,3 +60,14 @@ test('la postal respeta un presupuesto de memoria y restaura la resolución siem
   liberar('fin'); assert.equal(await lenta, 'fin'); assert.equal(actual, 2);
   assert.deepEqual(fijadas, [3, 2, 3, 2, 3, 2]);
 });
+
+test('PC: a 120 solo con movimiento rápido (gesto, inercia, vuelo); en reposo, a 60', () => {
+  const quieto = simular(crearPlanificador({ objetivo: 60, alto: 120 }), 120, 1000, () => ({ activo: true, rapido: false }));
+  assert.ok(quieto >= 59 && quieto <= 61, `en reposo, a 60: ${quieto}`);
+  const gesto = simular(crearPlanificador({ objetivo: 60, alto: 120 }), 120, 1000, () => ({ activo: true, rapido: true }));
+  assert.ok(gesto >= 118 && gesto <= 121, `con un gesto, a 120: ${gesto}`);
+  // Alternar reposo y gestos no lo deja para siempre en 60 (el primer cuadro rápido tras el reposo no cuenta como tarde).
+  const plan = crearPlanificador({ objetivo: 60, alto: 120 });
+  let t = 0; for (let ciclo = 0; ciclo < 20; ciclo++) { for (let i = 0; i < 30; i++, t += 1000 / 120) plan.decidir(t, { activo: true, rapido: false }); for (let i = 0; i < 30; i++, t += 1000 / 120) plan.decidir(t, { activo: true, rapido: true }); }
+  assert.ok(plan.rapido, 'sigue pudiendo ir a 120');
+});

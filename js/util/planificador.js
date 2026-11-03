@@ -2,7 +2,9 @@
 // intermedio: o se dibuja al ritmo fijo, o no se dibuja.
 //   reposo   página oculta, gráficos suspendidos o lectura → no se dibuja
 //   quieto   pausa completa → solo cuando se pide un cuadro (cambio de tamaño, toque…)
-//   activo   dentro del universo → al ritmo fijo: 60 en el móvil; en el PC, el de la pantalla con tope 120
+//   activo   dentro del universo → al ritmo fijo: 60 en el móvil; en el PC, el de la pantalla con tope 120 mientras hay
+//            movimiento rápido (rapido: un gesto, su inercia o un vuelo) y 60 el resto del tiempo (la vista quieta o girando
+//            despacio: 120 no se nota y la GPU trabaja el doble; con un portátil, batería y calor)
 //   dormido  la vista totalmente quieta, nada animado y sin tocar `esperaMs` (15 s) → no se dibuja (0 FPS). Un toque, una
 //            animación o pedirCuadro dibuja en el aviso de pantalla siguiente (el mismo cuadro), ya al ritmo fijo.
 // Las animaciones usan tiempo real: dejar de dibujar no cambia su velocidad.
@@ -14,7 +16,7 @@
 // vez, nunca vuelve a cambiar).
 export function crearPlanificador({ objetivo = 60, alto = 0, esperaMs = 15000 } = {}) {
   let ultimaActividad = -Infinity, ultimoDibujo = -Infinity, cuadroPedido = true, ultimoTic = -Infinity, periodo = 1000 / 60, cuenta = 0;
-  let rebajado = false, tardes = 0, contados = 0;
+  let rebajado = false, tardes = 0, contados = 0, ritmoRapidoAntes = false;
   const intervalos = [];
   const divisor = meta => Math.max(1, Math.floor(1000 / periodo / (meta * 0.95)));
   return {
@@ -25,7 +27,7 @@ export function crearPlanificador({ objetivo = 60, alto = 0, esperaMs = 15000 } 
     get hz() { return 1000 / periodo; },
     get rapido() { return alto > objetivo && !rebajado; },
     // Devuelve null si este rAF no debe dibujar; si debe, el modo ('activo' o 'quieto').
-    decidir(ahora, { reposo = false, quieto = false, activo = false } = {}) {
+    decidir(ahora, { reposo = false, quieto = false, activo = false, rapido: deprisa = true } = {}) {
       const d = ahora - ultimoTic; ultimoTic = ahora;
       if (d > 3 && d < 40) {   // (sin pausas ni cuadros perdidos)
         intervalos.push(d); if (intervalos.length > 61) intervalos.shift();
@@ -40,7 +42,7 @@ export function crearPlanificador({ objetivo = 60, alto = 0, esperaMs = 15000 } 
       }
       // Dormido: nada que dibujar hasta un toque, una animación o un cuadro pedido.
       if (!activo && !cuadroPedido && ahora - ultimaActividad >= esperaMs) return null;
-      const rapido = alto > objetivo && !rebajado, meta = rapido ? alto : objetivo, n = divisor(meta);
+      const rapido = alto > objetivo && !rebajado && deprisa, meta = rapido ? alto : objetivo, n = divisor(meta);
       // Por TIEMPO, con el intervalo medido: ciclos de pantalla transcurridos desde el último dibujo (tiempo / ciclo,
       // redondeado); se dibuja al llegar a n. No le afectan los avisos que el navegador se salta ni la imprecisión de sus
       // marcas. (Hasta tener medida la pantalla, por tiempo con un margen del 10 %.) Un cuadro pedido no espera.
@@ -49,11 +51,12 @@ export function crearPlanificador({ objetivo = 60, alto = 0, esperaMs = 15000 } 
         else if (Math.round((ahora - ultimoDibujo) / periodo) < n) return null;
       }
       // ¿Sostiene el PC el ritmo rápido? (cuadros que llegan con más de medio intervalo de retraso)
-      if (rapido && ultimoDibujo > 0 && intervalos.length >= 5) {
+      // (El primer cuadro rápido tras un rato a 60 llega «tarde» por definición: no cuenta.)
+      if (rapido && ritmoRapidoAntes && ultimoDibujo > 0 && intervalos.length >= 5) {
         const dt = ahora - ultimoDibujo; if (dt < 100) { contados++; if (dt > n * periodo * 1.4) tardes++; }
         if (contados >= 120) { if (tardes > contados * 0.06) rebajado = true; tardes = contados = 0; }
       }
-      cuadroPedido = false; ultimoDibujo = ahora;
+      cuadroPedido = false; ultimoDibujo = ahora; ritmoRapidoAntes = rapido;
       return 'activo';
     }
   };
