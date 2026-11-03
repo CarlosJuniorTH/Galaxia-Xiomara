@@ -116,34 +116,36 @@ export const respiracionCancion = s => { const c = COMPAS_SUPERNOVA.compas, e = 
 // (la estrella cabe en ~0,14 R: su encuadre de llegada). Azimut 0 = delante del corazón (mira a casa), crece hacia la
 // derecha. La pista acaba en la afirmación final (58,26, cuando la ceremonia pasa a «recuerdo»); desde ahí el director
 // funde en 2,5 s al encuadre normal del corazón: el corazón se ve grande en la revelación y se aleja al devolver el control.
+// Un solo arco en un sentido, de −56° a 0° (casi 1°/s), con los planos encadenados ('lineal': la cámara no se para en
+// cada uno): un acercamiento lento a la estrella mientras canta, que se detiene en la promesa, y desde ahí un único
+// alejamiento: despacio mientras se apaga y en el silencio, y de golpe en el estallido —el único golpe del clip (la
+// 'rapida' del 42,46)— hasta ver el corazón entero. Sin cortes ni alabeos (el filtro del director, que mira medio
+// segundo por delante, llega al golpe a tiempo con la música).
 //   t      pos [az°, el°, R]        mira                fov  curva     qué cuenta
 export const CAMARA_SUPERNOVA = Object.freeze([
-  { t: 0,      pos: [-28, 10, 0.207], mira: [0, 0, 0],          fov: 52, curva: 'suave' },    // la estrella sola, de lejos
-  { t: 2.116,  pos: [-22, 8, 0.186],  mira: [0, 0, 0],          fov: 50, curva: 'suave' },    // primera caja = primer latido: le da su corazón
-  { t: 4.734,  pos: [-12, 5, 0.143],  mira: [0, 0, 0],          fov: 48, curva: 'suave' },    // nos acercamos al latido
-  { t: 7.134,  pos: [-6, 4, 0.136],   mira: [0, 0, 0],          fov: 46, curva: 'suave' },    // ella es a quien se agarra
-  { t: 11.256, pos: [28, 11, 0.128],  mira: [0, -0.004, 0],     fov: 44, curva: 'lineal' },   // travelling lento con la nota larga
-  { t: 12.542, pos: [34, 12, 0.124],  mira: [0, -0.004, 0],     fov: 44, curva: 'lineal' },
-  { t: 15.157, pos: [48, 16, 0.114],  mira: [0.002, -0.003, 0], fov: 40, curva: 'suave' },    // primer plano del borde vivo (caja)
-  { t: 17.731, pos: [56, 18, 0.12],   mira: [0.002, -0.003, 0], fov: 40, curva: 'lineal' },   // sus dos notas largas
-  { t: 21.687, pos: [62, 24, 0.186],  mira: [0, 0, 0],          fov: 48, curva: 'suave' },    // la música respira: subimos y miramos
-  { t: 23.02,  pos: [44, 6, 0.164],   mira: [0, -0.006, 0],     fov: 46, curva: 'rapida', giro: -4 },  // se equivoca: la estrella se agita (caja)
-  { t: 27.95,  pos: [22, -6, 0.15],   mira: [0, -0.006, 0],     fov: 44, curva: 'suave', giro: 3 },    // la nota de 3 s: se acerca despacio
-  { t: 28.204, pos: [0, 2, 0.179],    mira: [0, -0.007, 0],     fov: 46, curva: 'corte', giro: 0 },    // promete: de frente, firme (en la caja)
-  { t: 31.25,  pos: [0, 4, 0.157],    mira: [0, -0.007, 0],     fov: 44, curva: 'lineal' },   // la nota sostenida; empieza el colapso
-  { t: 34.746, pos: [-6, 14, 0.172],  mira: [0, -0.007, 0],     fov: 46, curva: 'suave' },    // la envoltura suelta capas a compás
-  { t: 37.96,  pos: [4, 8, 0.114],    mira: [0, -0.004, 0],     fov: 42, curva: 'suave' },    // se apaga al callar la voz: entramos
-  { t: 38.606, pos: [0, 14, 0.2],     mira: [0, 0, 0],          fov: 46, curva: 'corte' },    // las dos estrellitas, en la caja
-  { t: 41.213, pos: [0, 10, 0.18],    mira: [0, 0, 0],          fov: 44, curva: 'lineal', giro: 6 },  // espiral: más cerca a cada vuelta (caja)
-  { t: 41.665, pos: [0, 9, 0.175],    mira: [0, 0, 0],          fov: 44, curva: 'lineal', giro: 6 },  // silencio: quieta sobre la mota
-  { t: 41.665, pos: [0, 9, 0.175],    mira: [0, 0, 0],          fov: 44, curva: 'lineal', giro: 6 },  // (el mismo plano otra vez: rompe la curva y el golpe no se nota antes)
-  { t: 42.46,  pos: [6, 12, 0.26],    mira: [0, 0, 0],          fov: 50, curva: 'rapida', giro: -2 }, // ¡pum! salimos despedidos hasta el salto de la voz
-  { t: 44.74,  pos: [16, 8, 0.42],    mira: [0, 0, 0],          fov: 56, curva: 'suave', giro: 0 },   // el grito sostenido: vuelan las chispas
-  { t: 47.07,  pos: [12, 5, 0.56],    mira: [0, 0.014, 0],      fov: 54, curva: 'suave' },    // la voz baja: las chispas vuelven
-  { t: 48.974, pos: [-4, 6, 0.78],    mira: [0, 0.021, 0],      fov: 54, curva: 'suave' },    // a golpes, el corazón se dibuja
-  { t: 52.06,  pos: [-10, 4, 0.92],   mira: [0, -0.04, 0],      fov: 60, curva: 'suave' },    // la promesa vuelve: el corazón entero
-  { t: 56.8,   pos: [-2, 1, 0.8],     mira: [0, -0.04, 0],      fov: 60, curva: 'lineal' },   // la nota más alta, sostenida: nos acercamos
-  { t: 58.26,  pos: [0, 0, 0.77],     mira: [0, -0.04, 0],      fov: 60, curva: 'suave' }     // la afirmación final, de frente y grande
+  { t: 0,      pos: [-56, 10, 0.207], mira: [0, 0, 0],          fov: 52, curva: 'suave' },    // la estrella sola, de lejos
+  { t: 2.116,  pos: [-54, 9, 0.198],  mira: [0, 0, 0],          fov: 51, curva: 'lineal' },   // primera caja = primer latido: le da su corazón
+  { t: 4.734,  pos: [-50, 7, 0.182],  mira: [0, 0, 0],          fov: 49, curva: 'lineal' },   // nos acercamos al latido
+  { t: 7.134,  pos: [-46, 6, 0.169],  mira: [0, -0.002, 0],     fov: 47, curva: 'lineal' },   // ella es a quien se agarra
+  { t: 11.256, pos: [-40, 8, 0.155],  mira: [0, -0.004, 0],     fov: 45, curva: 'lineal' },   // travelling lento con la nota larga
+  { t: 15.157, pos: [-34, 11, 0.144], mira: [0.002, -0.004, 0], fov: 43, curva: 'lineal' },   // el borde vivo, más cerca (caja)
+  { t: 17.731, pos: [-31, 13, 0.139], mira: [0.002, -0.004, 0], fov: 42, curva: 'lineal' },   // sus dos notas largas
+  { t: 21.687, pos: [-27, 15, 0.134], mira: [0, -0.005, 0],     fov: 42, curva: 'lineal' },   // la música respira: desde algo más arriba
+  { t: 23.02,  pos: [-25, 14, 0.132], mira: [0, -0.006, 0],     fov: 42, curva: 'lineal' },   // se equivoca: la estrella se agita (caja)
+  { t: 28.204, pos: [-19, 9, 0.127],  mira: [0, -0.007, 0],     fov: 42, curva: 'lineal' },   // promete: casi de frente, lo más cerca
+  { t: 31.25,  pos: [-16, 9, 0.127],  mira: [0, -0.007, 0],     fov: 42, curva: 'lineal' },   // la nota sostenida; empieza el colapso
+  { t: 34.746, pos: [-13, 10, 0.131], mira: [0, -0.006, 0],     fov: 43, curva: 'lineal' },   // la envoltura suelta capas a compás
+  { t: 37.96,  pos: [-11, 11, 0.14],  mira: [0, -0.004, 0],     fov: 44, curva: 'lineal' },   // se apaga al callar la voz
+  { t: 38.606, pos: [-10.5, 11, 0.148], mira: [0, -0.002, 0],   fov: 44, curva: 'lineal' },   // las dos estrellitas, en la caja
+  { t: 41.213, pos: [-9, 11, 0.168],  mira: [0, 0, 0],          fov: 45, curva: 'lineal' },   // la espiral (caja)
+  { t: 41.665, pos: [-8.6, 11, 0.172], mira: [0, 0, 0],         fov: 45, curva: 'lineal' },   // silencio: casi quieta sobre la mota
+  { t: 42.46,  pos: [-7, 10, 0.26],   mira: [0, 0, 0],          fov: 50, curva: 'rapida' },   // ¡pum! salimos despedidos hasta el salto de la voz
+  { t: 44.74,  pos: [-5, 8, 0.42],    mira: [0, 0.008, 0],      fov: 54, curva: 'lineal' },   // el grito sostenido: vuelan las chispas
+  { t: 47.07,  pos: [-3.5, 6, 0.56],  mira: [0, 0.014, 0],      fov: 55, curva: 'lineal' },   // la voz baja: las chispas vuelven
+  { t: 48.974, pos: [-2.5, 4, 0.72],  mira: [0, 0.006, 0],      fov: 57, curva: 'lineal' },   // a golpes, el corazón se dibuja
+  { t: 52.06,  pos: [-1.2, 2, 0.82],  mira: [0, -0.04, 0],      fov: 60, curva: 'lineal' },   // la promesa vuelve: el corazón entero
+  { t: 56.8,   pos: [-0.3, 1, 0.86],  mira: [0, -0.04, 0],      fov: 60, curva: 'lineal' },   // la nota más alta, sostenida
+  { t: 58.26,  pos: [0, 0, 0.88],     mira: [0, -0.04, 0],      fov: 60, curva: 'suave' }     // la afirmación final, de frente y grande
 ]);
 
 export const FRASE_SUPERNOVA = 'De toda esta luz, mi lugar favorito sigue siendo contigo.';
