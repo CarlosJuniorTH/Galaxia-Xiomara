@@ -23,8 +23,8 @@ const f = x => x.toFixed(4);
 // Color por temperatura (x: 0 borde interior → 1 exterior): blanco, oro, naranja, rosa y magenta oscuro. Doppler: el lado
 // que se acerca, más blanco y brillante (g > 1); el que se aleja, más rojo y apagado.
 const GLSL_DISCO = /* glsl */`
-  uniform float uR, uUnidad, uGiro, uEnc, uRevelar, uOla, uOlaR0, uOlaF, uBombo, uAvivar;
-  uniform vec3 uCamLocal;
+  uniform float uR, uUnidad, uGiro, uEnc, uRevelar, uOla, uOlaR0, uOlaF, uBombo, uAvivar, uOlaInc, uOlaFase;
+  uniform vec3 uCamLocal, uOlaC;
   vec3 temperatura(float x){
     x = clamp(x, 0.0, 1.0);
     vec3 c = mix(vec3(1.0, 0.95, 0.86), vec3(1.0, 0.72, 0.3), smoothstep(0.0, 0.14, x));
@@ -44,12 +44,18 @@ const GLSL_DISCO = /* glsl */`
   // disco de fuera y la onda que cae hacia el horizonte en cada «yours» (más estrecha y caliente cuanto más baja).
   // Sin pow() de negativos (puntos negros con MSAA): los cuadrados, a mano.
   float dormido(float r){ float rEnc = ${R_DENTRO.toFixed(2)} + 5.6 * uEnc; return smoothstep(rEnc - 0.22, rEnc + 0.22, r); }
-  float luzEscena(float r){
-    float d = dormido(r), rw = mix(uOlaR0, ${R_DENTRO.toFixed(2)}, uOla * uOla), x = (r - rw) / mix(0.4, 0.14, clamp(uOla, 0.0, 1.0));
-    float ola = (uOla >= 0.0 ? exp(-x * x) : 0.0) * uOlaF * (0.6 + 1.1 * clamp(uOla, 0.0, 1.0)) * (1.0 - smoothstep(0.95, 1.15, uOla));
+  // La onda en el radio rO (el del anillo de cada «yours», algo excéntrico: rO = r deformado por su inclinación).
+  float olaEn(float rO){
+    float rw = mix(uOlaR0, ${R_DENTRO.toFixed(2)}, uOla * uOla), x = (rO - rw) / mix(0.4, 0.14, clamp(uOla, 0.0, 1.0));
+    return (uOla >= 0.0 ? exp(-x * x) : 0.0) * uOlaF * (0.6 + 1.1 * clamp(uOla, 0.0, 1.0)) * (1.0 - smoothstep(0.95, 1.15, uOla));
+  }
+  float radioOla(float r, float a){ return r * (1.0 + uOlaInc * cos(a - uOlaFase)); }
+  float luzEscenaO(float r, float ola){
+    float d = dormido(r);
     // (El de dentro ya está a tope: el bombo y la onda avivan sobre todo el de fuera; no se quema sobre la sombra.)
     return mix(1.0, 0.13, d) * mix(1.0, uAvivar, smoothstep(1.6, 3.5, r)) * (1.0 + uBombo * smoothstep(1.8, 5.0, r)) * (1.0 + 2.4 * ola * (1.0 - d) * (0.45 + 0.55 * smoothstep(1.4, 2.2, r)));
   }
+  float luzEscena(float r){ return luzEscenaO(r, olaEn(r)); }
   // De canto se ve mucho más disco en la misma línea de visión: la luz se compensa con la inclinación (brillo de
   // superficie constante), así el disco no se quema en blanco ni enciende el resplandor sobre la sombra.
   float inclinacion(vec3 p){ return mix(0.42, 1.0, sqrt(abs(normalize(uCamLocal - p).y))); }`;
@@ -71,7 +77,8 @@ const GLSL_FINAL = /* glsl */`
 export function* construirTon618({ uScale, uPR, R, grupo }) {
   const planoDisco = new THREE.Group(); grupo.add(planoDisco);
   const comunes = { uScale, uPR, uMaximo: { value: 3 }, uSombra: { value: R }, uR: { value: R }, uUnidad: { value: R }, uGiro: { value: 0 },
-    uEnc: { value: 1 }, uRevelar: { value: 1 }, uOla: { value: -1 }, uOlaR0: { value: 6.8 }, uOlaF: { value: 0 }, uBombo: { value: 0 }, uAvivar: { value: 1 }, uFlujo: { value: 0 }, uCamLocal: { value: new THREE.Vector3(0, 0, 1e6) } };
+    uEnc: { value: 1 }, uRevelar: { value: 1 }, uOla: { value: -1 }, uOlaR0: { value: 6.8 }, uOlaF: { value: 0 }, uBombo: { value: 0 }, uAvivar: { value: 1 }, uFlujo: { value: 0 }, uCamLocal: { value: new THREE.Vector3(0, 0, 1e6) },
+    uOlaC: { value: new THREE.Vector3(1, 1, 1) }, uOlaInc: { value: 0 }, uOlaFase: { value: 0 } };
   const al = azar(618);
 
   // ── Sombra: negra, con el borde suavizado en su último píxel; escribe su profundidad (tapa lo que hay detrás). ──
@@ -95,8 +102,8 @@ export function* construirTon618({ uScale, uPR, R, grupo }) {
       tam[i] = 0.02 + al() * 0.024; fase[i] = al();
     }
     const { Q, S0, PSI, INCL, T1, T2 } = CAIDA;
-    var motasCaida = new THREE.Points(geometriaMotas({ aK: [k, 3], aOff: [off, 3], aTam: [tam, 1], aFase: [fase, 1], position: [new Float32Array(N_CAIDA * 3), 3] }, R * 18), materialMotas({ ...comunes, uT: { value: 0 }, uE: { value: 0 }, uCaida: { value: 0 }, uLatidoE: { value: 0 } }, /* glsl */`
-      attribute vec3 aK, aOff; uniform float uT, uE, uCaida, uLatidoE;
+    var motasCaida = new THREE.Points(geometriaMotas({ aK: [k, 3], aOff: [off, 3], aTam: [tam, 1], aFase: [fase, 1], position: [new Float32Array(N_CAIDA * 3), 3] }, R * 18), materialMotas({ ...comunes, uT: { value: 0 }, uE: { value: 0 }, uCaida: { value: 0 }, uLatidoE: { value: 0 }, uRecorre: { value: -9 }, uLucero: { value: 0 } }, /* glsl */`
+      attribute vec3 aK, aOff; uniform float uT, uE, uCaida, uLatidoE, uRecorre, uLucero;
       ${cabecera}
       float raiz3(float x){ return sign(x) * pow(abs(x), 1.0 / 3.0); }
       // caminoCaida (js/util/guionTon618.js): parábola de Barker hasta el pericentro; después, se enrosca en su anillo.
@@ -114,7 +121,8 @@ export function* construirTon618({ uScale, uPR, R, grupo }) {
         // Compacta hasta que la marea la estira; ya en hilo, un grosor fino que se ensancha al enroscarse. (Por detrás del
         // agujero, su imagen ya se ve estirada a lo ancho: la lente la alarga alrededor de la sombra.)
         float estira = clamp(uE / 0.3, 0.0, 1.0);
-        pl += aOff * (0.08 * (1.0 - estira) + 0.018 + 0.06 * smoothstep(0.0, 4.0, tau)) * vec3(1.0, mix(1.0, 0.25, 1.0 - plano), 1.0);
+        // (Lejos, al principio, la estrella algo más grande: uLucero.)
+        pl += aOff * ((0.08 + 0.05 * uLucero) * (1.0 - estira) + 0.018 + 0.06 * smoothstep(0.0, 4.0, tau)) * vec3(1.0, mix(1.0, 0.25, 1.0 - plano), 1.0);
         r = length(pl.xz);
         // Color: la estrella, blanca y cálida; al bajar se calienta (blanco azulado en el pericentro) y, ya en el disco,
         // el color de su anillo.
@@ -123,7 +131,11 @@ export function* construirTon618({ uScale, uPR, R, grupo }) {
         c = mix(c, vec3(0.9, 0.93, 1.0), (1.0 - smoothstep(2.6, 5.0, r)) * plano * 0.6);
         c = mix(c, temperatura((r - ${R_DENTRO.toFixed(2)}) / ${(R_FUERA - R_DENTRO).toFixed(2)}), 1.0 - plano);
         float th = atan(pl.z, pl.x), g = doppler(r, th, pl, c);
-        float nucleo = 1.0 + (1.0 - estira) * 0.8 * uLatidoE + 1.2 * smoothstep(0.75, 0.97, aK.x) * estira;   // la cabeza del hilo, nítida
+        float nucleo = 1.0 + (1.0 - estira) * (0.8 * uLatidoE + 1.6 * uLucero) + 1.2 * smoothstep(0.75, 0.97, aK.x) * estira;   // la cabeza del hilo, nítida
+        // A mitad del mantra un grumo recorre el hilo de la cola a la cabeza: da otra vuelta al disco en espiral.
+        float xg = (aK.x - uRecorre) / 0.07, grumo = uRecorre > -5.0 ? exp(-xg * xg) : 0.0;   // (sin pow de negativos)
+        nucleo += 2.6 * grumo;
+        c = mix(c, vec3(1.0, 0.95, 0.86), grumo * 0.6);
         float brillo = mix(0.2, 0.42, estira) * nucleo * (1.0 - 0.35 * abs(aK.x)) * mix(1.0, clamp(pow(g, 0.75), 0.35, 1.35) * inclinacion(pl * uR), 1.0 - plano)
           * mix(1.0, luzEscena(r), 0.4 * (1.0 - plano)) * smoothstep(1.02, 1.3, length(pl)) * uCaida;
         ${GLSL_FINAL}
@@ -175,7 +187,10 @@ export function* construirTon618({ uScale, uPR, R, grupo }) {
         col = mix(col, vec3(0.9, 0.93, 1.0), clamp(g - 1.0, 0.0, 1.0) * 0.4);
         col = mix(col, col * vec3(1.0, 0.55, 0.45), clamp(1.0 - g, 0.0, 1.0) * 0.6);
         float borde = smoothstep(${R_DENTRO.toFixed(2)}, ${(R_DENTRO + 0.06).toFixed(2)}, r) * pow(1.0 - smoothstep(2.6, ${(R_FUERA - 0.1).toFixed(2)}, r), 1.6);
-        float I = pow(${R_DENTRO.toFixed(2)} / r, 1.15) * (0.03 + 1.25 * h) * clamp(g * g * g, 0.2, 2.6) * luzEscena(r) * mix(1.0, 0.2, d) * borde * 0.75;
+        // La onda de cada «yours»: su anillo (algo excéntrico) y su tono propio sobre el fuego del disco.
+        float ola = olaEn(radioOla(r, a));
+        col = mix(col, col * uOlaC * 1.25, clamp(ola, 0.0, 1.0) * 0.7 * (1.0 - d));
+        float I = pow(${R_DENTRO.toFixed(2)} / r, 1.15) * (0.03 + 1.25 * h) * clamp(g * g * g, 0.2, 2.6) * luzEscenaO(r, ola) * mix(1.0, 0.2, d) * borde * 0.75;
         return col * I;
       }
       void main(){
@@ -276,10 +291,12 @@ export function* construirTon618({ uScale, uPR, R, grupo }) {
       comunes.uGiro.value = giro; comunes.uFlujo.value = flujo;
       comunes.uEnc.value = s.encendido; comunes.uRevelar.value = s.revelar; comunes.uBombo.value = s.bombo; comunes.uAvivar.value = s.avivar; superficie.material.uniforms.uLuzSup.value = 1 + 0.8 * s.cumbre;
       comunes.uOla.value = escena && w > 0 ? escena.guion.ola : -1; comunes.uOlaR0.value = escena ? escena.guion.olaR0 : 6.8; comunes.uOlaF.value = s.olaF;
+      comunes.uOlaC.value.set(s.olaCr, s.olaCg, s.olaCb); comunes.uOlaInc.value = s.olaInc; comunes.uOlaFase.value = escena ? escena.guion.olaFase : 0;
       // La estrella: su reloj es el de la canción; estiramiento de la marea (guionTon618.estiramiento).
       const tE = escena ? escena.guion.t : 0;
       mCaida.uT.value = tE; mCaida.uE.value = estiramiento(tE);
       mCaida.uCaida.value = s.caida; mCaida.uLatidoE.value = s.latidoEstrella; motasCaida.visible = s.caida > 0.001;
+      mCaida.uRecorre.value = escena && w > 0.5 ? escena.guion.recorre : -9; mCaida.uLucero.value = s.lucero;
       // Anillo de fotones: mira a la cámara; su lado brillante es el del disco que se acerca. Dormido, más tenue; en cada
       // «yours», más vivo (sigue siendo una línea de 1–1,5 px).
       anillo.lookAt(camera.position);

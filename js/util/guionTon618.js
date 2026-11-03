@@ -62,6 +62,12 @@ export const estrella = (t, o) => caminoCaida(t - MARCAS_TON618.tuyo, 4, o);
 //  revelar    luz de la imagen curvada (lo de detrás de la sombra): 0,5 dormido → 1 («harder to hide») → 1,25 → 1
 //  destello   el anillo de fotones en cada «yours» (una línea nítida más viva, sin halo)
 //  ola / olaR0 / olaF   onda de luz que cae desde el borde encendido hasta el horizonte (progreso 0 → 1, radio de salida, fuerza)
+//  olaCr / olaCg / olaCb / olaInc / olaFase   el tono de esa onda y su inclinación (el anillo que enciende no es un
+//             círculo perfecto: un poco excéntrico, con su lado más abierto en olaFase): cada «yours» enciende un anillo
+//             distinto (oro, rosa, blanco azulado, ámbar, magenta, oro pálido, blanco…), no el mismo efecto cinco veces
+//  recorre    el grumo que recorre el hilo de la estrella de la cola a la cabeza a mitad del mantra (−1,2 → 1,2; −9: no
+//             hay): la materia da otra vuelta al disco en espiral, en motas, antes de caer
+//  lucero     la estrella lejana al principio, más presente (más luz y algo más grande) hasta que la marea la estira
 //  bombo      el golpe del bombo en el disco de fuera
 //  caida      presencia de la estrella y su hilo (0 fuera de la escena; se funde en el disco al final)
 //  latidoEstrella   el destello de la estrella en «my heart»
@@ -69,6 +75,11 @@ export const estrella = (t, o) => caminoCaida(t - MARCAS_TON618.tuyo, 4, o);
 //  avivar     el disco que come brilla más (1 en reposo; sube con el mantra hasta la cumbre y vuelve a 1)
 //  flujo      velocidad con la que el disco cae en espiral hacia el centro (1 = la de siempre)
 //  calma      0 → 1 en el fundido
+// Tono [r, g, b], excentricidad y orientación (rad) del anillo que enciende cada «yours» (en el orden de TUYOS).
+const ANILLOS = [[1, 0.86, 0.6, 0.03, 0.4], [1, 0.74, 0.36, 0.05, 2.1], [1, 0.56, 0.62, 0.07, 4.0], [0.78, 0.88, 1, 0.09, 5.6], [1, 0.6, 0.26, 0.06, 1.2],
+  [1, 0.46, 0.74, 0.1, 3.1], [1, 0.9, 0.68, 0.05, 4.8], [1, 0.97, 0.92, 0.02, 0.0], [1, 0.8, 0.55, 0.04, 2.6]];
+// El grumo que recorre el hilo: desde este «yours» (el del medio del mantra), lo que dura en recorrerlo.
+export const RECORRE_TON618 = Object.freeze({ desde: 25.39, dura: 3.4 });
 const ENCENDIDO = [[MARCAS_TON618.tuyo, 0.26], [12.98, 0.34], [14.74, 0.42], [18.3, 0.52], [21.82, 0.62], [25.39, 0.72], [28.95, 0.84], [32.51, 1]];
 export function guionTon618(t, M = MARCAS_TON618, { reducido = false } = {}, o = {}) {
   const k = reducido ? 0.3 : 1;
@@ -78,17 +89,21 @@ export function guionTon618(t, M = MARCAS_TON618, { reducido = false } = {}, o =
   for (let i = 0; i < ENCENDIDO.length; i++) { const s = ENCENDIDO[i][0], v = ENCENDIDO[i][1]; enc += (v - enc) * muySuave(t, s - 0.15, s + 0.9); }
   o.encendido = Math.min(1, enc + (1 - enc) * muySuave(t, M.fundido, M.fundido + 2));
   o.revelar = 0.5 + 0.5 * suave(t, M.esconder, M.quizas) + 0.25 * suave(t, M.tuyo - 0.6, M.tuyo + 1) - 0.25 * suave(t, M.cumbre + 0.5, M.fundido + 2);
-  o.destello = 0; o.ola = -1; o.olaR0 = 6.8; o.olaF = 0;
+  o.destello = 0; o.ola = -1; o.olaR0 = 6.8; o.olaF = 0; o.olaCr = 1; o.olaCg = 1; o.olaCb = 1; o.olaInc = 0; o.olaFase = 0;
   for (let i = 0; i < TUYOS.length; i++) {
     const s = TUYOS[i]; if (t < s - 0.2) break;
     o.destello += golpe(t - s, i === 0 ? 0.9 : 0.55) * (i === 0 ? 1.4 : i === 7 ? 1.2 : 0.8) * k;
     // La onda cae desde el borde ya encendido (el de antes de este «yours») hasta el horizonte en 1,6 s, acelerando.
-    if (i >= 1) { const p = (t - s + 0.2) / 1.6; if (p <= 1.15) { o.ola = p; o.olaR0 = 1.3 + 5.5 * ENCENDIDO[Math.min(i - 1, ENCENDIDO.length - 1)][1]; o.olaF = (reducido ? 0.3 : 1) * (i === 7 ? 1.3 : 1); } }
+    if (i >= 1) { const p = (t - s + 0.2) / 1.6; if (p <= 1.15) { const a = ANILLOS[i]; o.ola = p; o.olaR0 = 1.3 + 5.5 * ENCENDIDO[Math.min(i - 1, ENCENDIDO.length - 1)][1]; o.olaF = (reducido ? 0.3 : 1) * (i === 7 ? 1.3 : 1);
+      o.olaCr = a[0]; o.olaCg = a[1]; o.olaCb = a[2]; o.olaInc = a[3]; o.olaFase = a[4]; } }
   }
   o.bombo = 0;
   for (const b of BOMBO) { if (b > t) break; o.bombo = golpe(t - b, 0.16); }
   o.bombo *= (t < M.tuyo ? 0.12 : 0.3) * k * (1 - suave(t, M.fundido, M.fundido + 2));
   o.latidoEstrella = golpe(t - M.corazon, 0.45) * k;
+  const r = (t - RECORRE_TON618.desde) / RECORRE_TON618.dura;
+  o.recorre = r >= 0 && r <= 1 ? -1.2 + 2.4 * r : -9;
+  o.lucero = 1 - suave(t, M.esconder, M.quizas + 1);
   o.caida = 1 - muySuave(t, 30, 36.5);
   o.cumbre = golpe(t - M.cumbre, 1.5) * k;
   o.avivar = 1 + 0.45 * suave(t, M.tuyo, M.mantra) + 0.35 * suave(t, 28.95, M.cumbre) - 0.8 * suave(t, M.cumbre + 0.5, M.fundido + 2);
@@ -96,7 +111,7 @@ export function guionTon618(t, M = MARCAS_TON618, { reducido = false } = {}, o =
   o.calma = muySuave(t, M.fundido, M.fundido + 2.3);
   return o;
 }
-export const REPOSO_TON618 = Object.freeze({ t: 0, encendido: 1, avivar: 1, cumbre: 0, revelar: 1, destello: 0, ola: -1, olaR0: 6.8, olaF: 0, bombo: 0, latidoEstrella: 0, caida: 0, flujo: 1, calma: 0 });
+export const REPOSO_TON618 = Object.freeze({ t: 0, encendido: 1, avivar: 1, cumbre: 0, revelar: 1, destello: 0, ola: -1, olaR0: 6.8, olaF: 0, olaCr: 1, olaCg: 1, olaCb: 1, olaInc: 0, olaFase: 0, recorre: -9, lucero: 0, bombo: 0, latidoEstrella: 0, caida: 0, flujo: 1, calma: 0 });
 
 // ── Pista de cámara (la lleva el director común, js/util/directorCamara.js): segundos del fragmento; pos = [azimut°,
 // elevación°, distancia] respecto al centro, en el marco del disco (azimut 0 = el lado de casa; elevación sobre el plano
