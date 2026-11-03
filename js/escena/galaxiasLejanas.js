@@ -98,15 +98,26 @@ export async function crearGalaxiasLejanas({ scene, uPR, uScale }) {
   }
   const porTipo = new Map();
   for (const f of fondo) { if (!porTipo.has(f.tipo)) porTipo.set(f.tipo, []); porTipo.get(f.tipo).push(f); }
-  for (const [tipo, lista] of porTipo) {
-    const im = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: tipos[tipo], transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }), lista.length);
-    lista.forEach((f, i) => {
-      o.position.copy(f.pos); o.scale.set(f.escala, f.escala, 1); o.rotation.set(0, 0, 0); o.lookAt(0, 0, 0);
-      o.rotateX(azar(-1.2, 1.2)); o.rotateY(azar(-0.6, 0.6)); o.rotateZ(Math.random() * Math.PI * 2); o.updateMatrix();
-      im.setMatrixAt(i, o.matrix); im.setColorAt(i, c.setScalar(f.op));
-    });
-    im.renderOrder = -2; im.frustumCulled = false; grupo.add(im);
+  // Una sola llamada de dibujo para las 130 (antes, un InstancedMesh por imagen: 9). El mismo MeshBasicMaterial; solo cambia
+  // de qué imagen lee cada instancia (aTipo; índices constantes, el tipo es el mismo en los cuatro vértices de cada una).
+  const usados = [...porTipo.keys()], mapasFondo = usados.map(t => tipos[t]);
+  const matFondo = new THREE.MeshBasicMaterial({ map: mapasFondo[0], transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+  matFondo.onBeforeCompile = sh => {
+    sh.uniforms.uMapas = { value: mapasFondo };
+    sh.vertexShader = 'attribute float aTipo; varying float vTipo;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vTipo = aTipo;');
+    sh.fragmentShader = `uniform sampler2D uMapas[${mapasFondo.length}]; varying float vTipo;\n` + sh.fragmentShader.replace('#include <map_fragment>',
+      `vec4 sampledDiffuseColor = vec4(0.0); ${mapasFondo.map((_, k) => `${k ? 'else ' : ''}if (vTipo < ${k}.5) sampledDiffuseColor = texture2D(uMapas[${k}], vMapUv);`).join(' ')} diffuseColor *= sampledDiffuseColor;`);
+  };
+  matFondo.customProgramCacheKey = () => 'fondoOptico' + mapasFondo.length;
+  const im = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), matFondo, fondo.length), tipoFondo = new Float32Array(fondo.length);
+  let i = 0;
+  for (const [tipo, lista] of porTipo) for (const f of lista) {
+    o.position.copy(f.pos); o.scale.set(f.escala, f.escala, 1); o.rotation.set(0, 0, 0); o.lookAt(0, 0, 0);
+    o.rotateX(azar(-1.2, 1.2)); o.rotateY(azar(-0.6, 0.6)); o.rotateZ(Math.random() * Math.PI * 2); o.updateMatrix();
+    im.setMatrixAt(i, o.matrix); im.setColorAt(i, c.setScalar(f.op)); tipoFondo[i++] = usados.indexOf(tipo);
   }
+  im.geometry.setAttribute('aTipo', new THREE.InstancedBufferAttribute(tipoFondo, 1));
+  im.renderOrder = -2; im.frustumCulled = false; grupo.add(im);
 
   universo.userData.universo = { galaxias: listaGalaxias, nebulosas: listaNubes, destinos: u.destinos, encuentros: ENCUENTROS };
   return {

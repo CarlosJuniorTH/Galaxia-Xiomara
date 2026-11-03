@@ -1,6 +1,6 @@
 // Campo de galaxias con posición, orientación y tamaño físico fijos (no miran a la cámara ni
 // cambian de tamaño). Dos niveles de detalle de la MISMA galaxia, en el mismo plano de su disco:
-//  · de lejos, su imagen (instancias por tipo): una galaxia no resuelta es su luz integrada; por
+//  · de lejos, su imagen (instancias, todas en una llamada): una galaxia no resuelta es su luz integrada; por
 //    debajo de ~1,5 px su brillo baja con el área que ocupa (no se apaga por un umbral);
 //  · de cerca, sus estrellas en 3D (brazos, barra, bulbo, espesor del disco).
 // El paso de una a otra es un fundido según su radio en pantalla (35–80 px), sin saltos. De
@@ -81,14 +81,19 @@ export function crearCampoGalaxias({ lista, texturas, descriptores, uPR }) {
   for (const d of Object.values(descriptores)) if (d) mapaGalaxia(d);
   const grupo = new THREE.Group();
   const uFocal = { value: 780 };
-  // ── De lejos: imágenes en el plano del disco, por tipo ──
-  const porTipo = new Map();
-  for (const g of lista) { const t = g.textura ?? g.tipo; if (!porTipo.has(t)) porTipo.set(t, []); porTipo.get(t).push(g); }
-  const m = new THREE.Matrix4(), esc = new THREE.Vector3(), color = new THREE.Color(), imagenes = [];
-  for (const [t, gs] of porTipo) {
-    const im = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({ uniforms: { uMapa: { value: texturas[t] }, uFocal },
-      vertexShader: `uniform float uFocal; attribute float aBeta; varying vec2 vUv; varying vec3 vC; varying float vF;
-        void main(){ vUv = uv; vC = vec3(1.0);
+  // ── De lejos: imágenes en el plano del disco: TODAS en una sola llamada de dibujo ──
+  // (Antes, un InstancedMesh por tipo: 11 llamadas siempre, desde cualquier sitio.) Cada instancia lleva su tipo (aTipo) y el
+  // sombreador elige su imagen entre las 11 con índices constantes (GLSL ES 3.0 no deja indexar muestreadores con una
+  // variable). El tipo es el mismo en los cuatro vértices de cada galaxia: todos los píxeles de un cuadrito 2×2 de la GPU
+  // toman la misma rama y la imagen se lee igual que antes (mismas coordenadas, mismos mipmaps).
+  const tiposUsados = [];
+  for (const g of lista) { const t = g.textura ?? g.tipo; if (!tiposUsados.includes(t)) tiposUsados.push(t); }
+  const mapas = tiposUsados.map(t => texturas[t]);
+  const leerMapa = mapas.map((_, k) => `${k ? 'else ' : ''}if (vTipo < ${k}.5) c = texture2D(uMapas[${k}], vUv).rgb;`).join(' ');
+  const m = new THREE.Matrix4(), esc = new THREE.Vector3(), color = new THREE.Color();
+  const im = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({ uniforms: { uMapas: { value: mapas }, uFocal },
+      vertexShader: `uniform float uFocal; attribute float aBeta, aTipo; varying vec2 vUv; varying vec3 vC; varying float vF, vTipo;
+        void main(){ vUv = uv; vC = vec3(1.0); vTipo = aTipo;
           #ifdef USE_INSTANCING_COLOR
           vC = instanceColor;
           #endif
@@ -109,12 +114,14 @@ export function crearCampoGalaxias({ lista, texturas, descriptores, uPR }) {
           // Por debajo de ~3 px la galaxia es una luz no resuelta (luzNoResuelta): la imagen entra al crecer.
           vF = smoothstep(1.5, 3.5, px) * max(0.0, 1.0 - estrellas) / coseno;
           gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0); }`,
-      fragmentShader: 'precision mediump float; uniform sampler2D uMapa; varying vec2 vUv; varying vec3 vC; varying float vF; void main(){ if (vF < 0.004) discard; gl_FragColor = vec4(texture2D(uMapa, vUv).rgb * vC * vF, 1.0); }',
-      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }), gs.length);
-    gs.forEach((g, i) => { m.compose(g.pos, g.quaternion, esc.set(g.radio * 2, g.radio * 2, g.radio * 2)); im.setMatrixAt(i, m); im.setColorAt(i, color.setScalar(g.op)); g.instancia = { im, i, textura: texturas[t] }; });
-    im.geometry.setAttribute('aBeta', new THREE.InstancedBufferAttribute(new Float32Array(gs.length).fill(0.45), 1));   // provisional hasta medir la textura
-    im.frustumCulled = false; im.renderOrder = -2; grupo.add(im); imagenes.push(im);
-  }
+      fragmentShader: `precision mediump float; uniform sampler2D uMapas[${mapas.length}]; varying vec2 vUv; varying vec3 vC; varying float vF, vTipo;
+        void main(){ if (vF < 0.004) discard; vec3 c = vec3(0.0); ${leerMapa} gl_FragColor = vec4(c * vC * vF, 1.0); }`,
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }), lista.length);
+  const tipoInstancia = new Float32Array(lista.length);
+  lista.forEach((g, i) => { const t = g.textura ?? g.tipo; tipoInstancia[i] = tiposUsados.indexOf(t); m.compose(g.pos, g.quaternion, esc.set(g.radio * 2, g.radio * 2, g.radio * 2)); im.setMatrixAt(i, m); im.setColorAt(i, color.setScalar(g.op)); g.instancia = { im, i, textura: texturas[t] }; });
+  im.geometry.setAttribute('aTipo', new THREE.InstancedBufferAttribute(tipoInstancia, 1));
+  im.geometry.setAttribute('aBeta', new THREE.InstancedBufferAttribute(new Float32Array(lista.length).fill(0.45), 1));   // provisional hasta medir la textura
+  im.frustumCulled = false; im.renderOrder = -2; grupo.add(im);
   // ── De cerca: estrellas en 3D de cada galaxia, generadas al acercarse (ver cabecera) ──
   const mat = new THREE.ShaderMaterial({ uniforms: { uFocal, uPR },
     vertexShader: `attribute vec3 aColor; attribute float aRadio, aTam; uniform float uFocal, uPR; varying vec3 vC; varying float vA;
@@ -269,7 +276,7 @@ export function crearCampoGalaxias({ lista, texturas, descriptores, uPR }) {
   // Diagnóstico (pruebas de luz): un grupo con SOLO esa galaxia, con los mismos materiales.
   function soloGalaxia(g) {
     const solo = new THREE.Group(), { im, i } = g.instancia;
-    const geo = im.geometry.clone(); geo.setAttribute('aBeta', new THREE.InstancedBufferAttribute(new Float32Array([im.geometry.attributes.aBeta.array[i]]), 1));
+    const geo = im.geometry.clone(); for (const a of ['aBeta', 'aTipo']) geo.setAttribute(a, new THREE.InstancedBufferAttribute(new Float32Array([im.geometry.attributes[a].array[i]]), 1));
     const una = new THREE.InstancedMesh(geo, im.material, 1); const mm = new THREE.Matrix4(); im.getMatrixAt(i, mm); una.setMatrixAt(0, mm); una.setColorAt(0, new THREE.Color().setScalar(g.op)); una.frustumCulled = false; una.userData.imagen = true;
     const propias = g.estrellas ?? crearEstrellas(g), pts = new THREE.Points(propias.geometry, mat); pts.position.copy(g.pos); pts.frustumCulled = false; pts.userData.estrellas = true;
     // Y su luz no resuelta (el mismo punto, con los mismos atributos).
