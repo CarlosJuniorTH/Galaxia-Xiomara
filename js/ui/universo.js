@@ -557,12 +557,16 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     finally { b.disabled = false; }
   }
   let ultimaFecha = partesEnZona().fecha;
+  const horaMostrada = new Map();
   function relojes() {
     const ahora = new Date();
+    // El DOM solo se toca si la hora mostrada cambió (cada 15 s se rehacía aunque fuera la misma: estilo y maquetación del HUD
+    // en pleno dibujo, sin nada nuevo que enseñar).
     for (const [id, nombre, zona] of [['hora-carlos', 'CAS · BARCELONA', ZONAS.carlos], ['hora-xiomara', 'XIO · BUENOS AIRES', ZONAS.xiomara]]) {
-      $(id).replaceChildren(el('small', '', nombre), document.createTextNode(relojZona(ahora, zona)));
+      const hora = relojZona(ahora, zona), nodo = $(id);
+      if (horaMostrada.get(id) !== hora) { horaMostrada.set(id, hora); nodo.replaceChildren(el('small', '', nombre), document.createTextNode(hora)); }
     }
-    if (panelActual === 'horarios') { $('reloj-panel-carlos').textContent = relojZona(ahora, ZONAS.carlos); $('reloj-panel-xiomara').textContent = relojZona(ahora, ZONAS.xiomara); }
+    if (panelActual === 'horarios') for (const [id, zona] of [['reloj-panel-carlos', ZONAS.carlos], ['reloj-panel-xiomara', ZONAS.xiomara]]) { const t = relojZona(ahora, zona), nodo = $(id); if (nodo.textContent !== t) nodo.textContent = t; }
     const hoy = partesEnZona(ahora).fecha;
     if (hoy !== ultimaFecha) { ultimaFecha = hoy; if (panelActual === 'capsulas') abrirPanel('capsulas'); }
   }
@@ -576,6 +580,8 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     avisos.poner(FRASES_COMETA[i], { tipo: 'cometa', vigente: fraseVigente });
   }
   let supernovaAntes = false;
+  // Oculta o muestra un aviso solo si cambia (cada 2 s se reescribía el atributo aunque fuera igual).
+  const poner = (nodo, oculto) => { if (nodo.hidden !== oculto) nodo.hidden = oculto; };
   // Cuando a la estrella le llega la hora, se viaja hasta ella desde donde se esté (también desde
   // el sistema solar) para verla estallar; si hay algo abierto, se espera un poco.
   setInterval(() => {
@@ -593,12 +599,12 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     // Unos segundos después de aparecer (en la primera pasada, ya terminado el vuelo de entrada).
     if (visible && !cometaAntes) setTimeout(() => { if (!escena.viajando) fraseCometa(); }, 9000);
     cometaAntes = visible;
-    $('cometa-aviso').hidden = !visible || actual === 'cometa' || tour || document.body.classList.contains('en-calma');
+    poner($('cometa-aviso'), !visible || actual === 'cometa' || tour || document.body.classList.contains('en-calma'));
     // Supernova: cuando una estrella estalla, se avisa y se puede viajar a verla.
     const supernova = escena.supernovaActiva;
     if (supernova && !supernovaAntes && !tour && !celebrando && document.body.classList.contains('dentro')) avisar('Ha nacido una nebulosa para nosotros. Su luz te está esperando. ♡');
     supernovaAntes = supernova;
-    $('supernova-aviso').hidden = !supernova || actual === 'supernova' || tour || contemplando || document.body.classList.contains('en-calma');
+    poner($('supernova-aviso'), !supernova || actual === 'supernova' || tour || contemplando || document.body.classList.contains('en-calma'));
   }, 2000);
   function tick(ahora) {
     const dt = Math.min(0.1, (ahora - ultimo) / 1000); ultimo = ahora;
