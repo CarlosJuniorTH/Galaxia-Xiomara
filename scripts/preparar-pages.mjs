@@ -2,6 +2,7 @@
 import { cp, mkdir, rm, writeFile, readdir, readFile, stat } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+import { transform } from 'esbuild';
 const destino = path.resolve('dist');
 await rm(destino, {recursive:true,force:true});
 await mkdir(destino,{recursive:true});
@@ -10,6 +11,26 @@ for (const carpeta of ['assets','css','js']) await cp(carpeta,path.join(destino,
 // El taller es una herramienta local, separada de la experiencia publicada.
 for (const archivo of ['js/editor.js','css/editor.css']) await rm(path.join(destino,archivo),{force:true});
 await writeFile(path.join(destino,'.nojekyll'),'');
+// Publicación más ligera: el JS y el CSS sin comentarios ni espacios (esbuild, archivo a archivo: mismas rutas y mismos
+// módulos, sin renombrar nada; three.module.min.js ya viene minificado). Los archivos que llaman a horneado()
+// (js/util/horno.js) se publican TAL CUAL: la clave del horno lleva la huella del texto de su función de cálculo y,
+// minificada, ninguna coincidiría con assets/horno/ (el iPhone lo recalcularía todo, ~20 s). Se comprueba abajo.
+{
+  const conHorno = t => /\bhorneado\(/.test(t.replace(/export function horneado\(/, ''));
+  let antes = 0, despues = 0; const intactos = [];
+  const recorrer = async dir => { for (const e of await readdir(dir, { withFileTypes: true })) { const r = path.join(dir, e.name); if (e.isDirectory()) await recorrer(r); else if (/\.(js|css)$/.test(e.name) && !e.name.endsWith('.min.js')) await uno(r); } };
+  const uno = async r => {
+    const texto = await readFile(r, 'utf8'), rel = path.relative(destino, r).split(path.sep).join('/');
+    antes += Buffer.byteLength(texto);
+    if (r.endsWith('.js') && conHorno(texto)) { intactos.push(rel); despues += Buffer.byteLength(texto); return; }
+    const { code } = await transform(texto, { loader: r.endsWith('.css') ? 'css' : 'js', minifyWhitespace: true, minifySyntax: true, legalComments: 'none', charset: 'utf8', sourcefile: rel });
+    await writeFile(r, code); despues += Buffer.byteLength(code);
+  };
+  for (const d of ['js', 'css', 'assets/vendor/three/addons']) await recorrer(path.join(destino, d));
+  // Los del horno, idénticos al original (si no, las claves no coincidirían).
+  for (const rel of intactos) if (!(await readFile(path.join(destino, rel))).equals(await readFile(rel))) throw new Error('El archivo del horno cambió al publicar: ' + rel);
+  console.log(`JS y CSS minificados: ${(antes / 1024).toFixed(0)} KB → ${(despues / 1024).toFixed(0)} KB (tal cual, por el horno: ${intactos.join(', ')}).`);
+}
 // three.js: la página usa el minificado (la versión oficial de la misma r160, ~45 % menos; mapa de importación de
 // index.html); el legible no se publica.
 await rm(path.join(destino, 'assets/vendor/three/three.module.js'), { force: true });

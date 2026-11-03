@@ -12,7 +12,7 @@ from email.utils import formatdate, parsedate_to_datetime
 from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
-ARCHIVOS = {'index.html', 'editor.html', 'manifest.webmanifest', 'favicon.ico', 'sw.js', 'app-shell.json'}
+ARCHIVOS = {'index.html', 'editor.html', 'manifest.webmanifest', 'favicon.ico', 'sw.js', 'app-shell.json', 'paquetes.json'}
 CARPETAS = {'assets', 'css', 'js'}
 # Comprimidos con gzip, como los sirve GitHub Pages (la web publicada): así los MB de las pruebas son los de verdad.
 COMPRIMIBLES = {'.js', '.mjs', '.css', '.json', '.svg', '.html', '.webmanifest', '.txt'}
@@ -36,7 +36,7 @@ class AppHandler(SimpleHTTPRequestHandler):
         # Todos los archivos públicos con sus bytes (como el paquetes.json de dist/): la precarga de la pantalla de carga
         # (js/util/precarga.js) descarga lo que la web pueda pedir después. Se calcula al vuelo: siempre al día.
         todos = {}
-        for nombre in sorted(ARCHIVOS - {'sw.js', 'app-shell.json', 'editor.html'}):
+        for nombre in sorted(ARCHIVOS - {'sw.js', 'app-shell.json', 'editor.html', 'paquetes.json'}):
             f = ROOT / nombre
             if f.is_file():
                 todos[nombre] = f.stat().st_size
@@ -149,7 +149,10 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--lan', action='store_true', help='Permitir pruebas desde la Wi-Fi local')
     parser.add_argument('--port', type=int, default=8080)
+    parser.add_argument('--raiz', help='Carpeta que se sirve (por defecto, el proyecto; p. ej. dist para probar lo publicado)')
     args = parser.parse_args()
+    if args.raiz:
+        ROOT = Path(args.raiz).resolve()
     host = '0.0.0.0' if args.lan else '127.0.0.1'
     handler = partial(AppHandler, directory=str(ROOT))
     with ThreadingHTTPServer((host, args.port), handler) as server:

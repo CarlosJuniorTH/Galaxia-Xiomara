@@ -16,5 +16,8 @@
   "dependencies": {
     "es-module-shims": "1.10.0",
     "three": "0.160.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
   }
 }
