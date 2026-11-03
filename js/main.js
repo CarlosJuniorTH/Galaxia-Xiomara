@@ -82,9 +82,14 @@ if (conDiagnostico && location.protocol === 'http:' && /^(192\.168\.|10\.)/.test
 // El porcentaje cuenta desde el principio: fuentes (0–3 %), módulos 3D (3–8 %) y el universo (8–100 %).
 entrada.progreso(0, 0.03);
 try {
+  // Los módulos 3D se piden ya, a la vez que las fuentes (antes esperaban a las fuentes: hasta 3,5 s en una conexión lenta).
+  // La portada ya está dibujada (crearEntrada) y la barra sigue en el mismo orden: fuentes, módulos, universo.
+  // (index.html precarga three.js y este módulo con modulepreload: llegan mientras se leen los de la portada.)
+  const modulos3D = import('./escena/index.js');
+  modulos3D.catch(() => {});   // (si falla, se ve en el await de abajo)
   await Promise.race([Promise.all([document.fonts.load("600 100px 'Quicksand'"), document.fonts.load("100px 'Great Vibes'"), document.fonts.load("100px 'Cormorant Garamond'")]), new Promise(r => setTimeout(r, 3500))]).catch(() => {});
   etapa = 'carga de módulos 3D'; entrada.progreso(0.03, 0.08);
-  const { crearEscena } = await import('./escena/index.js'); entrada.progreso(0.08);
+  const { crearEscena } = await modulos3D; entrada.progreso(0.08);
   etapa = 'creación de la escena 3D';
   // Un viaje corta lo que la cola esté bajando y la para hasta que aterriza (también el segundo tramo hacia el sistema solar).
   let mirandoVuelo = 0;
