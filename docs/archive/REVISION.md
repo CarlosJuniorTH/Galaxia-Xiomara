@@ -783,7 +783,7 @@ Una sola regla en vez de parches: **se ve lo que tiene tamaño para verse desde 
 - **El punto de fuga de las estelas no se escapa hacia un lado**: al corazón se llega en la recta hacia el punto que se mira.
 - **Entrada**: las nebulosas comparten 12 imágenes y 6 densidades 3D (antes, una por nebulosa: ~25 texturas y ~27 densidades). Las que no se ven desde casa y la galaxia lejana se generan en segundo plano. El botón de entrar está listo antes: 3,1 s frente a 4,3 s en PC y 3,7 s frente a 4,9 s en el móvil simulado. Además se compila todo durante la carga, también lo que aún no se ve (vecindario, la otra galaxia, la explosión), así que nada se compila por primera vez durante un viaje.
 
-> A partir de aquí la especificación vigente (escala, regiones, LOD, lente, nebulosas, supernova, viajes y encuadre) está en [ESCALA-Y-ESPACIO.md](ESCALA-Y-ESPACIO.md). Las cifras de pasadas anteriores (supernova a 200 000, ×28, Deneb a 66 000, galaxia hermana de radio 20 000) quedaron superadas: hoy la supernova está a 50 000 (×7), Deneb a 25 200 y la galaxia hermana tiene radio 4 000.
+> A partir de aquí la especificación vigente (escala, regiones, LOD, lente, nebulosas, supernova, viajes y encuadre) está en [ESCALA-Y-ESPACIO.md](../ESCALA-Y-ESPACIO.md). Las cifras de pasadas anteriores (supernova a 200 000, ×28, Deneb a 66 000, galaxia hermana de radio 20 000) quedaron superadas: hoy la supernova está a 50 000 (×7), Deneb a 25 200 y la galaxia hermana tiene radio 4 000.
 
 ## Trigésima séptima pasada: una regla espacial auditada (19 de octubre)
 

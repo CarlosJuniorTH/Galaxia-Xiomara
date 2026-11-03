@@ -105,7 +105,7 @@ npm run check
 
 `#debug` expone `window.__galaxia` para inspección manual durante desarrollo y métricas cada cuatro segundos en los atributos `data-fps`, `data-cpu-ms` y `data-texturas` del canvas. Los FPS usan tiempo real; el coste CPU no mide el tiempo GPU. `?comparar=original#debug` permite revisar el filtro de brillo anterior. No es necesario para usar el universo.
 
-Consulta `docs/REVISION.md` para el alcance de la validación y límites pendientes.
+Consulta `docs/archive/REVISION.md` (registro histórico) para el alcance de la validación y límites pendientes.
 
 
 ## Probar desde el móvil en la misma Wi-Fi

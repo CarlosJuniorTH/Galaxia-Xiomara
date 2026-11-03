@@ -1,6 +1,6 @@
 # Escala y espacio · especificación vigente
 
-Rama `feature/universo-vivo`. Este documento describe **cómo está construido el universo ahora**. La historia de cómo se llegó aquí está en [REVISION.md](REVISION.md) y en los registros fechados (`VIAJES-Y-ESCALA-COSMICA.md`, `MOVIMIENTO-Y-SUPERNOVA-REVISION.md`, `SUPERNOVA-DE-AMOR.md`). Si un registro antiguo contradice este documento, este documento manda.
+Rama `feature/universo-vivo`. Este documento describe **cómo está construido el universo ahora**. La historia de cómo se llegó aquí está en [archive/REVISION.md](archive/REVISION.md) y en los registros fechados de `docs/archive/` (`VIAJES-Y-ESCALA-COSMICA.md`, `MOVIMIENTO-Y-SUPERNOVA-REVISION.md`, `SUPERNOVA-DE-AMOR.md`). Si un registro antiguo contradice este documento, este documento manda.
 
 Fuente de los números: `js/data/escalaCosmica.js` (tabla y regiones) y `cosmos.medidas()` (cada límite sale de la geometría de su pieza con las escalas de todos sus padres). `tests/navegador/geometria.mjs` contrasta `medidas()` con los vértices transformados al mundo y la tabla con `medidas()`; el alcance de todas las pruebas está en la sección 12.
 
@@ -364,7 +364,7 @@ Comprobado:
 
 ## 11. Rendimiento
 
-Ver la sección «Rendimiento» de `REVISION.md` (trigésima octava pasada) para las cifras con sus condiciones. **La prueba sostenida de 15–20 minutos en un teléfono físico está pendiente**: no hay acceso a un móvil en este entorno, y una emulación o una captura a 60 FPS no la sustituye.
+Ver la sección «Rendimiento» de `docs/archive/REVISION.md` (trigésima octava pasada) para las cifras con sus condiciones. **La prueba sostenida de 15–20 minutos en un teléfono físico está pendiente**: no hay acceso a un móvil en este entorno, y una emulación o una captura a 60 FPS no la sustituye.
 
 ## 12. Alcance de las pruebas
 

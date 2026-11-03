@@ -1,6 +1,6 @@
 # Movimiento y supernova · revisión del 19 de octubre de 2026
 
-> Registro histórico. La especificación vigente de escala, espacio, niveles de detalle y viajes está en [ESCALA-Y-ESPACIO.md](ESCALA-Y-ESPACIO.md).
+> Registro histórico. La especificación vigente de escala, espacio, niveles de detalle y viajes está en [ESCALA-Y-ESPACIO.md](../ESCALA-Y-ESPACIO.md).
 
 Rama `feature/universo-vivo`. Cambios locales, sin fusionar ni publicar. Se conservan el fondo, las nebulosas y las galaxias aprobadas.
 

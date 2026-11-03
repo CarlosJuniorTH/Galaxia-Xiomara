@@ -1,6 +1,6 @@
 # Viajes, continuidad y profundidad · 19 de octubre de 2026
 
-> Registro histórico. La especificación vigente de escala, espacio, niveles de detalle y viajes está en [ESCALA-Y-ESPACIO.md](ESCALA-Y-ESPACIO.md).
+> Registro histórico. La especificación vigente de escala, espacio, niveles de detalle y viajes está en [ESCALA-Y-ESPACIO.md](../ESCALA-Y-ESPACIO.md).
 
 > La revisión posterior de movimiento y progenitora está en [MOVIMIENTO-Y-SUPERNOVA-REVISION.md](MOVIMIENTO-Y-SUPERNOVA-REVISION.md). El destello blanco de viaje descrito en este registro se sustituyó por estelas continuas que responden al gesto.
 
