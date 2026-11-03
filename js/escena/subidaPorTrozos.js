@@ -12,8 +12,9 @@ import { cuandoLibre } from '../util/descargas.js';
 const FILAS_BYTES = 1 << 20;   // ~1 MB por franja
 
 // Para la carga (cuando la cola de momentos libres está parada hasta la intro): cada franja en su propia tarea, cediendo
-// antes el hilo un momento (sin la espera mínima de setTimeout: scheduler.yield o un mensaje).
-export const cederUnMomento = () => globalThis.scheduler?.yield ? globalThis.scheduler.yield() : new Promise(r => { const c = new MessageChannel(); c.port1.onmessage = () => { c.port1.close(); r(); }; c.port2.postMessage(0); });
+// antes el hilo con setTimeout. (No con scheduler.yield ni con mensajes: encadenados, Chrome no deja dibujar la portada
+// entre ellos —medido en el recorrido del móvil: un cuadro cada ~117 ms en la carga tras el toque—.)
+export const cederUnMomento = () => new Promise(r => setTimeout(r, 0));
 export const enSeguida = async fn => { await cederUnMomento(); return fn(); };
 
 function parametros(gl, renderer, objetivo, t, niveles) {

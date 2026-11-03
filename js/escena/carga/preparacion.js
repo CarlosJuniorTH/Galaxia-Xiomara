@@ -6,11 +6,10 @@
 import * as THREE from 'three';
 import { cederUnMomento } from '../subidaPorTrozos.js';
 
-// Ceder el hilo un momento (que la portada dibuje su cuadro) sin la espera mínima de setTimeout (4 ms tras unos cuantos
-// encadenados: con cientos de trozos, segundos de carga perdidos): subidaPorTrozos.js.
+// Ceder el hilo un momento (que la portada dibuje su cuadro): subidaPorTrozos.js.
 const cederYa = cederUnMomento;
-// Trozos de ~8 ms: con la CPU ×4 (un móvil de gama media) ninguna tarea pasa de ~50 ms y la portada no da tirones.
-const TROZO_MS = 8;
+// Trozos de ~10 ms: con la CPU ×4 (un móvil de gama media) ninguna tarea pasa de ~50 ms y la portada no da tirones.
+const TROZO_MS = 10;
 const crearCesion = () => { let t0 = performance.now(); return async () => { if (performance.now() - t0 > TROZO_MS) { await cederYa(); t0 = performance.now(); } }; };
 const dibujable = o => o.isMesh || o.isLine || o.isPoints || o.isSprite;
 // La esfera envolvente de una geometría como BufferGeometry.computeBoundingSphere (la misma caja, el mismo centro y el
@@ -32,7 +31,7 @@ export async function esferaPorTrozos(g, cederSiToca) {
 
 export function crearPreparacion({ renderer, camera, scene, nucleo, solar, telarana, composer, obtenerCapaVolumen }) {
   const anisotropiaMax = renderer.capabilities.getMaxAnisotropy();
-  // A trozos de ~8 ms, cediendo entre ellos: subirlas todas de golpe congelaba la animación de la portada ~1 s en un móvil.
+  // A trozos de ~10 ms, cediendo entre ellos: subirlas todas de golpe congelaba la animación de la portada ~1 s en un móvil.
   const subirTexturas = async (escena = scene) => {
     const lista = new Set(); escena.traverse(o => { for (const m of [].concat(o.material || [])) for (const v of [...Object.values(m), ...Object.values(m.uniforms || {}).map(u => u.value)]) if (v?.isTexture) lista.add(v); });
     const cederSiToca = crearCesion();
@@ -58,7 +57,7 @@ export function crearPreparacion({ renderer, camera, scene, nucleo, solar, telar
   // Se dibujan una vez con un material mínimo (three.js sube todos los atributos de cada geometría que dibuja).
   const escenaSubida = new THREE.Scene(), rtSubida = new THREE.WebGLRenderTarget(4, 4, { depthBuffer: false });
   escenaSubida.overrideMaterial = new THREE.PointsMaterial({ size: 1 }); escenaSubida.matrixWorldAutoUpdate = false;
-  // Una pieza cada vez, cediendo cada ~8 ms (todas de golpe eran ~150 ms seguidos con la CPU ×4 en plena carga). No hace
+  // Una pieza cada vez, cediendo cada ~10 ms (todas de golpe eran ~150 ms seguidos con la CPU ×4 en plena carga). No hace
   // falta esperarla: si algo se dibuja antes, three sube lo que falte por su cuenta.
   const subirGeometrias = async objetos => {
     const piezas = []; for (const raiz of objetos) raiz.traverse(o => { if (dibujable(o)) piezas.push(o); });
