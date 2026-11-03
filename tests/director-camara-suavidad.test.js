@@ -85,3 +85,48 @@ test('en las pistas reales la cámara va lenta y suave (velocidad y aceleración
     assert.ok(mediana < 6, `${id}: llega a sus planos a tiempo con la música (mediana ${mediana.toFixed(1)}°)`);
   }
 });
+
+// Toda la pista de cada clip, no tramo a tramo (Carlos: «siempre en un solo sentido; nada de girar a un lado y luego a
+// otro»): el azimut va en un solo sentido de principio a fin (también a través de los cortes) y la distancia no va y
+// viene: como mucho un acercamiento y un alejamiento (un solo cambio de sentido; los cambios de menos de un 3 % no cuentan).
+const { CAMARA_DENEB_VERTICAL } = await import('../js/util/escenaDeneb.js');
+const PISTAS_CLIP = [...GIGANTES.map(id => [id, pistaDe(id)]), ['deneb (móvil vertical)', normalizarPista(CAMARA_DENEB_VERTICAL)]];
+function recorrerPista(P, paso = 0.05) {
+  const fin = P.at(-1).t, az = [], d = [];
+  for (let t = 0; t <= fin + 1e-9; t += paso) { const m = muestrearCamara(P, t); az.push(m.pos[0]); d.push(m.pos[2]); }
+  // (Cada plano también, por si un corte cae entre dos muestras.)
+  return { az, d };
+}
+// Cambios de sentido de una serie con histéresis relativa (en logaritmo): se cuenta un cambio cuando, desde el extremo
+// del tramo en curso, la serie vuelve atrás más del umbral.
+function cambiosDeSentido(serie, umbral) {
+  let sentido = 0, ref = serie[0], cambios = 0;
+  for (const v of serie) {
+    if (sentido === 0) { if (v > ref + umbral) { sentido = 1; ref = v; } else if (v < ref - umbral) { sentido = -1; ref = v; } }
+    else if (sentido > 0) { if (v > ref) ref = v; else if (v < ref - umbral) { cambios++; sentido = -1; ref = v; } }
+    else if (v < ref) ref = v; else if (v > ref + umbral) { cambios++; sentido = 1; ref = v; }
+  }
+  return cambios;
+}
+
+test('en toda la pista de cada clip el azimut va en un solo sentido (sin vaivenes), también entre planos y cortes', () => {
+  for (const [id, P] of PISTAS_CLIP) {
+    if (!P) continue;
+    const { az } = recorrerPista(P);
+    const sube = az.some((v, i) => i && v - az[i - 1] > 1e-6), baja = az.some((v, i) => i && v - az[i - 1] < -1e-6);
+    assert.ok(!(sube && baja), `${id}: el azimut va y vuelve (${P.map(p => p.pos[0]).join(' → ')})`);
+    const planos = P.map(p => p.pos[0]);
+    assert.ok(planos.every((v, i) => !i || (sube ? v >= planos[i - 1] : v <= planos[i - 1])), `${id}: los planos, en un solo sentido`);
+  }
+});
+
+test('la distancia de cada clip no va y viene: como mucho un acercamiento y un alejamiento', () => {
+  for (const [id, P] of PISTAS_CLIP) {
+    if (!P) continue;
+    const { d } = recorrerPista(P), n = cambiosDeSentido(d.map(Math.log), Math.log(1.03));
+    assert.ok(n <= 1, `${id}: la distancia cambia de sentido ${n} veces (${P.map(p => p.pos[2]).join(' → ')})`);
+  }
+  // La prueba de la prueba: un vaivén se detecta y un 2 % de temblor no.
+  assert.equal(cambiosDeSentido([1, 0.9, 1.2, 1.0, 1.3].map(Math.log), Math.log(1.03)), 3);
+  assert.equal(cambiosDeSentido([1, 0.9, 0.91, 0.89, 1.3].map(Math.log), Math.log(1.03)), 1);
+});
