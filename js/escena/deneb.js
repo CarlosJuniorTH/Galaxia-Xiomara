@@ -242,7 +242,7 @@ export function crearDeneb({ uScale, uPR }) {
   const nebulosa = crearNebulosaDeneb({ radio: R, radioEstrella: RE }); marco.add(nebulosa.grupo);
 
   // ── Viento, corona y espículas ──
-  const NV = 3000, NE = 2400, NBU = 1800, NB = NV + NE + NBU, dirV = new Float32Array(NB * 3), datoV = new Float32Array(NB * 4);
+  const NV = 3000, NE = 2400, NBU = 4200, NB = NV + NE + NBU, dirV = new Float32Array(NB * 3), datoV = new Float32Array(NB * 4);
   const serpentinas = Array.from({ length: 9 }, () => { const f = azar() * Math.PI * 2, y = (azar() - 0.5) * 0.7; const q = Math.sqrt(1 - y * y); return [Math.cos(f) * q, y, Math.sin(f) * q]; });
   const v = new THREE.Vector3();
   for (let k = 0; k < NB; k++) {
@@ -272,7 +272,7 @@ export function crearDeneb({ uScale, uPR }) {
         float rb = R * (1.06 + ${(R_BURBUJA / RE - 1.06).toFixed(3)} * q) * (1.0 + dedos + (aDato.x - 0.5) * (0.025 + 0.06 * q));
         vec4 mvb = modelViewMatrix * vec4(position * rb, 1.0); gl_Position = projectionMatrix * mvb;
         vC = mix(vec3(0.82, 0.9, 1.0), vec3(1.0, 0.66, 0.8), q * (0.4 + 0.6 * aDato.w));
-        vA = uBurbujaLuz * (1.5 - 0.6 * q) * tamMota(1.6 + aDato.w * 1.2, mvb, 2.6) * fueraSilueta(mvb, R * uEstrella) * uExpo;
+        vA = uBurbujaLuz * (2.6 - 0.9 * q) * tamMota(3.2 + aDato.w * 2.2, mvb, 3.0) * fueraSilueta(mvb, R * uEstrella) * uExpo;
         return;
       }
       float espicula = aDato.z, edad = fract(aDato.x + uViento * aDato.y * (espicula > 0.5 ? 6.0 : 1.0)), r, a;
