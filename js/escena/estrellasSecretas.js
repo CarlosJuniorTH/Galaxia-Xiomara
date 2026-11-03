@@ -8,6 +8,70 @@ import { vista } from '../util/vista.js';
 const ROSA = new THREE.Color(0xff6fb5);
 const DORADO = new THREE.Color(0xffd27a);
 
+// Constelación de cada año: al cumplirlo (el 15/12/2026 nace la estrella 12), las trece luces de ese capítulo (el comienzo
+// y sus doce meses, o del mes 12 al 24…) se unen con trazos finos en una vuelta cerrada alrededor del centro de la galaxia,
+// por el ángulo de cada una (como una órbita: «nuestra primera vuelta al Sol»). En orden de meses los trazos cruzaban el
+// corazón y el nombre (las estrellas van saltando por el ángulo de oro). Devuelve los pares de índices (vacío antes del año).
+const ANGULO = i => i * 2.39996323;   // el mismo de su posición, abajo
+export function trazosConstelacion(cantidad) {
+  const pares = [];
+  for (let anio = 0; 12 * (anio + 1) < cantidad; anio++) {
+    const vuelta = Array.from({ length: 13 }, (_, k) => 12 * anio + k).sort((a, b) => (ANGULO(a) % (2 * Math.PI)) - (ANGULO(b) % (2 * Math.PI)));
+    vuelta.forEach((i, k) => pares.push([i, vuelta[(k + 1) % 13]]));
+  }
+  return pares;
+}
+const CLAVE_CONSTELACION = 'xiomara:constelacion-vista';   // ya se vio aparecer: las siguientes veces, fundido corto
+// Trazo nítido en píxeles de pantalla (WebGL no deja líneas de más de 1 px de dispositivo: en un móvil de 3× serían
+// casi invisibles): cada tramo es un rectángulo de ANCHO px CSS con el borde suavizado medio píxel, sin halo. Los tramos
+// se acortan HUECO px por cada lado para no pisar el dibujo de las estrellas.
+const ANCHO = 1.25, HUECO = 9;
+function crearConstelacion(estrellas, pares, uPR) {
+  const n = pares.length, a = new Float32Array(n * 12), b = new Float32Array(n * 12), lado = new Float32Array(n * 4), fin = new Float32Array(n * 4), indices = [];
+  for (let k = 0; k < n; k++) { lado.set([-1, 1, -1, 1], k * 4); fin.set([0, 0, 1, 1], k * 4); const v = k * 4; indices.push(v, v + 2, v + 1, v + 1, v + 2, v + 3); }   // (en sentido antihorario en pantalla: si no, se descartan como caras traseras)
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(a, 3).setUsage(THREE.DynamicDrawUsage));   // (extremo A)
+  geo.setAttribute('aB', new THREE.BufferAttribute(b, 3).setUsage(THREE.DynamicDrawUsage));
+  geo.setAttribute('aLado', new THREE.BufferAttribute(lado, 1)); geo.setAttribute('aFin', new THREE.BufferAttribute(fin, 1));
+  geo.setIndex(indices);
+  const uOpacidad = { value: 0 }, uRes = { value: new THREE.Vector2(1, 1) };
+  const malla = new THREE.Mesh(geo, new THREE.ShaderMaterial({
+    uniforms: { uOpacidad, uRes, uPR, uColor: { value: new THREE.Color(0xffe2ad) } },
+    vertexShader: /* glsl */`attribute vec3 aB; attribute float aLado, aFin; uniform vec2 uRes; uniform float uPR; varying float vD; varying float vMedio;
+      void main(){
+        vec4 pa = projectionMatrix * modelViewMatrix * vec4(position, 1.0), pb = projectionMatrix * modelViewMatrix * vec4(aB, 1.0);
+        if (pa.w < 1.0 || pb.w < 1.0) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }   // un extremo detrás de la cámara
+        vec2 sa = pa.xy / pa.w * uRes * 0.5, sb = pb.xy / pb.w * uRes * 0.5, d = sb - sa; float largo = length(d);
+        vec2 u = d / max(largo, 1e-3), nn = vec2(-u.y, u.x); float hueco = min(${HUECO.toFixed(1)} * uPR, largo * 0.45);
+        vec4 p = aFin > 0.5 ? pb : pa; vec2 s = (aFin > 0.5 ? sb - u * hueco : sa + u * hueco);
+        vMedio = ${(ANCHO / 2).toFixed(3)} * uPR; vD = aLado * (vMedio + 1.0);
+        s += nn * vD; gl_Position = vec4(s / (uRes * 0.5) * p.w, p.z, p.w);
+      }`,
+    fragmentShader: /* glsl */`uniform float uOpacidad; uniform vec3 uColor; varying float vD; varying float vMedio;
+      void main(){ float borde = clamp(vMedio + 0.5 - abs(vD), 0.0, 1.0); gl_FragColor = vec4(uColor * uOpacidad * borde, 1.0); }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+  }));
+  malla.frustumCulled = false; malla.visible = false;
+  let yaVista = false; try { yaVista = localStorage.getItem(CLAVE_CONSTELACION) === '1'; } catch {}
+  let aparicion = 0; const duracion = yaVista ? 2.5 : 9;   // la primera vez, un fundido lento
+  return {
+    malla,
+    // El fundido avanza solo con ella ya en casa, con el vuelo terminado (no se gasta tras la tarjeta de entrada ni en un viaje).
+    actualizar(dt, apagar, mirando) {
+      if (mirando) aparicion = Math.min(1, aparicion + dt / duracion);
+      if (aparicion >= 1 && !yaVista) { yaVista = true; try { localStorage.setItem(CLAVE_CONSTELACION, '1'); } catch {} }
+      const e = aparicion * aparicion * (3 - 2 * aparicion);
+      uOpacidad.value = 0.5 * e * (1 - apagar);
+      malla.visible = uOpacidad.value > 0.004;
+      if (!malla.visible) return;
+      for (let k = 0; k < n; k++) for (let v = 0; v < 4; v++) { estrellas[pares[k][0]].position.toArray(a, (k * 4 + v) * 3); estrellas[pares[k][1]].position.toArray(b, (k * 4 + v) * 3); }
+      geo.attributes.position.needsUpdate = geo.attributes.aB.needsUpdate = true;
+      uRes.value.set(vista.ancho * uPR.value, vista.alto * uPR.value);
+    },
+    destruir() { geo.dispose(); malla.material.dispose(); }
+  };
+}
+
 export function crearEstrellasSecretas({ scene, camera, uScale, uPR }, cantidad, encontradas) {
   const grupo = new THREE.Group();
   scene.add(grupo);
@@ -17,7 +81,7 @@ export function crearEstrellasSecretas({ scene, camera, uScale, uPR }, cantidad,
   const estrellas = [];
 
   for (let i = 0; i < cantidad; i++) {
-    const ang = i * 2.39996323;
+    const ang = ANGULO(i);
     const r = 350 + ((i * 173) % 640); // estable entre visitas, también al añadir meses
     const s = new THREE.Sprite(new THREE.SpriteMaterial({
       map: tex, color: ROSA.clone(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
@@ -50,6 +114,9 @@ export function crearEstrellasSecretas({ scene, camera, uScale, uPR }, cantidad,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
   }));
   luces.frustumCulled = false; grupo.add(luces);
+  // Antes del primer año no existe (ni memoria ni órdenes de dibujo); después, una sola orden para todos sus trazos.
+  const pares = trazosConstelacion(cantidad), constelacion = pares.length ? crearConstelacion(estrellas, pares, uPR) : null;
+  if (constelacion) grupo.add(constelacion.malla);
   const copiarLuces = () => {
     for (let i = 0; i < n; i++) { const s = estrellas[i]; posLuz[i * 3] = s.position.x; posLuz[i * 3 + 1] = s.position.y; posLuz[i * 3 + 2] = s.position.z; colLuz[i * 3] = s.material.color.r; colLuz[i * 3 + 1] = s.material.color.g; colLuz[i * 3 + 2] = s.material.color.b; tamLuz[i] = s.scale.y; }
     for (const a of Object.values(geoLuz.attributes)) a.needsUpdate = true;
@@ -86,7 +153,7 @@ export function crearEstrellasSecretas({ scene, camera, uScale, uPR }, cantidad,
   let zonaT = 0, zonaIndice = -1;
   const centroZona = i => estrellas[i].position.clone();
   return {
-    destruir() { scene.remove(grupo); for (const s of estrellas) s.material.dispose(); geoLuz.dispose(); luces.material.dispose(); tex.dispose(); },
+    destruir() { scene.remove(grupo); for (const s of estrellas) s.material.dispose(); geoLuz.dispose(); luces.material.dispose(); tex.dispose(); constelacion?.destruir(); },
     posicion(i) { return estrellas[i]?.getWorldPosition(new THREE.Vector3()); },
     senalar(i) { pista = i; pistaT = 22; },
     iluminarZona(i) { if (!estrellas[i]) return null; zonaIndice = i; zonaT = 20; return centroZona(i); },
@@ -113,7 +180,7 @@ export function crearEstrellasSecretas({ scene, camera, uScale, uPR }, cantidad,
       s.material.color.copy(DORADO);
       s.userData.destello = 1;
     },
-    actualizar(t, dt) {
+    actualizar(t, dt, ctx) {
       pistaT = Math.max(0, pistaT - dt); // posiciones estables para encontrar y revisitar
       zonaT = Math.max(0, zonaT - dt);
       reunion += (reunionMeta - reunion) * Math.min(1, dt * (reunionMeta ? 0.22 : 0.6));
@@ -156,6 +223,8 @@ export function crearEstrellasSecretas({ scene, camera, uScale, uPR }, cantidad,
         s.scale.set(visible, visible, 1);
       }
       copiarLuces();
+      // (Mientras las estrellas vuelan a formar el corazón de la celebración, sus trazos se apagan: ese momento tiene su hilo.)
+      if (constelacion) constelacion.actualizar(dt, Math.min(1, reunion * 3), ctx?.tiempoDentro != null && ctx.destino === 'hogar');
     }
   };
 }

@@ -58,3 +58,15 @@ test('la validación acepta la lista antigua y el objeto por meses, y rechaza fo
   const vuelta = validarContenido(JSON.parse(JSON.stringify(contenidoActual())));
   assert.deepEqual(cartaDelMes(vuelta.config.cartaMeses, 11), CONFIG.cartaMeses[11]);
 });
+test('la constelación del primer año solo existe desde el 15/12/2026 y une sus trece luces en una vuelta', async () => {
+  const { trazosConstelacion } = await import('../js/escena/estrellasSecretas.js');
+  assert.deepEqual(trazosConstelacion(estrellasDisponibles(INICIO, ar('2026-12-14', '23:59')).length), []);
+  const pares = trazosConstelacion(estrellasDisponibles(INICIO, ar('2026-12-15', '00:00')).length);
+  // Una vuelta cerrada: trece trazos y cada una de las trece luces con dos vecinas.
+  assert.equal(pares.length, 13);
+  const grados = new Map(); for (const [x, y] of pares) for (const i of [x, y]) grados.set(i, (grados.get(i) || 0) + 1);
+  assert.deepEqual([...grados.keys()].sort((a, b) => a - b), Array.from({ length: 13 }, (_, i) => i));
+  assert.ok([...grados.values()].every(g => g === 2));
+  assert.equal(trazosConstelacion(24).length, 13);   // el segundo año se dibuja al cumplirse (25 estrellas)
+  assert.equal(trazosConstelacion(25).length, 26);
+});

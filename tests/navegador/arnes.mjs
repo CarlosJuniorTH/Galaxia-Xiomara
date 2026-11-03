@@ -74,8 +74,11 @@ async function lanzarUna(perfil, { musica }) {
 // La intro (toque, carga y videoclip de 32 s con su canción) es obligatoria para quien abre la página; las pruebas la
 // omiten con ?sinIntro (solo vale con #debug) salvo con toque: true, que pulsa «Toca para empezar ♡» (con canción: musica
 // o ?pruebaAudio) y espera a que el clip termine y salga la tarjeta (en la marca «tarjeta» de la canción).
-export async function abrir(base, perfil = 'pc', { espera = 2500, calidad = 'alta', consulta = '', toque = false, musica = false } = {}) {
+// fecha (opcional, una cadena ISO con su zona): la página cree que es ese momento y el reloj sigue corriendo desde ahí
+// (solo se desplaza Date; los temporizadores y la animación van como siempre).
+export async function abrir(base, perfil = 'pc', { espera = 2500, calidad = 'alta', consulta = '', toque = false, musica = false, fecha = null } = {}) {
   const { navegador, pagina, errores } = await lanzar(perfil, { musica });
+  if (fecha) await fijarFecha(pagina, fecha);
   await pagina.goto(`${base}/?calidad=${calidad}${consulta}${toque ? '' : '&sinIntro'}#debug`);
   if (toque) { await pagina.waitForSelector('#toque:not([hidden])', { timeout: 30000 }); await pagina.click('#toque'); await pagina.waitForFunction(() => document.getElementById('entrada').classList.contains('formado'), null, { timeout: 150000 }); await pagina.waitForTimeout(1400); }
   await pagina.waitForFunction(() => document.getElementById('btn-entrar')?.classList.contains('preparado'), null, { timeout: 90000 });
@@ -83,6 +86,14 @@ export async function abrir(base, perfil = 'pc', { espera = 2500, calidad = 'alt
   await pagina.waitForFunction(() => window.__galaxia && !window.__galaxia.escena.viajando && document.body.classList.contains('dentro'), null, { timeout: 40000 });
   await pagina.waitForTimeout(espera);
   return { navegador, pagina, errores };
+}
+
+export async function fijarFecha(pagina, fecha) {
+  await pagina.addInitScript(objetivo => {
+    const D = Date, desfase = objetivo - D.now();
+    class Simulada extends D { constructor(...a) { super(...(a.length ? a : [D.now() + desfase])); } static now() { return D.now() + desfase; } }
+    window.Date = Simulada;
+  }, Date.parse(fecha));
 }
 
 // Utilidades comunes para los casos.
