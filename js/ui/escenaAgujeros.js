@@ -9,7 +9,7 @@ import { relojMaestro } from '../util/relojMaestro.js';
 
 const GIGANTES = new Set(['ton618', 'sagitario']);
 
-export function crearEscenaAgujeros({ escena, banda = null, alRepetir = () => {} }) {
+export function crearEscenaAgujeros({ escena, banda = null, alRepetir = () => {}, alCompletar = () => {} }) {
   const reducido = matchMedia('(prefers-reduced-motion: reduce)').matches;
   let actual = null, ancla = null, vista = null, viajando = true, destino = null;
 
@@ -32,7 +32,8 @@ export function crearEscenaAgujeros({ escena, banda = null, alRepetir = () => {}
     actual = id; ancla = null;
     escena.escenaAgujero(id, { reloj, reducido });
     enCurso(id);
-    clearTimeout(vista); vista = setTimeout(function mirar() { if (actual === id && reloj() < finEscena(id)) vista = setTimeout(mirar, 250); else enCurso(null); }, 250);
+    // (Si llega al final sin salir de ella, se ha visto entera: alCompletar deja a la vista su carta.)
+    clearTimeout(vista); vista = setTimeout(function mirar() { if (actual === id && reloj() < finEscena(id)) vista = setTimeout(mirar, 250); else { enCurso(null); if (actual === id) alCompletar(id); } }, 250);
   }
   function cancelar() {
     if (!actual) return;

@@ -55,6 +55,35 @@ export const FARO_CUASAR = {
     ]
   }
 };
+// TON 618 y Sagitario A*: su carta «faro», a la vista cuando su videoclip termina entero (la misma mecánica del cuásar).
+// BORRADOR: revisar Carlos
+export const FARO_TON618 = {
+  accionCarta: 'Hay algo para ti',
+  carta: {
+    id: 'faro-ton618', ceja: 'DESDE EL BORDE DE LA SOMBRA', titulo: 'Todo cae hacia ti',
+    texto: [
+      'Mi Xio:',
+      'Dicen que nada consigue escapar de un gigante así. Yo, contigo, nunca lo he intentado.',
+      'Caer hacia ti no me da miedo: es la forma más tranquila que conozco de llegar a casa. Despacio, sin prisa, como la luz que gira a su alrededor.',
+      'Si alguna vez te preguntas hacia dónde va todo lo que siento, vuelve aquí y míralo: siempre hacia ti.',
+      'Con amor,\nCarlos.'
+    ]
+  }
+};
+// BORRADOR: revisar Carlos
+export const FARO_SAGITARIO = {
+  accionCarta: 'Hay algo para ti',
+  carta: {
+    id: 'faro-sagitario', ceja: 'EN EL CORAZÓN DE LA VÍA LÁCTEA', titulo: 'Una vuelta más, contigo',
+    texto: [
+      'Mi Xio:',
+      'Aquí las estrellas giran alrededor del mismo centro una vez y otra, y ninguna parece cansarse de volver.',
+      'Así me siento contigo. Pasan los días, cambian las cosas, y yo siempre encuentro el camino de vuelta hacia ti.',
+      'Si me lo preguntaras mil veces, mil veces te diría que sí.',
+      'Con amor,\nCarlos.'
+    ]
+  }
+};
 export const CARTAS = [
   { id: 'extranar', icono: '☾', titulo: 'Para cuando me extrañes', subtitulo: 'Un abrazo que cruza el océano', texto: ['Mi Xio:', 'Ojalá pudiera acortar la distancia con la misma facilidad con la que acerco estos planetas. Mientras tanto, te dejo estas palabras para que tengas un lugar al que volver.', 'Imagíname cerquita, escuchándote sin mirar el reloj. No hace falta que hoy tengas algo extraordinario que contarme: también quiero tus días normales.', 'Te quiero aquí, en mi vida, incluso cuando aquí nos queda lejos.'] },
   { id: 'dificil', icono: '✧', titulo: 'Para un día difícil', subtitulo: 'Hoy puedes ir despacito', texto: ['Mi amor:', 'No tienes que poder con todo hoy. Puedes parar, respirar y dejar algunas cosas para mañana.', 'No necesito que sonrías para quererte. También quiero acompañarte cuando estés cansada, cuando no sepas qué decir o cuando lo único que necesites sea un poco de compañía.', 'Este universo no te pide nada. Yo te mando un abrazo y me quedo contigo.'] },

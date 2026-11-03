@@ -1,5 +1,5 @@
 import { crearPresentacionViajes } from './presentacionViajes.js';
-import { DESTINOS, LEJANOS, lugaresDeZona, CARTAS, CAPSULAS, SUENOS, SORPRESAS, ZONAS, CONSTELACIONES, FRASES_COMETA } from '../data/universo.js';
+import { DESTINOS, LEJANOS, lugaresDeZona, CARTAS, CAPSULAS, SUENOS, SORPRESAS, ZONAS, CONSTELACIONES, FRASES_COMETA, FARO_CUASAR, FARO_TON618, FARO_SAGITARIO } from '../data/universo.js';
 import { relojZona, fechaBonita, capsulaAbierta, partesEnZona } from '../util/tiempo.js';
 import { momentoDelDia } from '../util/sol.js';
 import { crearCieloNoche } from './cieloNoche.js';
@@ -31,11 +31,13 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
   const supernovaAmor = crearSupernovaAmor({ escena, progreso, musica, banda, alDescubrir: () => { if (actual === 'supernova') situar('supernova'); } });
   // El púlsar y Deneb: su escena al llegar (sincronizable con su audio: relojDe).
   const escenasGigantes = crearEscenasGigantes({ escena, banda });
-  // La carta del cuásar: a la vista cuando su videoclip se ha visto entero.
-  const faro = crearFaroCuasar({ escena, progreso, mostrarLectura, alCambiar: () => { if (actual === 'cuasar') situar('cuasar'); } });
+  // La carta «faro» del cuásar, TON 618 y Sagitario A*: a la vista cuando su videoclip se ha visto entero.
+  const faros = Object.fromEntries([['cuasar', FARO_CUASAR], ['ton618', FARO_TON618], ['sagitario', FARO_SAGITARIO]].map(([id, datos]) =>
+    [id, crearFaroCuasar({ escena, progreso, mostrarLectura, id, datos, alCambiar: () => { if (actual === id) situar(id); } })]));
+  const faro = faros.cuasar;
   // TON 618 y Sagitario A*: su escena empieza sola al llegar, con su canción (js/ui/escenaAgujeros.js).
-  const escenaAgujeros = crearEscenaAgujeros({ escena, banda, alRepetir: (id, segundos) => escenaEnCurso(id, segundos) });
-  $('faro-carta').addEventListener('click', () => { if (actual === 'cuasar' && !escena.viajando) faro.abrirCarta(); });
+  const escenaAgujeros = crearEscenaAgujeros({ escena, banda, alRepetir: (id, segundos) => escenaEnCurso(id, segundos), alCompletar: id => { faros[id]?.marcarVisto(); if (actual === id) situar(id); } });
+  $('faro-carta').addEventListener('click', () => { if (faros[actual] && !escena.viajando) faros[actual].abrirCarta(); });
   // Tras el estallido, el corazón es un lugar más: misma tarjeta, y su gesto es volver a sentirlo.
   const corazonNacido = () => supernovaAmor.descubierta || escena.estadoSupernova === 'remanente';
   // Escena de un gigante (supernova, cuásar, púlsar, Deneb, TON 618, Sagitario A*): cada visita la dispara con su canción
@@ -173,8 +175,8 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     $('lugar-accion').replaceChildren(document.createTextNode(textoAccion), el('span', '', '↗'));
     // En el corazón ya nacido: contemplarlo aislado o con el universo, y guardar su postal.
     $('lugar-extra').hidden = !nacido;
-    $('lugar-faro').hidden = !(id === 'cuasar' && faro.cartaLista);
-    $('faro-carta').textContent = faro.accionCarta;
+    $('lugar-faro').hidden = !faros[id]?.cartaLista;
+    if (faros[id]) $('faro-carta').textContent = faros[id].accionCarta;
     aislarCorazon(nacido && document.body.dataset.supernovaAislada === 'true');   // el botón refleja el estado real
     if (id !== 'constelacion' && !celebrando && !tour) $('tejido').hidden = true;
     if ($('lugar-volver').hidden && id !== 'hogar') volverVisibleDesde = performance.now();
