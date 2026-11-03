@@ -237,3 +237,27 @@ el móvil dibujaba la escena a DPR 1,78 y salía algo blando (nitidez 0,7 en cas
   clip o se gira), `ritmo` y `saltos` de la música (0), `cortes` (0) y `desfase` audio↔imagen (< 20 ms).
 - Desde la consola (Safari con el Mac, Chrome con `chrome://inspect`): `__medidor.resumen()` da el JSON por tramo; con
   `__medidor.tramo('nombre')` se marcan tramos a mano.
+
+## Noviembre: fluidez por cuadro (rama mejoras/noviembre)
+
+Llamadas de dibujo (`tests/navegador/llamadas.mjs`, que ahora guarda el desglose del PEOR cuadro con la rama, la geometría
+y la textura de cada llamada), móvil en casa: mediana 121 → 100, pico 210 → 158 (objetivo < 150: aún no). Barrido de 108
+orientaciones desde casa: máx. 219 → 158, mediana 166 → 122. El pico lo daban, a la vez en pantalla, los soles del cielo
+(3-4 sprites cada uno), las galaxias del catálogo y del fondo óptico (11 + 9 instancias por textura), los brillos de los
+lugares (cápsulas, calma, constelación) y los tramos de la telaraña. Lo que queda en el pico: puntos de los lugares
+(cápsulas, jardín, calma: ~26), piezas de los gigantes que se ven desde casa y la cadena del resplandor (10 pasadas).
+
+- `js/escena/loteSprites.js`: sprites aditivos de la misma imagen en un dibujo instanciado con el programa de
+  THREE.SpriteMaterial (A/B en la misma página: PSNR ≈ 60 dB, como dos capturas seguidas).
+- Catálogo y fondo óptico: una llamada cada uno (el tipo de cada instancia elige su imagen).
+- Envolturas de las hipergigantes instanciadas; marco del reloj de arena en una malla; rayo de cápsula cerrada sin dibujar.
+- Telaraña: huecos pequeños entre tramos visibles se dibujan para unir tramos (≤ 5 % de puntos de más, fuera de la vista).
+- Trabajo por cuadro: el dibujo principal ya no recorre las matrices (salvo con casa inclinada); el recorte no lee
+  `innerHeight` (forzaba estilo y maquetación); capaVolumen marca sus capas solo al entrar/salir algo que se marca;
+  maravillas y mundos sin recorridos ni `getWorldPosition` repetidos; relojes y avisos del HUD solo si cambian.
+- Batería: con la cámara quieta, el gas calcula rayos 1 de cada 2 cuadros y la capa de galaxias de la telaraña como mucho
+  30 Hz (ninguno si nada cambia); en el PC, 120 Hz solo con gesto, inercia o vuelo.
+- «Empezar»: solo se acotó la pausa de animaciones (antes `#entrada.oculto *`). Probado y retirado: adelantar la capa de la
+  portada y retrasar su retirada hasta el fin del vuelo (cientos de rótulos con will-change vivos: el compositor tardaba más).
+  El cuadro del clic sigue siendo largo: ~20 ms de JavaScript del clic (main.js, alEntrar) + estilo/maquetación del panel
+  del viaje + el primer cuadro del vuelo, con la CPU ×4.
