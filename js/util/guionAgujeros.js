@@ -8,8 +8,8 @@ import { MARCAS_TON618, REPOSO_TON618, DURACION_TON618, CAMARA_TON618 } from './
 // su pista de cámara. El de Sagitario A*, en js/util/guionSagitario.js.
 export { guionTon618 } from './guionTon618.js';
 import { reposoSagitario, MARCAS_SAGITARIO, CAMARA_SAGITARIO } from './guionSagitario.js';
+import { suaveEn as suave } from './suave.js';
 
-const suave = (x, a, b) => { const k = Math.min(1, Math.max(0, (x - a) / (b - a))); return k * k * (3 - 2 * k); };
 const muySuave = (x, a, b) => { const k = Math.min(1, Math.max(0, (x - a) / (b - a))); return k * k * k * (k * (k * 6 - 15) + 10); };
 // Inicio del último compás (o tiempo, o ciclo de «periodo» segundos) de la rejilla del pulso antes de t.
 const rejilla = (t, periodo, inicio = 0) => Math.floor((t - inicio) / periodo) * periodo + inicio;

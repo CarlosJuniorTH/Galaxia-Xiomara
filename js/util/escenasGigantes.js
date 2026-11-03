@@ -68,6 +68,7 @@ export const ESCENA_CUASAR = {
 
 // Deneb: su escena, su pista de cámara y su estado viven aparte (js/util/escenaDeneb.js).
 import { ESCENA_DENEB, estadoDeneb } from './escenaDeneb.js';
+import { suaveEnSeguro as suave } from './suave.js';
 export { ESCENA_DENEB, estadoDeneb };
 
 export const ESCENAS_GIGANTES = { pulsar: ESCENA_PULSAR, cuasar: ESCENA_CUASAR, deneb: ESCENA_DENEB };
@@ -79,7 +80,6 @@ export function escalarEscena(config, duracion) {
 }
 
 const sat = x => x < 0 ? 0 : x > 1 ? 1 : x;
-const suave = (s, a, b) => { const x = sat((s - a) / Math.max(1e-6, b - a)); return x * x * (3 - 2 * x); };
 const mezcla = (a, b, k) => a + (b - a) * k;
 
 // Latido de corazón en cada pulso de la canción («pum-pum»: el golpe y otro menor 0,17 s después), con el primer

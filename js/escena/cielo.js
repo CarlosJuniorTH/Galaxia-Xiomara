@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { generador } from '../util/azarSemilla.js';
 import { horneado } from '../util/horno.js';
+import { suave } from '../util/suave.js';
 
 // Ruido de valor 3D (el mismo hash que usaba el sombreador del cielo) para modular la densidad.
 const fr = x => x - Math.floor(x);
@@ -28,7 +29,6 @@ function fbm(x, y, z, octavas = 4) {
   for (let o = 0; o < octavas; o++) { s += a * ruido(x, y, z); x = x * 2.03 + 1.7; y = y * 2.03 + 9.2; z = z * 2.03 + 3.1; a *= 0.5; }
   return s;
 }
-const suave = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 // Las dos capas de antes: celdas de 1/1400 y 1/700 de radián; en cada una, una estrella con la probabilidad de entonces.
 const CAPAS = [

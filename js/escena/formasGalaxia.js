@@ -6,7 +6,8 @@
 // barra, el anillo, los núcleos, las colas de marea y los carriles de polvo están en el mismo sitio,
 // con la misma orientación y silueta, en los dos niveles de detalle.
 // Sin dependencias de navegador: se ejecuta en el Web Worker de texturas y en el hilo principal.
-export const paso = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+import { suave as paso } from '../util/suave.js';
+export { paso };
 export const mixto = (a, b, t) => a + (b - a) * t;
 
 // Parámetros de forma de las galaxias especiales (una sola fuente).

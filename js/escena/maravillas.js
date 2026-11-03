@@ -17,12 +17,12 @@ import { texturasLigeras } from '../util/dispositivo.js';
 import { LLEGADA_GIGANTE, LEJANIA } from '../data/escalaCosmica.js';
 import { crearNube } from './nube.js';
 import { horneado } from '../util/horno.js';
+import { suave } from '../util/suave.js';
 
 function azarSemilla(semilla) { let s = semilla >>> 0; return () => { s = (s + 0x6d2b79f5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 const gauss = a => { let u = 0; while (!u) u = a(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * a()); };
 const C = h => new THREE.Color(h);
 const K = 1;   // el mismo contenido en móvil y en PC
-const suave = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 // ── Ruido 2D para pintar las imágenes de las nebulosas ──
 function ruido2D(semilla) {

@@ -4,10 +4,10 @@
 import { crearRuido, pintarEsfera } from '../util/ruido.js';
 import { componentesGalaxia, componentesAndromeda, componentesColision } from './formasGalaxia.js';
 import { CONTINENTES, MARES, ESPANA, ARGENTINA } from './geografia.js';
+import { suave as paso, suave as THREE_smooth } from '../util/suave.js';
 
 const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
 const mezcla = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
-const paso = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const pixeles = (ancho, alto, fn) => { const d = new Uint8ClampedArray(ancho * alto * 4); pintarEsfera(d, ancho, alto, fn); return d; };
 
 // Gigante gaseoso: bandas suaves deformadas por turbulencia fbm y algunas tormentas.
@@ -348,7 +348,6 @@ function galaxia({ tipo = 'espiral', semilla = 1, ancho: W, alto: H, brazos = 2,
   }
   return d;
 }
-const THREE_smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 // Nebulosa de emisión como en las fotografías del Hubble: gas con forma irregular y retorcida
 // (doble deformación del ruido), filamentos y frentes de ionización brillantes donde el gas

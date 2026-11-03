@@ -12,8 +12,8 @@
 // (la voz repite el estribillo y Whisper se pierde) los arranques de la voz con librosa: cada frase empieza en un compás
 // impar (17,79 · 21,34 · 24,89 · 28,44 · 32,02 · 35,55), el «be» cae en ese compás y el «yours» medio segundo después,
 // sostenido. 136 BPM: tiempo 0,4445 s, compás 1,778 s; el bombo en el 1 y en el contratiempo del 3–4; la caja en el 3.
+import { suaveEn as suave } from './suave.js';
 
-const suave = (x, a, b) => { const k = Math.min(1, Math.max(0, (x - a) / (b - a))); return k * k * (3 - 2 * k); };
 const muySuave = (x, a, b) => { const k = Math.min(1, Math.max(0, (x - a) / (b - a))); return k * k * k * (k * (k * 6 - 15) + 10); };
 // Un golpe de luz: sube en 25 ms y se apaga en «caida» segundos (sin parpadeo de un cuadro).
 const golpe = (dt, caida) => dt < 0 ? 0 : (1 - Math.exp(-dt / 0.025)) * Math.exp(-dt / caida);

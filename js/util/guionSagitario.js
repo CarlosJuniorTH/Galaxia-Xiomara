@@ -23,9 +23,9 @@
 // luminoso: la imagen del EHT entera, como si el cielo dijera que sí. (Distinto de TON 618: allí un disco ardiente de
 // canto, como en Interstellar; aquí un anillo visto de frente, la imagen real de nuestro agujero.)
 // Los «sí» van en el ataque de la sílaba medido sobre la voz aislada (Demucs): 18,82 · 23,52 · 28,46 · 33,15 s.
+import { suaveEn as suave } from './suave.js';
 
 const sat = x => x < 0 ? 0 : x > 1 ? 1 : x;
-const suave = (x, a, b) => { const k = sat((x - a) / (b - a)); return k * k * (3 - 2 * k); };
 const muySuave = (x, a, b) => { const k = sat((x - a) / (b - a)); return k * k * k * (k * (k * 6 - 15) + 10); };
 // Un destello: sube en «sube» segundos y se apaga en «caida» (sin parpadeo de un cuadro).
 const golpe = (dt, caida, sube = 0.04) => dt < 0 ? 0 : (1 - Math.exp(-dt / sube)) * Math.exp(-dt / caida);

@@ -28,6 +28,7 @@
 // (una vuelta por compás: el haz vuelve a la cámara en cada compás); con el grave, 1/2 (cada dos pulsos). Como todo está
 // en pulsos de la canción, los haces cruzan los mismos puntos en los mismos golpes en cada visita (la pista de cámara
 // los usa: planos en los que el haz atraviesa la cámara justo en el golpe).
+import { suaveEnSeguro as suave } from './suave.js';
 
 const P = 60 / 107.7;
 export const ESCENA_PULSAR = {
@@ -74,7 +75,6 @@ function latido(s, { pulso, compas = 4, desfase = 0 }, e, reducido) {
 }
 
 const sat = x => x < 0 ? 0 : x > 1 ? 1 : x;
-const suave = (s, a, b) => { const x = sat((s - a) / Math.max(1e-6, b - a)); return x * x * (3 - 2 * x); };
 
 // Vueltas por pulso en el pulso (fraccionario) b.
 export function ritmoGiro(b, { giros }) {
