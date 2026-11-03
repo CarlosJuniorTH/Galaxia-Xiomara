@@ -35,6 +35,25 @@ export function estrellasDisponibles(fechaInicio, ahora = new Date()) {
     return { id: fecha, mes: i, capitulo: Math.floor(i / 12) + 1 };
   });
 }
+// Cuenta atrás a cada aniversario: el último mes antes de cumplir un año (del mes 11 al 12, del 23 al 24…) y el mismo día.
+// Fecha en Argentina, como el contador y las estrellas (el día cambia a su medianoche). Días de calendario, no de 24 h.
+// Devuelve null fuera de ese mes; { dias, anios, texto } dentro (dias = 0 el día del aniversario).
+const VUELTAS = ['primera', 'segunda', 'tercera', 'cuarta', 'quinta', 'sexta', 'séptima', 'octava', 'novena', 'décima'];
+const diaUTC = f => Date.UTC(+f.slice(0, 4), +f.slice(5, 7) - 1, +f.slice(8, 10));
+export function cuentaAtrasAniversario(fechaInicio, ahora = new Date()) {
+  const meses = mesesCumplidos(fechaInicio, ahora);
+  const hoy = meses > 0 && meses % 12 === 0, vispera = meses % 12 === 11;
+  if (!hoy && !vispera) return null;
+  const anios = hoy ? meses / 12 : (meses + 1) / 12;
+  const meta = estrellasDisponibles(fechaInicio, ahora).at(-1).id;     // el último aniversario mensual (hoy o hace < 1 mes)
+  if (hoy && partesEnZona(ahora).fecha !== meta) return null;          // el aniversario ya pasó: solo cuenta su día
+  const vuelta = `nuestra ${VUELTAS[anios - 1] || `${anios}.ª`} vuelta al Sol`;
+  if (hoy) return { dias: 0, anios, texto: `Hoy, ${anios === 1 ? 'un año' : `${anios} años`} · ${vuelta}` };
+  const [a, m, d] = fechaInicio.split('-').map(Number), f = new Date(Date.UTC(a, m - 1 + meses + 1, 1));
+  const dia = Math.min(d, new Date(Date.UTC(f.getUTCFullYear(), f.getUTCMonth() + 1, 0)).getUTCDate());
+  const dias = Math.round((Date.UTC(f.getUTCFullYear(), f.getUTCMonth(), dia) - diaUTC(partesEnZona(ahora).fecha)) / 864e5);
+  return { dias, anios, texto: `Falta${dias === 1 ? '' : 'n'} ${dias} ${dias === 1 ? 'día' : 'días'} para ${vuelta}` };
+}
 export function capsulaAbierta(fecha, ahora = new Date()) { return partesEnZona(ahora).fecha >= fecha; }
 export function saludoMomento(ahora = new Date()) {
   const { hora } = partesEnZona(ahora);

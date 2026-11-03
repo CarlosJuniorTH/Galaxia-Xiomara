@@ -367,6 +367,9 @@ body.en-ruta #supernova-aviso{display:none;}
 .marca-universo,.horarios,#contador,#contador-sub{text-shadow:0 1px 2px #08020fe6,0 0 6px #08020fb3}
 #titulo-texto{text-shadow:0 1px 2px #08020fe6,0 0 8px #08020fb3,0 0 28px #be5c9d55}
 #contador-sub,.marca-universo small,.horarios small{text-shadow:0 1px 2px #08020f,0 0 6px #08020fe6,0 0 12px #08020fb3}
+/* Cuenta atrás al año (js/ui/contador.js): el último mes la línea de abajo se vuelve dorada; el día del aniversario, más clara. */
+#contador-sub.cuenta-atras{color:#e9cf9c;font-weight:500;}
+#contador-sub.aniversario{color:#fbe6bd;}
 
 /* Escena de un gigante en curso (js/ui/universo.js, escenaEnCurso): no se puede saltar; los controles para irse a otro
    sitio se apagan con un fundido y vuelven con otro al terminar. */
