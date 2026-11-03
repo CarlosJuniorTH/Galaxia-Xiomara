@@ -22,10 +22,14 @@
 //            adentro, hacia ella, y la estrella responde.
 //   20,57    el DROP (el bombo, en la rejilla de 0,5716 s): Deneb en toda su gloria; con cada golpe una onda de luz
 //            recorre la nube desde ella hacia fuera y lanza eyecciones de motas.
-//   32,00    segunda mitad: todo igual de vivo, más cálido.
+//   32,00    segunda mitad, más cálida: la estrella suelta una BURBUJA de viento estelar, una capa fina de motas que se
+//            desprende de su superficie y se expande por la cavidad, frenando a medida que barre el gas (3 compases);
+//            al chocar con la pared (≈38,3) la enciende: el borde y los pilares se iluminan de dentro afuera.
 //   41,15    se serena hasta su estado de siempre (el mismo que al llegar: sin saltos).
 // El estado es el mismo en s = 0 y en s ≥ fin (el «normal», lo que se ve fuera de la escena).
 import { vista } from './vista.js';
+// Lo que tarda la burbuja de viento de la segunda mitad en llegar a la pared: 3 compases (desde el 32,00 hasta el 38,86).
+export const BURBUJA_DENEB = 3 * 4 * 43.44 / 76;
 export const ESCENA_DENEB = {
   id: 'deneb', duracion: 43.4, pulso: 43.44 / 76, compas: 4, desfase: 0,
   marcas: { inicio: 0, silencio: 2.5, atras: 4.27, tiempo: 5.11, bien: 7.03, bien2: 8.56, nada: 9.57, promesa: 10.87, construir: 12.01, mundo: 12.86, dos: 14.93, contigo: 16.01, tu: 17.35, medio: 19.16, drop: 20.57, segunda: 32, fundido: 41.15, fin: 43.4 }
@@ -35,20 +39,21 @@ export const ESCENA_DENEB = {
 // fragmento; pos = [azimut°, elevación°, distancia] alrededor de Deneb en radios de encuadre (1 = la distancia de llegada;
 // la estrella mide 0,22, su cavidad ~0,46 y la nube llega a ~1); azimut 0 / elevación 0 = desde Deneb hacia casa: por
 // ahí está abierta la cavidad. Un solo travelling lento y continuo: el azimut siempre hacia el mismo lado (de −10° a 38°
-// en toda la canción, ~1°/s), mirando dentro de la cavidad; se aleja para ver la nube entera cuando no hay nada y
-// mientras se construye su mundo, queda de frente en «en el medio», se acerca despacio en el drop y acaba como empezó.
+// en toda la canción, ~1°/s), mirando dentro de la cavidad; se aleja para ver la nube entera cuando no hay nada y desde
+// ahí se acerca UNA sola vez, despacio y sin volver atrás: mientras se construye su mundo, de frente en «en el medio», con
+// el bombo del drop y, en la segunda mitad, con la burbuja que sale de ella hasta la pared; acaba a la distancia de llegada.
 const PISTA = [
   { t: 0, pos: [-10, 8, 1.15], mira: [0, 0, 0], fov: 55, curva: 'corte' },   // llegada: Deneb y su cavidad
-  { t: 4.27, pos: [-7, 9, 1.2], curva: 'lineal' },                           // el tiempo se rebobina…
+  { t: 4.27, pos: [-7, 9, 1.22], curva: 'lineal' },                          // el tiempo se rebobina…
   { t: 9.6, pos: [3, 14, 1.75], curva: 'lineal' },                           // …hasta la nube oscura: se ve entera
-  { t: 12.01, pos: [9, 12, 1.4], curva: 'lineal' },                          // se enciende
-  { t: 16.01, pos: [15, 9, 1.6], curva: 'lineal' },                          // su luz talla la nube: abierto para verlo crecer
-  { t: 19.16, pos: [19, 4, 1.42], curva: 'lineal' },                         // en el medio: de frente, ella en el centro
-  { t: 20.57, pos: [21, 4, 1.3], curva: 'lineal' },                          // el drop
-  { t: 28.0, pos: [27, 8, 1.05], curva: 'lineal' },                          // se acerca despacio con el bombo
-  { t: 32.0, pos: [31, 10, 1.12], curva: 'lineal' },                         // segunda mitad
-  { t: 41.15, pos: [36, 9, 1.18], curva: 'lineal' },
-  { t: 43.4, pos: [38, 8, 1.15], curva: 'suave' }                            // se posa como al llegar
+  { t: 12.01, pos: [9, 12, 1.68], curva: 'lineal' },                         // se enciende
+  { t: 16.01, pos: [15, 9, 1.56], curva: 'lineal' },                         // su luz talla la nube: abierto para verlo crecer
+  { t: 19.16, pos: [19, 4, 1.44], curva: 'lineal' },                         // en el medio: de frente, ella en el centro
+  { t: 20.57, pos: [21, 4, 1.38], curva: 'lineal' },                         // el drop
+  { t: 28.0, pos: [27, 8, 1.2], curva: 'lineal' },                           // se acerca despacio con el bombo
+  { t: 32.0, pos: [31, 10, 1.12], curva: 'lineal' },                         // segunda mitad: sale la burbuja
+  { t: 38.3, pos: [35, 9, 1.05], curva: 'lineal' },                          // la burbuja choca con la pared y la enciende
+  { t: 43.4, pos: [38, 8, 1.0], curva: 'suave' }                             // se posa a la distancia de llegada
 ];
 export const CAMARA_DENEB = PISTA;
 // En vertical (móvil): más cerca (la nube llena el alto) y mirando algo más arriba (el director deja el centro del gigante
@@ -114,6 +119,8 @@ const sat = x => x < 0 ? 0 : x > 1 ? 1 : x;
 //  encendido segundos desde que nace (−1 si no toca: el frente de motas del encendido);
 //  medio    el destello del «in the middle» (0–1) y `medioT` los segundos desde entonces (−1 antes): la luz corre
 //           por la nube de fuera adentro, hacia ella;
+//  burbuja  progreso de la burbuja de viento de la segunda mitad (0 → 1 al llegar a la pared; −1 si no hay), burbujaLuz su
+//           luz y choque  el golpe de luz en la pared cuando llega (0–1);
 //  calido   rosa y oro en la nube (0–1);  foco  penumbra del resto del cielo (0–0,9);  nubes  cuánto se apagan las
 //           nebulosas lejanas (0–0,93: casi del todo mientras la estrella no existe).
 export function estadoDeneb(s, config, e = {}, reducido = false) {
@@ -129,6 +136,12 @@ export function estadoDeneb(s, config, e = {}, reducido = false) {
   for (const b of [m.bien, m.bien2]) { const x = t - b; if (x >= 0 && x < 1.2) e.pum = Math.max(e.pum, 0.8 * Math.exp(-x / 0.35)); }
   const x = t - m.construir; e.encendido = x >= 0 && x < 2.5 && s < m.fin ? x : -1;
   const y = t - m.medio; e.medio = y >= 0 && s < m.fin ? sat(y / 0.25) * Math.exp(-Math.max(0, y - 0.25) / 1.1) : 0; e.medioT = y >= 0 && s < m.fin ? y : -1;
+  // La burbuja de la segunda mitad: progreso (0 al desprenderse → 1 al llegar a la pared; −1 si no hay), su luz y el
+  // choque con la pared (sube al llegar y se apaga en ~1,5 s).
+  const kb = m.fin / 43.4, dur = BURBUJA_DENEB * kb, xb = t - m.segunda;
+  e.burbuja = xb >= 0 && xb < dur + 3 * kb && s < m.fin ? Math.min(1, xb / dur) : -1;
+  e.burbujaLuz = e.burbuja < 0 ? 0 : sat(xb / (0.3 * kb)) * (1 - sat((xb - 0.82 * dur) / (0.25 * dur))) * (reducido ? 0.4 : 1);
+  e.choque = e.burbuja < 0 ? 0 : sat((xb - 0.9 * dur) / (0.35 * kb)) * Math.exp(-Math.max(0, xb - 0.95 * dur) / (1.1 * kb)) * (reducido ? 0.4 : 1);
   e.calido = c.calido(t);
   e.foco = c.foco(t); e.nubes = c.nubes(t);
   return e;

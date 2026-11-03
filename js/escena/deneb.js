@@ -13,6 +13,8 @@
 //  · viento y corona: motas que salen de la superficie (más en unos chorros, las serpentinas de la corona), un borde de
 //    espículas finísimas y, al encenderse, el frente de motas que sale de ella.
 //  · eyecciones: chorros de motas que la estrella lanza (en el drop, con el bombo; fuera de la escena, de vez en cuando).
+//  · burbuja: en la segunda mitad del clip, una capa fina de motas de viento que se desprende de la estrella, se expande
+//    frenando por la cavidad y, al chocar con la pared, la enciende (el borde de motas y la pared de la nebulosa).
 // Toda la luz son motas nítidas de 1,5–3 px (nada de halos ni degradados); delante de la estrella no hay motas (se ve
 // limpia). Geometrías y materiales se crean en la carga; en cada cuadro solo cambian uniformes.
 import * as THREE from 'three';
@@ -25,6 +27,8 @@ import { crearNebulosaDeneb } from './nebulosaDeneb.js';
 const R = 100;
 export const RADIO_DENEB = 55;
 const RE = RADIO_DENEB;
+// Hasta dónde llega la burbuja de viento de la segunda mitad del clip: el borde de la cavidad (~1,9 R; la pared, 1,5–2,7 R).
+const R_BURBUJA = 190;
 
 function azarCon(semilla) { let s = semilla >>> 0; return () => { s = (Math.imul(1664525, s) + 1013904223) >>> 0; return s / 4294967296; }; }
 
@@ -169,9 +173,9 @@ export function crearDeneb({ uScale, uPR }) {
   const fantasma = new Float32Array(N * F); for (let f = 0; f < F; f++) fantasma.fill(f, f * N, (f + 1) * N);
   const gM = new THREE.BufferGeometry();
   gM.setAttribute('position', rep(nube, 3)); gM.setAttribute('aDestino', rep(destino, 3)); gM.setAttribute('aLinea', rep(linea, 4)); gM.setAttribute('aDato', rep(dato, 4)); gM.setAttribute('aFantasma', new THREE.BufferAttribute(fantasma, 1));
-  const uM = { uScale, uPR, uExpo: EXPOSICION, uTau: { value: 1 }, uRastro: { value: 0 }, uFlujo: { value: 0 }, uOrbita: { value: 0 }, uGloria: { value: 0.55 }, uEdad: { value: 1 }, uFuerza: { value: 0 }, uMedio: { value: 0 }, uMedioT: { value: -1 }, uCalido: { value: 0.25 }, uT: { value: 0 }, uTitileo: { value: 1 }, uEstrella: { value: 1 }, uRebobina: { value: 0 } };
+  const uM = { uScale, uPR, uExpo: EXPOSICION, uTau: { value: 1 }, uRastro: { value: 0 }, uFlujo: { value: 0 }, uOrbita: { value: 0 }, uGloria: { value: 0.55 }, uEdad: { value: 1 }, uFuerza: { value: 0 }, uMedio: { value: 0 }, uMedioT: { value: -1 }, uCalido: { value: 0.25 }, uT: { value: 0 }, uTitileo: { value: 1 }, uEstrella: { value: 1 }, uRebobina: { value: 0 }, uChoque: { value: 0 } };
   const materia = new THREE.Points(gM, motas(uM, /* glsl */`attribute vec3 aDestino; attribute vec4 aLinea, aDato; attribute float aFantasma;
-    uniform float uScale, uPR, uExpo, uTau, uRastro, uFlujo, uOrbita, uGloria, uEdad, uFuerza, uMedio, uMedioT, uCalido, uT, uTitileo, uEstrella, uRebobina; varying vec3 vC; varying float vA;
+    uniform float uScale, uPR, uExpo, uTau, uRastro, uFlujo, uOrbita, uGloria, uEdad, uFuerza, uMedio, uMedioT, uCalido, uT, uTitileo, uEstrella, uRebobina, uChoque; varying vec3 vC; varying float vA;
     ${COMUN}
     const float R = ${R.toFixed(1)};
     float tipo;
@@ -211,7 +215,9 @@ export function crearDeneb({ uScale, uPR }) {
       float cara = tipo > 0.5 && tipo < 1.5 ? 1.0 - smoothstep(0.0, 0.45, aLinea.z) : 0.0;
       float iluminada = (0.16 + 0.12 * (1.0 - rn)) + (2.1 * borde + 1.5 * cara + 1.0 * punta) * (0.75 + 0.35 * uGloria);
       float oscuro = tipo > 0.5 && tipo < 1.5 ? 0.2 : 0.6;
-      float a = mix(oscuro, iluminada, luzT) * uEstrella + oscuro * (1.0 - uEstrella) + 1.4 * frente + luzT * (1.4 * onda + 1.6 * haciaElla + 0.3 * uMedio);
+      // La burbuja de la segunda mitad llega a la pared: el borde y los pilares se encienden (lo más cercano, primero).
+      float choque = uChoque * (borde + cara + 0.6 * punta) * (1.0 - smoothstep(0.1, 0.55, rn)) * step(tipo, 1.5);
+      float a = mix(oscuro, iluminada, luzT) * uEstrella + oscuro * (1.0 - uEstrella) + 1.4 * frente + luzT * (1.4 * onda + 1.6 * haciaElla + 0.3 * uMedio + 2.2 * choque);
       if (tipo > 1.5 && tipo < 2.5) a *= 1.0 - smoothstep(0.55, 0.9, luzT);          // lo que se lleva la luz, se apaga lejos
       if (tipo > 2.5) a *= 1.0 - smoothstep(0.44, 0.5, tau);                         // el núcleo, tragado por la estrella
       // Colores: la nube oscura, azul violáceo tenue; iluminada, el rojo-rosa del hidrógeno, el azul verdoso del oxígeno
@@ -225,7 +231,7 @@ export function crearDeneb({ uScale, uPR }) {
       luz = mix(luz, vec3(1.0, 0.88, 0.92), punta * 0.6);
       luz = mix(luz, vec3(1.0, 0.82, 0.62), uCalido * 0.35 * aDato.y);
       vC = mix(oscura, luz, luzT);
-      vC = mix(vC, vec3(1.0, 0.97, 0.95), clamp(frente, 0.0, 1.0) * 0.6);
+      vC = mix(vC, vec3(1.0, 0.97, 0.95), clamp(frente + 0.5 * choque, 0.0, 1.0) * 0.6);
       // Mientras el tiempo va hacia atrás, todo se tiñe de un azul helado (se nota que es un rebobinado, no otra cosa).
       vC = mix(vC, vec3(0.62, 0.86, 1.0), uRebobina * 0.55); a *= 1.0 + 0.35 * uRebobina;
       float estela = aFantasma < 0.5 ? 1.0 : (1.0 - aFantasma * 0.32) * smoothstep(0.003, 0.012, abs(uRastro));
@@ -236,22 +242,39 @@ export function crearDeneb({ uScale, uPR }) {
   const nebulosa = crearNebulosaDeneb({ radio: R, radioEstrella: RE }); marco.add(nebulosa.grupo);
 
   // ── Viento, corona y espículas ──
-  const NV = 3000, NE = 2400, NB = NV + NE, dirV = new Float32Array(NB * 3), datoV = new Float32Array(NB * 4);
+  const NV = 3000, NE = 2400, NBU = 1800, NB = NV + NE + NBU, dirV = new Float32Array(NB * 3), datoV = new Float32Array(NB * 4);
   const serpentinas = Array.from({ length: 9 }, () => { const f = azar() * Math.PI * 2, y = (azar() - 0.5) * 0.7; const q = Math.sqrt(1 - y * y); return [Math.cos(f) * q, y, Math.sin(f) * q]; });
   const v = new THREE.Vector3();
   for (let k = 0; k < NB; k++) {
+    if (k >= NV + NE) {   // la burbuja (aDato.z = 2): direcciones repartidas por toda la esfera, cada mota con su grosor
+      const z = azar() * 2 - 1, f = azar() * Math.PI * 2, q = Math.sqrt(1 - z * z);
+      dirV.set([Math.cos(f) * q, z, Math.sin(f) * q], k * 3); datoV.set([azar(), azar(), 2, azar()], k * 4); continue;
+    }
     const espicula = k >= NV;
     if (!espicula && azar() < 0.6) { const b = serpentinas[Math.floor(azar() * serpentinas.length)], g = () => (azar() + azar() + azar() - 1.5) * 0.18; v.set(b[0] + g(), b[1] + g(), b[2] + g()).normalize(); }
     else { const z = azar() * 2 - 1, f = azar() * Math.PI * 2, q = Math.sqrt(1 - z * z); v.set(Math.cos(f) * q, z, Math.sin(f) * q); }
     dirV.set([v.x, v.y, v.z], k * 3); datoV.set([azar(), 0.6 + azar() * 0.8, espicula ? 1 : 0, azar()], k * 4);
   }
   const gV = new THREE.BufferGeometry(); gV.setAttribute('position', new THREE.BufferAttribute(dirV, 3)); gV.setAttribute('aDato', new THREE.BufferAttribute(datoV, 4));
-  const uV = { uScale, uPR, uExpo: EXPOSICION, uViento: { value: 0 }, uEstrella: { value: 1 }, uGloria: { value: 0.55 }, uPum: { value: 0 }, uEncendido: { value: -1 }, uT: { value: 0 }, uTitileo: { value: 1 }, uCam: { value: new THREE.Vector3(0, 0, 1) } };
+  const uV = { uScale, uPR, uExpo: EXPOSICION, uViento: { value: 0 }, uEstrella: { value: 1 }, uGloria: { value: 0.55 }, uPum: { value: 0 }, uEncendido: { value: -1 }, uT: { value: 0 }, uTitileo: { value: 1 }, uCam: { value: new THREE.Vector3(0, 0, 1) }, uBurbuja: { value: -1 }, uBurbujaLuz: { value: 0 } };
   const viento = new THREE.Points(gV, motas(uV, /* glsl */`attribute vec4 aDato;
-    uniform float uScale, uPR, uExpo, uViento, uEstrella, uGloria, uPum, uEncendido, uT, uTitileo; uniform vec3 uCam; varying vec3 vC; varying float vA;
+    uniform float uScale, uPR, uExpo, uViento, uEstrella, uGloria, uPum, uEncendido, uT, uTitileo, uBurbuja, uBurbujaLuz; uniform vec3 uCam; varying vec3 vC; varying float vA;
     ${COMUN}
     const float R = ${RE.toFixed(1)};
     void main(){
+      if (aDato.z > 1.5) {
+        // La burbuja: una capa fina que sale de la superficie y barre la cavidad hasta la pared (~${(R_BURBUJA / RE).toFixed(1)} radios de la
+        // estrella), frenando como un quitanieves (cada vez más gas delante); no es una esfera perfecta (dedos de gas) y se
+        // engrosa al frenar. Fuera de su momento, oculta (fuera de la pantalla).
+        if (uBurbuja < 0.0 || uBurbujaLuz <= 0.001) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); gl_PointSize = 0.0; vC = vec3(0.0); vA = 0.0; return; }
+        float q = 1.0 - (1.0 - uBurbuja) * (1.0 - uBurbuja);
+        float dedos = 0.07 * q * sin(dot(position, vec3(7.0, 5.0, 9.0)) + 2.0) * sin(dot(position, vec3(-4.0, 8.0, 3.0)));
+        float rb = R * (1.06 + ${(R_BURBUJA / RE - 1.06).toFixed(3)} * q) * (1.0 + dedos + (aDato.x - 0.5) * (0.025 + 0.06 * q));
+        vec4 mvb = modelViewMatrix * vec4(position * rb, 1.0); gl_Position = projectionMatrix * mvb;
+        vC = mix(vec3(0.82, 0.9, 1.0), vec3(1.0, 0.66, 0.8), q * (0.4 + 0.6 * aDato.w));
+        vA = uBurbujaLuz * (1.5 - 0.6 * q) * tamMota(1.6 + aDato.w * 1.2, mvb, 2.6) * fueraSilueta(mvb, R * uEstrella) * uExpo;
+        return;
+      }
       float espicula = aDato.z, edad = fract(aDato.x + uViento * aDato.y * (espicula > 0.5 ? 6.0 : 1.0)), r, a;
       // Las espículas se ven en el borde (el limbo visto desde la cámara): se colocan siempre en ese anillo, con un poco
       // de profundidad; así forman un ribete de motas finísimas alrededor de la estrella, se mire desde donde se mire.
@@ -324,6 +347,8 @@ export function crearDeneb({ uScale, uPR }) {
       uM.uT.value = t; uM.uTitileo.value = reducido ? 0 : 1; uM.uRebobina.value = Math.min(1, Math.max(0, -reloj) / 2); uM.uEstrella.value = Math.max(estrella, 0.001);
       viento.visible = estrella > 0.002; uV.uViento.value += dt * reloj * (reducido ? 0.03 : 0.06 + 0.06 * gloria); uV.uEstrella.value = estrella; uV.uGloria.value = gloria; uV.uPum.value = e.pum * w;
       uV.uEncendido.value = w > 0.5 ? e.encendido : -1; uV.uT.value = t; uV.uTitileo.value = reducido ? 0 : 1;
+      const burbuja = w > 0.5 && e.burbuja !== undefined ? e.burbuja : -1;
+      uV.uBurbuja.value = burbuja; uV.uBurbujaLuz.value = burbuja >= 0 ? e.burbujaLuz * w : 0; uM.uChoque.value = (e.choque ?? 0) * w;
       // Eyecciones: en la escena, una cada dos golpes del bombo donde suena fuerte (el drop) (al encenderse ya sale el frente
       // de motas: tres eyecciones a la vez pegadas a la superficie se veían como formas blancas sueltas);
       // fuera de ella, una cada ~2,6 s. Con movimiento reducido, ninguna.
@@ -339,7 +364,9 @@ export function crearDeneb({ uScale, uPR }) {
       // de la lámina); las ondas del drop (una por golpe, hacia fuera) y la luz que corre hacia ella «en el medio».
       const x = Math.min(1, Math.max(0, (tau - 0.5) / 0.47)), fuerza = (e.fuerza ?? 0) * w;
       nebulosa.actualizar({ frente: tau >= 0.999 ? 1.3 : 0.04 + 1.16 * x * (2 - x) * (tau > 0.5 ? 1 : 0), onda: fuerza > 0.02 ? (e.edad ?? 9) / 0.55 * 1.1 : -1, ondaF: fuerza * Math.exp(-(e.edad ?? 9) / 0.6),
-        medio: w > 0.5 && e.medioT >= 0 && e.medioT < 1.4 ? 1.15 - e.medioT / 1.1 : -1, luz: 0.85 + 0.25 * gloria, rebobina: uM.uRebobina.value, calido: uM.uCalido.value, estrella: tam, t });
+        // (La luz que corre hacia ella y, en la segunda mitad, la burbuja que barre la cavidad: el mismo canal, nunca a la vez.)
+        medio: w > 0.5 && e.medioT >= 0 && e.medioT < 1.4 ? 1.15 - e.medioT / 1.1 : burbuja >= 0 ? (RE * 1.06 + (R_BURBUJA - RE * 1.06) * (1 - (1 - burbuja) ** 2)) / (R * 5.4) : -1,
+        medioF: w > 0.5 && e.medioT >= 0 && e.medioT < 1.4 ? 1 : burbuja >= 0 ? 0.35 * e.burbujaLuz + 0.9 * (e.choque ?? 0) : 1, luz: 0.85 + 0.25 * gloria, rebobina: uM.uRebobina.value, calido: uM.uCalido.value, estrella: tam, t });
     }
   };
 }

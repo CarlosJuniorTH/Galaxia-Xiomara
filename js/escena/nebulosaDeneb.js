@@ -89,14 +89,14 @@ export function crearNebulosaDeneb({ radio, radioEstrella = radio, semiLado = 5.
   const S = radio * semiLado, LADO = nivelSeguro ? 1024 : esMovil ? 2048 : 3072;
   const rt = new THREE.WebGLRenderTarget(LADO, LADO, { generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter });
   rt.texture.colorSpace = THREE.NoColorSpace; rt.texture.anisotropy = 8;
-  const uFrente = { value: 1.2 }, uOnda = { value: -1 }, uOndaF = { value: 0 }, uMedio = { value: -1 }, uLuz = { value: 1 }, uRebobina = { value: 0 }, uCalido = { value: 0 }, uT = { value: 0 };
+  const uFrente = { value: 1.2 }, uOnda = { value: -1 }, uOndaF = { value: 0 }, uMedio = { value: -1 }, uMedioF = { value: 1 }, uLuz = { value: 1 }, uRebobina = { value: 0 }, uCalido = { value: 0 }, uT = { value: 0 };
   const rEstrella = { value: 1 / semiLado };   // radio de la estrella en radios de la lámina (con su tamaño actual)
   const grupo = new THREE.Group(); grupo.name = 'Nebulosa de Deneb';
   for (const [z, escala, giro, tipo] of LAMINAS) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(2 * S, 2 * S), new THREE.ShaderMaterial({
-      uniforms: { uTex: { value: rt.texture }, uFrente, uOnda, uOndaF, uMedio, uLuz, uRebobina, uCalido, uT, rEstrella, uEscala: { value: escala }, uGiro: { value: giro }, uTipo: { value: tipo }, uProf: { value: z / semiLado } },
+      uniforms: { uTex: { value: rt.texture }, uFrente, uOnda, uOndaF, uMedio, uMedioF, uLuz, uRebobina, uCalido, uT, rEstrella, uEscala: { value: escala }, uGiro: { value: giro }, uTipo: { value: tipo }, uProf: { value: z / semiLado } },
       vertexShader: 'varying vec2 vP; void main(){ vP = uv * 2.0 - 1.0; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-      fragmentShader: /* glsl */`uniform sampler2D uTex; uniform float uFrente, uOnda, uOndaF, uMedio, uLuz, uRebobina, uCalido, uT, rEstrella, uEscala, uGiro, uTipo, uProf; varying vec2 vP;
+      fragmentShader: /* glsl */`uniform sampler2D uTex; uniform float uFrente, uOnda, uOndaF, uMedio, uMedioF, uLuz, uRebobina, uCalido, uT, rEstrella, uEscala, uGiro, uTipo, uProf; varying vec2 vP;
         void main(){
           // El frente se mide desde la estrella en el espacio 3D (cada lámina a su profundidad): la luz llega a la vez a
           // todo lo que está a la misma distancia de ella.
@@ -119,7 +119,7 @@ export function crearNebulosaDeneb({ radio, radioEstrella = radio, semiLado = 5.
           float pasa = exp(-pow((r - uFrente + 0.02) / 0.018, 2.0)) * step(uFrente, 1.15) * smoothstep(0.08, 0.4, dot(t.rgb, vec3(0.3, 0.45, 0.25)));
           float ondas = 1.0;
           if (uOnda >= 0.0) ondas += 1.1 * uOndaF * exp(-pow((r - uOnda) / 0.04, 2.0));      // el drop: una onda hacia fuera
-          if (uMedio >= 0.0) ondas += 1.5 * exp(-pow((r - uMedio) / 0.05, 2.0));             // «en el medio»: hacia ella
+          if (uMedio >= 0.0) ondas += 1.5 * uMedioF * exp(-pow((r - uMedio) / 0.05, 2.0));             // «en el medio»: hacia ella
           vec3 lit = t.rgb * uLuz * ondas;
           lit = mix(lit, lit * vec3(1.15, 0.95, 0.8) + vec3(0.03, 0.015, 0.0) * t.a, uCalido * 0.4);
           vec3 col = mix(oscura, lit, k) + vec3(0.85, 0.95, 1.0) * pasa * t.a * 1.4;
@@ -145,9 +145,9 @@ export function crearNebulosaDeneb({ radio, radioEstrella = radio, semiLado = 5.
       malla.geometry.dispose(); mat.dispose();
     },
     // frente: radio del frente de luz (en radios de la lámina; ≥ 1,2: todo iluminado; 0: nada); onda / medio: radio de la
-    // onda del drop (y su fuerza) y de la luz que va hacia ella (−1: no hay); estrella: tamaño de la estrella (0–1).
-    actualizar({ frente, onda, ondaF, medio, luz, rebobina, calido, estrella, t }) {
-      uFrente.value = frente; uOnda.value = onda; uOndaF.value = ondaF; uMedio.value = medio; uLuz.value = luz; uRebobina.value = rebobina; uCalido.value = calido; uT.value = t;
+    // onda del drop (y su fuerza) y de la luz que va hacia ella o de la burbuja (−1: no hay; medioF, su fuerza); estrella: tamaño de la estrella (0–1).
+    actualizar({ frente, onda, ondaF, medio, medioF = 1, luz, rebobina, calido, estrella, t }) {
+      uFrente.value = frente; uOnda.value = onda; uOndaF.value = ondaF; uMedio.value = medio; uMedioF.value = medioF; uLuz.value = luz; uRebobina.value = rebobina; uCalido.value = calido; uT.value = t;
       rEstrella.value = Math.max(0.02, estrella) * radioEstrella / radio / semiLado;
     }
   };
