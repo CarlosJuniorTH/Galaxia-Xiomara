@@ -1,0 +1,31 @@
+# Trampas: videoclips y cámara
+
+## Qué debe contar un clip
+- Cada videoclip cuenta lo que hace FÍSICAMENTE el objeto siguiendo la canción (TON 618: una estrella cae y la marea la
+  estira; Sagitario A*: se traga un grumo de gas en cada palabra clave; cuásar: los chorros nacen con las frases…).
+- Escenas en el reloj de su fragmento (`bandaSonora.tiempo(id)`), no se pueden saltar; mecanismo común
+  `escenaEnCurso(id, s)` / `terminarEscena(id)` (ab63563). Durante el clip, `ocupado('clip')` (9228790).
+- «Volver a sentirlo» repite canción, escena y cámara desde el 0 (9ff7b25).
+
+## Director de cámara (`js/util/directorCamara.js`)
+- Pistas de planos `{ t, pos: [az, el, dist], mira, fov, curva, giro }` en el sistema del gigante y en radios R
+  (`directorCamara.js:3`). Pistas en `guionAgujeros.js` (CAMARA_AGUJEROS), `supernovaAmor.js`, `escenasGigantes.js`.
+- Regla de Carlos: lenta, suave, centrada en el móvil y **siempre en un solo sentido** (nada de girar a un lado y luego
+  al otro). Lo garantiza la capa global `SUAVIDAD` (`directorCamara.js:58`): cortes a menos de `CORTE_MIN` = 8 s se
+  vuelven pasos suaves, tangentes monótonas (`:154`), filtro críticamente amortiguado con v/a máximas.
+- Una pista nueva debe pasar `tests/director-camara-suavidad.test.js` (monotonía, velocidad, llegada a tiempo).
+- Móvil vertical: la distancia se escala para que quepa a lo ancho como en el PC, tope ×2,5 (`directorCamara.js:74`).
+- Entrada al clip desde donde dejó el viaje: filtro más blando 4 s (`ENTRADA_LARGA`, `:70`).
+- Los cortes no encienden las estelas del salto (835f1d2).
+
+## Qué se ve junto a los gigantes
+- Nada de fugaces, cometas, corazones, infinitos ni la constelación de casa cerca de las seis grandes (b7751af, 9be4970,
+  2c628e9).
+- Durante el clip los gigantes vecinos no se recortan (parpadeaban, 20bf642). La ocultación por pocos píxeles se decide
+  antes de las partes (e161777). El cuásar se ve desde el púlsar y TON 618 desde Sagitario A* (62b51a7).
+- Tocar la pantalla durante un clip no saca besos ni frases (20bf642). El panel de abajo vuelve siempre al terminar
+  (cbc1290).
+
+## Viajes
+- 10–15 s en un movimiento continuo, recorridos por distancia real (7b69846). Plan del vuelo en un obrero desde el clic
+  (7715786). El paso al sistema solar cambia de escena con la pantalla ya negra (e4c0fd6).
