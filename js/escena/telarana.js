@@ -132,20 +132,36 @@ function enBloques({ atributos, bloques }, material, O, fraccion = 1) {
 // Antes de cada dibujo con esa cámara: el mismo recorte que hacía three.js bloque a bloque (su esfera contra la vista) y los
 // visibles seguidos, en un solo tramo.
 const frustumTramos = new THREE.Frustum(), mTramos = new THREE.Matrix4(), esferaTramo = new THREE.Sphere();
+// Huecos pequeños entre tramos visibles (bloques fuera de la vista entre dos que se ven) también se dibujan, para unir los
+// dos tramos en una orden: como mucho un 5 % más de puntos que los visibles, empezando por los huecos más pequeños. Sus
+// puntos caen fuera de la vista (su esfera no la toca) y la tarjeta gráfica los descarta: la imagen es la misma, con menos
+// órdenes de dibujo (desde casa, ~25 → ~15 entre las tres capas).
+const HUECO_MAXIMO = 0.05, inicios = [], finales = [], huecos = [];
 function tramar(grupo, camera) {
   const tramos = grupo.userData.tramos.children, bloques = grupo.children;
   if (!grupo.visible) { for (const t of tramos) t.visible = false; return; }
   frustumTramos.setFromProjectionMatrix(mTramos.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
-  let k = 0, ini = -1, fin = -1;
-  const cerrar = () => { if (ini < 0) return; const t = tramos[k++]; t.geometry.setDrawRange(ini, fin - ini); t.visible = true; };
+  let n = 0, visibles = 0;
   for (let i = 0; i < bloques.length; i++) {
     const t = bloques[i], dr = t.geometry.drawRange;
     esferaTramo.copy(t.geometry.boundingSphere).applyMatrix4(t.matrixWorld);
     if (!frustumTramos.intersectsSphere(esferaTramo)) continue;
-    if (ini >= 0 && dr.start === fin) fin = dr.start + dr.count;
-    else { cerrar(); ini = dr.start; fin = dr.start + dr.count; }
+    visibles += dr.count;
+    if (n && dr.start === finales[n - 1]) finales[n - 1] = dr.start + dr.count;
+    else { inicios[n] = dr.start; finales[n] = dr.start + dr.count; n++; }
   }
-  cerrar();
+  // Unir por los huecos más pequeños mientras quepan en el presupuesto (sin memoria nueva: listas reutilizadas).
+  huecos.length = 0; for (let i = 1; i < n; i++) huecos.push(i);
+  huecos.sort((a, b) => (inicios[a] - finales[a - 1]) - (inicios[b] - finales[b - 1]));
+  let extra = 0;
+  for (const i of huecos) { const h = inicios[i] - finales[i - 1]; if (h < 0 || extra + h > visibles * HUECO_MAXIMO) break; extra += h; inicios[i] = -1; }
+  let k = 0, ini = -1, fin = -1;
+  for (let i = 0; i < n; i++) {
+    if (inicios[i] === -1) { fin = finales[i]; continue; }
+    if (ini >= 0) { const t = tramos[k++]; t.geometry.setDrawRange(ini, fin - ini); t.visible = true; }
+    ini = inicios[i]; fin = finales[i];
+  }
+  if (ini >= 0) { const t = tramos[k++]; t.geometry.setDrawRange(ini, fin - ini); t.visible = true; }
   for (let i = k; i < tramos.length; i++) tramos[i].visible = false;
 }
 
@@ -278,11 +294,20 @@ export async function crearTelaranaCosmica({ scene, uPR, uScale, renderer }, dat
   compuesto.frustumCulled = false; compuesto.renderOrder = -1.5; raiz.add(compuesto);
   const colorPrevio = new THREE.Color();
   let escalaCapa = esMovil ? ESCALA_MOVIL : CAPA_PC, escalaMax = escalaCapa;   // si el teléfono se calienta, la calidad automática la baja (solo cambia su zona: zona.js)
+  // Batería y calor: con la cámara quieta la capa se dibuja como mucho uno de cada dos cuadros (30 veces por segundo: lo
+  // único que puede cambiar entonces es la exposición, despacio), y ninguno si no cambia nada de lo que lee (sus
+  // galaxias no se mueven ni titilan: la misma imagen). Al mover la cámara, en cada cuadro como siempre.
+  const vistaPrevia = new THREE.Matrix4(), proyPrevia = new THREE.Matrix4(); let firmaPrevia = NaN, saltada = false;
+  const firmaCapa = () => { let f = uniformes.uCasa.value * 1.3 + uScale.value * 17.9 + uPRgal.value * 2.9 + uComp.value * 5.1 + escalaCapa * 7.3 + rtGalaxias.width * 11 + rtGalaxias.height * 13; for (let i = 0; i < 6; i++) { const a = uniformes.uGigA.value[i], b = uniformes.uGigB.value[i]; f += (a.x + a.y * 2 + a.z * 3 + a.w * 4 + b.x * 5 + b.y * 6 + b.z * 7) * (i + 1); } return f; };
   function dibujarGalaxias(renderer, camera) {
-    if (!raiz.visible) return;   // oculta (p. ej. «Mirar hacia casa»): su capa no se ve, no se dibuja
+    if (!raiz.visible) { firmaPrevia = NaN; return; }   // oculta (p. ej. «Mirar hacia casa»): su capa no se ve, no se dibuja
     // Reservada al tamaño de su escala más alta; bajar la escala (calidad automática) solo cambia la zona (zona.js).
     const rw = Math.max(1, Math.round(vista.ancho * escalaMax)), rh = Math.max(1, Math.round(vista.alto * escalaMax));
-    if (rtGalaxias.width < rw || rtGalaxias.height < rh || rtGalaxias.width * rtGalaxias.height > rw * rh * 2.2) rtGalaxias.setSize(rw, rh);
+    if (rtGalaxias.width < rw || rtGalaxias.height < rh || rtGalaxias.width * rtGalaxias.height > rw * rh * 2.2) { rtGalaxias.setSize(rw, rh); firmaPrevia = NaN; saltada = true; }   // (nueva: se dibuja ya)
+    const quieta = vistaPrevia.equals(camera.matrixWorld) && proyPrevia.equals(camera.projectionMatrix), firma = firmaCapa();
+    vistaPrevia.copy(camera.matrixWorld); proyPrevia.copy(camera.projectionMatrix);
+    if (quieta && (firma === firmaPrevia || !saltada)) { saltada = true; return; }
+    saltada = false; firmaPrevia = firma;
     fijarZona(rtGalaxias, vista.ancho * escalaCapa, vista.alto * escalaCapa); zonaDe(rtGalaxias, uZonaCapa.value);
     const previo = renderer.getRenderTarget(), alfa = renderer.getClearAlpha(); renderer.getClearColor(colorPrevio);
     renderer.setRenderTarget(rtGalaxias); renderer.setClearColor(0x000000, 0); renderer.clear(true, false, false);

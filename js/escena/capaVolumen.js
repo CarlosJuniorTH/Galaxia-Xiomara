@@ -27,6 +27,21 @@ export const ESCALA_HISTORIA = 0.5;
 const HALTON = Array.from({ length: 8 }, (_, i) => { const h = (b, k) => { let f = 1, r = 0; k++; while (k > 0) { f /= b; r += f * (k % b); k = Math.floor(k / b); } return r; }; return [h(2, i) - 0.5, h(3, i) - 0.5]; });
 const AUREA = 0.6180339887, SIN_DESPLAZAR = [0, 0];
 
+// Las capas (gas en la suya, opacos del cosmos en la de profundidad, luces en todas) se marcan recorriendo la escena entera,
+// y eso solo hace falta cuando entra o sale algo que se marca. Antes se recorría cada 120 cuadros por si acaso: con la CPU
+// del móvil, un cuadro largo cada 2 s. Ahora, Object3D.add/remove avisan cuando lo que entra o sale lleva dentro una luz,
+// una nebulosa con volumen o una malla opaca (el resto, como las estrellas que se crean al acercarse a una galaxia, no).
+let cambioMarcas = true;
+const marcable = o => o.isLight || o.userData.volumen3D || (o.isMesh && o.material && !o.material.transparent);
+const contiene = o => { if (o.userData.sinMarcas) return false; if (marcable(o)) return true; for (const h of o.children) if (contiene(h)) return true; return false; };
+for (const metodo of ['add', 'remove']) {
+  const original = THREE.Object3D.prototype[metodo];
+  THREE.Object3D.prototype[metodo] = function (...objetos) {
+    if (!cambioMarcas) for (const o of objetos) if (o && o.isObject3D && contiene(o)) { cambioMarcas = true; break; }
+    return original.apply(this, objetos);
+  };
+}
+
 const VERTICE = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
 
 // Resolución de la historia: reproyección + la muestra más cercana del cuadro actual.
@@ -103,8 +118,8 @@ export function crearCapaVolumen({ scene, renderer, uPR, hdr, sinProfundidad = f
   const compuesto = new THREE.Group(); compuesto.add(pieza(false)); if (!sinProfundidad) compuesto.add(pieza(true));
   compuesto.name = 'Gas volumétrico (capa reducida y reconstruida)'; scene.add(compuesto);
 
-  const muestra = new THREE.Mesh(new THREE.PlaneGeometry(1e-3, 1e-3)); muestra.frustumCulled = false;
-  let cuenta = 0, volumenes = 0, cuadro = 0, actualHist = 0, reiniciar = true, distanciaGas = 1;
+  const muestra = new THREE.Mesh(new THREE.PlaneGeometry(1e-3, 1e-3)); muestra.frustumCulled = false; muestra.userData.sinMarcas = true;   // (entra y sale al calentar: no hace marcar)
+  let volumenes = 0, cuadro = 0, actualHist = 0, reiniciar = true, distanciaGas = 1;
   const lista = [], frustum = new THREE.Frustum(), pv = new THREE.Matrix4(), esfera = new THREE.Sphere();
   const vpPrevio = new THREE.Matrix4(), vpActual = new THREE.Matrix4(), inversa = new THREE.Matrix4(), posPrevia = new THREE.Vector3(), dirPrevia = new THREE.Vector3(), dir = new THREE.Vector3();
   // ¿Hay algún gas a la vista? (visible y dentro de la cámara, con margen). Si no, la capa no recorre la escena.
@@ -120,18 +135,29 @@ export function crearCapaVolumen({ scene, renderer, uPR, hdr, sinProfundidad = f
     }
     return hay;
   };
-  // Cada cierto tiempo (y al principio) se marcan las capas: el gas en la suya, los opacos del cosmos en la de profundidad.
+  // Al principio y cuando entra o sale algo que se marca (cambioMarcas): el gas en su capa, los opacos del cosmos en la de
+  // profundidad.
   function marcar() {
-    volumenes = 0; lista.length = 0;
+    cambioMarcas = false; volumenes = 0; lista.length = 0; opacos.length = 0;
     scene.traverse(o => {
       // Las luces, en las tres capas: three.js incluye el número de luces en cada programa de GPU; sin ellas, cada
       // nebulosa se compilaría otra vez la primera vez que se ve (un tirón al llegar a un gigante nuevo).
       if (o.isLight) { o.layers.enable(CAPA_VOLUMEN); o.layers.enable(CAPA_OPACOS); return; }
       if (o.userData.volumen3D) { o.layers.set(CAPA_VOLUMEN); volumenes++; lista.push(o); return; }
       let raiz = o; while (raiz.parent && raiz.parent !== scene) raiz = raiz.parent;
-      if (o.isMesh && o.material && !o.material.transparent && raiz.userData.capa === 'cosmos') o.layers.enable(CAPA_OPACOS);
+      if (o.isMesh && o.material && !o.material.transparent && raiz.userData.capa === 'cosmos') { o.layers.enable(CAPA_OPACOS); opacos.push(o); }
     });
   }
+  // Lo que cambia la imagen del gas sin mover la cámara: dónde está (y cómo gira) cada nebulosa visible y cada opaco que la
+  // tapa (la estrella del púlsar gira: entonces no se salta nada), su brillo y la atenuación.
+  let saltado = false, firmaPrevia = NaN; const vpQuieta = new THREE.Matrix4(), opacos = [];
+  const firmaMatriz = (o, k) => { let x = o; while (x && x.visible) x = x.parent; if (x) return 0; const m = o.matrixWorld.elements; let f = 0; for (let j = 0; j < 16; j++) f += m[j] * (j + 1.37); return f * k; };
+  const firmaGas = () => {
+    let f = uC.uAtenuar.value;
+    for (let i = 0; i < lista.length; i++) { const o = lista[i], u = o.material.uniforms, fm = firmaMatriz(o, i + 1); if (fm) f += fm + (u.uBrillo?.value ?? 0) * 3.1 * (i + 1) + (u.uOpacidad?.value ?? 0) * 7.7 * (i + 1); }
+    for (let i = 0; i < opacos.length; i++) f += firmaMatriz(opacos[i], i + 0.5);
+    return f;
+  };
   const tamano = (t, w, h) => { if (t.width !== w || t.height !== h) { t.setSize(w, h); reiniciar = true; } };
   const color = new THREE.Color();
   return {
@@ -141,7 +167,7 @@ export function crearCapaVolumen({ scene, renderer, uPR, hdr, sinProfundidad = f
     set atenuacion(k) { uC.uAtenuar.value = k; },
     // lado: calentamiento en la carga (se dibuja aunque no haya gas a la vista, para que todo quede compilado).
     dibujar(camera, lado = 0) {
-      if (cuenta++ % 120 === 0) marcar();
+      if (cambioMarcas) marcar();
       if (!volumenes || (!lado && !hayGas(camera))) { compuesto.visible = false; reiniciar = true; return; }
       if (lado) { muestra.layers.set(CAPA_OPACOS); scene.add(muestra); }
       const pr = uPR.value, w = Math.max(1, Math.round(vista.ancho * pr * ESCALA_VOLUMEN)), h = Math.max(1, Math.round(vista.alto * pr * ESCALA_VOLUMEN));
@@ -150,6 +176,12 @@ export function crearCapaVolumen({ scene, renderer, uPR, hdr, sinProfundidad = f
       // Un salto de cámara (un corte del director, el principio de un viaje) no se reproyecta: se empieza de nuevo.
       camera.getWorldDirection(dir);
       if (posPrevia.distanceTo(camera.position) > Math.max(1, distanciaGas) * 0.5 || dir.dot(dirPrevia) < 0.94) reiniciar = true;
+      // Batería y calor: con la cámara quieta y el gas igual (el gas no cambia solo: no lleva tiempo), los rayos se calculan
+      // uno de cada dos cuadros. La historia ya tiene la imagen (la reproyección la va afinando con cada muestra nueva): el
+      // cuadro sin rayos enseña la misma historia y la afina el siguiente. Lo más caro de la GPU, a la mitad, sin verse.
+      const firma = firmaGas();
+      if (!lado && !reiniciar && !saltado && firma === firmaPrevia && posPrevia.equals(camera.position) && vpQuieta.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).equals(vpPrevio)) { saltado = true; compuesto.visible = true; return; }
+      saltado = false; firmaPrevia = firma;
       const previo = renderer.getRenderTarget(), alfa = renderer.getClearAlpha(), autoClear = renderer.autoClear, fondo = scene.background, mascara = camera.layers.mask, auto = scene.matrixWorldAutoUpdate;
       renderer.getClearColor(color);
       compuesto.visible = false;

@@ -230,7 +230,11 @@ export function* construirMaravillas({ scene, uScale, uPR, centros }) {
       let vis = false;
       for (const m of creadas) { const L = centros[m.destino].length(), d = camera.position.distanceTo(centros[m.destino]);
         const k = (1 - THREE.MathUtils.smoothstep(d, L * 0.55, L * 0.8)) * (m.destino === 'supernova' ? atenuacion : 1); m.grupo.visible = k > 0.002; vis ||= m.grupo.visible;
-        m.grupo.traverse(x => { const u = x.material?.uniforms; if (u?.uVis) u.uVis.value = (x.userData.visBase ??= u.uVis.value) * k; if (u?.uBrillo && x.userData.volumen3D) u.uOpacidad.value = k; }); }
+        // Solo si cambió k (casi siempre es 0: lejos de su gigante), con la lista de sus materiales hecha una vez (antes, un
+        // recorrido de su rama y una función nueva en cada cuadro por cada maravilla).
+        if (k === m.kAplicado) continue; m.kAplicado = k;
+        m.conVis ??= (() => { const l = []; m.grupo.traverse(x => { const u = x.material?.uniforms; if (u?.uVis || (u?.uBrillo && x.userData.volumen3D)) l.push(x); }); return l; })();
+        for (const x of m.conVis) { const u = x.material.uniforms; if (u.uVis) u.uVis.value = (x.userData.visBase ??= u.uVis.value) * k; if (u.uBrillo && x.userData.volumen3D) u.uOpacidad.value = k; } }
       // Las nebulosas (el Ojo, el fuego) miran siempre a la cámara: desde cualquier camino se ven de frente, sin voltearse.
       for (const m of creadas) if (m.grupo.visible && (m.id === 'ojo' || m.id === 'fuego')) { m.grupo.lookAt(camera.position); if (m.id === 'fuego') m.grupo.rotateZ(0.3); }
       raiz.visible = vis; return; if (Math.abs(k - anterior) < 0.002) return; anterior = k; for (const [m, b] of materiales) m.uniforms.uVis.value = b * k; } };

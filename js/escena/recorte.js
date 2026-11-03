@@ -6,6 +6,7 @@
 // estaba al terminar (scene.onAfterRender). Para el resto del código el grupo sigue visible: sus matrices se ponen al día,
 // se anima y se puede tocar como siempre. La imagen es la misma: solo se quitan dibujos que no tocan la pantalla.
 import * as THREE from 'three';
+import { vista } from '../util/vista.js';
 
 // Margen en píxeles CSS alrededor de la esfera: los puntos tienen tamaño en píxeles (los destellos, hasta 170 px: medio
 // punto, 85) y uno en el borde de la esfera puede asomar aunque su centro quede fuera.
@@ -15,7 +16,9 @@ const MARGEN_PX = 100;
 const porEscena = new WeakMap();
 export const recorteDe = escena => { let r = porEscena.get(escena); if (!r) porEscena.set(escena, r = crearRecorte(escena)); return r; };
 
-function crearRecorte(escena, { alto = () => innerHeight } = {}) {
+// alto: el de la ventana guardado (vista.js). Leer innerHeight en cada dibujo obligaba al navegador a recalcular estilo y
+// maquetación si el HTML había cambiado (el clic en «Empezar», el fundido del HUD): ~19 ms en el móvil con la CPU ×4.
+function crearRecorte(escena, { alto = () => vista.alto } = {}) {
   const lista = [], ocultos = [], antesDeDibujar = [];
   let activo = true;
   const frustum = new THREE.Frustum(), m = new THREE.Matrix4(), esfera = new THREE.Sphere(), camPos = new THREE.Vector3();
@@ -23,7 +26,9 @@ function crearRecorte(escena, { alto = () => innerHeight } = {}) {
   let contados = 0;
   escena.onBeforeRender = function (renderer, scene, camera, objetivo) {
     antes.call(this, renderer, scene, camera, objetivo);
-    for (let i = 0; i < antesDeDibujar.length; i++) antesDeDibujar[i](camera);
+    // Lo de antes de cada dibujo (tramos de la telaraña, lotes de sprites) solo en los dibujos que ven la capa 0, la de
+    // siempre: las capas propias (el gas volumétrico y la profundidad de los opacos, capaVolumen.js) no dibujan nada de eso.
+    if (camera.layers.mask & 1) for (let i = 0; i < antesDeDibujar.length; i++) antesDeDibujar[i](camera);
     if (!activo || !camera.isPerspectiveCamera || !lista.length) return;
     m.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); frustum.setFromProjectionMatrix(m);
     camPos.setFromMatrixPosition(camera.matrixWorld);
@@ -48,7 +53,8 @@ function crearRecorte(escena, { alto = () => innerHeight } = {}) {
     // radio y centro en las coordenadas locales del objeto (sin su escala: se aplica la del mundo en cada dibujo).
     // cuando: si se da, el grupo solo se recorta mientras devuelve true.
     anadir(objeto, radio, centro = new THREE.Vector3(), cuando = null) { lista.push({ objeto, radio, centro: centro.clone(), cuando }); },
-    // fn(cámara) antes de que three.js decida qué dibujar en cada dibujo de la escena (tramos de la telaraña).
+    // fn(cámara) antes de que three.js decida qué dibujar en cada dibujo de la escena que ve la capa 0 (tramos de la
+    // telaraña, lotes de sprites).
     alDibujar(fn) { antesDeDibujar.push(fn); },
     // Apagado mientras se calienta la GPU (carga/preparacion.js dibuja todo para estrenarlo: nada se debe quedar fuera).
     set activo(v) { activo = v; }, get activo() { return activo; },

@@ -64,6 +64,25 @@ function crearRecorridoLuz(puntos, color) {
   });
   const p = new THREE.Points(g, m); p.frustumCulled = false; return p;
 }
+// Varias mallas quietas en UNA geometría (cada una con su posición, giro y escala ya aplicados): una sola llamada de dibujo.
+function unirGeometrias(mallas) {
+  const pos = [], nor = [], uv = [], idx = []; let base = 0;
+  const v = new THREE.Vector3(), nm = new THREE.Matrix3();
+  for (const m of mallas) {
+    m.updateMatrix(); nm.getNormalMatrix(m.matrix);
+    const g = m.geometry, p = g.attributes.position, n = g.attributes.normal, u = g.attributes.uv;
+    for (let i = 0; i < p.count; i++) {
+      v.fromBufferAttribute(p, i).applyMatrix4(m.matrix); pos.push(v.x, v.y, v.z);
+      v.fromBufferAttribute(n, i).applyMatrix3(nm).normalize(); nor.push(v.x, v.y, v.z);
+      uv.push(u.getX(i), u.getY(i));
+    }
+    const ind = g.index; for (let i = 0; i < ind.count; i++) idx.push(ind.getX(i) + base);
+    base += p.count; g.dispose();
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
+  return g;
+}
 // Textura con un texto repetido a lo largo (para escribir en anillos).
 function texTextoAnillo(texto, fuente, color) {
   const W = 2048, H = 96, c = document.createElement('canvas'); c.width = W; c.height = H;
@@ -289,7 +308,7 @@ export function* construirMundos({ scene, uScale, uPR }, { alConstelar = () => {
   // Corazoncitos que se desprenden de los sobres y suben despacio.
   const corazonesCorreo = new THREE.Points(geometriaPuntos(40, (i, p) => { p.x = p.y = p.z = 0; const c = new THREE.Color(i % 2 ? '#ffb7d6' : '#ffe2ef'); p.r = c.r; p.g = c.g; p.b = c.b; p.s = 6; }), materialPuntos({ uScale, uPR, corazon: true, maximo: 10, titileo: 0.2 }));
   corazonesCorreo.frustumCulled = false; correo.add(corazonesCorreo);
-  const puntoSobre = new THREE.Vector3(); let todosSobres = null;
+  const puntoSobre = new THREE.Vector3(), mRuta = new THREE.Matrix4(), mRuta2 = new THREE.Matrix4(); let todosSobres = null;
 
   yield;
   // ── El jardín de lo que viene ──
@@ -406,8 +425,11 @@ export function* construirMundos({ scene, uScale, uPR }, { alConstelar = () => {
   yield;
   // Marco del reloj de arena: dos bases y tres columnas de luz dorada.
   const oro = new THREE.MeshBasicMaterial({ color: '#ffcf8f', transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending, depthWrite: false });
-  for (const y of [-44, 44]) reloj.add(new THREE.Mesh(new THREE.TorusGeometry(31, 1.2, 8, 64), oro).rotateX(Math.PI / 2).translateZ(-y));
-  for (let k = 0; k < 3; k++) { const a = k / 3 * Math.PI * 2, c = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 88, 8), oro); c.position.set(Math.cos(a) * 31, 0, Math.sin(a) * 31); reloj.add(c); }
+  // (Las cinco piezas, con el mismo material y quietas dentro del reloj, en una sola malla: una llamada de dibujo, no cinco.)
+  const piezasMarco = [];
+  for (const y of [-44, 44]) piezasMarco.push(new THREE.Mesh(new THREE.TorusGeometry(31, 1.2, 8, 64), oro).rotateX(Math.PI / 2).translateZ(-y));
+  for (let k = 0; k < 3; k++) { const a = k / 3 * Math.PI * 2, c = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 88, 8), oro); c.position.set(Math.cos(a) * 31, 0, Math.sin(a) * 31); piezasMarco.push(c); }
+  reloj.add(new THREE.Mesh(unirGeometrias(piezasMarco), oro));
   const arena = (() => {
     const n = 260, pos = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) pos.set([Math.random() * Math.PI * 2, Math.random(), Math.random()], i * 3);
@@ -621,14 +643,19 @@ export function* construirMundos({ scene, uScale, uPR }, { alConstelar = () => {
       posEstela2.needsUpdate = true; estelaSobres2.material.uniforms.uTime.value = t; polvoRuta2.material.uniforms.uTime.value = t;
       // Destello al pasar por delante (el lado de la ruta más cercano a la cámara).
       const distanciaLuna = camera.position.distanceTo(luna.getWorldPosition(puntoSobre));
+      // La posición de cada sobre, con las matrices de sus rutas calculadas una vez (la de la luna acaba de poner al día las
+      // de correo): antes, getWorldPosition por sobre y getWorldPosition + worldToLocal (una matriz inversa) por corazoncito,
+      // unas 50 subidas por la rama y 40 inversas en cada cuadro. Mismo resultado.
+      ruta.updateMatrix(); ruta2.updateMatrix();
+      mRuta.multiplyMatrices(correo.matrixWorld, ruta.matrix); mRuta2.multiplyMatrices(correo.matrixWorld, ruta2.matrix);
       for (const sp of todosSobres ??= [...sobres, ...sobres2]) {   // (la misma lista siempre: sin memoria nueva por cuadro)
-        sp.getWorldPosition(puntoSobre); const cerca = 1 - Math.min(1, (puntoSobre.distanceTo(camera.position) - distanciaLuna + 150) / 300);
+        puntoSobre.copy(sp.position).applyMatrix4(sp.parent === ruta ? mRuta : mRuta2); const cerca = 1 - Math.min(1, (puntoSobre.distanceTo(camera.position) - distanciaLuna + 150) / 300);
         sp.material.color.setScalar(0.8 + Math.max(0, cerca) * 0.25);
       }
       // Corazoncitos: nacen junto a un sobre y suben desvaneciéndose.
       const pc = corazonesCorreo.geometry.getAttribute('position');
       for (let k = 0; k < pc.count; k++) {
-        const f = (t * 0.18 + k / pc.count) % 1, sp = sobres[k % sobres.length]; sp.getWorldPosition(puntoSobre); correo.worldToLocal(puntoSobre);
+        const f = (t * 0.18 + k / pc.count) % 1, sp = sobres[k % sobres.length]; puntoSobre.copy(sp.position).applyMatrix4(ruta.matrix);   // (en las coordenadas de correo)
         if (f < 0.02) corazonesCorreo.userData[k] = puntoSobre.clone();
         const base = corazonesCorreo.userData[k] || puntoSobre;
         pc.setXYZ(k, base.x + Math.sin(t * 2 + k) * 6, base.y + f * 70, base.z);
@@ -661,7 +688,8 @@ export function* construirMundos({ scene, uScale, uPR }, { alConstelar = () => {
       for (const e of espirales) e.material.uniforms.uTime.value = t;
       facetas.rotation.y -= dt * 0.04; facetas.material.opacity = 0.16 + 0.08 * Math.sin(t * 1.1);
       anilloHoras.rotation.y = t * 0.2; horas.material.uniforms.uTime.value = t;
-      for (let i = 0; i < rayosCapsula.length; i++) { const m = rayosCapsula[i]; m.material.uniforms.uT.value = t; m.material.uniforms.uA.value = relicarios[i].userData.abierta ? 0.9 : 0; }
+      // (Con la cápsula cerrada su rayo tiene intensidad 0: no se dibuja; antes era una llamada de dibujo que no pintaba nada.)
+      for (let i = 0; i < rayosCapsula.length; i++) { const m = rayosCapsula[i], abierta = relicarios[i].userData.abierta; m.material.uniforms.uT.value = t; m.material.uniforms.uA.value = abierta ? 0.9 : 0; m.visible = !!abierta; }
       disco.material.uniforms.uTime.value = t;
       for (const f of fugaces) f.material.uniforms.uTime.value = t;
       parCalma.actualizar(t);

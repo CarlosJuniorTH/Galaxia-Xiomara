@@ -145,37 +145,9 @@ export function* construirCosmos({ uScale, uPR }) {
     // Hipergigantes rojas: capas de polvo expulsadas en arcos (como VY Canis Majoris);
     // azules muy luminosas: burbuja de gas ionizado (como la nebulosa de la Pistola).
     if ((roja && tam >= 1500) || nombre === 'Estrella Pistola') {
-      const S = tam * 0.6, env = new THREE.Mesh(new THREE.PlaneGeometry(S, S), aditivo(
-        { uT: { value: 0 }, uC: { value: new THREE.Color(roja ? '#ff7448' : '#8fa6ff') }, uC2: { value: new THREE.Color(roja ? '#ffb27a' : '#d68cff') }, uTipo: { value: roja ? 0 : 1 }, uSemilla: { value: acimut * 0.13 } },
-        'varying vec2 vP; void main(){ vP = uv * 2.0 - 1.0; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-        /* glsl */`uniform float uT, uTipo, uSemilla; uniform vec3 uC, uC2; varying vec2 vP;
-          float h(vec2 p){ vec3 q = fract(p.xyx * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
-          float rn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
-          float fbm(vec2 p){ return rn(p) * 0.5 + rn(p * 2.1 + 3.1) * 0.3 + rn(p * 4.3 + 7.7) * 0.2; }
-          void main(){
-            float r = length(vP), a = atan(vP.y, vP.x);
-            float n = fbm(vP * 3.2 + uSemilla + uT * 0.004);
-            float l; vec3 col;
-            if (uTipo < 0.5) {
-              float arcos = 0.0;
-              for (int k = 0; k < 5; k++) { float fk = float(k);
-                float rk = 0.24 + fk * 0.13 + 0.035 * sin(a * 3.0 + fk + uSemilla);
-                arcos += exp(-pow((r - rk) / 0.05, 2.0)) * pow(fbm(vec2(a * 2.2 + fk * 1.7 + uSemilla, r * 6.0 + fk)), 2.5);
-              }
-              // Polvo en grumos y arcos rotos, más denso hacia un lado (como VY Canis Majoris).
-              float grumos = pow(fbm(vP * 7.0 - uSemilla), 2.0);
-              l = (arcos * 0.9 + n * n * exp(-r * 2.6) * 1.2) * (0.35 + 0.65 * grumos) * (0.45 + 0.55 * sin(a + uSemilla));
-              col = mix(uC, uC2, n);
-            } else {
-              // Burbuja de gas irregular con filamentos (como la nebulosa de la Pistola).
-              float capa = exp(-pow((r - 0.58 - (n - 0.5) * 0.32) / 0.08, 2.0));
-              float fil = pow(fbm(vec2(a * 5.0, r * 9.0) + uSemilla), 3.0);
-              l = capa * (0.25 + 1.1 * fil) + exp(-r * 4.0) * 0.25 * n;
-              col = mix(uC, uC2, smoothstep(0.4, 0.8, n));
-            }
-            l *= (1.0 - smoothstep(0.75, 1.0, r)) * smoothstep(0.1, 0.2, r) * 0.55;
-            gl_FragColor = vec4(col * l, l); }`));
-      env.renderOrder = -1; g.add(env); envolturas.push(env);
+      // (Todas las envolturas en una sola malla instanciada, después del bucle: una llamada de dibujo en vez de una por sol.)
+      envolturas.push({ g, S: tam * 0.6, c: new THREE.Color(roja ? '#ff7448' : '#8fa6ff'), c2: new THREE.Color(roja ? '#ffb27a' : '#d68cff'), tipo: roja ? 0 : 1, semilla: acimut * 0.13 });
+
     }
     // Estrellas de nuestra zona que pasan por delante del disco: se nota que el sol está detrás, lejísimos.
     for (let k = 0, n = 2 + (tam % 4); k < n; k++) {
@@ -205,6 +177,54 @@ export function* construirCosmos({ uScale, uPR }) {
     g.userData.halos = halos.map(h => [h, h.scale.x]); g.userData.k = 1;
     estrellas.push({ nucleo: rayos, base: rayos.scale.x, fase: acimut * 0.3, grupo: g }); superficies.push({ superficie, late: roja && tam >= 1500, fase: acimut });
   }
+  // Envolturas de las hipergigantes (polvo expulsado, burbuja de gas): todas en UNA malla instanciada (antes, una por sol:
+  // seis llamadas de dibujo desde casa). Mismo sombreador; sus colores, tipo y semilla van por instancia, y la matriz de cada
+  // una es la de su sol (posición, giro y escala de su grupo) por su tamaño. Su luz es aditiva: el orden no importa.
+  let mallaEnvolturas = null;
+  if (envolturas.length) {
+    const geo = new THREE.PlaneGeometry(1, 1), n = envolturas.length, c = new Float32Array(n * 3), c2 = new Float32Array(n * 3), ts = new Float32Array(n * 2);
+    envolturas.forEach((e, i) => { c.set([e.c.r, e.c.g, e.c.b], i * 3); c2.set([e.c2.r, e.c2.g, e.c2.b], i * 3); ts.set([e.tipo, e.semilla], i * 2); });
+    geo.setAttribute('aC', new THREE.InstancedBufferAttribute(c, 3)); geo.setAttribute('aC2', new THREE.InstancedBufferAttribute(c2, 3)); geo.setAttribute('aTS', new THREE.InstancedBufferAttribute(ts, 2));
+    mallaEnvolturas = new THREE.InstancedMesh(geo, aditivo({ uT: { value: 0 } },
+      'attribute vec3 aC, aC2; attribute vec2 aTS; varying vec3 uC, uC2; varying float uTipo, uSemilla; varying vec2 vP; void main(){ vP = uv * 2.0 - 1.0; uC = aC; uC2 = aC2; uTipo = aTS.x; uSemilla = aTS.y; gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0); }',
+      /* glsl */`uniform float uT; varying float uTipo, uSemilla; varying vec3 uC, uC2; varying vec2 vP;
+          float h(vec2 p){ vec3 q = fract(p.xyx * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
+          float rn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
+          float fbm(vec2 p){ return rn(p) * 0.5 + rn(p * 2.1 + 3.1) * 0.3 + rn(p * 4.3 + 7.7) * 0.2; }
+          void main(){
+            float r = length(vP), a = atan(vP.y, vP.x);
+            float n = fbm(vP * 3.2 + uSemilla + uT * 0.004);
+            float l; vec3 col;
+            if (uTipo < 0.5) {
+              float arcos = 0.0;
+              for (int k = 0; k < 5; k++) { float fk = float(k);
+                float rk = 0.24 + fk * 0.13 + 0.035 * sin(a * 3.0 + fk + uSemilla);
+                arcos += exp(-pow((r - rk) / 0.05, 2.0)) * pow(fbm(vec2(a * 2.2 + fk * 1.7 + uSemilla, r * 6.0 + fk)), 2.5);
+              }
+              // Polvo en grumos y arcos rotos, más denso hacia un lado (como VY Canis Majoris).
+              float grumos = pow(fbm(vP * 7.0 - uSemilla), 2.0);
+              l = (arcos * 0.9 + n * n * exp(-r * 2.6) * 1.2) * (0.35 + 0.65 * grumos) * (0.45 + 0.55 * sin(a + uSemilla));
+              col = mix(uC, uC2, n);
+            } else {
+              // Burbuja de gas irregular con filamentos (como la nebulosa de la Pistola).
+              float capa = exp(-pow((r - 0.58 - (n - 0.5) * 0.32) / 0.08, 2.0));
+              float fil = pow(fbm(vec2(a * 5.0, r * 9.0) + uSemilla), 3.0);
+              l = capa * (0.25 + 1.1 * fil) + exp(-r * 4.0) * 0.25 * n;
+              col = mix(uC, uC2, smoothstep(0.4, 0.8, n));
+            }
+            l *= (1.0 - smoothstep(0.75, 1.0, r)) * smoothstep(0.1, 0.2, r) * 0.55;
+            gl_FragColor = vec4(col * l, l); }`), n);
+    mallaEnvolturas.renderOrder = -1; mallaEnvolturas.frustumCulled = false; mallaEnvolturas.name = 'Envolturas de las hipergigantes'; decor.add(mallaEnvolturas);
+  }
+  let envolturasColocadas = false;
+  const colocarEnvolturas = () => {
+    // (La matriz de su sol: su posición y giro, y la escala que actualizar le da cada cuadro, siempre la misma.)
+    const m = new THREE.Matrix4(), esc = new THREE.Vector3();
+    envolturas.forEach((e, i) => { mallaEnvolturas.setMatrixAt(i, m.compose(e.g.position, e.g.quaternion, esc.copy(e.g.scale).multiplyScalar(e.S))); });
+    mallaEnvolturas.instanceMatrix.needsUpdate = true; envolturasColocadas = true;
+  };
+  // Ya colocadas con la escala de cada sol (la que actualizar le pondrá); en el primer cuadro se confirman.
+  if (mallaEnvolturas) { for (const e of envolturas) e.g.scale.setScalar(e.g.userData.base || 1); colocarEnvolturas(); envolturasColocadas = false; }
   const delante = new THREE.Points(new THREE.BufferGeometry().setFromPoints(cercanas), aditivo({ uT: { value: 0 }, uPR },
     'uniform float uT, uPR; varying float vA; void main(){ float f = fract(sin(dot(position.xy, vec2(12.9898, 78.233))) * 43758.5); vA = 0.7 + 0.3 * sin(uT * (1.0 + f * 2.0) + f * 6.28); gl_PointSize = (1.6 + f * 1.8) * uPR; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
     'varying float vA; void main(){ float d = length(gl_PointCoord - 0.5); float a = pow(max(0.0, 1.0 - d * 2.0), 2.0) * vA; gl_FragColor = vec4(vec3(1.0, 0.97, 0.95) * a, a); }'));
@@ -488,7 +508,7 @@ export function* construirCosmos({ uScale, uPR }) {
       // (El cuásar vecino se ve también desde el púlsar, en su clip y después.)
       cuasar.quaternion.copy(rotacionCuasar);   // orientación fija: se ve igual siempre (lo que gira es su gas, en los shaders)
       for (const { superficie, late, fase } of superficies) { superficie.material.uniforms.uT.value = t; if (late) superficie.scale.setScalar(1 + 0.03 * Math.sin(t * 0.25 + fase)); }   // las rojas laten despacio
-      for (const e of envolturas) e.material.uniforms.uT.value = t;
+      if (mallaEnvolturas) { mallaEnvolturas.material.uniforms.uT.value = t; if (!envolturasColocadas) colocarEnvolturas(); }
       delante.material.uniforms.uT.value = t;
       // TON 618 y Sagitario A*, con su escena si la hay (js/ui/escenaAgujeros.js da el reloj de la canción). Al salir a
       // mitad, el reloj se queda quieto y la escena se funde con el reposo en 1,8 s (sin cortes).

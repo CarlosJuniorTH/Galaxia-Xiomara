@@ -31,6 +31,7 @@ import { crearRutas } from './camara/rutas.js';
 import { construirMaravillas } from './maravillas.js';
 import { crearPolvo } from './polvo.js';
 import { recorteDe, esferaDe } from './recorte.js';
+import { agruparSprites } from './loteSprites.js';
 import { texturasListas, texturasTodas, subirAlLlegar, texturasTardiasEnReposo } from './fabricaTexturas.js';
 import { hornoListo, soltarHorno } from '../util/horno.js';
 import { DESTINOS, LEJANOS, ZONAS_LUGARES } from '../data/universo.js';
@@ -255,6 +256,11 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // Las motas de la escena del púlsar están dentro de su nebulosa: se dibujan tras la capa del gas volumétrico (−3),
   // que si no las cubría con su alfa. Nítidas y por encima del gas, como las estrellas que hay en él.
   for (const o of cosmos.sobreGas) o.renderOrder = -2.5;
+  // Los sprites aditivos de la misma imagen, en un solo dibujo (loteSprites.js): los soles y las enanas rojas del cielo
+  // (3-4 brillos por sol: decenas de órdenes de dibujo desde casa) y los brillos de cada lugar de casa. Con su orden de dibujo
+  // ya definitivo (lo de arriba lo cambia). Todo lo de los lugares es aditivo: el orden entre ellos no cambia la imagen.
+  agruparSprites(cosmos.decor, scene, { nombre: 'Lote de sprites del cielo' });
+  for (const [id, g] of mundos.grupos) if (!SOLARES.has(id)) agruparSprites(g, scene, { nombre: 'Lote de sprites · ' + id });
   // El cielo profundo (estrellas, galaxias lejanas, nebulosas, soles gigantes, agujeros) está
   // tan lejos que nunca se acerca ni cambia de sitio al moverse: acompaña a la cámara, como el
   // cielo de verdad. Así se siente la distancia y nada se puede alcanzar ni solapar.
@@ -388,8 +394,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // Perfil ultra único: la calidad y la resolución interna son fijas toda la visita (nucleo.js); no hay resolución dinámica
   // ni escalones que bajen la calidad en plena experiencia (cada cambio era un tirón).
 
-  // Ritmo de dibujo (ver util/planificador.js): dentro, siempre 60 FPS en el móvil y el ritmo de la pantalla (tope 120) en
-  // el PC; con la vista quieta, nada animado y sin tocar 15 s, no se dibuja; vuelve en el mismo cuadro del toque.
+  // Ritmo de dibujo (ver util/planificador.js): dentro, siempre 60 FPS en el móvil; en el PC, el ritmo de la pantalla (tope
+  // 120) con un gesto, su inercia o un vuelo, y 60 el resto.
   // Movimiento reducido: el universo sigue en 3D, pero la cámara no gira sola.
   const movimientoReducido = matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (movimientoReducido) controls.autoRotateSpeed = 0;
@@ -1210,7 +1216,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
       : controls.autoRotate || giroSuave > 0.002 ? 'giro' : mundos.cometaVisible ? 'cometa' : '';
     const activo = !!motivo;
     if (estrenos) estrenos.momento = vuelo ? 'vuelo' : clip ? 'clip' : gesto || giro.moviendo || zoom.moviendo ? 'gesto' : '';
-    const modo = planificador.decidir(ahora, { reposo, quieto: pausa && !vuelo && !captura, activo });
+    // En el PC, a 120 solo lo que se mueve deprisa (un gesto, su inercia, un vuelo); el resto, a 60 (planificador.js).
+    const modo = planificador.decidir(ahora, { reposo, quieto: pausa && !vuelo && !captura, activo, rapido: motivo === 'vuelo' || motivo === 'gesto' || motivo === 'inercia' });
     if (modo === null) { if (reposo) prev = ahora; return; }
     if (modo !== modoAnterior) { modoAnterior = modo; if (diagnosticar) canvas.dataset.ritmo = modo; }
     const motivoActual = modo === 'activo' ? motivo || 'reciente' : '';
@@ -1573,7 +1580,14 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     if (escenaActiva !== 'solar') scene.updateMatrixWorld();
     if (escenaActiva !== 'solar') { capaVolumen.dibujar(camera); telarana.dibujarGalaxias(renderer, camera); }   // capas a menor resolución: gas volumétrico (capaVolumen.js) y galaxias de la telaraña (telarana.js)
     seguirLuces(); inclinarCasa();
+    // Las matrices del mundo ya están al día (arriba, antes de las capas): el dibujo principal no las recorre otra vez
+    // (renderer.render las ponía al día de nuevo, ~1000 objetos, sin nada que hubiera cambiado), salvo las luces, que
+    // seguirLuces acaba de mover. Con casa inclinada («Mirar hacia casa»: inclinarCasa la gira solo para este dibujo) sí se
+    // recalculan, como antes.
+    const autoMatrices = scene.matrixWorldAutoUpdate;
+    if (escenaActiva !== 'solar' && !casaInclinada) { scene.matrixWorldAutoUpdate = false; for (let i = 0; i < lucesFijas.length; i++) lucesFijas[i].updateMatrixWorld(); }
     try { if (document.body.dataset.supernovaAislada === 'true') conFocoSupernova(scene, cosmos.raiz, cosmos.supernova.grupo, () => composer.render()); else composer.render(); } catch (e) { suspendida = true; alProblema('No se ha podido dibujar el universo. Conservamos tu progreso; vuelve a intentarlo en 3D.'); console.error(e); }
+    finally { scene.matrixWorldAutoUpdate = autoMatrices; }
     // El sistema solar se prepara (shaders y texturas) en un momento tranquilo tras la entrada,
     // no durante la carga: así se entra antes y el móvil trabaja menos al principio.
     if (!solarPreparado && tEntrada !== null && tiempo - tEntrada > 9 && !vuelo) {
