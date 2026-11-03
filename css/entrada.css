@@ -10,7 +10,10 @@
 /* El fundido al entrar va en su propia capa (solo opacidad, en el compositor) encima de los primeros cuadros del vuelo:
    lo de dentro se queda quieto (nada que repintar en cada cuadro: ni el brillo del nombre ni el destello del botón, ni
    el filtro del botón desactivado, que antes se animaba sobre la escena en movimiento). */
-#entrada.oculto *,#entrada.oculto::before,#entrada.oculto *::before,#entrada.oculto *::after{animation-play-state:paused;}
+/* (Solo lo que tiene animación: con «#entrada.oculto *» el clic recalculaba el estilo de cada nodo de la portada, también
+   los cientos de rótulos del mapa, en el cuadro de «Empezar».) */
+#entrada.oculto::before,#entrada.oculto .tarjeta-foto img,#entrada.oculto .nombre::after,#entrada.oculto #btn-entrar,#entrada.oculto #btn-entrar::before,
+#entrada.oculto #btn-entrar .cargando i,#entrada.oculto .carga-ceja,#entrada.oculto .carga-barra::after,#entrada.oculto .toque-texto{animation-play-state:paused;}
 #entrada.oculto #btn-entrar{filter:none;transition:none;}
 
 /* Intro: el videoclip se dibuja en un lienzo detrás de todo (js/ui/portada.js); el texto de la historia, arriba, nítido

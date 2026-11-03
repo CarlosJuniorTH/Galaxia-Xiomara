@@ -141,8 +141,17 @@ export function crearEntrada(config, { viaje, banda } = {}) {
     entrada.classList.add('oculto');
     // La animación de la portada se para ya (su último cuadro se queda en el fundido de 1,5 s): seguía dibujando a pantalla
     // completa encima de los primeros cuadros del vuelo de entrada, los más cargados.
-    portada.parar();
-    setTimeout(() => { entrada.style.display = 'none'; }, 1600);
+    // (Sus nodos se quitan después, con la portada ya fuera: quitarlos aquí era maquetación en el cuadro del clic.)
+    portada.parar({ retirar: false });
+    // Fuera del todo (display: none, y la portada suelta su WebGL) cuando acaba el fundido Y el vuelo de entrada: hacerlo a
+    // los 1,6 s caía en pleno vuelo (estilo, maquetación y una capa menos que componer en un cuadro ya cargado). Mientras
+    // tanto sigue en su capa con opacidad 0, sin eventos y con sus animaciones en pausa: no cuesta nada.
+    const lienzo3D = document.getElementById('galaxia'), t0 = performance.now();
+    const retirar = () => {
+      if (lienzo3D?.dataset.viaje && performance.now() - t0 < 30000) { setTimeout(retirar, 400); return; }
+      entrada.style.display = 'none'; portada.retirar?.();
+    };
+    setTimeout(retirar, 1600);
     document.body.classList.add('dentro');
     document.getElementById('hud').inert = false;
     setTimeout(() => document.getElementById('btn-tour')?.focus({ preventScroll: true }), 1700);
@@ -198,6 +207,9 @@ export function crearEntrada(config, { viaje, banda } = {}) {
   async function completar() {
     await decidido;   // (casi siempre ya resuelto: la carga tarda mucho más que la respuesta del servidor)
     preparado = true; boton.disabled = continuar.disabled = false; boton.classList.add('preparado');
+    // La portada ya en su propia capa (la del fundido de salida) mientras se lee la tarjeta: al pulsar «Empezar» solo cambia
+    // su opacidad (en el compositor), sin crear la capa ni pintarla entera en ese cuadro.
+    entrada.style.willChange = 'opacity';
     if (sinIntro) { entrada.classList.remove('cargando'); mostrarTarjeta(); return; }
     // Al 100 %: el clip y la canción (si ya se tocó; si no, empezarán con el toque).
     if (!cancion || tocado) cuandoCancion(empezarClip);

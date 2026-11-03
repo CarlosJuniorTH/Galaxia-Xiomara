@@ -1190,7 +1190,11 @@ export function crearPortada(lienzo, { reloj = () => null, calma = false, alFras
   const api = {
     // Para las pruebas: un cuadro en un instante dado (sin esperar al reloj).
     dibujar,
-    parar() { activo = false; cancelAnimationFrame(id); removeEventListener('resize', alCambiar); clearTimeout(esperaMedir); try { lienzoGL.getContext('webgl')?.getExtension('WEBGL_lose_context')?.loseContext(); } catch {} lienzoGL.remove(); capaRotulos.remove(); },
+    // parar: deja de dibujar (su último cuadro se queda en el fundido); retirar: suelta su WebGL y quita sus nodos. Con
+    // { retirar: false } lo segundo se deja para cuando la portada ya no se ve (entrada.js): quitar nodos en el clic de
+    // «Empezar» obligaba a recalcular la maquetación en ese mismo cuadro.
+    parar({ retirar = true } = {}) { activo = false; cancelAnimationFrame(id); removeEventListener('resize', alCambiar); clearTimeout(esperaMedir); if (retirar) api.retirar(); },
+    retirar() { try { lienzoGL.getContext('webgl')?.getExtension('WEBGL_lose_context')?.loseContext(); } catch {} lienzoGL.remove(); capaRotulos.remove(); },
     get finalDado() { return finalDado; },
     // (para las pruebas: dónde queda el pequeño mundo del final, en px CSS)
     get mundo() { return { x: Fx, y: Fy, r: Sf }; },
