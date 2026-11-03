@@ -45,18 +45,22 @@ export const ESCENA_PULSAR = {
   // del estribillo (el primero, justo en el grave del 16,71).
   // Cámara LENTA y suave (Carlos): sin cortes ni giros bruscos; un solo arco que rodea al púlsar hacia la izquierda (~9°/s)
   // mientras se acerca, y que pasa por el camino del haz justo en los golpes (270° en el pre-estribillo, 180° en el grave).
-  // Planos a ~0,39 radios: en el móvil vertical el toro ocupa ~90 % del ancho, entero y centrado.
+  // Un acercamiento hasta el grave (~0,39 radios: en el móvil vertical el toro ocupa ~90 % del ancho, entero y centrado) y,
+  // desde ahí, un alejamiento lento y continuo hasta el encuadre final (sin ir y venir). Durante el estribillo la cámara
+  // sube poco a poco por encima del cono que barre el haz (de 30° a 45°): se ve el cono entero que dibuja el faro, cada
+  // barrido desde un poco más arriba; en la instrumental y la segunda vuelta vuelve a bajar despacio.
   camara: [
     { t: 0, pos: [0, 8, 1.0], mira: [0, 0, 0], fov: 50, curva: 'suave' },             // llegada: dormido, sin haces
     { t: 4.86, pos: [-35, 18, 0.62], mira: [0, 0, 0], fov: 50, curva: 'suave' },      // «quererte»: nacen los haces; se acerca
     { t: 8.6, pos: [-75, 27, 0.44], mira: [0, 0, 0], fov: 48, curva: 'suave' },       // «caliente»: late y acelera
-    { t: 12.4, pos: [-95, 30, 0.39], mira: [0, 0, 0], fov: 48, curva: 'lineal' },     // en el camino del haz (11,14): «nunca falla»
+    { t: 12.4, pos: [-95, 30, 0.395], mira: [0, 0, 0], fov: 48, curva: 'lineal' },    // en el camino del haz (11,14): «nunca falla»
     { t: 14.5, pos: [-137, 30, 0.39], mira: [0, 0, 0], fov: 48, curva: 'lineal' },    // «de tu amor»: sigue el arco, sin prisa
     { t: 16.7, pos: [-180, 30, 0.39], mira: [0, 0, 0], fov: 48, curva: 'lineal' },    // el haz la atraviesa en el grave
-    { t: 22.3, pos: [-212, 28, 0.38], mira: [0, 0, 0], fov: 48, curva: 'lineal' },    // estribillo: el faro barre una y otra vez
-    { t: 27.9, pos: [-245, 18, 0.6], mira: [0, 0, 0], fov: 52, curva: 'suave' },     // instrumental: se abre despacio
-    { t: 31.2, pos: [-268, 24, 0.42], mira: [0, 0, 0], fov: 50, curva: 'suave' },     // segunda vuelta: vuelve a acercarse
-    { t: 33.6, pos: [-285, 14, 0.62], mira: [0, 0, 0], fov: 52, curva: 'suave' }      // queda despierto: encuadre final
+    { t: 20.3, pos: [-198, 37, 0.41], mira: [0, 0, 0], fov: 48, curva: 'lineal' },    // estribillo: sube sobre el cono del faro…
+    { t: 24.5, pos: [-222, 45, 0.45], mira: [0, 0, 0], fov: 49, curva: 'lineal' },    // …hasta verlo entero desde arriba
+    { t: 27.9, pos: [-245, 36, 0.52], mira: [0, 0, 0], fov: 51, curva: 'lineal' },    // instrumental: se abre despacio
+    { t: 31.2, pos: [-268, 24, 0.57], mira: [0, 0, 0], fov: 52, curva: 'lineal' },    // segunda vuelta
+    { t: 33.6, pos: [-285, 16, 0.62], mira: [0, 0, 0], fov: 52, curva: 'suave' }      // queda despierto: encuadre final
   ]
 };
 
