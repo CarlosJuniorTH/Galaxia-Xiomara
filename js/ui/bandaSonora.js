@@ -429,6 +429,8 @@ export function crearBandaSonora({ volumen = () => 0.85 } = {}) {
     // El botón de música (y el toque de la portada): con ella apagada nada suena ni se descarga de más.
     activar(valor) { activa = !!valor; if (activa && objetivo === null) objetivo = reposo(); if (activa && ctx && ctx.state !== 'running') { ctx.resume().catch(() => {}); maestro.gain.setValueAtTime(1, ctx.currentTime); } aplicar(activa ? 0.8 : 0.3); },
     ir,
+    // Pedir ya la canción de un momento que la cola de reposo no baja (los videoclips de los meses, solo cuando tocan).
+    pedir(nombre) { const p = pistas.get(nombre); if (p?.estado === 'pendiente') descargar(p); else if (p?.estado === 'guardada') decodificar(p); },
     // La ceremonia de un lugar (la supernova): su canción desde ese segundo, a la vez que la animación.
     ceremonia: (nombre, desde = 0) => ir(nombre, { desde }),
     // Instante del reloj maestro en que la canción de ese momento está en su segundo 0 (null si no está programada). Las

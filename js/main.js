@@ -8,6 +8,7 @@ import { crearContador } from './ui/contador.js';
 import { crearMensajes } from './ui/mensajes.js';
 import { crearCarta } from './ui/carta.js';
 import { crearRecuerdos } from './ui/recuerdos.js';
+import { guionVuelta } from './util/guionVuelta.js';
 import './util/horno.js';   // empieza a descargar los cálculos horneados en cuanto arranca la página
 import { crearEfectos } from './ui/efectos.js';
 import { escucharToques } from './ui/toques.js';
@@ -129,6 +130,7 @@ try {
   const recuerdos = crearRecuerdos(CONFIG, estrellas, progreso, {
     alEncontrar: i => { escena.marcarEstrella(i); navigator.vibrate?.(40); },
     alCompletar: () => interfaz.celebrar(),
+    alMesNuevo: m => interfaz.verClip(m),
   });
   interfaz = crearInterfazUniverso({ config: CONFIG, escena, progreso, recuerdos, estrellas, efectos, musica, viaje, banda });
   contemplacion = crearContemplacion({
@@ -167,6 +169,8 @@ try {
     else escena.iniciar(continuar?.destino || 'hogar');
     if (['render', 'completo'].includes(new URLSearchParams(location.search).get('diag'))) diagnosticoRender();
     if (new URLSearchParams(location.search).get('diag') === 'gigantes') setTimeout(async () => { while (escena.viajando) await new Promise(r => setTimeout(r, 300)); const { diagnosticarGigantes } = await import('./escena/diagnosticoGigantes.js'); diagnosticarGigantes(escena, interfaz); }, 3000);
+    // El día de un videoclip, una invitación hasta que se vea.
+    { const meses = estrellas.length - 1; if (guionVuelta(meses) && !progreso.tiene('celebraciones', `clip-${meses}`) && !progreso.tiene('estrellas', estrellas[meses].id)) setTimeout(() => interfaz.avisar(meses === 12 ? 'Hoy se cierra nuestra primera vuelta al Sol. Busca la última estrella. ♡' : 'Hay una estrella nueva esperándote. Encuéntrala: hoy pasa algo. ♡'), 14000); }
     if (!progreso.disponible) interfaz.avisar('El guardado local no está disponible. Puedes explorar durante esta visita.');
     try { if (!sessionStorage.getItem('xiomara:bienvenida')) { setTimeout(() => interfaz.avisar('Empieza por «Deja que te lleve» o elige una órbita en Explorar.'), 8500); sessionStorage.setItem('xiomara:bienvenida', '1'); } } catch {}
   });

@@ -26,6 +26,14 @@
 - Tocar la pantalla durante un clip no saca besos ni frases (20bf642). El panel de abajo vuelve siempre al terminar
   (cbc1290).
 
+## Clips de la primera vuelta al Sol (meses 11 y 12)
+- Guion puro en `js/util/guionVuelta.js`, escena propia en `js/escena/teatroVuelta.js` (una geometría, un dibujo, todo en el
+  vértice), interfaz en `js/ui/teatroVuelta.js`. La escena grande no se dibuja mientras dura; todo se prepara con la
+  pantalla en negro y se libera al terminar. Canciones `mes-11.m4a` y `mes-12.m4a`: fuera de la cola de reposo (`precarga.js`),
+  se piden solo cuando tocan.
+- Se ven con `?fecha=2026-11-15` / `?fecha=2026-12-15` en el servidor de casa. Capturas: `tests/navegador/tiraVuelta.mjs`.
+- `js/escena/anilloVuelta.js`: desde el mes 11, un dibujo más en casa (el trozo de órbita ya recorrido).
+
 ## Viajes
 - 10–15 s en un movimiento continuo, recorridos por distancia real (7b69846). Plan del vuelo en un obrero desde el clic
   (7715786). El paso al sistema solar cambia de escena con la pantalla ya negra (e4c0fd6).

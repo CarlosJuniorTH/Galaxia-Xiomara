@@ -58,6 +58,22 @@
     "hasta": 94.621,
     "lufs": -16
   },
+  "mes-11.m4a": {
+    "bytes": 638590,
+    "duracion": 38.85,
+    "origen": "Deneb-Galaxia",
+    "desde": 64.39,
+    "hasta": 103.24,
+    "lufs": -16
+  },
+  "mes-12.m4a": {
+    "bytes": 1600750,
+    "duracion": 98.01,
+    "origen": "Intro-Galaxia",
+    "desde": 100.66,
+    "hasta": 198.67,
+    "lufs": -16
+  },
   "pulsar-estancia.m4a": {
     "bytes": 653664,
     "duracion": 40.4,

@@ -26,6 +26,9 @@ import { EXPOSICION } from './exposicion.js';
 import { crearTelaranaCosmica, pedirDatosTelarana } from './telarana.js';
 import { crearCieloProfundo } from './cieloProfundo.js';
 import { crearPreparacion } from './carga/preparacion.js';
+import { crearTeatroVuelta } from './teatroVuelta.js';
+import { crearAnilloVuelta } from './anilloVuelta.js';
+import { mesesCumplidos } from '../util/tiempo.js';
 import { matricesSoloVisibles, actualizarVisibles } from './matrices.js';
 import { crearRutas } from './camara/rutas.js';
 import { construirMaravillas } from './maravillas.js';
@@ -597,6 +600,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // «Mirar hacia casa» desde un gigante: los gigantes están casi en el plano de la galaxia de Xiomara y se veía de canto (una
   // raya). Mientras se mira, casa se inclina hacia la cámara (como una foto desde arriba, ~45°) solo al dibujar: antes del
   // dibujo se gira alrededor de su centro y después vuelve a su sitio (la lógica de cada parte no lo nota).
+  // Desde el mes 11, alrededor de casa, el trozo de órbita ya recorrido (se decide al cargar: un dibujo solo si toca).
+  const mesesAnillo = mesesCumplidos(config.fechaInicio, new Date()), anilloVuelta = mesesAnillo >= 11 ? crearAnilloVuelta({ scene, uPR: nucleo.uPR, meses: mesesAnillo }) : null;
   const todaCasa = scene.children.filter(o => ['mundos', 'galaxia', 'amor', 'agujeroNegro', 'corazon', 'nombre', 'frases', 'secretas', 'polvo', 'marcaSolar'].includes(o.userData.capa) || o === marcaSolar);
   const giroCasa = new THREE.Quaternion(), guardadoCasa = todaCasa.map(() => [new THREE.Vector3(), new THREE.Quaternion()]), ejeCasa = new THREE.Vector3(), haciaCamCasa = new THREE.Vector3();
   const ajenosCasa = [];
@@ -1187,11 +1192,15 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   let nivelEnsayo = 0, cuentaEnsayo = 0, ultimoEnsayo = -Infinity;   // 3D detrás de la portada (precalentar)
   const tmpPunto = new THREE.Vector3(), tmpDesvioVuelo = new THREE.Vector3(), tmpMirada = new THREE.Vector3();
   const tmpDir = new THREE.Vector3(), tmpProy = new THREE.Vector3();   // temporales del bucle (sin crear objetos en cada cuadro)
+  const teatroVuelta = crearTeatroVuelta(renderer);
+  let cuadroTeatro = null;
   function animar(ahora) {
     requestAnimationFrame(animar);
     // El reloj maestro (el del audio) avanza una vez por cuadro, también sin dibujar: las marcas de la banda sonora se
     // disparan aquí y todo lo que se mueve con la música lee este mismo instante.
     const sMaestro = relojMaestro.cuadro(ahora);
+    // Un videoclip de la primera vuelta al Sol tiene su propia escena: la grande no trabaja ni se dibuja mientras dura.
+    if (cuadroTeatro) { prev = ahora; if (!document.hidden) cuadroTeatro(); return; }
     // Estados: con una carta o panel abiertos se conserva la última imagen sin trabajo 3D
     // (en todos los dispositivos); una postal pendiente siempre obtiene su cuadro.
     // Junto al cometa se sigue dibujando mientras se lee: se le ve alejarse con la carta abierta.
@@ -1231,6 +1240,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     cuadrosDibujados++;
     const inicioCuadro = medir ? performance.now() : 0;
     tiempo += dt;
+    anilloVuelta?.actualizar(tiempo);
     mundos.moverCometa(tiempo, dt, { tiempoDentro: tEntrada === null ? null : tiempo - tEntrada, camera });
     if (tEntrada === null) {
       camera.position.x = Math.sin(tiempo * 0.025) * 400 - 2400;
@@ -1633,6 +1643,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     get viajeBreve() { return viajeBreve; },
     set viajeBreve(v) { viajeBreve = !!v; try { localStorage.setItem('xiomara:viaje-breve', viajeBreve ? '1' : '0'); } catch {} },
     mirarCasa: activar => mirarCasa(activar),
+    teatroVuelta,
+    abrirTeatro(fn) { cuadroTeatro = fn; },
+    cerrarTeatro() { cuadroTeatro = null; planificador.pedirCuadro(); },
     get mirandoCasa() { return !!mirada && !mirada.saliendo; },
     get lejosDeCasa() { return camera.position.length() > 15000; },
     volver: () => viajar('hogar'),

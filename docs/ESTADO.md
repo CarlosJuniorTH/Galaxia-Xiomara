@@ -3,6 +3,10 @@
 Lo nuevo arriba. Se consulta con `grep`; no se lee entero. Resumen por temas de `git log --oneline` (los hashes
 permiten ver el detalle con `git show <hash>`).
 
+## 2026-11-04 · La primera vuelta al Sol
+
+Videoclips «Falta una luz» (mes 11) y «La primera vuelta» (mes 12), anillo de la órbita alrededor de casa, dial de doce marcas y tema dorado del día del año. Textos de los clips: borrador para Carlos (`js/util/guionVuelta.js`).
+
 ## Estado (2026-11-03)
 
 - `main` = 9c52a7b (cada push a `main` se publica en GitHub Pages). Trabajo en curso en la rama `mejoras/noviembre`.

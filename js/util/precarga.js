@@ -11,7 +11,7 @@
 import { enReposo } from './descargas.js';
 
 // Lo que ya descarga la carga por su cuenta, o que la página no pide nunca (o solo con herramientas de diagnóstico).
-const PROPIO = /^(assets\/texturas\/|assets\/horno\/|assets\/musica\/(inicio|viajes)\.m4a$|assets\/musica\/prueba\/|assets\/escucha-ciegas\/|assets\/vendor\/|editor\.html$|js\/editor\.js$|css\/editor\.css$|js\/escena\/diagnostico\w*\.js$|sw\.js$|paquetes\.json$)|\.txt$|LICENSE$/;
+const PROPIO = /^(assets\/texturas\/|assets\/horno\/|assets\/musica\/(inicio|viajes|mes-\d+)\.m4a$|assets\/musica\/prueba\/|assets\/escucha-ciegas\/|assets\/vendor\/|editor\.html$|js\/editor\.js$|css\/editor\.css$|js\/escena\/diagnostico\w*\.js$|sw\.js$|paquetes\.json$)|\.txt$|LICENSE$/;
 
 // Prioridad en la cola (menor = antes).
 export function prioridad(ruta) {

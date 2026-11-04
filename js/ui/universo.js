@@ -3,6 +3,8 @@ import { DESTINOS, LEJANOS, lugaresDeZona, CARTAS, CAPSULAS, SUENOS, SORPRESAS, 
 import { relojZona, fechaBonita, capsulaAbierta, partesEnZona } from '../util/tiempo.js';
 import { momentoDelDia } from '../util/sol.js';
 import { crearCieloNoche } from './cieloNoche.js';
+import { crearTeatroUI } from './teatroVuelta.js';
+import { guionVuelta, MESES_CON_CLIP } from '../util/guionVuelta.js';
 import { crearSupernovaAmor } from './supernovaAmor.js';
 import { crearFaroCuasar } from './faroCuasar.js';
 import { crearMapa } from './mapa.js';
@@ -27,6 +29,7 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
   const destinoCometa = { id: 'cometa', nombre: 'Un beso fuera de órbita', tipo: 'Una visita inesperada', texto: 'Este viajero no se queda para siempre. Se acerca un ratito, deja una pequeña sorpresa y sigue su camino entre las estrellas.', accion: 'Abrir la sorpresa del cometa' };
   const datos = id => DESTINOS.find(d => d.id === id) || LEJANOS.find(d => d.id === id) || destinoCometa;
   const cieloNoche = crearCieloNoche();
+  const teatro = crearTeatroUI({ escena, banda, config, estrellas });
   crearPresentacionViajes({ canvas: $('galaxia'), escena, nombre: id => id === 'supernova' ? 'nuestra supernova' : id === 'hogar' ? 'nuestra galaxia' : datos(id).nombre, elegirDestino: () => abrirPanel('lugares') });
   const supernovaAmor = crearSupernovaAmor({ escena, progreso, musica, banda, alDescubrir: () => { if (actual === 'supernova') situar('supernova'); } });
   // El púlsar y Deneb: su escena al llegar (sincronizable con su audio: relojDe).
@@ -324,6 +327,7 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
       separar();
       contenido.append(el('p', 'intro-panel', `También has abierto ${progreso.estado.cartas.length} ${progreso.estado.cartas.length === 1 ? 'carta' : 'cartas'}, descubierto ${progreso.estado.cometas.length} ${progreso.estado.cometas.length === 1 ? 'sorpresa' : 'sorpresas'} y tejido ${progreso.estado.constelaciones.length} de ${CONSTELACIONES.length} constelaciones.`));
       if (progreso.estado.suenos.length) contenido.append(el('p', 'intro-panel', `${progreso.estado.suenos.length} sueños marcados como cumplidos. Cada uno conserva su luz en el jardín.`));
+      for (const m of MESES_CON_CLIP) if (progreso.tiene('estrellas', estrellas[m]?.id)) contenido.append(boton(`✦ Ver «${guionVuelta(m).titulo}»`, 'secundario ancho', () => verClip(m)));
       if (n === estrellas.length) contenido.append(boton('♡ Volver a vivir la celebración', 'primario ancho', () => { cerrarPanel(); celebrar(); }));
       else contenido.append(boton('⌁ Ayúdame a encontrar otra estrella', 'primario ancho', () => { cerrarPanel(); darPista(); }));
       separar();
@@ -497,6 +501,14 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     $('reunion-mes').textContent = mes; $('reunion-titulo').textContent = titulo; $('reunion-detalle').textContent = detalle;
     r.classList.add('visible');
   }
+  const clipPendiente = m => !!guionVuelta(m) && !progreso.tiene('celebraciones', `clip-${m}`);
+  async function verClip(m, { dentroDeCelebracion = false } = {}) {
+    if (!guionVuelta(m) || teatro.activo || (!dentroDeCelebracion && (celebrando || tour || escena.viajando))) return;
+    if (!dentroDeCelebracion) { if (panel.open) cerrarPanel(); celebrando = true; }
+    progreso.anotar('celebraciones', `clip-${m}`);
+    await teatro.reproducir(m);
+    if (!dentroDeCelebracion) celebrando = false;
+  }
   async function celebrar() {
     if (celebrando) return; celebrando = true;
     const version = ++celebracionRevision, sigue = () => version === celebracionRevision;
@@ -524,7 +536,10 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     mostrarReunion(`${fechaBonita(estrellas.at(-1).id)}`, meses ? `${meses} ${meses === 1 ? 'mes' : 'meses'} de nosotros` : 'Nuestra primera estrella', `Cada luz de este corazón la encontraste tú: ${indices.length} ${indices.length === 1 ? 'recuerdo' : 'recuerdos'}.`);
     escena.besar(); efectos.fuegos(3500);
     await esperar(5200);
-    if (sigue()) finalCelebracion();
+    if (!sigue()) return;
+    // El mes 11 y el mes 12 tienen su videoclip antes de la carta (una vez; luego, desde el álbum).
+    if (clipPendiente(meses)) { $('omitir-celebracion').hidden = true; await verClip(meses, { dentroDeCelebracion: true }); if (!sigue()) return; }
+    finalCelebracion();
   }
   async function postal({ supernova = false } = {}) {
     if (tour) pausarRuta(true);
@@ -619,5 +634,5 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
   }
   let tickActivo = false;
   const despertarTick = () => { if (tickActivo) return; tickActivo = true; ultimo = performance.now(); requestAnimationFrame(tick); };
-  return { get contemplando() { return contemplando || performance.now() - salidaContemplar < 700; }, contemplar, abrirCieloNoche: () => cieloNoche.abrir(), get celebrando() { return celebrando; }, actualizarAlbum() { if (panelActual === 'album') abrirPanel('album'); }, avisar, get enLasGrandes() { return enLasGrandes(); }, situar, visitar, llegada, escenaEnCurso, terminarEscena, get escenaActual() { return escenaActual ? { id: escenaActual.id, restante: Math.max(0, (escenaActual.fin - performance.now()) / 1000) } : null; }, alConstelar, tocarNodo, celebrar, abrirPanel, sorpresa, pausarRuta, iniciarRuta, get enRuta() { return tour; } };
+  return { verClip, teatro, get contemplando() { return contemplando || performance.now() - salidaContemplar < 700; }, contemplar, abrirCieloNoche: () => cieloNoche.abrir(), get celebrando() { return celebrando; }, actualizarAlbum() { if (panelActual === 'album') abrirPanel('album'); }, avisar, get enLasGrandes() { return enLasGrandes(); }, situar, visitar, llegada, escenaEnCurso, terminarEscena, get escenaActual() { return escenaActual ? { id: escenaActual.id, restante: Math.max(0, (escenaActual.fin - performance.now()) / 1000) } : null; }, alConstelar, tocarNodo, celebrar, abrirPanel, sorpresa, pausarRuta, iniciarRuta, get enRuta() { return tour; } };
 }

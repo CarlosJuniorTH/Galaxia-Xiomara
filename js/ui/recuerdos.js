@@ -3,12 +3,13 @@ import { crearEscritura } from './escritura.js';
 import { fechaBonita } from '../util/tiempo.js';
 import { cartaDelMes } from '../data/contenido.js';
 
-export function crearRecuerdos(config, estrellas, progreso, { alEncontrar, alCompletar, alCerrar = () => {} }) {
+export function crearRecuerdos(config, estrellas, progreso, { alEncontrar, alCompletar, alMesNuevo, alCerrar = () => {} }) {
   const $ = id => document.getElementById(id);
-  let pendienteCelebrar = false;
+  let pendienteCelebrar = false, pendienteMes = 0;   // (la estrella del mes con videoclip, aunque aún falten otras)
   const ventana = crearVentana('recuerdo', { alCerrar: () => {
     alCerrar();
     if (pendienteCelebrar) { pendienteCelebrar = false; setTimeout(alCompletar, 550); }
+    else if (pendienteMes) { const m = pendienteMes; pendienteMes = 0; setTimeout(() => alMesNuevo?.(m), 550); }
   } });
   const escritura = crearEscritura($('celebracion-texto'), $('celebracion-firma'), 24);
   const celebracion = crearVentana('celebracion', { alCerrar: () => escritura.parar() });
@@ -34,6 +35,7 @@ export function crearRecuerdos(config, estrellas, progreso, { alEncontrar, alCom
     const faltan = estrellas.length - encontradas().length;
     $('recuerdo-progreso').textContent = faltan ? `Qued${faltan === 1 ? 'a' : 'an'} ${faltan} ${faltan === 1 ? 'luz por encontrar' : 'luces por encontrar'}. Este recuerdo ya vive en tu álbum.` : 'Todas nuestras estrellas están encendidas. Hay una sorpresa al cerrar…';
     pendienteCelebrar = nueva && faltan === 0 && !progreso.tiene('celebraciones', estrellas.at(-1).id);
+    pendienteMes = nueva && !pendienteCelebrar && i === estrellas.length - 1 && i > 0 ? i : 0;
     ventana.abrir();
   }
   function mostrarCelebracion() {

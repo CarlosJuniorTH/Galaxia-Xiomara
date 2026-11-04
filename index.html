@@ -24,6 +24,7 @@
   <link rel="stylesheet" href="css/interfaz.css">
   <link rel="stylesheet" href="css/ventanas.css">
   <link rel="stylesheet" href="css/universo.css">
+  <link rel="stylesheet" href="css/teatro.css">
 
   <!-- Solo en navegadores sin mapas de importación nativos (Safari anterior a iOS 16.4…): los demás no lo descargan. -->
   <!-- Vista previa de una fecha (?fecha=2026-11-15): solo en el servidor de casa, nunca en la web publicada. -->
@@ -79,6 +80,7 @@
       <div id="titulo-texto"></div>
       <div id="contador"></div>
       <div id="contador-sub"></div>
+      <svg id="dial-vuelta" viewBox="0 0 24 24" role="img" hidden></svg>
       <div id="pastilla-estrellas"></div>
     </header>
     <div id="mensaje" class="fuera"></div>
@@ -192,6 +194,7 @@
   <div id="sobre-animado" class="sobre-animado" hidden aria-hidden="true"><div class="sobre"><div class="sobre-carta"><i></i><i></i><i></i><b>♡</b></div><div class="sobre-cuerpo"></div><div class="sobre-solapa"></div></div></div>
   <div id="cometa-frase" class="cometa-frase" hidden aria-live="polite"><span aria-hidden="true">☄</span><p id="cometa-frase-texto"></p></div>
   <div id="reunion" class="reunion" hidden aria-live="polite"><div id="reunion-mes" class="ceja"></div><div id="reunion-titulo" class="reunion-titulo"></div><div id="reunion-detalle" class="reunion-detalle"></div></div>
+  <div id="teatro" hidden aria-live="polite"><div class="teatro-negro"></div><div class="teatro-mes"><small></small><strong></strong></div><div class="teatro-textos"></div></div>
   <div id="tejido" class="tejido" hidden><span id="tejido-texto">Uniendo nuestras estrellas…</span><i></i><button id="omitir-celebracion" hidden>Ir directamente a mi carta ↗</button></div>
   <canvas id="galaxia"></canvas>
   <canvas id="efectos"></canvas>

@@ -82,7 +82,10 @@ export const MOMENTOS = {
   // Una canción por mes (1 = enero … 12 = diciembre, en la hora de Argentina): suena en casa durante ese mes en lugar
   // del ambiente. Basta con añadir más meses con la misma forma.
   mes: {
-    10: momento({ volumen: 0.8 })
+    10: momento({ volumen: 0.8 }),
+    // Los videoclips de la primera vuelta al Sol (js/util/guionVuelta.js): tramos que el universo aún no había usado.
+    11: momento({ archivo: 'mes-11.m4a', duracion: 38.85 }),
+    12: momento({ archivo: 'mes-12.m4a', duracion: 98.01 })
   }
 };
 

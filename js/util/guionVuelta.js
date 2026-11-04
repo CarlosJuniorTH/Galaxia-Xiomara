@@ -1,0 +1,86 @@
+// Los dos videoclips de la primera vuelta al Sol: «Falta una luz» (mes 11) y «La primera vuelta» (mes 12). Solo datos y
+// cálculo, sin Three.js ni DOM: la escena (js/escena/teatroVuelta.js) y su interfaz (js/ui/teatroVuelta.js) leen este guion en
+// el segundo de la canción. Física que cuentan: dos astros que giran uno alrededor del otro recorren juntos la órbita; cada
+// 30° es un mes; al mes 11 queda un tramo sin recorrer y al mes 12 la órbita se cierra sobre su propio comienzo.
+const GRADO = Math.PI / 180, VUELTA = Math.PI * 2;
+export const PASO_MES = VUELTA / 12;
+
+// Interpolación monótona (Fritsch–Carlson): sin rebasar ninguna clave, así la cámara nunca da marcha atrás entre dos planos.
+export function pistaSuave(claves) {
+  const n = claves.length, t = claves.map(c => c[0]), v = claves.map(c => c[1]), m = new Array(n).fill(0), d = [];
+  for (let i = 0; i < n - 1; i++) d[i] = (v[i + 1] - v[i]) / (t[i + 1] - t[i]);
+  m[0] = d[0]; m[n - 1] = d[n - 2];
+  for (let i = 1; i < n - 1; i++) m[i] = d[i - 1] * d[i] <= 0 ? 0 : (d[i - 1] + d[i]) / 2;
+  for (let i = 0; i < n - 1; i++) {
+    if (d[i] === 0) { m[i] = 0; m[i + 1] = 0; continue; }
+    const a = m[i] / d[i], b = m[i + 1] / d[i], s = a * a + b * b;
+    if (s > 9) { const k = 3 / Math.sqrt(s); m[i] = k * a * d[i]; m[i + 1] = k * b * d[i]; }
+  }
+  return s => {
+    if (s <= t[0]) return v[0];
+    if (s >= t[n - 1]) return v[n - 1];
+    let i = 0; while (s > t[i + 1]) i++;
+    const h = t[i + 1] - t[i], u = (s - t[i]) / h, u2 = u * u, u3 = u2 * u;
+    return (2 * u3 - 3 * u2 + 1) * v[i] + (u3 - 2 * u2 + u) * h * m[i] + (-2 * u3 + 3 * u2) * v[i + 1] + (u3 - u2) * h * m[i + 1];
+  };
+}
+const suave = (a, b, s) => { const k = Math.min(1, Math.max(0, (s - a) / (b - a))); return k * k * k * (k * (k * 6 - 15) + 10); };
+
+// Textos propios (BORRADOR: revisar Carlos). Ninguno cita la canción.
+const GUIONES = {
+  11: {
+    id: 'mes-11', titulo: 'Falta una luz', duracion: 38.85,
+    // El primer mes en cuanto se ve la órbita; cada mes, un poco más de dos compases; noviembre se posa al entrar el final.
+    frente: pistaSuave([[0, 0], [2.3, 0], [8, 45 * GRADO], [20, 192 * GRADO], [28, 306 * GRADO], [31.5, 330 * GRADO], [38.85, 330 * GRADO]]),
+    camara: {
+      az: pistaSuave([[0, 196], [14, 232], [28, 268], [38.85, 292]]),
+      el: pistaSuave([[0, 24], [16, 36], [38.85, 52]]),
+      dist: pistaSuave([[0, 21], [16, 23], [38.85, 27]]),
+      mira: [pistaSuave([[0, 0], [38.85, 0]]), pistaSuave([[0, 0], [38.85, 0]]), pistaSuave([[0, 0], [38.85, 0]])]
+    },
+    meses: { desde: 2.3, hasta: 33.2 },
+    textos: [
+      { desde: 33.2, hasta: 38.2, clase: 'grande', texto: 'Once meses.' },
+      { desde: 34.6, hasta: 38.2, clase: 'pie', texto: 'Falta una luz.' }
+    ],
+    abrir: () => 0, nombres: () => 0, ola: () => -1, corona: null, chispas: [],
+    espera: s => suave(32, 35, s)
+  },
+  12: {
+    id: 'mes-12', titulo: 'La primera vuelta', duracion: 98.01,
+    // El último tramo acaba justo en el estribillo (14,02 s, el compás 114,68 de la canción): ahí se cierra la órbita.
+    frente: pistaSuave([[0, 330 * GRADO], [3, 330 * GRADO], [14.02, 360 * GRADO], [98.01, 360 * GRADO]]),
+    camara: {
+      az: pistaSuave([[0, 306], [14, 342], [44, 402], [62, 446], [78, 472], [98.01, 492]]),
+      el: pistaSuave([[0, 10], [14, 16], [44, 30], [62, 66], [98.01, 72]]),
+      dist: pistaSuave([[0, 15], [14, 19], [44, 30], [62, 40], [98.01, 44]]),
+      // Mira primero al tramo que falta y, una vez cerrada, al Sol.
+      mira: [pistaSuave([[0, 8.5], [14, 7], [24, 0], [98.01, 0]]), pistaSuave([[0, 0], [18, 0], [32, 2.5], [48, 2.5], [62, 0], [98.01, 0]]), pistaSuave([[0, -4.6], [14, -1.5], [24, 0], [98.01, 0]])]
+    },
+    meses: null,
+    textos: [
+      { desde: 0.8, hasta: 7.5, clase: 'pie', texto: 'Faltaba una luz…' },
+      { desde: 14.2, hasta: 17.8, clase: 'grande', texto: 'Una vuelta al Sol' },
+      { desde: 46, hasta: 56, clase: 'pie', texto: 'De una órbita nació un universo.' },
+      { desde: 78.1, hasta: 95.5, clase: 'grande abajo', texto: 'Un año' },
+      { desde: 79.6, hasta: 95.5, clase: 'pie abajo', texto: '15 · 12 · 2025 — 15 · 12 · 2026' }
+    ],
+    abrir: s => suave(44, 62, s),
+    nombres: s => suave(62, 78, s),
+    // La luz que recorre la órbita recién cerrada, dos vueltas (en radianes; −1 = apagada).
+    ola: s => s < 14.02 || s > 18.5 ? -1 : (s - 14.02) / 4.48 * 2 * VUELTA,
+    // Cada estrella sube de la órbita en su compás: de la primera (18 s) a la decimotercera (42 s).
+    corona: { inicio: 18, paso: 2 },
+    chispas: [78.04, 80.04, 82.01, 84.03, 86.03, 88.03, 90.02, 92.02],
+    espera: () => 0
+  }
+};
+export const guionVuelta = meses => GUIONES[meses] || null;
+export const MESES_CON_CLIP = Object.keys(GUIONES).map(Number);
+
+// El mes que se está nombrando en ese segundo (−1 si ninguno).
+export function mesEnEscena(guion, s) {
+  if (guion.corona) { const i = Math.floor((s - guion.corona.inicio) / guion.corona.paso); return i >= 0 && i < 13 ? i : -1; }
+  if (s < guion.meses.desde || s >= guion.meses.hasta) return -1;
+  return Math.min(11, Math.floor(guion.frente(s) / PASO_MES + 1e-6));
+}

@@ -1,0 +1,32 @@
+/* Los videoclips de la primera vuelta al Sol: sobre el lienzo, nada más que sus textos. */
+#teatro{position:fixed;inset:0;z-index:60;pointer-events:none;color:#f8ecdf;text-align:center}
+#teatro[hidden]{display:none}
+body.en-teatro>*:not(#galaxia):not(#teatro):not(script):not(style){visibility:hidden !important;pointer-events:none !important}
+.teatro-negro{position:absolute;inset:0;background:#05010c;opacity:0;transition:opacity .9s ease}
+.teatro-negro.activo{opacity:1}
+.teatro-mes,.teatro-linea{position:absolute;left:0;right:0;padding:0 24px;opacity:0;transform:translateY(6px);transition:opacity .55s ease,transform .55s ease;will-change:opacity,transform}
+.teatro-mes{bottom:calc(env(safe-area-inset-bottom,0px) + 11vh)}
+.teatro-mes.visible,.teatro-linea.visible{opacity:1;transform:none}
+.teatro-mes small{display:block;font:500 clamp(.68rem,2.8vw,.8rem)/1.4 'Quicksand',sans-serif;letter-spacing:.2em;text-transform:uppercase;color:#e8c6a0}
+.teatro-mes strong{display:block;margin-top:.35em;font:italic 500 clamp(1.45rem,6.4vw,2.2rem)/1.15 'Cormorant Garamond',Georgia,serif;color:#fff6ec}
+.teatro-linea.grande{top:15vh;font:italic 500 clamp(2.1rem,9.5vw,3.5rem)/1.1 'Cormorant Garamond',Georgia,serif;color:#fff6ec}
+.teatro-linea.pie{bottom:calc(env(safe-area-inset-bottom,0px) + 12vh);font:italic 500 clamp(1.3rem,5.6vw,2rem)/1.2 'Cormorant Garamond',Georgia,serif;color:#f4d9b4}
+.teatro-linea.grande.abajo{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 9.5vh);color:#f6d595}
+.teatro-linea.pie.abajo{bottom:calc(env(safe-area-inset-bottom,0px) + 6vh);font:500 clamp(.66rem,2.7vw,.8rem)/1.4 'Quicksand',sans-serif;letter-spacing:.2em;color:#e8c6a0}
+@media (prefers-reduced-motion:reduce){.teatro-mes,.teatro-linea{transform:none}}
+/* El dial de la primera vuelta, junto a la cuenta atrás. */
+#dial-vuelta{position:absolute;left:50%;top:100%;width:26px;height:26px;margin:8px 0 0 -13px;overflow:visible}
+@media(max-width:900px){#dial-vuelta{margin-top:52px}}
+#dial-vuelta[hidden]{display:none}
+#dial-vuelta .llena{fill:#f2c777}
+#dial-vuelta .vacia{fill:#ffffff30}
+#dial-vuelta .espera{fill:#ffe9c2;animation:dial-espera 2.4s ease-in-out infinite}
+@keyframes dial-espera{50%{opacity:.25}}
+/* El día del mes 11, un toque; el día del año, todo en dorado. */
+body.dia-mes-once #titulo-texto{color:#f8dfb6}
+body.dia-anio #titulo-texto{color:#f6d595;text-shadow:none}
+body.dia-anio #contador,body.dia-anio #contador-sub{color:#f2d7a4}
+body.dia-anio .papel-especial{border-color:#d9ae62}
+body.dia-anio #celebracion-titulo,body.dia-anio .firma{color:#f2c777}
+body.dia-anio #btn-entrar{border-color:#d9ae62}
+@media (prefers-reduced-motion:reduce){#dial-vuelta .espera{animation:none}}
