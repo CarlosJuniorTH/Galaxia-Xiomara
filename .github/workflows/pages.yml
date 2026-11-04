@@ -28,6 +28,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+      # esbuild (minifica el JS y el CSS de dist/) viene de las dependencias del proyecto.
+      - name: Instalar dependencias
+        run: npm ci
       - name: Preparar dist/
         run: node scripts/preparar-pages.mjs
       - uses: actions/configure-pages@v5
