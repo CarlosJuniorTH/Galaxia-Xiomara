@@ -13,6 +13,11 @@ export const DESTINOS = [
   { id: 'azul', mapa: [-640, -430], icono: '☾', nombre: 'Dos orillas, un cielo', tipo: 'España y Argentina', posicion: [1650, -100, 1600], foco: [0, 22, 0], distancia: 225, color: '#adc8ff', texto: 'Puede que mi tarde y tu mañana no empiecen a la vez. Pero hay algo que compartimos a cualquier hora: estas ganas de encontrarnos.', detalle: 'Dos pequeñas luces se buscan y vuelven a encontrarse, una y otra vez.', accion: 'Rodar con su luna' },
   { id: 'calma', icono: '༄', nombre: 'Aquí, contigo', tipo: 'Un refugio sin prisa', posicion: [120, 1450, -3200], distancia: 540, color: '#c9c2f5', texto: 'No tienes que encontrar nada. No tienes que terminar nada. Quédate un ratito: este pedacito de universo también sabe acompañarte en silencio.', detalle: 'El cielo gira despacio. Lo demás puede esperar.', accion: 'Quedarme aquí contigo' }
 ];
+// Lugares que el universo abre con el tiempo: antes de su día, no existen. Fecha en Argentina, como las estrellas.
+// (No usa util/tiempo.js: ese módulo importa este.)
+const HOY_ARGENTINA = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).format(new Date());
+if (HOY_ARGENTINA >= '2026-11-15') DESTINOS.push({ id: 'dossoles', icono: '∞', nombre: 'Dos soles', tipo: 'Una estrella doble', posicion: [2500, 640, 1050], distancia: 640, color: '#ffc58a', texto: 'Dos estrellas que nacieron lejos y que la gravedad fue acercando. Ya se dan luz la una a la otra, y juntas dibujan un infinito.' });   // BORRADOR: revisar Carlos
+if (HOY_ARGENTINA >= '2026-12-15') DESTINOS.push({ id: 'vuelta', icono: '☉', nombre: 'Nuestra primera vuelta', tipo: 'Un año alrededor del Sol', posicion: [-1750, -820, -2150], distancia: 560, color: '#f2c777', texto: 'Trece estrellas, doce meses y una órbita cerrada. Lo que empezó con una sola luz, ya ha dado la vuelta entera.' });   // BORRADOR: revisar Carlos
 // Objetos que se visitan sin acercarlos (los seis grandes, más allá de nuestra galaxia, y el gigante del corazón, que
 // vive en el sistema solar: ver ZONAS_LUGARES). La cámara viaja
 // hasta donde están de verdad en el cielo (el cielo deja de acompañarla durante el viaje).
@@ -36,7 +41,7 @@ export const LEJANOS = [
 //    (viaLactea.js, con su centro en él), y Deneb, en este universo, una supergigante lejana: los dos, fuera.
 export const ZONAS_LUGARES = Object.freeze({
   solar: Object.freeze(['rosa', 'cartas', 'azul', 'gigante']),
-  galaxia: Object.freeze(['hogar', 'constelacion', 'suenos', 'capsulas', 'calma']),
+  galaxia: Object.freeze(['hogar', 'constelacion', 'suenos', 'capsulas', 'calma', ...DESTINOS.filter(d => d.id === 'dossoles' || d.id === 'vuelta').map(d => d.id)]),
   fuera: Object.freeze(LEJANOS.map(l => l.id).filter(id => id !== 'gigante'))
 });
 export const lugarPorId = id => DESTINOS.find(d => d.id === id) || LEJANOS.find(d => d.id === id) || null;

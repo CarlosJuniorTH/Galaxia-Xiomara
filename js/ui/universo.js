@@ -82,6 +82,8 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
   }
   // Al terminar un viaje (en el mismo cuadro que la canción del destino): la escena de un gigante empieza ya.
   function llegada(id) {
+    // El lugar nuevo tiene su videoclip en cada visita (fuera de un recorrido o un paseo), como las grandes.
+    if (id === 'dossoles' && !tour && !contemplando) setTimeout(() => { if (actual === 'dossoles' && !escena.viajando) verClip('dossoles'); }, 500);
     if (!GIGANTES.has(id)) { terminarEscena(); return; }
     // La supernova, en cada visita, su ceremonia (la primera vez estalla; después renace y vuelve a estallar).
     const duracion = id === 'supernova' ? (corazonNacido() ? 4 : 0) + TIEMPOS_AMOR.espera + TIEMPOS_AMOR.revelar + 4.5 : banda?.duracion(id) || 0;
@@ -174,7 +176,7 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     $('lugar-tipo').textContent = d.tipo; $('lugar-nombre').textContent = id === 'hogar' ? 'Nuestro pequeño infinito' : nacido ? 'Donde nuestra luz se encontró' : d.nombre;
     $('lugar-texto').textContent = id === 'hogar' ? 'Hay una historia escondida entre estas estrellas. La nuestra.' : nacido ? `De tanta luz, nacimos nosotros. ${FRASE_SUPERNOVA}` : d.texto;
     // En los seis gigantes, tras su videoclip: «Volver a sentirlo» (la supernova, cuando su corazón ya ha nacido).
-    const textoAccion = id === 'hogar' ? 'Explorar los lugares' : nacido || (GIGANTES.has(id) && id !== 'supernova') ? 'Volver a sentirlo' : id === 'constelacion' && escena.constelada ? 'Elegir otra figura' : d.accion;
+    const textoAccion = id === 'hogar' ? 'Explorar los lugares' : id === 'dossoles' || id === 'vuelta' ? 'Volver a sentirlo' : nacido || (GIGANTES.has(id) && id !== 'supernova') ? 'Volver a sentirlo' : id === 'constelacion' && escena.constelada ? 'Elegir otra figura' : d.accion;
     $('lugar-accion').replaceChildren(document.createTextNode(textoAccion), el('span', '', '↗'));
     // En el corazón ya nacido: contemplarlo aislado o con el universo, y guardar su postal.
     $('lugar-extra').hidden = !nacido;
@@ -257,6 +259,8 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
         else { tejer(); escena.accion('constelacion'); }
       }
       else if (id === 'calma') { modoCalma(true); escena.accion('calma'); }
+      else if (id === 'dossoles') await verClip('dossoles');
+      else if (id === 'vuelta') await verClip(12);
       else if (id === 'cometa') sorpresa();
       else if (id === 'supernova') await verSupernova();
       else if (GIGANTES.has(id)) await volverASentirlo(id);   // su gesto: volver a sentir su videoclip

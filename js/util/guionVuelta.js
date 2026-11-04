@@ -75,11 +75,35 @@ const GUIONES = {
     espera: () => 0
   }
 };
-export const guionVuelta = meses => GUIONES[meses] || null;
-export const MESES_CON_CLIP = Object.keys(GUIONES).map(Number);
+// «Dos soles», el videoclip del lugar nuevo (js/escena/dosSoles.js): separación, ángulo del giro, corriente e infinito.
+// El infinito acaba de cara a la cámara: su ángulo es el de la cámara más 90° (y dos vueltas).
+GUIONES.dossoles = {
+  id: 'mes-dossoles', titulo: 'Dos soles', duracion: 59.28, binaria: true,
+  // En cada segundo: la cámara, más arriba al final para leer el infinito.
+  frente: () => 0, abrir: () => 0, nombres: () => 0, ola: () => -1, espera: () => 0, corona: null, chispas: [], meses: null,
+  camara: {
+    az: pistaSuave([[0, 30], [20, 60], [46, 100], [59.28, 110]]),
+    el: pistaSuave([[0, 22], [30, 38], [46, 62], [59.28, 66]]),
+    dist: pistaSuave([[0, 40], [20.62, 38], [30.93, 31], [46, 29], [59.28, 28]]),
+    mira: [() => 0, () => 0, () => 0]
+  },
+  sep: pistaSuave([[0, 25], [20.62, 24], [30.93, 11], [46, 14 * Math.SQRT1_2], [59.28, 14 * Math.SQRT1_2]]),
+  ang: pistaSuave([[0, 0], [20, 200], [31, 520], [46, 910], [59.28, 920]]),   // en grados
+  flujo: s => suave(22, 33, s),
+  infinito: s => suave(33, 46, s),
+  textos: [
+    { desde: 2.5, hasta: 10, clase: 'pie', texto: 'Dos soles, con un océano en medio.' },
+    { desde: 21, hasta: 29.5, clase: 'pie', texto: 'Pero la gravedad no entiende de distancias.' },
+    { desde: 34, hasta: 44, clase: 'pie', texto: 'Cada uno le da al otro parte de su luz.' },
+    { desde: 47.5, hasta: 57.5, clase: 'grande', texto: 'Nuestro pequeño infinito' }
+  ]
+};
+export const guionVuelta = clave => GUIONES[clave] || null;
+export const MESES_CON_CLIP = [11, 12];
 
 // El mes que se está nombrando en ese segundo (−1 si ninguno).
 export function mesEnEscena(guion, s) {
+  if (!guion.corona && !guion.meses) return -1;
   if (guion.corona) { const i = Math.floor((s - guion.corona.inicio) / guion.corona.paso); return i >= 0 && i < 13 ? i : -1; }
   if (s < guion.meses.desde || s >= guion.meses.hasta) return -1;
   return Math.min(11, Math.floor(guion.frente(s) / PASO_MES + 1e-6));

@@ -5,6 +5,7 @@
 // Luz solo con motas nítidas: nada de halos ni posproceso (sin bloom, sin tone mapping).
 import * as THREE from 'three';
 import { guionVuelta } from '../util/guionVuelta.js';
+import { geometriaDosSoles, materialDosSoles } from './dosSoles.js';
 
 const F_HEBRA = 0, F_SOL = 2, F_FONDO = 3, F_MARCA = 4, F_PAR = 5, F_CHISPA = 6, F_HILO = 7;
 const N_HEBRA = 45000, N_SOL = 15000, N_FONDO = 3000, N_HILO = 5000, N_POR_CHISPA = 1500;
@@ -166,18 +167,42 @@ const FRAGMENTO = /* glsl */`
     gl_FragColor = vec4(vColor * a, 1.0);
   }`;
 
+// «Nuestra primera vuelta», el lugar del año: la órbita ya cerrada, con su Sol y sus trece estrellas, en su grupo del universo.
+export function crearLugarVuelta({ grupo, renderer, uPR, escala = 11 }) {
+  const N = 11000, nSol = 4500, total = N * 2 + nSol + 13, A = new Float32Array(total * 4); let k = 0;
+  const r = azar(1512); const poner = (a, s, f, w) => { A.set([a, s, f, w], k * 4); k++; };
+  const G = new Float32Array(total * 3), esfera = () => { const y = r() * 2 - 1, f = r() * Math.PI * 2, q = Math.sqrt(1 - y * y); return [q * Math.cos(f), y, q * Math.sin(f)]; };
+  for (let h = 0; h < 2; h++) for (let i = 0; i < N; i++) poner((i + r()) / N * Math.PI * 2, r(), F_HEBRA, h);
+  for (let i = 0; i < nSol; i++) { G.set(esfera(), k * 3); poner(0, r(), F_SOL, r() < 0.2 ? 1 : 0); }
+  for (let i = 0; i < 13; i++) poner(0, r(), F_MARCA, i);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(total * 3), 3));
+  geo.setAttribute('aA', new THREE.BufferAttribute(A, 4)); geo.setAttribute('aG', new THREE.BufferAttribute(G, 3)); geo.setAttribute('aN', new THREE.BufferAttribute(new Float32Array(total * 3), 3));
+  const v = { value: 0 }, u = { uT: v, uFrente: { value: Math.PI * 2 + 0.01 }, uAbrir: { value: 0 }, uNombres: { value: 0 }, uOla: { value: -1 }, uEspera: { value: 0 }, uPx: { value: 1000 }, uTexto: { value: 1 }, uPR, uCoronaInicio: { value: 0 }, uCoronaPaso: { value: 1 }, uHayCorona: { value: 0 }, uChispaX: { value: 1 }, uChispaY: { value: 1 }, uChispaAbajo: { value: 0 } };
+  const puntos = new THREE.Points(geo, new THREE.ShaderMaterial({ vertexShader: VERTICE, fragmentShader: FRAGMENTO, uniforms: u, transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, toneMapped: false }));
+  puntos.frustumCulled = false; puntos.scale.setScalar(escala); puntos.rotation.x = 0.28; grupo.add(puntos);
+  const tam = new THREE.Vector2();
+  return { puntos, actualizar(t, camara) { renderer.getDrawingBufferSize(tam); v.value = t; u.uPx.value = tam.y / (2 * Math.tan(camara.fov * Math.PI / 360)) * escala; } };
+}
+
 export function crearTeatroVuelta(renderer) {
   const escena = new THREE.Scene(), camara = new THREE.PerspectiveCamera(40, 1, 0.1, 900);
   let puntos = null, guion = null;
   const u = {
     uT: { value: 0 }, uFrente: { value: 0 }, uAbrir: { value: 0 }, uNombres: { value: 0 }, uOla: { value: -1 }, uEspera: { value: 0 },
-    uPx: { value: 1000 }, uTexto: { value: 10 }, uPR: { value: 1 }, uCoronaInicio: { value: 0 }, uCoronaPaso: { value: 1 }, uHayCorona: { value: 0 }, uChispaX: { value: 1 }, uChispaY: { value: 1 }, uChispaAbajo: { value: 1 }
+    uPx: { value: 1000 }, uTexto: { value: 10 }, uPR: { value: 1 }, uCoronaInicio: { value: 0 }, uCoronaPaso: { value: 1 }, uHayCorona: { value: 0 }, uChispaX: { value: 1 }, uChispaY: { value: 1 }, uChispaAbajo: { value: 1 },
+    uSep: { value: 1 }, uAng: { value: 0 }, uFlujo: { value: 0 }, uInfinito: { value: 0 }
   };
   const tam = new THREE.Vector2(), mira = new THREE.Vector3();
 
   async function preparar(meses) {
     liberar();
     guion = guionVuelta(meses); if (!guion) return false;
+    if (guion.binaria) {
+      puntos = new THREE.Points(geometriaDosSoles(), materialDosSoles(u)); puntos.frustumCulled = false; escena.add(puntos);
+      fijar(0); renderer.compile(escena, camara);
+      return true;
+    }
     const r = azar(20251215 + meses), conNombres = !!guion.corona;
     const nChispas = guion.chispas.length * N_POR_CHISPA, nHilo = conNombres ? N_HILO : 0;
     const total = N_HEBRA * 2 + N_SOL + N_FONDO + 13 + 2 + nChispas + nHilo;
@@ -236,6 +261,7 @@ export function crearTeatroVuelta(renderer) {
     camara.lookAt(mira);
     const mediaAltura = Math.tan(camara.fov * Math.PI / 360);
     u.uT.value = s; u.uFrente.value = guion.frente(s); u.uAbrir.value = guion.abrir(s); u.uNombres.value = guion.nombres(s); u.uOla.value = guion.ola(s); u.uEspera.value = guion.espera(s);
+    if (guion.binaria) { u.uSep.value = guion.sep(s); u.uAng.value = guion.ang(s) * Math.PI / 180; u.uFlujo.value = guion.flujo(s); u.uInfinito.value = guion.infinito(s); }
     u.uPx.value = tam.y / (2 * mediaAltura); u.uPR.value = renderer.getPixelRatio();
     u.uTexto.value = Math.min(0.66, 0.86 * aspecto) * PROFUNDIDAD_TEXTO * mediaAltura;
     // Las chispas estallan fuera del círculo de los nombres: en vertical solo arriba (abajo está su texto), en horizontal a los lados.

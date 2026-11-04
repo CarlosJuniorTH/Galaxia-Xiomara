@@ -26,8 +26,10 @@ import { EXPOSICION } from './exposicion.js';
 import { crearTelaranaCosmica, pedirDatosTelarana } from './telarana.js';
 import { crearCieloProfundo } from './cieloProfundo.js';
 import { crearPreparacion } from './carga/preparacion.js';
-import { crearTeatroVuelta } from './teatroVuelta.js';
+import { crearTeatroVuelta, crearLugarVuelta } from './teatroVuelta.js';
 import { crearAnilloVuelta } from './anilloVuelta.js';
+import { crearLugarDosSoles } from './dosSoles.js';
+import { crearCrecimiento } from './crecimiento.js';
 import { mesesCumplidos } from '../util/tiempo.js';
 import { matricesSoloVisibles, actualizarVisibles } from './matrices.js';
 import { crearRutas } from './camara/rutas.js';
@@ -295,7 +297,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   velo.frustumCulled = false; velo.renderOrder = -5; velo.visible = false; scene.add(velo);
   // Cuánto se apaga el fondo en cada lugar: más donde el mensaje es un dibujo de luz.
   // Distancia mínima de la cámara a cada lugar (radio del objeto con margen).
-  const CERCA = { hogar: 300, rosa: 240, azul: 95, cartas: 195, constelacion: 260, suenos: 235, capsulas: 180, calma: 245, cometa: 170 };
+  const CERCA = { hogar: 300, rosa: 240, azul: 95, cartas: 195, constelacion: 260, suenos: 235, capsulas: 180, calma: 245, cometa: 170, dossoles: 300, vuelta: 260 };
   // Salto a la velocidad de la luz: estelas de estrellas alrededor de la cámara que se
   // alargan con la velocidad del viaje (y el campo de visión se abre un poco en el tramo
   // más rápido). Fuera de los vuelos, ocultas.
@@ -545,6 +547,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     { c: v3(DESTINOS.find(d => d.id === 'suenos').posicion), r: 215 },         // jardín
     { c: v3(DESTINOS.find(d => d.id === 'calma').posicion), r: 215 },          // refugio
     { c: v3(DESTINOS.find(d => d.id === 'constelacion').posicion), r: 170 },   // constelación
+    ...DESTINOS.filter(d => d.id === 'dossoles' || d.id === 'vuelta').map(d => ({ c: v3(d.posicion), r: 200 })),   // los lugares que abre el tiempo
     { c: CENTRO_GIGANTE.clone(), r: RADIO_GIGANTE * 3.2 },                     // gigante gaseoso y su cinturón
     ...OTROS_PLANETAS.map(p => ({ c: p.centro.clone(), r: p.radio * (p.anillos ? 2.6 : 1.8) + 30 }))   // el resto del sistema solar
   ];
@@ -602,6 +605,10 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // dibujo se gira alrededor de su centro y después vuelve a su sitio (la lógica de cada parte no lo nota).
   // Desde el mes 11, alrededor de casa, el trozo de órbita ya recorrido (se decide al cargar: un dibujo solo si toca).
   const mesesAnillo = mesesCumplidos(config.fechaInicio, new Date()), anilloVuelta = mesesAnillo >= 11 ? crearAnilloVuelta({ scene, uPR: nucleo.uPR, meses: mesesAnillo }) : null;
+  // La galaxia crece cada mes (crecimiento.js), y los lugares que abre el tiempo (data/universo.js) traen su objeto.
+  crearCrecimiento({ grupo: galaxia.grupo, uPR: nucleo.uPR, meses: mesesAnillo });
+  const lugarDosSoles = mundos.grupos.has('dossoles') ? crearLugarDosSoles({ grupo: mundos.grupos.get('dossoles'), renderer, uPR: nucleo.uPR }) : null;
+  const lugarVuelta = mundos.grupos.has('vuelta') ? crearLugarVuelta({ grupo: mundos.grupos.get('vuelta'), renderer, uPR: nucleo.uPR }) : null;
   const todaCasa = scene.children.filter(o => ['mundos', 'galaxia', 'amor', 'agujeroNegro', 'corazon', 'nombre', 'frases', 'secretas', 'polvo', 'marcaSolar'].includes(o.userData.capa) || o === marcaSolar);
   const giroCasa = new THREE.Quaternion(), guardadoCasa = todaCasa.map(() => [new THREE.Vector3(), new THREE.Quaternion()]), ejeCasa = new THREE.Vector3(), haciaCamCasa = new THREE.Vector3();
   const ajenosCasa = [];
@@ -1240,7 +1247,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     cuadrosDibujados++;
     const inicioCuadro = medir ? performance.now() : 0;
     tiempo += dt;
-    anilloVuelta?.actualizar(tiempo);
+    anilloVuelta?.actualizar(tiempo); lugarDosSoles?.actualizar(tiempo, camera); lugarVuelta?.actualizar(tiempo, camera);
     mundos.moverCometa(tiempo, dt, { tiempoDentro: tEntrada === null ? null : tiempo - tEntrada, camera });
     if (tEntrada === null) {
       camera.position.x = Math.sin(tiempo * 0.025) * 400 - 2400;
