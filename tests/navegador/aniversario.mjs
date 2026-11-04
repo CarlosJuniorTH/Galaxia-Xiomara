@@ -38,9 +38,9 @@ export default async function ({ base, informe }) {
       informe.comprobar(textos[11].titulo === 'Once meses' && textos[11].texto.length > 40, 'la estrella del mes 11 abre su recuerdo «Once meses»', textos[11].titulo);
       informe.comprobar(textos.every(t => !/Carlos/.test(t.texto)), 'ningún recuerdo dice que falta que Carlos lo escriba');
       informe.comprobar(/Todas nuestras estrellas están encendidas/.test(await pagina.textContent('#recuerdo-progreso')), 'con la duodécima, todas están encendidas');
-      // Al cerrar el último recuerdo empieza la celebración (viaje a casa, corazón de estrellas) y luego la carta.
+      // Al cerrar el último recuerdo empieza la celebración (viaje a casa, corazón de estrellas), su videoclip y luego la carta.
       await pagina.evaluate(() => document.querySelector('#recuerdo .cerrar').click());
-      await pagina.waitForFunction(() => document.getElementById('celebracion').classList.contains('abierta'), null, { timeout: 60000 });
+      await pagina.waitForFunction(() => document.getElementById('celebracion').classList.contains('abierta'), null, { timeout: 180000 });
       await pagina.click('#celebracion .papel', { position: { x: 30, y: 200 } }).catch(() => {});   // termina de escribirla
       await pagina.waitForTimeout(800);
       const carta = await pagina.evaluate(() => ({ titulo: document.getElementById('celebracion-titulo').textContent, texto: document.getElementById('celebracion-texto').textContent }));
