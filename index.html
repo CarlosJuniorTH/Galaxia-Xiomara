@@ -26,6 +26,9 @@
   <link rel="stylesheet" href="css/universo.css">
 
   <!-- Solo en navegadores sin mapas de importación nativos (Safari anterior a iOS 16.4…): los demás no lo descargan. -->
+  <!-- Vista previa de una fecha (?fecha=2026-11-15): solo en el servidor de casa, nunca en la web publicada. -->
+  <script>{ const f = !/github\.io$/.test(location.hostname) && new URLSearchParams(location.search).get('fecha'), t = f && Date.parse(/T/.test(f) ? f : f + 'T12:00:00');
+    if (t) { const D = Date, desfase = t - D.now(); window.Date = class extends D { constructor(...a) { super(...(a.length ? a : [D.now() + desfase])); } static now() { return D.now() + desfase; } }; } }</script>
   <script>if (!(window.HTMLScriptElement && HTMLScriptElement.supports && HTMLScriptElement.supports('importmap'))) { const s = document.createElement('script'); s.async = true; s.src = 'assets/vendor/es-module-shims.js'; document.head.appendChild(s); }</script>
   <script type="importmap">
   {"imports":{"three":"./assets/vendor/three/three.module.min.js","three/addons/":"./assets/vendor/three/addons/"}}
