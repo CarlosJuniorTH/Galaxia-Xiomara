@@ -94,6 +94,7 @@ dialog::backdrop{background:#08041052;backdrop-filter:blur(4px);}
 /* La postal entera y el botón de guardarla a la vista: en el móvil la imagen (alta, como la pantalla) empujaba el botón
    fuera y había que desplazarse para encontrarlo. */
 .postal-dialogo{width:min(700px,calc(100vw - 32px));}.postal-dialogo img{display:block;width:auto;max-width:100%;max-height:calc(100dvh - var(--arriba) - var(--abajo) - 280px);margin:0 auto 20px;border-radius:12px;}.postal-dialogo .primario{display:flex;}
+@media(max-width:420px){.postal-dialogo img{max-height:calc(100dvh - var(--arriba) - var(--abajo) - 325px);}}   /* (en estrecho, la ceja y el título ocupan dos líneas cada uno) */
 .resumen-album{display:flex;align-items:center;gap:18px;margin-bottom:22px;}.resumen-numero{font-family:'Cormorant Garamond',serif;font-size:3.5rem;color:var(--oro);line-height:1;}.resumen-album p{font-size:.72rem;line-height:1.7;color:#d6c6dc;}
 .capitulo-titulo{font-size:var(--letra-ceja);font-weight:600;letter-spacing:2.4px;color:var(--oro);margin:24px 0 14px;text-transform:uppercase;}
 .zona-titulo{margin:6px 0 6px;}.zona-titulo+.intro-panel{font-size:1.02rem;margin-bottom:14px;}
