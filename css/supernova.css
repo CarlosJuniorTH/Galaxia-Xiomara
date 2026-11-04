@@ -49,7 +49,10 @@ body.supernova-en-escena #brindis,body.supernova-en-escena #mensaje,body.superno
 
 /* Corazón ya nacido: dos acciones discretas en la tarjeta del lugar (contemplar aislado y postal). */
 .lugar-extra[hidden]{display:none!important}
-.lugar-extra{display:flex;gap:14px;margin-top:10px;flex-wrap:wrap}
-.lugar-extra button{font:500 .64rem 'Quicksand',sans-serif;letter-spacing:.4px;color:#e7c9d6;background:none;border:0;border-bottom:1px solid #e7c9d64d;padding:6px 0;min-height:36px;cursor:pointer}
-.lugar-extra button:hover,.lugar-extra button[aria-pressed="true"]{color:#f6dcc0;border-bottom-color:#f6dcc0aa}
+.lugar-extra{display:flex;gap:14px;margin-top:8px;flex-wrap:wrap}
+.lugar-extra button{font:500 .72rem 'Quicksand',sans-serif;letter-spacing:.3px;color:#eed4df;background:none;border:0;border-bottom:1px solid #e7c9d666;padding:6px 0;min-height:32px;cursor:pointer;text-shadow:var(--sombra-texto)}
+.lugar-extra button[aria-pressed="true"]{color:#f6dcc0;border-bottom-color:#f6dcc0aa}
+@media(hover:hover){.lugar-extra button:hover{color:#f6dcc0;border-bottom-color:#f6dcc0aa}}
+/* La carta del faro («Hay algo para ti») es un regalo, no una opción más: pastilla dorada como «Volver al centro». */
+#lugar-faro button{color:var(--oro);padding:6px 15px;border:1px solid #e8c6a073;border-radius:var(--radio-pastilla);background:#1a1226d9;text-shadow:none}
 .lugar-extra button:focus-visible{outline:2px solid #f6d6a9;outline-offset:4px;border-radius:6px}

@@ -83,7 +83,7 @@
 .entrada-opciones{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;column-gap:4px;margin-top:6px;}
 .entrada-opciones .enlace-suave+.enlace-suave::before{content:'·';margin-right:8px;color:rgba(255,215,235,.4);}
 .entrada-opciones[hidden]{display:none;}
-.entrada-opciones .enlace-suave{font-size:.62rem;padding:7px 4px;border-bottom:none;color:rgba(255,215,235,.7);}
+.entrada-opciones .enlace-suave{font-size:var(--letra-nota);padding:7px 4px;border-bottom:none;color:rgba(255,222,238,.82);}
 
 .tarjeta-foto{
   position:relative;border-radius:18px;overflow:hidden;aspect-ratio:4/3;margin-bottom:16px;

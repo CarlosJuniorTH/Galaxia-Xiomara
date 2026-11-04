@@ -14,6 +14,16 @@
      y un grano fino (una imagen fija: se pinta una vez y la GPU solo la compone). */
   --grano:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 .92 0 0 0 0 .96 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)'/%3E%3C/svg%3E");
   --brillo-vidrio:linear-gradient(165deg,rgba(255,236,246,.07),rgba(255,236,246,0) 50%);
+  /* Medidas comunes de la interfaz: mismos radios en todas las ventanas y un suelo para la letra pequeña (cejas en
+     mayúsculas espaciadas, notas y botones; por debajo de ~10 px no se lee en el móvil). */
+  --radio-ventana:24px;
+  --radio-tarjeta:16px;
+  --radio-pastilla:999px;
+  --letra-ceja:.64rem;
+  --letra-nota:.7rem;
+  --letra-boton:.74rem;
+  /* Texto sobre el cielo: contorno oscuro corto y pegado a las letras (se lee sobre el disco brillante; no es un halo). */
+  --sombra-texto:0 1px 2px #08020fe6,0 0 6px #08020fb3;
   --arriba:env(safe-area-inset-top,0px);
   --abajo:env(safe-area-inset-bottom,0px);
 }
