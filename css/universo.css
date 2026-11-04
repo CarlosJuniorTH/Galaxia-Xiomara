@@ -91,7 +91,9 @@ dialog::backdrop{background:#08041052;backdrop-filter:blur(4px);}
 .lectura>.cerrar-panel,.postal-dialogo>.cerrar-panel{position:absolute;top:15px;right:15px;}
 .lectura h2,.postal-dialogo h2{font-family:'Cormorant Garamond',serif;font-size:2.5rem;line-height:1.05;font-weight:400;margin:12px 0 24px;color:#f4deeb;}
 .lectura p,.lectura #lectura-texto{font-family:'Cormorant Garamond',serif;font-size:1.25rem;line-height:1.65;color:#dcc9dc;}.lectura #lectura-texto p{margin-bottom:18px;}.lectura .firma{font-size:1.8rem;color:var(--oro);}.acciones-dialogo{display:flex;gap:12px;justify-content:flex-end;margin-top:26px;flex-wrap:wrap;}.problema-3d .acciones-dialogo{justify-content:center;margin-top:0;}
-.postal-dialogo{width:min(700px,calc(100vw - 32px));}.postal-dialogo img{display:block;width:100%;border-radius:12px;margin-bottom:20px;}.postal-dialogo .primario{display:flex;}
+/* La postal entera y el botón de guardarla a la vista: en el móvil la imagen (alta, como la pantalla) empujaba el botón
+   fuera y había que desplazarse para encontrarlo. */
+.postal-dialogo{width:min(700px,calc(100vw - 32px));}.postal-dialogo img{display:block;width:auto;max-width:100%;max-height:calc(100dvh - var(--arriba) - var(--abajo) - 280px);margin:0 auto 20px;border-radius:12px;}.postal-dialogo .primario{display:flex;}
 .resumen-album{display:flex;align-items:center;gap:18px;margin-bottom:22px;}.resumen-numero{font-family:'Cormorant Garamond',serif;font-size:3.5rem;color:var(--oro);line-height:1;}.resumen-album p{font-size:.72rem;line-height:1.7;color:#d6c6dc;}
 .capitulo-titulo{font-size:var(--letra-ceja);font-weight:600;letter-spacing:2.4px;color:var(--oro);margin:24px 0 14px;text-transform:uppercase;}
 .zona-titulo{margin:6px 0 6px;}.zona-titulo+.intro-panel{font-size:1.02rem;margin-bottom:14px;}
@@ -244,13 +246,14 @@ body:has(.brindis.visible) #mensaje{opacity:0;}
 .btn-mapa{position:fixed;z-index:16;left:30px;top:calc(var(--arriba) + 92px);width:44px;height:44px;border-radius:50%;display:grid;place-items:center;padding:0;cursor:pointer;
   border:1px solid var(--linea);background:var(--grano),var(--brillo-vidrio),#20132be6;color:#f1dcc4;transition:opacity 1.2s ease,scale .14s ease;}
 .btn-mapa svg{width:22px;height:22px;}
-.mapa{position:fixed;z-index:30;left:24px;top:calc(var(--arriba) + 142px);width:min(420px,calc(100vw - 32px));padding:14px 14px 10px;border-radius:22px;
+.mapa{position:fixed;z-index:30;left:24px;top:calc(var(--arriba) + 142px);width:min(420px,calc(100vw - 32px));padding:14px 14px 10px;border-radius:var(--radio-ventana);
   max-height:calc(100dvh - var(--arriba) - 158px);overflow-y:auto;overscroll-behavior:contain;
-  background:#170f22;border:1px solid #e8c6a033;box-shadow:0 20px 60px #0009;color:#f4e2ef;}
+  background:#170f22;border:1px solid #e4c4dc2b;box-shadow:0 20px 60px #0009;color:#f4e2ef;}
 .mapa[hidden]{display:none;}
-.mapa-cabecera{display:flex;justify-content:space-between;align-items:flex-start;margin:0 2px 6px;}
+.mapa-cabecera{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin:0 2px 6px;}
 .mapa-cabecera strong{display:block;font-family:'Cormorant Garamond',serif;font-weight:500;font-size:1.45rem;line-height:1.15;}
-.mapa-cabecera button{border:none;background:none;color:#f4e2ef;font-size:1rem;padding:4px 6px;cursor:pointer;}
+/* El mismo ✕ redondo que los paneles (antes, 25×28 px). */
+.mapa-cabecera button{display:grid;place-items:center;flex-shrink:0;width:44px;height:44px;border-radius:50%;border:1px solid var(--linea);background:#dec0d512;color:#e7d3e4;cursor:pointer;}
 #mapa-svg{width:100%;height:auto;display:block;}
 /* Zonas: encabezados como la ceja del resto de la interfaz, marcos y bordes de trazo fino. */
 /* Los textos llevan un contorno nítido del color del panel (no un halo): se leen sobre motas e hilos. */
@@ -284,7 +287,7 @@ body:has(.brindis.visible) #mensaje{opacity:0;}
 .mapa-aqui{fill:none;stroke:#ffe1b0;stroke-width:1.4;animation:latido-mapa 2s ease-in-out infinite;transform-box:fill-box;transform-origin:center;}
 @keyframes latido-mapa{50%{transform:scale(1.35);opacity:.5}}
 .mapa-lugar:focus-visible .mapa-punto{stroke:#fff;stroke-width:2;}
-.mapa-nota{margin:6px 2px 2px;font-size:.62rem;color:#d9c3d6aa;line-height:1.4;}
+.mapa-nota{margin:8px 2px calc(var(--abajo) + 2px);font-size:var(--letra-nota);color:#d9c3d6;line-height:1.45;}
 div.contemplando .btn-mapa{opacity:0;pointer-events:none;}
 body.en-ruta .btn-mapa,body.en-calma .btn-mapa{display:none;}
 @media(max-width:600px){
