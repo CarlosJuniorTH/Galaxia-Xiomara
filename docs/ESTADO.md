@@ -5,7 +5,7 @@ permiten ver el detalle con `git show <hash>`).
 
 ## 2026-11-04 · La primera vuelta al Sol
 
-Videoclips «Falta una luz» (mes 11) y «La primera vuelta» (mes 12), anillo de la órbita alrededor de casa, dial de doce marcas y tema dorado del día del año. Textos de los clips: borrador para Carlos (`js/util/guionVuelta.js`).
+Videoclips «Falta una luz» (mes 11) y «La primera vuelta» (mes 12), anillo de la órbita alrededor de casa, dial de doce marcas y tema dorado del día del año. Textos de los clips: borrador para Carlos (`js/util/guionVuelta.js`). También: lugares por fecha «Dos soles» (15/11, con videoclip) y «Nuestra primera vuelta» (15/12), crecimiento mensual de la galaxia (`js/escena/crecimiento.js`), pulido de CSS de toda la interfaz.
 
 ## Estado (2026-11-03)
 

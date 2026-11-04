@@ -8,7 +8,7 @@ const L_INFINITO = 14;
 
 export const VERTICE_DOS_SOLES = /* glsl */`
   #define PI 3.14159265
-  uniform float uT, uSep, uAng, uFlujo, uInfinito, uPx, uPR;
+  uniform float uT, uSep, uAng, uFlujo, uInfinito, uPx, uPR, uAtenua;
   attribute vec4 aA;   // x: parámetro · y: semilla · z: familia (0 estrellas, 1 corriente, 2 infinito, 3 fondo) · w: 0 oro, 1 rosa
   attribute vec3 aG;   // dirección sobre la estrella o en el cielo
   varying vec3 vColor;
@@ -22,7 +22,7 @@ export const VERTICE_DOS_SOLES = /* glsl */`
       vec3 d = vec3(c * aG.x - s * aG.z, aG.y, s * aG.x + c * aG.z);
       float granulo = sin(d.x * 8.0 + uT * 0.7) * sin(d.y * 10.0 - uT * 0.5) * sin(d.z * 9.0 + uT * 0.4);
       mundo = centro(k) + d * (1.55 + granulo * 0.04);
-      float mu = dot(d, normalize(cameraPosition - mundo));
+      float mu = dot(normalize(normalMatrix * d), normalize(-(modelViewMatrix * vec4(mundo, 1.0)).xyz));   // (en la vista: también vale con el objeto a escala)
       if (mu > 0.0) { brillo = (0.24 + 0.76 * pow(mu, 0.7)) * (0.3 + 0.3 * semilla); tam = 0.07; color = mix(color, PERLA, smoothstep(0.0, 0.8, granulo + semilla * 0.4) * 0.5); }
     } else if (fam < 1.5) {                           // La corriente: de cada estrella a la otra, curvada por el giro
       float f = fract(semilla * 7.0 + uT * (0.12 + semilla * 0.1));
@@ -45,7 +45,7 @@ export const VERTICE_DOS_SOLES = /* glsl */`
     vec4 vista = modelViewMatrix * vec4(mundo, 1.0);
     gl_Position = projectionMatrix * vista;
     gl_PointSize = clamp(uPx * tam / max(0.1, -vista.z), 1.05 * uPR, 3.2 * uPR);
-    vColor = color * min(brillo, 1.5);
+    vColor = color * min(brillo, 1.5) * uAtenua;
   }`;
 export const FRAGMENTO_DOS_SOLES = /* glsl */`
   precision highp float; varying vec3 vColor;
@@ -68,13 +68,15 @@ export function geometriaDosSoles({ factor = 1, conFondo = true } = {}) {
   geo.setAttribute('aA', new THREE.BufferAttribute(A, 4)); geo.setAttribute('aG', new THREE.BufferAttribute(G, 3));
   return geo;
 }
-export const materialDosSoles = uniforms => new THREE.ShaderMaterial({ vertexShader: VERTICE_DOS_SOLES, fragmentShader: FRAGMENTO_DOS_SOLES, uniforms, transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, toneMapped: false });
+export const materialDosSoles = (uniforms, { profundidad = false } = {}) => new THREE.ShaderMaterial({ vertexShader: VERTICE_DOS_SOLES, fragmentShader: FRAGMENTO_DOS_SOLES, uniforms, transparent: true, depthWrite: false, depthTest: profundidad, blending: THREE.AdditiveBlending, toneMapped: false });
 
 // El lugar: el sistema ya en contacto, girando despacio dentro de su grupo. `ESCALA` unidades del universo por unidad del guion.
 export function crearLugarDosSoles({ grupo, renderer, uPR, escala = 15 }) {
-  const u = { uT: { value: 0 }, uSep: { value: 14 * Math.SQRT1_2 }, uAng: { value: 0 }, uFlujo: { value: 1 }, uInfinito: { value: 1 }, uPx: { value: 1000 }, uPR };
-  const puntos = new THREE.Points(geometriaDosSoles({ factor: 0.34, conFondo: false }), materialDosSoles(u));
+  const u = { uT: { value: 0 }, uSep: { value: 14 * Math.SQRT1_2 }, uAng: { value: 0 }, uFlujo: { value: 1 }, uInfinito: { value: 1 }, uPx: { value: 1000 }, uPR, uAtenua: { value: 0.6 } };   // (atenuado: en el universo pasa por el bloom y no debe hacer halo)
+  const puntos = new THREE.Points(geometriaDosSoles({ factor: 0.34, conFondo: false }), materialDosSoles(u, { profundidad: true }));
   puntos.frustumCulled = false; puntos.scale.setScalar(escala); grupo.add(puntos);
+  // El infinito, de cara a casa: desde donde se llega se lee entero.
+  puntos.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), grupo.position.clone().negate().normalize());
   const tam = new THREE.Vector2();
   return { puntos, actualizar(t, camara) {
     renderer.getDrawingBufferSize(tam);

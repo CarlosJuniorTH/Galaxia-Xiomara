@@ -37,5 +37,15 @@ export default async function ({ base, informe: inf }) {
     inf.comprobar(d.llenas === 12 && d.clase, 'mes 12: dial completo y día en dorado', d);
     inf.comprobar(!e2.length, 'mes 12: sin errores en la consola', e2.slice(0, 4));
     await p2.screenshot({ path: `${CAP}-mes12-casa-pc.png` });
+    // Los lugares que abre el tiempo: «Dos soles» dispara su videoclip al llegar.
+    const lugares = await p2.evaluate(() => ['dossoles', 'vuelta'].map(id => !!document.querySelector(`[data-destino="${id}"]`) || window.__galaxia.escena.posicionDe?.(id) !== undefined));
+    await p2.evaluate(() => window.__galaxia.interfaz.visitar('dossoles')); await p2.waitForTimeout(1000);
+    await p2.waitForFunction(() => !window.__galaxia.escena.viajando, null, { timeout: 90000 });
+    await p2.waitForFunction(() => document.body.classList.contains('en-teatro'), null, { timeout: 8000 });
+    await p2.waitForFunction(() => !document.querySelector('.teatro-negro').classList.contains('activo'), null, { timeout: 25000 });
+    const c2 = await p2.evaluate(() => new Promise(fin => { const d = []; let a = performance.now(), n = 0; const paso = t => { d.push(t - a); a = t; if (++n < 240) requestAnimationFrame(paso); else { d.sort((x, y) => x - y); fin({ p50: d[120], p99: d[237] }); } }; requestAnimationFrame(paso); }));
+    inf.comprobar(c2.p50 < 18, 'Dos soles: su videoclip abre al llegar y va a 60 FPS', { ...c2, lugares });
+    await p2.waitForFunction(() => !document.body.classList.contains('en-teatro'), null, { timeout: 70000 });
+    inf.comprobar(!e2.length, 'Dos soles: sin errores en la consola', e2.slice(0, 4));
   } finally { await n2.close(); }
 }

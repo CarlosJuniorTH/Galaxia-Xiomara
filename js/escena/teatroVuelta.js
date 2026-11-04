@@ -40,7 +40,7 @@ async function sitiosDeNombres(cuantos, r) {
 
 const VERTICE = /* glsl */`
   #define PI 3.14159265
-  uniform float uT, uFrente, uAbrir, uNombres, uOla, uEspera, uPx, uTexto, uPR, uCoronaInicio, uCoronaPaso, uHayCorona, uChispaX, uChispaY, uChispaAbajo;
+  uniform float uT, uFrente, uAbrir, uNombres, uOla, uEspera, uPx, uTexto, uPR, uCoronaInicio, uCoronaPaso, uHayCorona, uChispaX, uChispaY, uChispaAbajo, uAtenua;
   attribute vec4 aA;   // x: ángulo en la órbita · y: semilla · z: familia · w: hebra, índice o instante de la chispa
   attribute vec3 aG;   // destino en la galaxia, dirección en el Sol o velocidad de la chispa
   attribute vec3 aN;   // xy: sitio en los nombres (de −1 a 1) · z: 1 si va a los nombres
@@ -102,7 +102,7 @@ const VERTICE = /* glsl */`
       bool arco = aA.w > 0.5;
       float vidaArco = fract(uT * (0.05 + semilla * 0.06) + semilla * 17.0), alto = arco ? sin(vidaArco * PI) * (0.14 + semilla * semilla * 0.8) : 0.0;
       mundo = d * (1.25 + granulo * 0.03 + alto);
-      float mu = dot(d, normalize(cameraPosition - mundo));
+      float mu = dot(normalize(normalMatrix * d), normalize(-(modelViewMatrix * vec4(mundo, 1.0)).xyz));
       color = arco ? mix(vec3(1.0, 0.46, 0.2), ORO, semilla) : mix(vec3(1.0, 0.48, 0.14), mix(ORO, PERLA, 0.5), smoothstep(-0.35, 0.65, granulo + semilla * 0.45));
       if (arco) { brillo = 0.55 * sin(vidaArco * PI); tam = 0.04; }
       else if (mu > 0.0) { brillo = (0.22 + 0.78 * pow(mu, 0.7)) * (0.42 + 0.38 * semilla); tam = 0.072; }
@@ -147,7 +147,7 @@ const VERTICE = /* glsl */`
     if (!enVista) vista = modelViewMatrix * vec4(mundo, 1.0);
     gl_Position = projectionMatrix * vista;
     gl_PointSize = clamp(uPx * tam / max(0.1, -vista.z), 1.05 * uPR, vForma > 0.5 ? 68.0 * uPR : 3.2 * uPR);
-    vColor = color * min(brillo, 1.6);
+    vColor = color * min(brillo, 1.6) * uAtenua;
   }`;
 
 const FRAGMENTO = /* glsl */`
@@ -178,9 +178,10 @@ export function crearLugarVuelta({ grupo, renderer, uPR, escala = 11 }) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(total * 3), 3));
   geo.setAttribute('aA', new THREE.BufferAttribute(A, 4)); geo.setAttribute('aG', new THREE.BufferAttribute(G, 3)); geo.setAttribute('aN', new THREE.BufferAttribute(new Float32Array(total * 3), 3));
-  const v = { value: 0 }, u = { uT: v, uFrente: { value: Math.PI * 2 + 0.01 }, uAbrir: { value: 0 }, uNombres: { value: 0 }, uOla: { value: -1 }, uEspera: { value: 0 }, uPx: { value: 1000 }, uTexto: { value: 1 }, uPR, uCoronaInicio: { value: 0 }, uCoronaPaso: { value: 1 }, uHayCorona: { value: 0 }, uChispaX: { value: 1 }, uChispaY: { value: 1 }, uChispaAbajo: { value: 0 } };
-  const puntos = new THREE.Points(geo, new THREE.ShaderMaterial({ vertexShader: VERTICE, fragmentShader: FRAGMENTO, uniforms: u, transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, toneMapped: false }));
-  puntos.frustumCulled = false; puntos.scale.setScalar(escala); puntos.rotation.x = 0.28; grupo.add(puntos);
+  const v = { value: 0 }, u = { uT: v, uFrente: { value: Math.PI * 2 + 0.01 }, uAbrir: { value: 0 }, uNombres: { value: 0 }, uOla: { value: -1 }, uEspera: { value: 0 }, uPx: { value: 1000 }, uTexto: { value: 1 }, uPR, uCoronaInicio: { value: 0 }, uCoronaPaso: { value: 1 }, uHayCorona: { value: 0 }, uChispaX: { value: 1 }, uChispaY: { value: 1 }, uChispaAbajo: { value: 0 }, uAtenua: { value: 0.55 } };
+  const puntos = new THREE.Points(geo, new THREE.ShaderMaterial({ vertexShader: VERTICE, fragmentShader: FRAGMENTO, uniforms: u, transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending, toneMapped: false }));
+  puntos.frustumCulled = false; puntos.scale.setScalar(escala);
+  puntos.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), grupo.position.clone().negate().normalize());   // la órbita, de cara a casa grupo.add(puntos);
   const tam = new THREE.Vector2();
   return { puntos, actualizar(t, camara) { renderer.getDrawingBufferSize(tam); v.value = t; u.uPx.value = tam.y / (2 * Math.tan(camara.fov * Math.PI / 360)) * escala; } };
 }
@@ -191,7 +192,7 @@ export function crearTeatroVuelta(renderer) {
   const u = {
     uT: { value: 0 }, uFrente: { value: 0 }, uAbrir: { value: 0 }, uNombres: { value: 0 }, uOla: { value: -1 }, uEspera: { value: 0 },
     uPx: { value: 1000 }, uTexto: { value: 10 }, uPR: { value: 1 }, uCoronaInicio: { value: 0 }, uCoronaPaso: { value: 1 }, uHayCorona: { value: 0 }, uChispaX: { value: 1 }, uChispaY: { value: 1 }, uChispaAbajo: { value: 1 },
-    uSep: { value: 1 }, uAng: { value: 0 }, uFlujo: { value: 0 }, uInfinito: { value: 0 }
+    uSep: { value: 1 }, uAng: { value: 0 }, uFlujo: { value: 0 }, uInfinito: { value: 0 }, uAtenua: { value: 1 }
   };
   const tam = new THREE.Vector2(), mira = new THREE.Vector3();
 
@@ -254,7 +255,7 @@ export function crearTeatroVuelta(renderer) {
     const aspecto = tam.x / Math.max(1, tam.y);
     if (Math.abs(camara.aspect - aspecto) > 1e-3) { camara.aspect = aspecto; camara.updateProjectionMatrix(); }
     // En vertical la órbita ha de caber a lo ancho: la cámara se aleja lo justo.
-    const lejos = Math.min(2.3, Math.max(1, 1.12 / aspecto));
+    const lejos = guion.binaria ? Math.min(3.3, Math.max(1, 1.4 / aspecto)) : Math.min(2.3, Math.max(1, 1.12 / aspecto));
     const c = guion.camara, az = c.az(s) * Math.PI / 180, el = c.el(s) * Math.PI / 180, d = c.dist(s) * lejos;
     mira.set(c.mira[0](s), c.mira[1](s), c.mira[2](s));
     camara.position.set(mira.x + Math.cos(el) * Math.cos(az) * d, mira.y + Math.sin(el) * d, mira.z + Math.cos(el) * Math.sin(az) * d);

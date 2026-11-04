@@ -384,6 +384,7 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
       contenido.append(boton('✦ Ver el cielo de la noche en que empezó todo', 'secundario ancho', () => { cerrarPanel(); cieloNoche.abrir(); }));
     }
     if (!panel.open) panel.showModal();
+    contenido.scrollTop = 0;   // (ya abierto: con el panel cerrado no surtía efecto y se abría donde se dejó)
   }
   function exportarViaje() {
     const copia = { tipo: 'universo-xiomara', inicio: config.fechaInicio, guardado: new Date().toISOString(), progreso: progreso.estado };
