@@ -54,6 +54,8 @@ export default async function ({ base, informe: inf }) {
 
     // 2. En una de las grandes (el púlsar).
     await visitar(pagina, 'pulsar');
+    // Durante su videoclip tocar no hace nada (la pantalla es suya): los besos, cuando termina.
+    await pagina.waitForFunction(() => !document.body.classList.contains('escena-gigante') && !window.__galaxia.escena.clip, null, { timeout: 240000, polling: 250 });
     await pagina.evaluate(() => { window.__meteoros = 0; window.__flotantes = []; });
     await tocar(4);
     const grande = await pagina.evaluate(async () => {
