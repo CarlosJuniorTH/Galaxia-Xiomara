@@ -53,12 +53,12 @@ h1,h2,h3,.brindis{text-wrap:balance;}
 #pista{bottom:calc(var(--abajo) + 128px);color:#c6b6cc;font-size:.58rem;pointer-events:none;text-shadow:var(--sombra-texto);}
 #btn-musica{width:46px;height:46px;bottom:calc(var(--abajo) + 39px);right:30px;background:var(--grano),var(--brillo-vidrio),#20132be6;box-shadow:none;border-color:var(--linea);}
 .cometa-aviso{position:fixed;right:30px;bottom:calc(var(--abajo) + 116px);z-index:15;}.cometa-aviso button{min-height:40px;border:1px solid #ffdca82e;background:var(--grano),var(--brillo-vidrio),#20192df0;color:#f5dec2;padding:12px 15px;border-radius:20px;font-family:'Cormorant Garamond',serif;font-size:1rem;cursor:pointer;}.cometa-aviso span{margin-left:10px;}
-.tarjeta{width:min(430px,100%);padding:24px 32px 28px;border-color:#ecd1e328;background:linear-gradient(160deg,#2c1a388c,#120c258c);box-shadow:0 30px 100px #0005;}
+.tarjeta{width:min(430px,100%);padding:24px 32px 28px;border-radius:var(--radio-ventana);border-color:#ecd1e328;background:linear-gradient(160deg,#2c1a388c,#120c258c);box-shadow:0 30px 100px #0005;}
 /* En el PC la tarjeta se desenfocaba por detrás; sin backdrop-filter, algo más opaca y con el grano del cristal (en el móvil ya iba sin desenfoque). */
 @media (pointer:fine){.tarjeta{background:var(--grano),var(--brillo-vidrio),linear-gradient(160deg,#2c1a38cc,#120c25d0);}}
-.tarjeta-foto{aspect-ratio:16/10;margin-bottom:26px;border-radius:15px;box-shadow:none;border:1px solid #d6b4d01c;}
+.tarjeta-foto{aspect-ratio:16/10;margin-bottom:26px;border-radius:var(--radio-tarjeta);box-shadow:none;border:1px solid #d6b4d01c;}
 .tarjeta-foto img{animation:none;}.tarjeta-foto::after{display:none;}
-.para{font-size:.53rem;letter-spacing:3.5px;color:var(--oro);}.nombre{font-size:4.3rem;margin-top:10px;}.cita{font-size:1.23rem;color:#e0cddd;margin:8px 0 24px;}
+.para{font-size:var(--letra-ceja);letter-spacing:3.2px;color:var(--oro);}.nombre{font-size:4.3rem;margin-top:10px;}.cita{font-size:1.23rem;color:#e0cddd;margin:8px 0 24px;}
 /* Presentación opaca y diseñada (ya no deja ver el universo 3D detrás desde un punto cualquiera): el cielo profundo
    del propio universo, con su pared cálida a la izquierda y la fría a la derecha; las dos luces de la portada salen
    de cada pared y se encuentran en el vacío del centro. Un acercamiento muy lento le da vida. */
@@ -69,8 +69,8 @@ h1,h2,h3,.brindis{text-wrap:balance;}
 @keyframes portadaCielo{from{transform:scale(1)}to{transform:scale(1.08) translate(-1%,-1%)}}
 @media (prefers-reduced-motion:reduce){#entrada::before{animation:none;}}
 
-#btn-entrar{font-size:.62rem;letter-spacing:1.2px;min-height:51px;border:1px solid #efcfe359;background:linear-gradient(110deg,#875175,#54426e);animation:none;box-shadow:0 10px 32px #0003;}#btn-entrar::before{opacity:.2;}#btn-entrar b{margin-left:24px;font-size:1.1rem;font-weight:400;}
-.saludo-entrada{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1.03rem;line-height:1.4;color:#d6c1d9;margin-top:18px;}.audifonos{font-size:.52rem;line-height:1.6;letter-spacing:.7px;color:#b7a0bd;}
+#btn-entrar{font-size:var(--letra-boton);letter-spacing:1.2px;min-height:51px;border:1px solid #efcfe359;background:linear-gradient(110deg,#875175,#54426e);animation:none;box-shadow:0 10px 32px #0003;}#btn-entrar::before{opacity:.2;}#btn-entrar b{margin-left:24px;font-size:1.1rem;font-weight:400;}
+.saludo-entrada{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1.03rem;line-height:1.4;color:#d6c1d9;margin-top:18px;}.audifonos{font-size:.66rem;line-height:1.5;letter-spacing:.4px;color:#c6b2cc;}.audifonos:empty{display:none;}
 /* Paneles de exploración; el universo permanece visible detrás. */
 dialog{color:#f6e8ee;border:1px solid #e4c4dc2b;box-shadow:0 30px 110px #0007;}
 dialog::backdrop{background:#08041052;backdrop-filter:blur(4px);}
