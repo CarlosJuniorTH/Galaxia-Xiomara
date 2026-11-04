@@ -2,10 +2,29 @@
 :root{--oro:#e8c6a0;--crema:#f7e9e8;--panel:rgba(19,12,32,.94);--linea:rgba(231,206,229,.15);--tenue:#bcadc7;}
 [hidden]{display:none!important;}
 button,a{-webkit-tap-highlight-color:transparent;}
-button:focus-visible,a:focus-visible{outline:2px solid var(--oro);outline-offset:5px;}
-button{color:inherit;}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--oro);outline-offset:5px;}
+.papel :focus-visible{outline-color:var(--vino);}   /* el dorado no se ve sobre el papel claro */
+button{color:inherit;touch-action:manipulation;transition:scale .14s ease;}
 button:disabled{cursor:default;opacity:.4;}
-button{touch-action:manipulation;}
+/* Pulsado: con la propiedad scale, independiente del transform con que se centran algunos botones (ni maqueta ni repinta).
+   Sin efecto en #btn-entrar (tiene el suyo) ni en .toque (ocupa toda la pantalla). */
+button:not(:disabled,#btn-entrar,.toque):active,a.primario:active{scale:.97;}
+/* Zona táctil de 44 px en lo que por diseño es más bajo: un pseudoelemento la amplía sin mover nada. El tamaño visible
+   no cambia a propósito: la escena mide estas piezas para encuadrar en el móvil (js/escena/index.js, medirZonaLibre). */
+.enlace-accion,.enlace-suave,.ruta-descubrir,.lugar-extra button,.volver-centro,.cometa-aviso button{position:relative;}
+:is(.enlace-accion,.enlace-suave,.ruta-descubrir,.lugar-extra button,.volver-centro,.cometa-aviso button,.boton-tour,.btn-mapa,#btn-musica)::after{content:'';position:absolute;inset:-9px -4px;}
+/* Las ventanas no aparecen de golpe: fundido corto con un leve desplazamiento (solo opacidad y transform). */
+@keyframes abrirVentana{from{opacity:0;transform:translateY(12px) scale(.985)}}
+@keyframes abrirPanel{from{opacity:0;transform:translateX(18px)}}
+@keyframes abrirHoja{from{opacity:0;transform:translateY(22px)}}
+@keyframes abrirFondo{from{opacity:0}}
+dialog[open]{animation:abrirVentana .34s cubic-bezier(.2,.8,.2,1);}
+dialog[open]::backdrop{animation:abrirFondo .34s ease;}
+.panel-universo[open]{animation-name:abrirPanel;}
+.mapa:not([hidden]){animation:abrirVentana .28s cubic-bezier(.2,.8,.2,1);}
+@media(max-width:600px){.panel-universo[open],.mapa:not([hidden]){animation-name:abrirHoja;}}
+h1,h2,h3,.brindis{text-wrap:balance;}
+.intro-panel{text-wrap:pretty;}
 #hud{transition:opacity 1.6s ease 1s;}
 #hud>*{pointer-events:auto;}
 #titulo{top:calc(var(--arriba) + 28px);left:260px;right:260px;pointer-events:none;}
@@ -17,14 +36,16 @@ button{touch-action:manipulation;}
 .marca-universo .marca-y{font-style:normal;font-weight:400;color:var(--oro);}.marca-universo small{display:block;font-family:'Quicksand',sans-serif;font-size:.48rem;letter-spacing:3px;color:var(--tenue);margin-top:5px;}.marca-simbolo{font-size:2.3rem;color:var(--oro);}
 .horarios{position:fixed;right:32px;top:calc(var(--arriba) + 31px);display:flex;gap:20px;z-index:12;}
 .horarios span{font-size:.62rem;line-height:1.9;color:#ded0e7;text-align:right;white-space:pre-line;}.horarios small{display:block;letter-spacing:2px;font-size:.45rem;color:var(--tenue);}
-.boton-tour{z-index:20;position:fixed;top:calc(var(--arriba) + 113px);right:32px;border:1px solid #e8c6a043;border-radius:30px;background:var(--grano),var(--brillo-vidrio),#1e132ce6;padding:11px 17px;display:flex;gap:16px;align-items:center;font-size:.64rem;letter-spacing:.6px;color:#f0decc;cursor:pointer;transition:background .3s;}.boton-tour:hover{background-color:#59374be6;}
+.boton-tour{z-index:20;position:fixed;top:calc(var(--arriba) + 113px);right:32px;border:1px solid #e8c6a043;border-radius:30px;background:var(--grano),var(--brillo-vidrio),#1e132ce6;padding:11px 17px;display:flex;gap:16px;align-items:center;font-size:.64rem;letter-spacing:.6px;color:#f0decc;cursor:pointer;}
+@media(hover:hover){.boton-tour:hover{background-color:#59374be6;}}
 .lugar{position:fixed;left:36px;bottom:145px;width:min(330px,30vw);z-index:12;padding:24px 0 0;background:radial-gradient(ellipse at left,#10071788,transparent);}
 .ceja{font-size:.52rem;letter-spacing:2.8px;line-height:1.8;color:var(--oro);font-weight:600;text-transform:uppercase;}
 .lugar h1{font-family:'Cormorant Garamond',serif;font-size:2.8rem;line-height:1.05;font-weight:400;margin:10px 0 14px;color:#f9e8ed;}
 .lugar p{font-family:'Cormorant Garamond',serif;font-size:1.12rem;color:#d8c3d9;line-height:1.5;max-width:300px;text-shadow:0 2px 15px #05010c;}
 .enlace-accion,.enlace-suave{border:none;border-bottom:1px solid #e8c6a03a;background:none;color:#e8c6a0;padding:14px 0 8px;font-size:.65rem;letter-spacing:.6px;cursor:pointer;}.enlace-accion span{margin-left:18px;}
 .muelle{position:fixed;left:50%;bottom:calc(var(--abajo) + 24px);transform:translateX(-50%);display:flex;align-items:center;padding:5px 14px;border:1px solid #e5cbe029;border-radius:24px;background:var(--grano),var(--brillo-vidrio),linear-gradient(120deg,#26132cf2,#130d23f5);box-shadow:0 12px 60px #0005;z-index:22;}
-.muelle button{background:transparent;border:0;cursor:pointer;display:flex;align-items:center;flex-direction:column;gap:5px;padding:10px 20px;min-width:78px;font-size:.57rem;letter-spacing:.5px;color:#c7b8d0;border-radius:15px;transition:background .3s,color .3s;}.muelle button span{font-family:serif;font-size:1.5rem;line-height:1;color:#edd6d5;}.muelle button:hover{background:#e9badb12;color:#ffe2f0;}
+.muelle button{background:transparent;border:0;cursor:pointer;display:flex;align-items:center;flex-direction:column;gap:5px;padding:10px 20px;min-width:78px;font-size:.57rem;letter-spacing:.5px;color:#c7b8d0;border-radius:15px;transition:background .3s,color .3s,scale .14s ease;}.muelle button span{font-family:serif;font-size:1.5rem;line-height:1;color:#edd6d5;}.muelle button:active{background:#e9badb1f;}
+@media(hover:hover){.muelle button:hover{background:#e9badb12;color:#ffe2f0;}}
 #pastilla-estrellas{bottom:calc(var(--abajo) + 112px);border:0;background:none;font-size:.54rem;letter-spacing:1px;pointer-events:none;color:#d5bfd8;}
 #mensaje{left:50%;right:auto;width:min(560px,calc(100% - 780px));transform:translateX(-50%);bottom:calc(var(--abajo) + 165px);font-size:1.15rem;line-height:1.45;color:#ead6e3;text-shadow:0 2px 15px #000;}#mensaje.fuera{transform:translate(-50%,6px);}@media(max-width:1180px){#mensaje{display:none;}}
 #pista{bottom:calc(var(--abajo) + 128px);color:#b2a0b8;font-size:.48rem;pointer-events:none;}
@@ -57,7 +78,8 @@ dialog::backdrop{background:#08041052;backdrop-filter:blur(4px);}
 .cerrar-panel{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:#dec0d512;border:1px solid var(--linea);cursor:pointer;color:#e7d3e4;flex-shrink:0;}
 .panel-contenido{padding:22px 28px 32px;overflow:auto;height:calc(100% - 126px);scrollbar-width:thin;scrollbar-color:#78536d transparent;}
 .intro-panel{font-family:'Cormorant Garamond',serif;font-size:1.16rem;line-height:1.5;color:#cbb8d1;margin-bottom:20px;}
-.tarjeta-lugar{width:100%;text-align:left;background:linear-gradient(120deg,#e3b5da09,transparent);border:1px solid var(--linea);border-radius:17px;padding:18px;margin:0 0 10px;display:grid;grid-template-columns:40px 1fr 16px;gap:10px;align-items:center;cursor:pointer;transition:background .3s,border-color .3s;}.tarjeta-lugar:hover{background:#e3b5da13;border-color:#d6a5d354;}
+.tarjeta-lugar{width:100%;text-align:left;background:linear-gradient(120deg,#e3b5da09,transparent);border:1px solid var(--linea);border-radius:17px;padding:18px;margin:0 0 10px;display:grid;grid-template-columns:40px 1fr 16px;gap:10px;align-items:center;cursor:pointer;transition:background .3s,border-color .3s,scale .14s ease;}.tarjeta-lugar:active{background:#e3b5da1a;}
+@media(hover:hover){.tarjeta-lugar:hover{background:#e3b5da13;border-color:#d6a5d354;}}
 .icono-lugar{font-family:serif;font-size:1.9rem;color:var(--acento,var(--oro));}.tarjeta-lugar strong{display:block;font-family:'Cormorant Garamond',serif;font-size:1.35rem;line-height:1.2;font-weight:400;color:#f2dfe8;}.tarjeta-lugar small{display:block;margin-top:6px;font-size:.55rem;line-height:1.5;letter-spacing:.6px;color:#b9a7c3;}.flecha{font-size:1rem;color:var(--oro);}
 .primario,.secundario{display:inline-flex;align-items:center;justify-content:center;gap:10px;border-radius:30px;padding:13px 21px;cursor:pointer;text-decoration:none;font-family:'Quicksand',sans-serif;font-size:.65rem;line-height:1.5;letter-spacing:.6px;}
 .primario{background:linear-gradient(120deg,#9e668b,#605180);border:1px solid #e2c2d546;color:#fff3f8;}.secundario{background:transparent;border:1px solid var(--linea);color:#deccdf;}
@@ -168,7 +190,10 @@ body.en-calma #hud>:not(.salir-calma){opacity:0;pointer-events:none;transition:o
 
 /* Modo contemplación (js/ui/contemplacion.js): la navegación secundaria se retira y
    vuelve con cualquier toque. Título, relojes y música permanecen. */
-.muelle,.lugar,.cometa-aviso,#pastilla-estrellas,.boton-tour{transition:opacity 1.2s ease;}
+/* (El muelle también se retira 8 px: sin transition de transform daba un salto al empezar el fundido.) */
+.lugar,.cometa-aviso,#pastilla-estrellas{transition:opacity 1.2s ease;}
+.muelle{transition:opacity 1.2s ease,transform 1.2s ease;}
+.boton-tour{transition:opacity 1.2s ease,background-color .3s ease,scale .14s ease;}
 #mensaje{transition:opacity 1.2s ease,transform 1.2s ease;}
 div.contemplando .muelle,div.contemplando .lugar,div.contemplando .cometa-aviso,
 div.contemplando #pastilla-estrellas,div.contemplando .boton-tour,div.contemplando #mensaje{opacity:0;pointer-events:none;}
