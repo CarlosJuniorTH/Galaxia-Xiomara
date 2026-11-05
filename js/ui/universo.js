@@ -331,7 +331,7 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
       separar();
       contenido.append(el('p', 'intro-panel', `También has abierto ${progreso.estado.cartas.length} ${progreso.estado.cartas.length === 1 ? 'carta' : 'cartas'}, descubierto ${progreso.estado.cometas.length} ${progreso.estado.cometas.length === 1 ? 'sorpresa' : 'sorpresas'} y tejido ${progreso.estado.constelaciones.length} de ${CONSTELACIONES.length} constelaciones.`));
       if (progreso.estado.suenos.length) contenido.append(el('p', 'intro-panel', `${progreso.estado.suenos.length} sueños marcados como cumplidos. Cada uno conserva su luz en el jardín.`));
-      for (const m of MESES_CON_CLIP) if (progreso.tiene('estrellas', estrellas[m]?.id)) contenido.append(boton(`✦ Ver «${guionVuelta(m).titulo}»`, 'secundario ancho', () => verClip(m)));
+      for (const m of MESES_CON_CLIP) if (progreso.tiene('estrellas', estrellas[m]?.id) || progreso.tiene('celebraciones', `clip-${m}`)) contenido.append(boton(`✦ Ver «${guionVuelta(m).titulo}»`, 'secundario ancho', () => verClip(m)));
       if (n === estrellas.length) contenido.append(boton('♡ Volver a vivir la celebración', 'primario ancho', () => { cerrarPanel(); celebrar(); }));
       else contenido.append(boton('⌁ Ayúdame a encontrar otra estrella', 'primario ancho', () => { cerrarPanel(); darPista(); }));
       separar();
@@ -507,11 +507,11 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     r.classList.add('visible');
   }
   const clipPendiente = m => !!guionVuelta(m) && !progreso.tiene('celebraciones', `clip-${m}`);
-  async function verClip(m, { dentroDeCelebracion = false } = {}) {
+  async function verClip(m, { dentroDeCelebracion = false, desdeEntrada = false, alFinal } = {}) {
     if (!guionVuelta(m) || teatro.activo || (!dentroDeCelebracion && (celebrando || tour || escena.viajando))) return;
     if (!dentroDeCelebracion) { if (panel.open) cerrarPanel(); celebrando = true; }
     progreso.anotar('celebraciones', `clip-${m}`);
-    await teatro.reproducir(m);
+    await teatro.reproducir(m, { desdeEntrada, alFinal });
     if (!dentroDeCelebracion) celebrando = false;
   }
   async function celebrar() {
@@ -639,5 +639,5 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
   }
   let tickActivo = false;
   const despertarTick = () => { if (tickActivo) return; tickActivo = true; ultimo = performance.now(); requestAnimationFrame(tick); };
-  return { verClip, teatro, get contemplando() { return contemplando || performance.now() - salidaContemplar < 700; }, contemplar, abrirCieloNoche: () => cieloNoche.abrir(), get celebrando() { return celebrando; }, actualizarAlbum() { if (panelActual === 'album') abrirPanel('album'); }, avisar, get enLasGrandes() { return enLasGrandes(); }, situar, visitar, llegada, escenaEnCurso, terminarEscena, get escenaActual() { return escenaActual ? { id: escenaActual.id, restante: Math.max(0, (escenaActual.fin - performance.now()) / 1000) } : null; }, alConstelar, tocarNodo, celebrar, abrirPanel, sorpresa, pausarRuta, iniciarRuta, get enRuta() { return tour; } };
+  return { verClip, clipPendiente, teatro, get contemplando() { return contemplando || performance.now() - salidaContemplar < 700; }, contemplar, abrirCieloNoche: () => cieloNoche.abrir(), get celebrando() { return celebrando; }, actualizarAlbum() { if (panelActual === 'album') abrirPanel('album'); }, avisar, get enLasGrandes() { return enLasGrandes(); }, situar, visitar, llegada, escenaEnCurso, terminarEscena, get escenaActual() { return escenaActual ? { id: escenaActual.id, restante: Math.max(0, (escenaActual.fin - performance.now()) / 1000) } : null; }, alConstelar, tocarNodo, celebrar, abrirPanel, sorpresa, pausarRuta, iniciarRuta, get enRuta() { return tour; } };
 }

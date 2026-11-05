@@ -11,7 +11,8 @@ try {
   await pagina.waitForFunction(() => window.__galaxia?.interfaz?.teatro, null, { timeout: 120000 });
   await pagina.evaluate(m => { window.__clip = window.__galaxia.interfaz.teatro.reproducir(m); }, mes === 'dossoles' ? mes : +mes);
   await pagina.waitForFunction(() => document.querySelector('.teatro-negro') && !document.querySelector('.teatro-negro').classList.contains('activo'), null, { timeout: 30000 });
-  const t0 = Date.now(); let saltado = 0;
+  await pagina.waitForTimeout(3000);   // (sin toque no hay audio: el clip espera su canción lo que dura su plazo)
+  const t0 = Date.now() - 400; let saltado = 0;
   for (const s of lista.split(',').map(Number)) {
     const ahora = saltado + (Date.now() - t0) / 1000;
     if (s > ahora) { await pagina.evaluate(d => window.__galaxia.interfaz.teatro.saltar(d), s - ahora); saltado += s - ahora; }

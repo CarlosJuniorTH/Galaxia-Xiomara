@@ -2,7 +2,7 @@
 #teatro{position:fixed;inset:0;z-index:60;pointer-events:none;color:#f8ecdf;text-align:center}
 #teatro[hidden]{display:none}
 body.en-teatro>*:not(#galaxia):not(#teatro):not(script):not(style){visibility:hidden !important;pointer-events:none !important}
-.teatro-negro{position:absolute;inset:0;background:#05010c;opacity:0;transition:opacity .9s ease}
+.teatro-negro{position:absolute;inset:0;background:#05010c;opacity:0;transition:opacity .6s ease}
 .teatro-negro.activo{opacity:1}
 .teatro-mes,.teatro-linea{position:absolute;left:0;right:0;padding:0 24px;opacity:0;transform:translateY(6px);transition:opacity .55s ease,transform .55s ease;will-change:opacity,transform}
 .teatro-mes{bottom:calc(env(safe-area-inset-bottom,0px) + 11vh)}
@@ -13,6 +13,7 @@ body.en-teatro>*:not(#galaxia):not(#teatro):not(script):not(style){visibility:hi
 .teatro-linea.pie{bottom:calc(env(safe-area-inset-bottom,0px) + 12vh);font:italic 500 clamp(1.3rem,5.6vw,2rem)/1.2 'Cormorant Garamond',Georgia,serif;color:#f4d9b4}
 .teatro-linea.grande.abajo{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 9.5vh);color:#f6d595}
 .teatro-linea.pie.abajo{bottom:calc(env(safe-area-inset-bottom,0px) + 6vh);font:500 clamp(.66rem,2.7vw,.8rem)/1.4 'Quicksand',sans-serif;letter-spacing:.2em;color:#e8c6a0}
+.teatro-linea.pie.abajo.letra{font:italic 500 clamp(1.1rem,4.8vw,1.6rem)/1.2 'Cormorant Garamond',Georgia,serif;letter-spacing:0;color:#f4d9b4}
 @media (prefers-reduced-motion:reduce){.teatro-mes,.teatro-linea{transform:none}}
 /* El dial de la primera vuelta, junto a la cuenta atrás. */
 #dial-vuelta{position:absolute;left:50%;top:100%;width:26px;height:26px;margin:8px 0 0 -13px;overflow:visible}

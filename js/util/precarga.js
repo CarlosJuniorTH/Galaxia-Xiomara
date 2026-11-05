@@ -21,10 +21,10 @@ export function prioridad(ruta) {
   return 6;
 }
 
-export function filtrarLista(archivos, { cieloAlto = true, pedidos = new Set() } = {}) {
+export function filtrarLista(archivos, { cieloAlto = true, pedidos = new Set(), abiertas = [] } = {}) {
   const lista = [];
   for (const [ruta, bytes] of Object.entries(archivos || {})) {
-    if (PROPIO.test(ruta) || pedidos.has(ruta)) continue;
+    if ((PROPIO.test(ruta) && !abiertas.includes(ruta)) || pedidos.has(ruta)) continue;
     // El cielo de fondo: la carga trae el mediano; el grande lo pide cieloProfundo.js en reposo (salvo en el modo seguro).
     if (/^assets\/cielo\//.test(ruta) && (!cieloAlto || !/-alta\./.test(ruta))) continue;
     lista.push([ruta, bytes]);
@@ -42,13 +42,13 @@ function yaPedidos() {
 // Pone en la cola de reposo todo lo que falta. La cola no empieza hasta que la carga la suelta (al terminar la intro).
 // Devuelve { archivos, bytes } de lo encolado.
 // cuando: promesa tras la que se encola (la intro terminada: así se sabe todo lo que la carga ya pidió).
-export async function precargarEnReposo({ cieloAlto = true, cuando = Promise.resolve() } = {}) {
+export async function precargarEnReposo({ cieloAlto = true, cuando = Promise.resolve(), abiertas = [] } = {}) {
   if (typeof fetch !== 'function') return { archivos: 0, bytes: 0 };
   try {
     const r = await fetch('./paquetes.json', { cache: 'no-cache' });
     if (!r.ok) throw Error(`HTTP ${r.status}`);
     const archivos = await r.json(); await cuando;
-    const lista = filtrarLista(archivos, { cieloAlto, pedidos: yaPedidos() });
+    const lista = filtrarLista(archivos, { cieloAlto, pedidos: yaPedidos(), abiertas });
     for (const [ruta] of lista) enReposo(ruta, prioridad(ruta));
     return { archivos: lista.length, bytes: lista.reduce((a, [, b]) => a + b, 0) };
   } catch (e) {

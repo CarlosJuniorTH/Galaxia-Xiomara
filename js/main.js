@@ -8,12 +8,12 @@ import { crearContador } from './ui/contador.js';
 import { crearMensajes } from './ui/mensajes.js';
 import { crearCarta } from './ui/carta.js';
 import { crearRecuerdos } from './ui/recuerdos.js';
-import { guionVuelta } from './util/guionVuelta.js';
+import { guionVuelta, clipDelDia } from './util/guionVuelta.js';
 import './util/horno.js';   // empieza a descargar los cálculos horneados en cuanto arranca la página
 import { crearEfectos } from './ui/efectos.js';
 import { escucharToques } from './ui/toques.js';
 import { crearProgreso } from './util/progreso.js';
-import { estrellasDisponibles, saludoMomento } from './util/tiempo.js';
+import { estrellasDisponibles, saludoMomento, partesEnZona } from './util/tiempo.js';
 import { crearInterfazUniverso } from './ui/universo.js';
 import { describirFallo } from './util/webgl.js';
 import { cargarContenido, aplicarContenido } from './data/contenido.js';
@@ -35,7 +35,9 @@ document.getElementById('compatible-3d').addEventListener('click', () => { const
 window.addEventListener('unhandledrejection', e => { console.error('Universo:', e.reason); });
 // Banda sonora (js/data/bandaSonora.js): sus canciones de la carga empiezan a descargarse ya, antes que nada (sin archivos
 // configurados no hace nada). CONFIG.volumen se lee al sonar (el contenido puede cambiarlo).
-const banda = crearBandaSonora({ volumen: () => CONFIG.volumen });
+// El día exacto de los once meses y el del año, la visita abre directamente con su videoclip, sin la intro.
+const hoyArgentina = partesEnZona().fecha, clipHoy = new URLSearchParams(location.search).has('sinIntro') ? 0 : clipDelDia(hoyArgentina);
+const banda = crearBandaSonora({ volumen: () => CONFIG.volumen, cargaEn: clipHoy ? guionVuelta(clipHoy).id : null });
 if (location.hash === '#debug' || new URLSearchParams(location.search).has('pruebaAudio')) window.__bandaSonora = banda;
 // Paquetes guardados en el dispositivo desde el primer momento (también en la primera visita: lo que se descarga se
 // guarda mientras llega). Nunca recarga la página por sí solo.
@@ -55,10 +57,10 @@ try { almacen = localStorage; } catch { almacen = { getItem() { return null; }, 
 const progreso = crearProgreso(almacen, texto => interfaz?.avisar(texto));
 const estrellas = estrellasDisponibles(CONFIG.fechaInicio);
 const viaje = crearViaje(almacen);
-const entrada = crearEntrada(CONFIG, { viaje, banda }), musica = crearMusica(CONFIG, banda), mensajes = crearMensajes(CONFIG), efectos = crearEfectos();
+const entrada = crearEntrada(CONFIG, { viaje, banda, clipHoy: clipHoy ? { pista: guionVuelta(clipHoy).id, ceja: clipHoy === 12 ? 'Nuestro primer año' : 'Once meses', reproducir: () => interfaz.verClip(clipHoy, { desdeEntrada: true, alFinal: () => entrada.entrarTrasClip() }) } : null }), musica = crearMusica(CONFIG, banda), mensajes = crearMensajes(CONFIG), efectos = crearEfectos();
 // La carga (y el clip) ocupan la cola hasta que la intro termina; entonces se encola el resto y empieza a bajar en reposo.
 // (La lista se pide ya, en la carga: es pequeña, y así no sale nada a la red si se entra enseguida.)
-const listaReposo = precargarEnReposo({ cieloAlto: !texturasLigeras, cuando: new Promise(r => entrada.trasIntro(r)) });
+const listaReposo = precargarEnReposo({ cieloAlto: !texturasLigeras, cuando: new Promise(r => entrada.trasIntro(r)), abiertas: [hoyArgentina >= '2026-11-15' && 'assets/musica/mes-11.m4a', hoyArgentina >= '2026-11-15' && 'assets/musica/mes-dossoles.m4a', hoyArgentina >= '2026-12-15' && 'assets/musica/mes-12.m4a'].filter(Boolean) });
 entrada.trasIntro(() => listaReposo.finally(() => ocupado('carga', false)));
 crearContador(CONFIG, inicio); crearCarta(CONFIG);
 document.getElementById('saludo-entrada').textContent = saludoMomento();
@@ -130,7 +132,7 @@ try {
   const recuerdos = crearRecuerdos(CONFIG, estrellas, progreso, {
     alEncontrar: i => { escena.marcarEstrella(i); navigator.vibrate?.(40); },
     alCompletar: () => interfaz.celebrar(),
-    alMesNuevo: m => interfaz.verClip(m),
+    alMesNuevo: m => { if (interfaz.clipPendiente(m)) interfaz.verClip(m); },
   });
   interfaz = crearInterfazUniverso({ config: CONFIG, escena, progreso, recuerdos, estrellas, efectos, musica, viaje, banda });
   contemplacion = crearContemplacion({
@@ -162,11 +164,11 @@ try {
   });
   // Al final del clip, el 3D se dibuja detrás de la portada en la pose inicial del vuelo de entrada (escena.precalentar).
   entrada.alPrecalentar(n => escena.precalentar(n));
-  entrada.alEntrar(({ continuar } = {}) => {
+  entrada.alEntrar(({ continuar, trasClip } = {}) => {
     // Continuar: el vuelo de entrada lleva directamente al lugar (o al paso del recorrido).
     banda.entrar(); musica.reproducir(true); mensajes.iniciar(); setTimeout(() => efectos.programarFugaces(() => !interfaz.enLasGrandes), 4000);
     if (continuar?.paso !== null && continuar?.paso !== undefined) { escena.iniciar('hogar', { duracion: 3 }); setTimeout(() => interfaz.iniciarRuta(continuar.paso), 2600); }
-    else escena.iniciar(continuar?.destino || 'hogar');
+    else escena.iniciar(continuar?.destino || 'hogar', trasClip ? { duracion: 4.5 } : undefined);   // (tras el videoclip del día, una llegada corta)
     if (['render', 'completo'].includes(new URLSearchParams(location.search).get('diag'))) diagnosticoRender();
     if (new URLSearchParams(location.search).get('diag') === 'gigantes') setTimeout(async () => { while (escena.viajando) await new Promise(r => setTimeout(r, 300)); const { diagnosticarGigantes } = await import('./escena/diagnosticoGigantes.js'); diagnosticarGigantes(escena, interfaz); }, 3000);
     // El día de un videoclip, una invitación hasta que se vea.
@@ -197,6 +199,8 @@ try {
     const mirar = () => { if (escena.viajando) { setTimeout(mirar, 500); return; } setTimeout(cargaTerminada, 3000); };
     setTimeout(mirar, 1500);
   });
+  // El videoclip del día, ya preparado y estrenado en la GPU durante la carga (detrás de la pantalla opaca): empieza sin esperas.
+  if (clipHoy) { etapa = 'preparación del videoclip del día'; if (await escena.teatroVuelta.preparar(clipHoy)) { escena.teatroVuelta.fijar(0); escena.teatroVuelta.dibujar(); } }
   entrada.listo();
   crearMedidor(escena);
   window.__medidor?.conectar(escena);
