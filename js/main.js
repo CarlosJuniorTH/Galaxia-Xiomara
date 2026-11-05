@@ -8,7 +8,7 @@ import { crearContador } from './ui/contador.js';
 import { crearMensajes } from './ui/mensajes.js';
 import { crearCarta } from './ui/carta.js';
 import { crearRecuerdos } from './ui/recuerdos.js';
-import { guionVuelta, clipDelDia } from './util/guionVuelta.js';
+import { guionVuelta, clipDeEstreno } from './util/guionVuelta.js';
 import './util/horno.js';   // empieza a descargar los cálculos horneados en cuanto arranca la página
 import { crearEfectos } from './ui/efectos.js';
 import { escucharToques } from './ui/toques.js';
@@ -35,8 +35,13 @@ document.getElementById('compatible-3d').addEventListener('click', () => { const
 window.addEventListener('unhandledrejection', e => { console.error('Universo:', e.reason); });
 // Banda sonora (js/data/bandaSonora.js): sus canciones de la carga empiezan a descargarse ya, antes que nada (sin archivos
 // configurados no hace nada). CONFIG.volumen se lee al sonar (el contenido puede cambiarlo).
-// El día exacto de los once meses y el del año, la visita abre directamente con su videoclip, sin la intro.
-const hoyArgentina = partesEnZona().fecha, clipHoy = new URLSearchParams(location.search).has('sinIntro') ? 0 : clipDelDia(hoyArgentina);
+// El estreno de hoy (js/util/guionVuelta.js): la intro como siempre y, al entrar, su videoclip; una vez en cada dispositivo.
+// (?estreno, solo en el servidor de casa: lo repite para poder revisarlo; ?sinIntro y ?sinEstreno, en las pruebas, sin él.)
+let almacen;
+try { almacen = localStorage; } catch { almacen = { getItem() { return null; }, setItem() { throw Error('No disponible'); } }; }
+const progreso = crearProgreso(almacen, texto => interfaz?.avisar(texto));
+const consulta = new URLSearchParams(location.search), repetirEstreno = consulta.has('estreno') && !/github\.io$/.test(location.hostname);
+const hoyArgentina = partesEnZona().fecha, clipHoy = consulta.has('sinIntro') || consulta.has('sinEstreno') ? 0 : clipDeEstreno(hoyArgentina, c => !repetirEstreno && progreso.tiene('celebraciones', `clip-${c}`));
 const banda = crearBandaSonora({ volumen: () => CONFIG.volumen, cargaEn: clipHoy ? guionVuelta(clipHoy).id : null });
 if (location.hash === '#debug' || new URLSearchParams(location.search).has('pruebaAudio')) window.__bandaSonora = banda;
 // Paquetes guardados en el dispositivo desde el primer momento (también en la primera visita: lo que se descarga se
@@ -52,12 +57,9 @@ try {
 } catch (e) { console.warn('Se conserva el contenido original:', e.message); }
 document.title = `Nuestro pequeño infinito · ${CONFIG.nombre}`;
 const inicio = leerFecha(CONFIG.fechaInicio);
-let almacen;
-try { almacen = localStorage; } catch { almacen = { getItem() { return null; }, setItem() { throw Error('No disponible'); } }; }
-const progreso = crearProgreso(almacen, texto => interfaz?.avisar(texto));
 const estrellas = estrellasDisponibles(CONFIG.fechaInicio);
 const viaje = crearViaje(almacen);
-const entrada = crearEntrada(CONFIG, { viaje, banda, clipHoy: clipHoy ? { pista: guionVuelta(clipHoy).id, ceja: clipHoy === 12 ? 'Nuestro primer año' : 'Once meses', reproducir: () => interfaz.verClip(clipHoy, { desdeEntrada: true, alFinal: () => entrada.entrarTrasClip() }) } : null }), musica = crearMusica(CONFIG, banda), mensajes = crearMensajes(CONFIG), efectos = crearEfectos();
+const entrada = crearEntrada(CONFIG, { viaje, banda, estreno: clipHoy ? { pista: guionVuelta(clipHoy).id, reproducir: () => interfaz.verClip(clipHoy, { alFinal: () => entrada.entrarTrasClip() }) } : null }), musica = crearMusica(CONFIG, banda), mensajes = crearMensajes(CONFIG), efectos = crearEfectos();
 // La carga (y el clip) ocupan la cola hasta que la intro termina; entonces se encola el resto y empieza a bajar en reposo.
 // (La lista se pide ya, en la carga: es pequeña, y así no sale nada a la red si se entra enseguida.)
 const listaReposo = precargarEnReposo({ cieloAlto: !texturasLigeras, cuando: new Promise(r => entrada.trasIntro(r)), abiertas: [hoyArgentina >= '2026-11-15' && 'assets/musica/mes-11.m4a', hoyArgentina >= '2026-11-15' && 'assets/musica/mes-dossoles.m4a', hoyArgentina >= '2026-12-15' && 'assets/musica/mes-12.m4a'].filter(Boolean) });

@@ -79,7 +79,7 @@ async function lanzarUna(perfil, { musica }) {
 export async function abrir(base, perfil = 'pc', { espera = 2500, calidad = 'alta', consulta = '', toque = false, musica = false, fecha = null } = {}) {
   const { navegador, pagina, errores } = await lanzar(perfil, { musica });
   if (fecha) await fijarFecha(pagina, fecha);
-  await pagina.goto(`${base}/?calidad=${calidad}${consulta}${toque ? '' : '&sinIntro'}#debug`);
+  await pagina.goto(`${base}/?calidad=${calidad}${consulta}${toque ? '&sinEstreno' : '&sinIntro'}#debug`);
   if (toque) { await pagina.waitForSelector('#toque:not([hidden])', { timeout: 30000 }); await pagina.click('#toque'); await pagina.waitForFunction(() => document.getElementById('entrada').classList.contains('formado'), null, { timeout: 150000 }); await pagina.waitForTimeout(1400); }
   await pagina.waitForFunction(() => document.getElementById('btn-entrar')?.classList.contains('preparado'), null, { timeout: 90000 });
   await pagina.click('#btn-entrar');

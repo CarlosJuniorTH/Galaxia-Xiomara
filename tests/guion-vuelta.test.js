@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { guionVuelta, mesEnEscena, pistaSuave, MESES_CON_CLIP, clipDelDia } from '../js/util/guionVuelta.js';
+import { guionVuelta, mesEnEscena, pistaSuave, MESES_CON_CLIP, clipDeEstreno, clipEnAlbum } from '../js/util/guionVuelta.js';
 import { escalaGalaxia } from '../js/escena/crecimiento.js';
 import { mesesConFraccion } from '../js/util/tiempo.js';
 
@@ -28,9 +28,13 @@ test('mes 12: la órbita se cierra justo en el estribillo, y nombra los trece re
   const vistos = new Set(); for (let s = 0; s < g.duracion; s += 0.05) { const i = mesEnEscena(g, s); if (i >= 0) vistos.add(i); }
   assert.equal(vistos.size, 13);
 });
-test('el clip abre la visita solo el día exacto', () => {
-  assert.equal(clipDelDia('2026-11-15'), 11); assert.equal(clipDelDia('2026-12-15'), 12);
-  for (const f of ['2026-11-14', '2026-11-16', '2026-12-14', '2026-12-16', '2027-12-15']) assert.equal(clipDelDia(f), 0);
+test('cada estreno sale una vez, desde su fecha y dentro de su plazo', () => {
+  assert.equal(clipDeEstreno('2026-11-14'), 0);
+  assert.equal(clipDeEstreno('2026-11-15'), 'dossoles'); assert.equal(clipDeEstreno('2026-11-20'), 'dossoles');   // si no se entró ese día, espera
+  assert.equal(clipDeEstreno('2026-11-15', c => c === 'dossoles'), 0);   // una sola vez
+  assert.equal(clipDeEstreno('2026-12-15'), 12); assert.equal(clipDeEstreno('2026-12-15', c => c === 12), 0);
+  assert.equal(clipDeEstreno('2028-01-01'), 0);
+  assert.equal(clipEnAlbum('2026-12-14'), false); assert.equal(clipEnAlbum('2026-12-15'), true);   // «Falta una luz» no se repite hasta el año
 });
 test('la galaxia crece cada mes sin saltos y siempre con tope', () => {
   assert.equal(escalaGalaxia(10), 1); assert.ok(escalaGalaxia(11) > 1 && escalaGalaxia(12) > escalaGalaxia(11));

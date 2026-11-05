@@ -37,13 +37,13 @@ const MARGEN = 0.03;          // lo mínimo por delante del contexto para progra
 const CRUCE = 0.4;            // fundido cruzado de la música de los viajes al encadenar un viaje con otro
 const ANTICLIC = 0.015;       // una voz que entra a mitad de canción sube en esto (sin chasquido)
 
-export function crearBandaSonora({ volumen = () => 0.85, cargaEn = null } = {}) {   // cargaEn: la canción que hoy abre la visita en lugar de la intro
+export function crearBandaSonora({ volumen = () => 0.85, cargaEn = null } = {}) {   // cargaEn: la canción del estreno de hoy, además de las de siempre
   const { carpeta, momentos } = configuracionActiva();
   const pistas = new Map();
   for (const [nombre, conf] of Object.entries(momentos)) if (conf?.archivo) {
     // existe: se resuelve en cuanto el servidor responde (true) o falla (false: 404 en GitHub Pages, sin red…).
     let avisar; const existe = new Promise(r => { avisar = r; });
-    pistas.set(nombre, { nombre, conf, url: carpeta + conf.archivo, bufer: !conf.esEstancia, estado: 'pendiente', contar: nombre === cargaEn || (nombre === 'inicio' ? !cargaEn : CON_LA_CARGA.has(nombre)), previsto: 0, nivel: 0, previo: -1e-3, ancla: null, desdePedido: null, voz: null, existe, avisar });
+    pistas.set(nombre, { nombre, conf, url: carpeta + conf.archivo, bufer: !conf.esEstancia, estado: 'pendiente', contar: nombre === cargaEn || CON_LA_CARGA.has(nombre), previsto: 0, nivel: 0, previo: -1e-3, ancla: null, desdePedido: null, voz: null, existe, avisar });
   }
   const ambiente = { nombre: 'ambiente', nivel: 0, encendido: false, registro: null };
   const oyentes = new Set(), aterrizajes = [];
@@ -113,14 +113,14 @@ export function crearBandaSonora({ volumen = () => 0.85, cargaEn = null } = {}) 
   }
   // La que suena, la del destino del viaje en curso, la del lugar y la de los viajes se quedan; las demás se liberan.
   // (La de la intro, hasta que ha sonado.)
-  const necesaria = p => p.nombre === 'viajes' || p.nombre === cargaEn || (p.nombre === 'inicio' && !p.usada) || !!p.voz || p.nombre === objetivo || p.nombre === viajeEnCurso?.id || p.nombre === lugar;
+  const necesaria = p => p.nombre === 'viajes' || ((p.nombre === cargaEn || p.nombre === 'inicio') && !p.usada) || !!p.voz || p.nombre === objetivo || p.nombre === viajeEnCurso?.id || p.nombre === lugar;
   function liberar() {
     for (const p of pistas.values()) if (p.bufer && p.buffer && !p.decodificando && !necesaria(p)) { p.buffer = null; p.estado = 'guardada'; }
   }
   // Desde que se abre la página: la canción de la portada primero (hace falta al tocar) y la de los viajes detrás.
-  // (El día de un videoclip, su canción ocupa el lugar de la de la intro, que esa visita no suena.)
-  const primera = pistas.get(cargaEn) || pistas.get('inicio');
-  if (primera) descargar(primera).then(() => pistas.has('viajes') && descargar(pistas.get('viajes')));
+  // (El día de un estreno, detrás, la de su videoclip.)
+  const primera = pistas.get('inicio');
+  if (primera) descargar(primera).then(() => pistas.has('viajes') && descargar(pistas.get('viajes'))).then(() => pistas.has(cargaEn) && descargar(pistas.get(cargaEn)));
   else if (pistas.has('viajes')) descargar(pistas.get('viajes'));
 
   function crearContexto() {
@@ -393,7 +393,7 @@ export function crearBandaSonora({ volumen = () => 0.85, cargaEn = null } = {}) 
     // Hay canción de portada configurada (aún sin saber si su archivo está).
     get conInicio() { return pistas.has('inicio'); },
     // Promesa: true si el archivo de la canción de portada está (el servidor respondió bien), false si no.
-    get inicioDisponible() { return pistas.get(cargaEn || 'inicio')?.existe ?? Promise.resolve(false); },
+    get inicioDisponible() { return pistas.get('inicio')?.existe ?? Promise.resolve(false); },
     get activa() { return activa; },
     get objetivo() { return objetivo; },
     tiene: nombre => pistas.has(nombre) && pistas.get(nombre).estado !== 'fallo',

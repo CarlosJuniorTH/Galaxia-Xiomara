@@ -30,7 +30,7 @@ export const VERTICE_DOS_SOLES = /* glsl */`
       float mu = dot(normalize(normalMatrix * d), normalize(-(modelViewMatrix * vec4(mundo, 1.0)).xyz));   // (en la vista: también vale con el objeto a escala)
       // Centro casi blanco, borde hondo del color de cada una.
       vec3 borde = k < 0.5 ? vec3(1.0, 0.36, 0.08) : vec3(0.82, 0.14, 0.42);
-      if (mu > 0.0) { brillo = (0.017 + 0.05 * pow(mu, 0.6)) * (1.0 + 0.6 * granulo); tam = 0.2; maxPx = 40.0; color = mix(borde, mix(color, PERLA, 0.2 + 0.6 * smoothstep(-0.4, 0.6, granulo)), smoothstep(0.02, 0.72, mu)); }   // (se solapan: superficie continua)
+      if (mu > 0.0) { brillo = (0.017 + 0.05 * pow(mu, 0.6)) * (1.0 + 0.32 * granulo); tam = 0.2; maxPx = 40.0; color = mix(borde, mix(color, PERLA, 0.2 + 0.6 * smoothstep(-0.4, 0.6, granulo)), smoothstep(0.02, 0.72, mu)); }   // (se solapan: superficie continua)
     } else if (fam < 1.5) {                           // La corriente: de cada estrella a la otra, curvada por el giro
       float f = fract(semilla * 7.0 + uT * (0.12 + semilla * 0.1));
       vec3 de = centro(k), a2 = centro(1.0 - k), tang = girar(vec3(0.0, 0.0, 1.0)) * (k < 0.5 ? 1.0 : -1.0);
@@ -83,7 +83,8 @@ export function geometriaDosSoles({ factor = 1, conFondo = true, conOceano = tru
   const total = nE * 2 + nC * 2 + nI + nF + nV * 2 + nO, A = new Float32Array(total * 4), G = new Float32Array(total * 3); let k = 0;
   const poner = (a, sem, fam, w, d = [0, 0, 0]) => { A[k * 4] = a; A[k * 4 + 1] = sem; A[k * 4 + 2] = fam; A[k * 4 + 3] = w; G[k * 3] = d[0]; G[k * 3 + 1] = d[1]; G[k * 3 + 2] = d[2]; k++; };
   const esfera = () => { const y = r() * 2 - 1, f = r() * Math.PI * 2, q = Math.sqrt(1 - y * y); return [q * Math.cos(f), y, q * Math.sin(f)]; };
-  for (let h = 0; h < 2; h++) for (let i = 0; i < nE; i++) poner(0, r(), 0, h, esfera());
+  // Repartidas casi por igual sobre la esfera (Fibonacci con un poco de azar, para que no se vea trama): sin grumos ni calvas.
+  for (let h = 0; h < 2; h++) for (let i = 0; i < nE; i++) { const y = 1 - 2 * (i + r()) / nE, q = Math.sqrt(Math.max(0, 1 - y * y)), f = i * 2.399963 + h + r() * 0.9; poner(0, r(), 0, h, [q * Math.cos(f), y, q * Math.sin(f)]); }
   for (let h = 0; h < 2; h++) for (let i = 0; i < nC; i++) poner(0, r(), 1, h);
   // Cada lóbulo del infinito, del color de su estrella (cos > 0: la primera).
   for (let i = 0; i < nI; i++) { const a = r() * Math.PI * 2; poner(a, r(), 2, Math.cos(a) > 0 ? 0 : 1); }

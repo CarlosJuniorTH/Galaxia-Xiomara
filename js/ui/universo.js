@@ -4,7 +4,8 @@ import { relojZona, fechaBonita, capsulaAbierta, partesEnZona } from '../util/ti
 import { momentoDelDia } from '../util/sol.js';
 import { crearCieloNoche } from './cieloNoche.js';
 import { crearTeatroUI } from './teatroVuelta.js';
-import { guionVuelta, MESES_CON_CLIP } from '../util/guionVuelta.js';
+import { guionVuelta, MESES_CON_CLIP, clipEnAlbum } from '../util/guionVuelta.js';
+const CLIP_DE_LUGAR = { dossoles: 'dossoles', vuelta: 12 };
 import { crearSupernovaAmor } from './supernovaAmor.js';
 import { crearFaroCuasar } from './faroCuasar.js';
 import { crearMapa } from './mapa.js';
@@ -82,8 +83,13 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
   }
   // Al terminar un viaje (en el mismo cuadro que la canción del destino): la escena de un gigante empieza ya.
   function llegada(id) {
-    // El lugar nuevo tiene su videoclip en cada visita (fuera de un recorrido o un paseo), como las grandes.
-    if (id === 'dossoles' && !tour && !contemplando) setTimeout(() => { if (actual === 'dossoles' && !escena.viajando) verClip('dossoles'); }, 500);
+    // Los lugares de los clips: la primera vez, su videoclip al llegar (fuera de un recorrido o un paseo); después, listo para
+    // «Volver a sentirlo», sin esperas. Al irse a otro sitio, se libera.
+    const clipDelLugar = CLIP_DE_LUGAR[id];
+    if (clipDelLugar) {
+      if (clipPendiente(clipDelLugar) && !tour && !contemplando) setTimeout(() => { if (actual === id && !escena.viajando) verClip(clipDelLugar); }, 500);
+      else setTimeout(() => { if (actual === id && !escena.viajando) teatro.anticipar(clipDelLugar); }, 900);
+    } else teatro.soltar();
     if (!GIGANTES.has(id)) { terminarEscena(); return; }
     // La supernova, en cada visita, su ceremonia (la primera vez estalla; después renace y vuelve a estallar).
     const duracion = id === 'supernova' ? (corazonNacido() ? 4 : 0) + TIEMPOS_AMOR.espera + TIEMPOS_AMOR.revelar + 4.5 : banda?.duracion(id) || 0;
@@ -331,7 +337,7 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
       separar();
       contenido.append(el('p', 'intro-panel', `También has abierto ${progreso.estado.cartas.length} ${progreso.estado.cartas.length === 1 ? 'carta' : 'cartas'}, descubierto ${progreso.estado.cometas.length} ${progreso.estado.cometas.length === 1 ? 'sorpresa' : 'sorpresas'} y tejido ${progreso.estado.constelaciones.length} de ${CONSTELACIONES.length} constelaciones.`));
       if (progreso.estado.suenos.length) contenido.append(el('p', 'intro-panel', `${progreso.estado.suenos.length} sueños marcados como cumplidos. Cada uno conserva su luz en el jardín.`));
-      for (const m of MESES_CON_CLIP) if (progreso.tiene('estrellas', estrellas[m]?.id) || progreso.tiene('celebraciones', `clip-${m}`)) contenido.append(boton(`✦ Ver «${guionVuelta(m).titulo}»`, 'secundario ancho', () => verClip(m)));
+      if (clipEnAlbum(partesEnZona().fecha)) for (const m of MESES_CON_CLIP) contenido.append(boton(`✦ Ver «${guionVuelta(m).titulo}»`, 'secundario ancho', () => verClip(m)));
       if (n === estrellas.length) contenido.append(boton('♡ Volver a vivir la celebración', 'primario ancho', () => { cerrarPanel(); celebrar(); }));
       else contenido.append(boton('⌁ Ayúdame a encontrar otra estrella', 'primario ancho', () => { cerrarPanel(); darPista(); }));
       separar();
@@ -507,12 +513,15 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     r.classList.add('visible');
   }
   const clipPendiente = m => !!guionVuelta(m) && !progreso.tiene('celebraciones', `clip-${m}`);
-  async function verClip(m, { dentroDeCelebracion = false, desdeEntrada = false, alFinal } = {}) {
+  async function verClip(m, { dentroDeCelebracion = false, alFinal } = {}) {
     if (!guionVuelta(m) || teatro.activo || (!dentroDeCelebracion && (celebrando || tour || escena.viajando))) return;
     if (!dentroDeCelebracion) { if (panel.open) cerrarPanel(); celebrando = true; }
-    progreso.anotar('celebraciones', `clip-${m}`);
-    await teatro.reproducir(m, { desdeEntrada, alFinal });
+    // (Se anota al verlo entero: si el teléfono lo interrumpe, no se pierde.)
+    if (alFinal) await teatro.reproducir(m, { alFinal: () => { progreso.anotar('celebraciones', `clip-${m}`); alFinal(); } });
+    else if (await teatro.reproducir(m)) progreso.anotar('celebraciones', `clip-${m}`);
     if (!dentroDeCelebracion) celebrando = false;
+    const lugar = Object.keys(CLIP_DE_LUGAR).find(l => CLIP_DE_LUGAR[l] === m);
+    if (lugar && actual === lugar) setTimeout(() => { if (actual === lugar && !escena.viajando) teatro.anticipar(m); }, 1200);
   }
   async function celebrar() {
     if (celebrando) return; celebrando = true;

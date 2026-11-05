@@ -3,6 +3,15 @@
 Lo nuevo arriba. Se consulta con `grep`; no se lee entero. Resumen por temas de `git log --oneline` (los hashes
 permiten ver el detalle con `git show <hash>`).
 
+## 2026-11-05 · Estrenos tras la intro, sin negro, y tiara
+
+- Estrenos (`clipDeEstreno`): la intro sale como siempre con su música y, al pulsar para entrar, el clip sustituye al vuelo; al acabar, a casa. Una vez por dispositivo, anotada al verlo entero. Dos soles desde el 15/11 (hasta el 14/12) y el año desde el 15/12 (hasta el 14/01), esperando a la primera visita si no se entró ese día. Sustituye a la versión de abajo, que quitaba la intro.
+- «Falta una luz» se ve una vez, al encontrar la estrella del mes 11; se repite desde el álbum a partir del 15/12 (`clipEnAlbum`). Dos soles y el año solo arrancan solos al llegar a su lugar si no se han visto.
+- Sin negro antes del clip: corte directo a su primer cuadro; se deja preparado en la carga (estreno) o al llegar a su lugar (`teatro.anticipar`). Desde el álbum, si no está preparado, se prepara con la escena a la vista.
+- En vertical (`camara.distV`) todo se ve desde el primer cuadro, sin el plano cerrado.
+- La guirnalda sale de la galaxia: tiara de trece estrellas sobre «Xiomara» (`anilloVuelta.js`). El lugar del año pasa a órbita fina con los dos astros recorriéndola (`uTrenza 0`).
+- Soles de Dos soles repartidos casi por igual (Fibonacci con azar), con menos contraste de granos.
+
 ## 2026-11-05 · Los días del clip y la guirnalda
 
 - El 15/11/2026 y el 15/12/2026 (fecha de Argentina) la visita abre con su videoclip, sin intro ni tarjeta (`clipDelDia`): se baja su canción en lugar de la de la intro y el clip se prepara durante la carga. Solo sigue haciendo falta el toque (audio). Al acabar, llegada corta a casa.

@@ -17,7 +17,7 @@ const $ = s => document.querySelector(s);
 // Lo que se espera a la canción al terminar la carga (si aún se descarga) antes de empezar el clip sin ella.
 const ESPERA_CANCION = 15000;
 
-export function crearEntrada(config, { viaje, banda, clipHoy = null } = {}) {   // clipHoy: el videoclip que hoy sustituye a la intro
+export function crearEntrada(config, { viaje, banda, estreno = null } = {}) {   // estreno: el videoclip que hoy sustituye al vuelo de entrada
   $('#entrada-nombre').textContent = $('#entrada-nombre').dataset.texto = config.nombre;
   $('#entrada-cita').textContent = config.cita;
   const foto = $('#foto');
@@ -31,7 +31,7 @@ export function crearEntrada(config, { viaje, banda, clipHoy = null } = {}) {   
   const yaVista = !!viaje?.portadaVista;
   // cancion: hay canción de intro Y su archivo está (se sabe en cuanto responde el servidor; si falta, por ejemplo en
   // GitHub Pages sin los audios, no hay pantalla de toque y el clip va con su propio reloj).
-  const pistaInicio = clipHoy?.pista || 'inicio', conInicio = !!banda?.conInicio, marcas = conInicio ? banda.marcas('inicio') : {};
+  const pistaInicio = 'inicio', conInicio = !!banda?.conInicio, marcas = conInicio ? banda.marcas('inicio') : {};
   let cancion = false;
   // Solo para las pruebas automáticas (?sinIntro con #debug): la tarjeta en cuanto carga, sin toque ni clip.
   const sinIntro = location.hash === '#debug' && new URLSearchParams(location.search).has('sinIntro');
@@ -89,12 +89,6 @@ export function crearEntrada(config, { viaje, banda, clipHoy = null } = {}) {   
     empezado = true; t0Clip = relojMaestro.ahora();
     entrada.classList.remove('cargando', 'con-toque'); entrada.classList.add('clip');
     conCancion = !!sonar;
-    // El día del clip: él en lugar de la intro. Al acabar se entra en el universo, sin pasar por la tarjeta.
-    if (clipHoy) {
-      portada.parar(); viaje?.marcarPortada(); if (sonar) banda.activar(true);
-      clipHoy.reproducir();
-      return;
-    }
     if (conCancion) { banda.ir('inicio', { desde: 0 }); banda.activar(true); }
   }
   // Al terminar la carga: la canción ya debería estar (va la primera y cuenta en los MB); si aún llega, se la espera.
@@ -117,7 +111,6 @@ export function crearEntrada(config, { viaje, banda, clipHoy = null } = {}) {   
   const decidido = !conInicio ? Promise.resolve(false) : Promise.race([banda.inicioDisponible, new Promise(r => setTimeout(() => r(false), 2500))]).then(hay => {
     cancion = hay;
     if (!hay || sinIntro) { entrada.classList.remove('con-toque'); return hay; }
-    if (clipHoy) toque.querySelector('.toque-ceja').textContent = clipHoy.ceja;
     toque.hidden = false;
     toque.addEventListener('click', () => {
       if (tocado) return; tocado = true;
@@ -139,7 +132,8 @@ export function crearEntrada(config, { viaje, banda, clipHoy = null } = {}) {   
   const paso = viaje?.paso;
   if (paso !== null && paso !== undefined) continuar.textContent = `Continuar el recorrido · lugar ${paso + 1} ↗`;
   else if (destino) continuar.textContent = `Continuar en «${destino.nombre}» ↗`;
-  continuar.hidden = !(destino || (paso !== null && paso !== undefined));
+  // (El día de un estreno se entra por él, y de él se llega a casa, no a donde se estaba.)
+  continuar.hidden = !!estreno || !(destino || (paso !== null && paso !== undefined));
 
   function entrar(opciones) {
     if (!preparado || boton.disabled) return;
@@ -156,7 +150,16 @@ export function crearEntrada(config, { viaje, banda, clipHoy = null } = {}) {   
     alEntrar(opciones);
     for (const fn of alEntrarMas.splice(0)) fn(opciones);
   }
-  boton.addEventListener('click', () => entrar({}));
+  // El estreno: al pulsar, su videoclip en lugar del vuelo, ya preparado y con su primer cuadro al instante.
+  let estrenado = false;
+  function abrirEstreno() {
+    if (!preparado || boton.disabled) return;
+    estrenado = true; boton.disabled = continuar.disabled = true;
+    clearTimeout(esperaEnsayo); ensayar(0); dentro = true; portada.parar();
+    if (!banda?.activa) banda?.activar(!!cancion);
+    estreno.reproducir();
+  }
+  boton.addEventListener('click', () => { if (estreno && !estrenado) abrirEstreno(); else entrar({}); });
   continuar.addEventListener('click', () => entrar({ continuar: { destino: destino?.id ?? null, paso: paso ?? null } }));
 
   // Barra de carga (como un videojuego): la barra se llena y el porcentaje cuenta de 0 a 100, sin saltos y sin
@@ -223,6 +226,7 @@ export function crearEntrada(config, { viaje, banda, clipHoy = null } = {}) {   
     async listo() {
       await Promise.all([decidido, todoDescargado()]);
       if (cancion && !sinIntro) await banda.preparada(pistaInicio);
+      if (estreno) await banda?.preparada(estreno.pista, 15000);   // (su canción, lista: al pulsar suena a la vez que el clip)
       // Y que la página se asiente (la recolección de lo que dejó la carga, el trabajo pendiente de la GPU): el clip empieza
       // con cuadros parejos desde el primero, no a tirones en su primer segundo.
       if (!sinIntro) await asentar();
@@ -230,8 +234,8 @@ export function crearEntrada(config, { viaje, banda, clipHoy = null } = {}) {   
       textoCarga.textContent = descargas.total ? `Universo listo · ${mb(descargas.total)} de ${mb(descargas.total)} MB` : textoInicial;
       alCompletar = completar; this.progreso(1);
     },
-    // Fin del videoclip del día: lo que espera a la intro ya puede empezar, y se entra (sin vuelo largo ni tarjeta).
-    entrarTrasClip() { introAcabada = true; for (const fn of trasIntro.splice(0)) fn(); entrada.style.display = 'none'; entrar({ trasClip: true }); },
+    // Fin del estreno: se entra en casa, con una llegada corta.
+    entrarTrasClip() { boton.disabled = continuar.disabled = false; entrada.style.display = 'none'; entrar({ trasClip: true }); },
     alEntrar(fn) { alEntrar = fn; },
     // fn(nivel): dibujar el 3D detrás de la portada (0 nada, 1 uno de cada 3 cuadros, 2 todos, 3 de vez en cuando).
     alPrecalentar(fn) { alEnsayo = fn; if (nivelEnsayo) fn(nivelEnsayo); },

@@ -38,6 +38,7 @@ const GUIONES = {
       az: pistaSuave([[0, 10], [14, 60], [28, 120], [38.85, 160]]),
       el: pistaSuave([[0, 20], [16, 40], [38.85, 62]]),
       dist: pistaSuave([[0, 13], [16, 22], [38.85, 27]]),
+      distV: pistaSuave([[0, 68], [38.85, 76]]),   // en vertical se ve entera desde el principio
       abre: pistaSuave([[0, 0], [5, 0.05], [18, 1], [38.85, 1]]),
       mira: [pistaSuave([[0, 6], [9, 0.8], [16, 0], [38.85, 0]]), pistaSuave([[0, 0], [38.85, 0]]), pistaSuave([[0, 0], [38.85, 0]])]
     },
@@ -57,6 +58,7 @@ const GUIONES = {
       az: pistaSuave([[0, 306], [14, 342], [44, 402], [62, 446], [78, 472], [98.01, 492]]),
       el: pistaSuave([[0, 16], [14, 24], [44, 34], [62, 66], [98.01, 72]]),
       dist: pistaSuave([[0, 12.5], [14, 20], [44, 30], [62, 40], [98.01, 44]]),
+      distV: pistaSuave([[0, 68], [14, 70], [30, 82], [62, 108], [98.01, 118]]),
       // De cerca hasta que la órbita se cierra: entonces la cámara se abre y se ve entera.
       abre: pistaSuave([[0, 0], [11, 0.05], [20, 1], [98.01, 1]]),
       // Mira primero al tramo que falta y, una vez cerrada, al Sol.
@@ -98,6 +100,7 @@ GUIONES.dossoles = {
     az: pistaSuave([[0, 0], [20, 26], [46, 56], [59.28, 60]]),
     el: pistaSuave([[0, 30], [30, 42], [46, 72], [59.28, 78]]),
     dist: pistaSuave([[0, 34], [20.62, 34], [30.93, 32], [46, 29], [59.28, 28]]),
+    distV: pistaSuave([[0, 62], [8, 63], [22, 86], [44, 92], [59.28, 92]]),   // las dos caben siempre, y al final el infinito a lo ancho
     abre: pistaSuave([[0, 0.12], [20, 0.25], [40, 1], [59.28, 1]]),
     mira: [() => 0, () => 0, () => 0]
   },
@@ -114,9 +117,13 @@ GUIONES.dossoles = {
 };
 export const guionVuelta = clave => GUIONES[clave] || null;
 export const MESES_CON_CLIP = [11, 12];
-// El día exacto (fecha de Argentina, 'AAAA-MM-DD') su videoclip sustituye a la intro: se entra directamente en él.
-const DIAS_DE_CLIP = { '2026-11-15': 11, '2026-12-15': 12 };
-export const clipDelDia = fecha => DIAS_DE_CLIP[fecha] || 0;
+// Los estrenos: desde su fecha (de Argentina, 'AAAA-MM-DD'), la primera vez que se entra en cada dispositivo la intro sale como
+// siempre y, al pulsar para entrar, su videoclip sustituye al vuelo; luego se llega a la galaxia. Una sola vez. Si ese día no se
+// entró, espera a la primera visita dentro de su plazo: un regalo así no se pierde por no abrirlo a tiempo.
+const ESTRENOS = [{ clave: 12, desde: '2026-12-15', hasta: '2027-01-14' }, { clave: 'dossoles', desde: '2026-11-15', hasta: '2026-12-14' }];
+export const clipDeEstreno = (fecha, visto = () => false) => ESTRENOS.find(e => fecha >= e.desde && fecha <= e.hasta && !visto(e.clave))?.clave ?? 0;
+// «Falta una luz» se ve una sola vez, al encontrar la estrella del mes 11; desde el año, los dos se pueden repetir en el álbum.
+export const clipEnAlbum = fecha => fecha >= '2026-12-15';
 
 // El mes que se está nombrando en ese segundo (−1 si ninguno).
 export function mesEnEscena(guion, s) {

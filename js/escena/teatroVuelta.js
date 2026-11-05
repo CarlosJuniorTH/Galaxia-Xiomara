@@ -40,7 +40,7 @@ async function sitiosDeNombres(cuantos, r) {
 
 const VERTICE = /* glsl */`
   #define PI 3.14159265
-  uniform float uT, uFrente, uAbrir, uNombres, uOla, uEspera, uPx, uTexto, uPR, uCoronaInicio, uCoronaPaso, uHayCorona, uChispaX, uChispaY, uChispaAbajo, uAtenua, uLatido, uSegunda, uOnda;
+  uniform float uT, uFrente, uAbrir, uNombres, uOla, uEspera, uPx, uTexto, uPR, uCoronaInicio, uCoronaPaso, uHayCorona, uChispaX, uChispaY, uChispaAbajo, uAtenua, uLatido, uSegunda, uOnda, uTrenza, uSol;
   attribute vec4 aA;   // x: ángulo en la órbita · y: semilla · z: familia · w: hebra, índice o instante de la chispa
   attribute vec3 aG;   // destino en la galaxia, dirección en el Sol o velocidad de la chispa
   attribute vec3 aN;   // xy: sitio en los nombres (de −1 a 1) · z: 1 si va a los nombres
@@ -49,11 +49,11 @@ const VERTICE = /* glsl */`
   const vec3 ORO = vec3(1.0, 0.76, 0.40), ROSA = vec3(1.0, 0.44, 0.66), PERLA = vec3(1.0, 0.93, 0.84), AZUL = vec3(0.62, 0.74, 1.0);
 
   vec3 orbita(float a) { return vec3(10.0 * cos(a), 0.0, 9.7 * sin(a)); }
-  // Las dos hebras se cruzan en cada mes: doce eslabones, con la estrella de cada mes en su nudo (la misma cadena que queda
-  // alrededor de la galaxia de casa, anilloVuelta.js).
+  // Las dos hebras se cruzan en cada mes: doce eslabones, con la estrella de cada mes en su nudo (uTrenza 0, en el lugar del
+  // año: una sola órbita fina).
   vec3 trenza(float a, float hebra) {
     float signo = hebra < 0.5 ? 1.0 : -1.0;
-    return vec3(cos(a), 0.0, sin(a)) * signo * sin(a * 6.0) * 0.72 + vec3(0.0, signo * sin(a * 12.0) * 0.3, 0.0);
+    return (vec3(cos(a), 0.0, sin(a)) * signo * sin(a * 6.0) * 0.72 + vec3(0.0, signo * sin(a * 12.0) * 0.3, 0.0)) * uTrenza;
   }
   float subida(float i) { return uHayCorona * smoothstep(0.0, 2.6, uT - uCoronaInicio - i * uCoronaPaso); }
   vec3 enCorona(float i) { float a = i / 13.0 * 2.0 * PI - 1.4; return vec3(cos(a) * 7.2, 5.4, sin(a) * 7.2); }
@@ -117,7 +117,7 @@ const VERTICE = /* glsl */`
       // Una estrella de verdad: blanca y dorada en el centro, naranja oscura en el borde, con una granulación fina.
       color = arco ? mix(vec3(1.0, 0.46, 0.2), ORO, semilla) : mix(vec3(1.0, 0.34, 0.07), mix(ORO, PERLA, 0.2 + 0.6 * smoothstep(-0.4, 0.6, granulo)), smoothstep(0.02, 0.72, mu));
       if (arco) { brillo = 0.55 * sin(vidaArco * PI); tam = 0.04; }
-      else if (mu > 0.0) { brillo = (0.016 + 0.05 * pow(mu, 0.6)) * (1.0 + 0.6 * granulo); tam = 0.13; maxPx = 34.0; }   // (motas que se solapan: una superficie continua, con su borde nítido)
+      else if (mu > 0.0) { brillo = uSol * (0.016 + 0.05 * pow(mu, 0.6)) * (1.0 + 0.6 * granulo); tam = 0.13; maxPx = 34.0; }   // (motas que se solapan: una superficie continua, con su borde nítido)
       brillo *= 1.0 - 0.8 * uNombres;
     } else if (fam < 3.5) {                                              // ── El fondo
       mundo = aG * 220.0; color = mix(AZUL, PERLA, semilla);
@@ -136,7 +136,8 @@ const VERTICE = /* glsl */`
       vista.xyz = mix(vista.xyz, marcaFinal(i), uNombres);
       enVista = true;
     } else if (fam < 5.5) {                                              // ── Los dos astros, a la cabeza de sus hebras
-      mundo = orbita(uFrente) + trenza(uFrente, aA.w) * 1.1;
+      // (Sin trenza, los dos giran el uno alrededor del otro mientras recorren la órbita.)
+      mundo = orbita(uFrente) + trenza(uFrente, aA.w) * 1.1 + vec3(cos(uT * 1.4), 0.0, sin(uT * 1.4)) * (aA.w < 0.5 ? 0.34 : -0.34) * (1.0 - uTrenza);
       color = aA.w < 0.5 ? ORO : ROSA; vForma = 1.0;
       brillo = 1.0 - uAbrir; tam = 1.15 * (1.0 - uAbrir);
       // Y al final echan a andar otra vez, alrededor de los nombres: empieza la vuelta siguiente.
@@ -172,7 +173,7 @@ const VERTICE = /* glsl */`
     if (!enVista) vista = modelViewMatrix * vec4(mundo, 1.0);
     gl_Position = projectionMatrix * vista;
     gl_PointSize = clamp(uPx * tam / max(0.1, -vista.z), (vForma > 0.5 ? 30.0 : 1.05) * uPR, vForma > 0.5 ? 68.0 * uPR : maxPx * uPR);
-    vColor = color * min(brillo, 1.6) * uAtenua;
+    vColor = color * min(brillo, 1.6) * (vForma > 0.5 ? max(uAtenua, 0.6) : uAtenua);   // (las estrellas, nítidas también en el lugar)
   }`;
 
 const FRAGMENTO = /* glsl */`
@@ -192,24 +193,26 @@ const FRAGMENTO = /* glsl */`
     gl_FragColor = vec4(vColor * a, 1.0);
   }`;
 
-// «Nuestra primera vuelta», el lugar del año: la órbita ya cerrada, con su Sol y sus trece estrellas, en su grupo del universo.
+// «Nuestra primera vuelta», el lugar del año: una órbita fina y ya cerrada, con su Sol y sus trece estrellas, y los dos astros
+// recorriéndola sin parar con su luz (uFrente sigue más allá de una vuelta: todo queda encendido y solo se mueven ellos).
 export function crearLugarVuelta({ grupo, renderer, uPR, escala = 11 }) {
-  const N = 11000, nSol = 4500, total = N * 2 + nSol + 13, A = new Float32Array(total * 4); let k = 0;
+  const N = 11000, nSol = 12000, total = N * 2 + nSol + 13 + 2, A = new Float32Array(total * 4); let k = 0;
   const r = azar(1512); const poner = (a, s, f, w) => { A.set([a, s, f, w], k * 4); k++; };
   const G = new Float32Array(total * 3), esfera = () => { const y = r() * 2 - 1, f = r() * Math.PI * 2, q = Math.sqrt(1 - y * y); return [q * Math.cos(f), y, q * Math.sin(f)]; };
   for (let h = 0; h < 2; h++) for (let i = 0; i < N; i++) poner((i + r()) / N * Math.PI * 2, r(), F_HEBRA, h);
   for (let i = 0; i < nSol; i++) { G.set(esfera(), k * 3); poner(0, r(), F_SOL, r() < 0.2 ? 1 : 0); }
   for (let i = 0; i < 13; i++) poner(0, r(), F_MARCA, i);
+  poner(0, 0.5, F_PAR, 0); poner(0, 0.5, F_PAR, 1);
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(total * 3), 3));
   geo.setAttribute('aA', new THREE.BufferAttribute(A, 4)); geo.setAttribute('aG', new THREE.BufferAttribute(G, 3)); geo.setAttribute('aN', new THREE.BufferAttribute(new Float32Array(total * 3), 3));
-  const v = { value: 0 }, u = { uT: v, uFrente: { value: Math.PI * 2 + 0.01 }, uAbrir: { value: 0 }, uNombres: { value: 0 }, uOla: { value: -1 }, uEspera: { value: 0 }, uPx: { value: 1000 }, uTexto: { value: 1 }, uPR, uCoronaInicio: { value: 0 }, uCoronaPaso: { value: 1 }, uHayCorona: { value: 0 }, uChispaX: { value: 1 }, uChispaY: { value: 1 }, uChispaAbajo: { value: 0 }, uAtenua: { value: 0.2 } };   // (muy atenuado: en el universo pasa por el bloom y no debe hacer halo)
+  const v = { value: 0 }, u = { uT: v, uFrente: { value: Math.PI * 2 + 0.01 }, uAbrir: { value: 0 }, uNombres: { value: 0 }, uOla: { value: -1 }, uEspera: { value: 0 }, uPx: { value: 1000 }, uTexto: { value: 1 }, uPR, uCoronaInicio: { value: 0 }, uCoronaPaso: { value: 1 }, uHayCorona: { value: 0 }, uChispaX: { value: 1 }, uChispaY: { value: 1 }, uChispaAbajo: { value: 0 }, uAtenua: { value: 0.2 }, uTrenza: { value: 0 }, uSol: { value: 2.4 } };   // (muy atenuado: en el universo pasa por el bloom y no debe hacer halo)
   const puntos = new THREE.Points(geo, new THREE.ShaderMaterial({ vertexShader: VERTICE, fragmentShader: FRAGMENTO, uniforms: u, transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending, toneMapped: false }));
   puntos.frustumCulled = false; puntos.scale.setScalar(escala);
   puntos.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), grupo.position.clone().negate().normalize());   // la órbita, de cara a casa
   grupo.add(puntos);
   const tam = new THREE.Vector2();
-  return { puntos, actualizar(t, camara) { renderer.getDrawingBufferSize(tam); v.value = t; u.uPx.value = tam.y / (2 * Math.tan(camara.fov * Math.PI / 360)) * escala; } };
+  return { puntos, actualizar(t, camara) { renderer.getDrawingBufferSize(tam); v.value = t; const paso = (t * 0.09) % (Math.PI * 2); u.uFrente.value = Math.PI * 2 + 0.01 + paso; u.uOla.value = paso; u.uPx.value = tam.y / (2 * Math.tan(camara.fov * Math.PI / 360)) * escala; } };
 }
 
 export function crearTeatroVuelta(renderer) {
@@ -218,7 +221,7 @@ export function crearTeatroVuelta(renderer) {
   const u = {
     uT: { value: 0 }, uFrente: { value: 0 }, uAbrir: { value: 0 }, uNombres: { value: 0 }, uOla: { value: -1 }, uEspera: { value: 0 },
     uPx: { value: 1000 }, uTexto: { value: 10 }, uPR: { value: 1 }, uCoronaInicio: { value: 0 }, uCoronaPaso: { value: 1 }, uHayCorona: { value: 0 }, uChispaX: { value: 1 }, uChispaY: { value: 1 }, uChispaAbajo: { value: 1 },
-    uSep: { value: 1 }, uAng: { value: 0 }, uFlujo: { value: 0 }, uInfinito: { value: 0 }, uAtenua: { value: 1 }, uLatido: { value: 0 }, uSegunda: { value: 0 }, uOnda: { value: 0 }
+    uSep: { value: 1 }, uAng: { value: 0 }, uFlujo: { value: 0 }, uInfinito: { value: 0 }, uAtenua: { value: 1 }, uLatido: { value: 0 }, uSegunda: { value: 0 }, uOnda: { value: 0 }, uTrenza: { value: 1 }, uSol: { value: 1 }
   };
   const tam = new THREE.Vector2(), mira = new THREE.Vector3();
 
@@ -283,8 +286,10 @@ export function crearTeatroVuelta(renderer) {
     if (Math.abs(camara.aspect - aspecto) > 1e-3) { camara.aspect = aspecto; camara.updateProjectionMatrix(); }
     // En vertical la órbita ha de caber a lo ancho: la cámara se aleja lo justo.
     const lejos = guion.binaria ? Math.min(3.6, Math.max(1, 1.5 / aspecto)) : Math.min(2.7, Math.max(1, 1.25 / aspecto));
-    const c = guion.camara, az = c.az(s) * Math.PI / 180, el = c.el(s) * Math.PI / 180, d = c.dist(s) * (1 + (lejos - 1) * c.abre(s));
-    mira.set(c.mira[0](s), c.mira[1](s), c.mira[2](s));
+    const c = guion.camara, az = c.az(s) * Math.PI / 180, el = c.el(s) * Math.PI / 180, vertical = aspecto < 1;
+    // En vertical, todo a la vista desde el primer cuadro, sin el plano cerrado (su propia distancia, centrada en la órbita).
+    const d = vertical ? Math.max(c.dist(s), c.distV(s) * 0.46 / aspecto) : c.dist(s) * (1 + (lejos - 1) * c.abre(s));
+    mira.set(vertical ? 0 : c.mira[0](s), c.mira[1](s), vertical ? 0 : c.mira[2](s));
     camara.position.set(mira.x + Math.cos(el) * Math.cos(az) * d, mira.y + Math.sin(el) * d, mira.z + Math.cos(el) * Math.sin(az) * d);
     camara.lookAt(mira);
     const mediaAltura = Math.tan(camara.fov * Math.PI / 360);

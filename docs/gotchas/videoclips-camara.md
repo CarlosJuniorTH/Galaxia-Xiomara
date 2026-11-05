@@ -32,8 +32,8 @@
   pantalla en negro y se libera al terminar. Canciones `mes-11.m4a` y `mes-12.m4a`: fuera de la cola de reposo (`precarga.js`),
   se piden solo cuando tocan.
 - Se ven con `?fecha=2026-11-15` / `?fecha=2026-12-15` en el servidor de casa. Capturas: `tests/navegador/tiraVuelta.mjs`.
-- `js/escena/anilloVuelta.js`: desde el mes 11, la guirnalda alrededor del corazón (hijo de su grupo, siempre de cara a la cámara; un dibujo más). Avanza a diario.
-- El día exacto el clip sustituye a la intro (`clipDelDia`, `clipHoy` en `js/main.js` y `js/ui/entrada.js`). `?sinIntro` lo desactiva: las pruebas que quieran ese día sin clip no usan el toque, y las de la estrella van con fecha del 16.
+- `js/escena/anilloVuelta.js`: desde el mes 11, la tiara de trece estrellas sobre el nombre (hijo del grupo del corazón, siempre de cara a la cámara; un dibujo más). Avanza a diario.
+- Estrenos (`clipDeEstreno` en `js/util/guionVuelta.js`, `estreno` en `js/main.js` y `js/ui/entrada.js`): la intro de siempre y, al pulsar, el clip en lugar del vuelo; una vez por dispositivo. `?estreno` lo repite (solo fuera de github.io); `?sinIntro` y `?sinEstreno` lo desactivan (el arnés siempre pone uno de los dos). Nada de negro antes de un clip: `teatro.anticipar` al llegar a su lugar. En vertical manda `camara.distV`.
 - Cámara: `camara.abre(s)` reparte el alejamiento del vertical (0 = de cerca, 1 = cabe todo); las transiciones de `abre` no deben notarse como un salto.
 
 ## Viajes
