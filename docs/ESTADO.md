@@ -3,6 +3,15 @@
 Lo nuevo arriba. Se consulta con `grep`; no se lee entero. Resumen por temas de `git log --oneline` (los hashes
 permiten ver el detalle con `git show <hash>`).
 
+## 2026-11-05 · Los días del clip y la guirnalda
+
+- El 15/11/2026 y el 15/12/2026 (fecha de Argentina) la visita abre con su videoclip, sin intro ni tarjeta (`clipDelDia`): se baja su canción en lugar de la de la intro y el clip se prepara durante la carga. Solo sigue haciendo falta el toque (audio). Al acabar, llegada corta a casa.
+- Sin negro de espera: el clip se destapa con su primer cuadro aunque la canción tarde (plazo 2,5 s). `banda.preparada` ahora pide decodificar (agotaba el plazo de 8 s). Las canciones de clips ya abiertos van a la cola de reposo.
+- Galaxia: crece por escala del grupo entero (`escalaGalaxia`, 3 %/mes desde el mes 10); fuera las motas añadidas.
+- Anillo → guirnalda de doce eslabones alrededor del corazón, de cara a la cámara y avanzando a diario (`mesesConFraccion`). Los clips dibujan la misma cadena. Constelación del año, mucho más tenue.
+- Clips: cámara que empieza cerca y se abre; soles de superficie continua; onda al cerrarse la órbita, colores de galaxia, corazón que late, vuelta siguiente al final. Dos soles: marea, hebra enroscada, viento en espiral y océano.
+- Arreglado: `crearLugarVuelta` no añadía su objeto (el `grupo.add` estaba en un comentario).
+
 ## 2026-11-04 · La primera vuelta al Sol
 
 Videoclips «Falta una luz» (mes 11) y «La primera vuelta» (mes 12), anillo de la órbita alrededor de casa, dial de doce marcas y tema dorado del día del año. Textos de los clips: borrador para Carlos (`js/util/guionVuelta.js`). También: lugares por fecha «Dos soles» (15/11, con videoclip) y «Nuestra primera vuelta» (15/12), crecimiento mensual de la galaxia (`js/escena/crecimiento.js`), pulido de CSS de toda la interfaz.

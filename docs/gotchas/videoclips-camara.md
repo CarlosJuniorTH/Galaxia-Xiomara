@@ -32,7 +32,9 @@
   pantalla en negro y se libera al terminar. Canciones `mes-11.m4a` y `mes-12.m4a`: fuera de la cola de reposo (`precarga.js`),
   se piden solo cuando tocan.
 - Se ven con `?fecha=2026-11-15` / `?fecha=2026-12-15` en el servidor de casa. Capturas: `tests/navegador/tiraVuelta.mjs`.
-- `js/escena/anilloVuelta.js`: desde el mes 11, un dibujo más en casa (el trozo de órbita ya recorrido).
+- `js/escena/anilloVuelta.js`: desde el mes 11, la guirnalda alrededor del corazón (hijo de su grupo, siempre de cara a la cámara; un dibujo más). Avanza a diario.
+- El día exacto el clip sustituye a la intro (`clipDelDia`, `clipHoy` en `js/main.js` y `js/ui/entrada.js`). `?sinIntro` lo desactiva: las pruebas que quieran ese día sin clip no usan el toque, y las de la estrella van con fecha del 16.
+- Cámara: `camara.abre(s)` reparte el alejamiento del vertical (0 = de cerca, 1 = cabe todo); las transiciones de `abre` no deben notarse como un salto.
 
 ## Viajes
 - 10–15 s en un movimiento continuo, recorridos por distancia real (7b69846). Plan del vuelo en un obrero desde el clic

@@ -7,8 +7,8 @@ import * as THREE from 'three';
 import { guionVuelta } from '../util/guionVuelta.js';
 import { geometriaDosSoles, materialDosSoles } from './dosSoles.js';
 
-const F_HEBRA = 0, F_SOL = 2, F_FONDO = 3, F_MARCA = 4, F_PAR = 5, F_CHISPA = 6, F_HILO = 7;
-const N_HEBRA = 45000, N_SOL = 15000, N_FONDO = 3000, N_HILO = 5000, N_POR_CHISPA = 1500;
+const F_HEBRA = 0, F_SOL = 2, F_FONDO = 3, F_MARCA = 4, F_PAR = 5, F_CHISPA = 6, F_HILO = 7, F_ONDA = 8;
+const N_HEBRA = 45000, N_SOL = 22000, N_FONDO = 4000, N_HILO = 6000, N_POR_CHISPA = 1900, N_ONDA = 9000;
 const PROFUNDIDAD_TEXTO = 30;
 
 // Aleatorio con semilla: el mismo universo en cada dispositivo y en cada repetición.
@@ -40,18 +40,20 @@ async function sitiosDeNombres(cuantos, r) {
 
 const VERTICE = /* glsl */`
   #define PI 3.14159265
-  uniform float uT, uFrente, uAbrir, uNombres, uOla, uEspera, uPx, uTexto, uPR, uCoronaInicio, uCoronaPaso, uHayCorona, uChispaX, uChispaY, uChispaAbajo, uAtenua;
+  uniform float uT, uFrente, uAbrir, uNombres, uOla, uEspera, uPx, uTexto, uPR, uCoronaInicio, uCoronaPaso, uHayCorona, uChispaX, uChispaY, uChispaAbajo, uAtenua, uLatido, uSegunda, uOnda;
   attribute vec4 aA;   // x: ángulo en la órbita · y: semilla · z: familia · w: hebra, índice o instante de la chispa
   attribute vec3 aG;   // destino en la galaxia, dirección en el Sol o velocidad de la chispa
   attribute vec3 aN;   // xy: sitio en los nombres (de −1 a 1) · z: 1 si va a los nombres
   varying vec3 vColor; varying float vForma;
+  float maxPx = 3.2;
   const vec3 ORO = vec3(1.0, 0.76, 0.40), ROSA = vec3(1.0, 0.44, 0.66), PERLA = vec3(1.0, 0.93, 0.84), AZUL = vec3(0.62, 0.74, 1.0);
 
   vec3 orbita(float a) { return vec3(10.0 * cos(a), 0.0, 9.7 * sin(a)); }
-  // Las dos hebras giran una alrededor de la otra mientras recorren la órbita.
+  // Las dos hebras se cruzan en cada mes: doce eslabones, con la estrella de cada mes en su nudo (la misma cadena que queda
+  // alrededor de la galaxia de casa, anilloVuelta.js).
   vec3 trenza(float a, float hebra) {
-    float f = a * 14.0 + hebra * PI + uT * 0.25;
-    return vec3(cos(a), 0.0, sin(a)) * cos(f) * 0.42 + vec3(0.0, sin(f) * 0.42, 0.0);
+    float signo = hebra < 0.5 ? 1.0 : -1.0;
+    return vec3(cos(a), 0.0, sin(a)) * signo * sin(a * 6.0) * 0.72 + vec3(0.0, signo * sin(a * 12.0) * 0.3, 0.0);
   }
   float subida(float i) { return uHayCorona * smoothstep(0.0, 2.6, uT - uCoronaInicio - i * uCoronaPaso); }
   vec3 enCorona(float i) { float a = i / 13.0 * 2.0 * PI - 1.4; return vec3(cos(a) * 7.2, 5.4, sin(a) * 7.2); }
@@ -73,7 +75,7 @@ const VERTICE = /* glsl */`
       vec3 sobreOrbita = orbita(a) + trenza(a, aA.w) + azarM * mix(0.09, 1.25 * azarM.x * azarM.x * 4.0 + 0.4, polvo) + deriva * polvo;
       color = aA.w < 0.5 ? ORO : ROSA;
       if (edad >= 0.0) { brillo = mix(0.46, 0.2, polvo) + 0.95 * exp(-edad * 9.0); tam = mix(0.05, 0.042, polvo) + 0.02 * exp(-edad * 9.0); }
-      else if (semilla < 0.035) { brillo = 0.085; color = PERLA; tam = 0.04; }   // lo que falta: una línea de puntos apenas visible
+      else if (semilla < 0.07) { brillo = 0.13 + 0.55 * uEspera * pow(0.5 + 0.5 * sin(a * 40.0 - uT * 2.4), 8.0); color = PERLA; tam = 0.042; }   // lo que falta: una línea de puntos, ya visible desde el principio, con pulsos hacia la estrella que espera
       if (uOla >= 0.0) { float d = abs(mod(uOla - a + PI, 2.0 * PI) - PI); brillo += 1.6 * (1.0 - smoothstep(0.0, 0.75, d)); }
       brillo *= 0.82 + 0.18 * sin(uT * (1.0 + semilla * 3.0) + semilla * 40.0);
       // La órbita se abre: cada mota se va a su brazo girando, unas antes que otras.
@@ -81,31 +83,41 @@ const VERTICE = /* glsl */`
       float giro = (1.0 - m) * m * 2.6 + uAbrir * uT * 0.018, c = cos(giro), s = sin(giro);
       vec3 enGalaxia = mix(sobreOrbita, aG, m);
       mundo = vec3(c * enGalaxia.x - s * enGalaxia.z, enGalaxia.y + sin(m * PI) * (semilla - 0.5) * 3.0, s * enGalaxia.x + c * enGalaxia.z);
-      if (uAbrir > 0.0) { brillo = mix(brillo, 0.42 + semilla * 0.3, m); tam = mix(tam, 0.066, m); }
+      if (uAbrir > 0.0) {
+        // La galaxia nacida de la órbita, con el color de una de verdad: núcleo de perla y oro, brazos rosas, borde lila.
+        float rg = length(aG.xz) / 16.3;
+        vec3 tono = mix(mix(PERLA, ORO, smoothstep(0.03, 0.16, rg)), ROSA, smoothstep(0.14, 0.46, rg));
+        tono = mix(tono, vec3(0.70, 0.56, 1.0), smoothstep(0.58, 0.98, rg));
+        color = mix(color, mix(tono, PERLA, step(0.93, fract(semilla * 23.0)) * 0.8), m);
+        brillo = mix(brillo, (0.42 + semilla * 0.3) * (1.28 - 0.5 * rg), m); tam = mix(tam, 0.066, m);
+      }
       vista = modelViewMatrix * vec4(mundo, 1.0);
       if (aN.z > 0.5 && uNombres > 0.0) {                                // … y una parte escribe los nombres, de cara a la pantalla
         float k = smoothstep(semilla * 0.5, semilla * 0.5 + 0.5, uNombres);
-        vec3 sitio = vec3(aN.xy * uTexto, -${PROFUNDIDAD_TEXTO}.0);
+        vec2 enLetra = aN.xy, centroCorazon = vec2(0.0, 0.6);
+        if (aN.y > 0.36) enLetra = centroCorazon + (aN.xy - centroCorazon) * (1.0 + 0.1 * uLatido);   // el corazón late
+        vec3 sitio = vec3(enLetra * uTexto, -${PROFUNDIDAD_TEXTO}.0);
         vista.xyz = mix(vista.xyz, sitio, k) + vec3(sin(k * PI) * (aG.z * 0.12), sin(k * PI) * (aG.x * 0.12), 0.0);
         // Se leen como luz, no como letra: granos sueltos, un destello que los recorre y el corazón en rosa.
         float destello = pow(0.5 + 0.5 * sin(aN.x * 3.2 + aN.y * 2.0 - uT * 1.15), 6.0);
-        brillo = mix(brillo, (aN.y > 0.36 ? 0.62 : 1.0) * (0.34 + 0.2 * sin(uT * 1.7 + semilla * 50.0) * sin(uT * 0.9 + semilla * 23.0) + destello * 0.55), k); tam = mix(tam, 0.0235, k);
-        color = mix(color, aN.y > 0.36 ? ROSA : mix(ORO, PERLA, 0.25 + 0.35 * smoothstep(-0.6, 0.3, aN.y)), k);
+        brillo = mix(brillo, (aN.y > 0.36 ? 0.56 : 0.82) * (0.34 + 0.2 * sin(uT * 1.7 + semilla * 50.0) * sin(uT * 0.9 + semilla * 23.0) + destello * 0.55 + (aN.y > 0.36 ? uLatido * 0.14 : 0.0)), k); tam = mix(tam, 0.0235, k);
+        color = mix(color, aN.y > 0.36 ? ROSA : mix(ORO, PERLA, 0.12 + 0.3 * smoothstep(-0.6, 0.3, aN.y)), k);
       } else if (uNombres > 0.0) brillo *= 1.0 - 0.72 * uNombres;        // las demás se quedan detrás, a media luz
       enVista = true;
     } else if (fam < 2.5) {                                              // ── El Sol: gránulos sobre su superficie
       float g = uT * 0.09, c = cos(g), s = sin(g);
       vec3 d = vec3(c * aG.x - s * aG.z, aG.y, s * aG.x + c * aG.z);
-      float granulo = sin(d.x * 9.0 + uT * 0.8) * sin(d.y * 11.0 - uT * 0.6) * sin(d.z * 10.0 + uT * 0.4);
+      float granulo = sin(d.x * 9.0 + uT * 0.8) * sin(d.y * 11.0 - uT * 0.6) * sin(d.z * 10.0 + uT * 0.4) * 0.6 + sin(d.x * 19.0 - uT * 0.5) * sin(d.y * 21.0 + uT * 0.4) * sin(d.z * 23.0) * 0.4;
       // Las de la superficie se oscurecen hacia el borde, como en el Sol de verdad; el reverso no se dibuja. Una de cada cinco
       // es una protuberancia: un arco fino que sale y vuelve.
       bool arco = aA.w > 0.5;
       float vidaArco = fract(uT * (0.05 + semilla * 0.06) + semilla * 17.0), alto = arco ? sin(vidaArco * PI) * (0.14 + semilla * semilla * 0.8) : 0.0;
       mundo = d * (1.25 + granulo * 0.03 + alto);
       float mu = dot(normalize(normalMatrix * d), normalize(-(modelViewMatrix * vec4(mundo, 1.0)).xyz));
-      color = arco ? mix(vec3(1.0, 0.46, 0.2), ORO, semilla) : mix(vec3(1.0, 0.48, 0.14), mix(ORO, PERLA, 0.5), smoothstep(-0.35, 0.65, granulo + semilla * 0.45));
+      // Una estrella de verdad: blanca y dorada en el centro, naranja oscura en el borde, con una granulación fina.
+      color = arco ? mix(vec3(1.0, 0.46, 0.2), ORO, semilla) : mix(vec3(1.0, 0.34, 0.07), mix(ORO, PERLA, 0.2 + 0.6 * smoothstep(-0.4, 0.6, granulo)), smoothstep(0.02, 0.72, mu));
       if (arco) { brillo = 0.55 * sin(vidaArco * PI); tam = 0.04; }
-      else if (mu > 0.0) { brillo = (0.22 + 0.78 * pow(mu, 0.7)) * (0.42 + 0.38 * semilla); tam = 0.072; }
+      else if (mu > 0.0) { brillo = (0.016 + 0.05 * pow(mu, 0.6)) * (1.0 + 0.6 * granulo); tam = 0.13; maxPx = 34.0; }   // (motas que se solapan: una superficie continua, con su borde nítido)
       brillo *= 1.0 - 0.8 * uNombres;
     } else if (fam < 3.5) {                                              // ── El fondo
       mundo = aG * 220.0; color = mix(AZUL, PERLA, semilla);
@@ -114,7 +126,9 @@ const VERTICE = /* glsl */`
       float i = aA.w, angulo = i / 12.0 * 2.0 * PI, edad = uFrente - angulo + 0.001;
       vForma = 1.0; mundo = marca(i);
       color = i < 0.5 || i > 11.5 ? ORO : PERLA;
-      if (edad >= 0.0) { brillo = 1.0; tam = 0.95 + 1.1 * exp(-edad * 9.0); }
+      if (edad >= 0.0) { brillo = 1.0; tam = 1.3 + 1.3 * exp(-edad * 9.0); }
+      // Al llegar arriba, un destello breve: esa estrella ya está en la corona.
+      if (uHayCorona > 0.5) { float tras = uT - uCoronaInicio - i * uCoronaPaso - 2.6; if (tras > 0.0) tam += 1.5 * exp(-tras * 3.2); }
       if (i > 11.5) { float late = 0.55 + 0.45 * sin(uT * 2.2); brillo = max(brillo, uEspera * late); tam = max(tam, uEspera * (1.1 + 0.35 * late)); }
       if (uOla >= 0.0) tam += 0.35 * (1.0 - smoothstep(0.0, 0.5, abs(mod(uOla - angulo + PI, 2.0 * PI) - PI)));
       tam += subida(i) * 0.12;
@@ -125,15 +139,24 @@ const VERTICE = /* glsl */`
       mundo = orbita(uFrente) + trenza(uFrente, aA.w) * 1.1;
       color = aA.w < 0.5 ? ORO : ROSA; vForma = 1.0;
       brillo = 1.0 - uAbrir; tam = 1.15 * (1.0 - uAbrir);
+      // Y al final echan a andar otra vez, alrededor de los nombres: empieza la vuelta siguiente.
+      if (uSegunda > 0.0) { vista = vec4(marcaFinal(uSegunda) + vec3(0.0, 0.0, 0.0) + vec3(cos(uT * 3.0), sin(uT * 3.0), 0.0) * (aA.w < 0.5 ? 0.16 : -0.16), 1.0); enVista = true; brillo = smoothstep(0.0, 0.3, uSegunda); tam = 0.8; }
     } else if (fam < 6.5) {                                              // ── Chispas nítidas en cada golpe del estribillo final
       float tau = uT - aA.w;
       if (tau >= 0.0 && tau < 2.6) {
         // Cada mota sale un instante después que la anterior de su rayo: estelas finas, no una nube.
-        float tauM = max(0.0, tau - fract(semilla * 9.7) * 0.32);
-        vec3 sitio = vec3(aN.x * uChispaX, (uChispaAbajo > 0.5 ? aN.y : abs(aN.y)) * uChispaY, -${PROFUNDIDAD_TEXTO}.0) + aG * (1.0 - exp(-tauM * 2.3)) * uTexto * 0.4 + vec3(0.0, -0.09 * tau * tau * uTexto, 0.0);
+        float tauM = max(0.0, tau - fract(semilla * 9.7) * 0.55);
+        vec3 sitio = vec3(aN.x * uChispaX, (uChispaAbajo > 0.5 ? aN.y : abs(aN.y)) * uChispaY, -${PROFUNDIDAD_TEXTO}.0) + aG * (1.0 - exp(-tauM * 2.3)) * uTexto * 0.4 + vec3(0.0, -0.05 * tau * tau * uTexto, 0.0);
         vista = vec4(sitio, 1.0); enVista = true;
         color = semilla < 0.33 ? ORO : semilla < 0.66 ? ROSA : PERLA;
         brillo = pow(1.0 - tau / 2.6, 1.6) * 1.15; tam = 0.062;
+      }
+    } else if (fam > 7.5) {                                              // ── La onda de luz que sale de la órbita al cerrarse
+      float tau = uT - uOnda;
+      if (uOnda > 0.0 && tau >= 0.0 && tau < 6.0) {
+        float avance = 1.0 - exp(-tau * 0.62), R = 10.0 + avance * 44.0 + (fract(semilla * 17.0) - 0.5) * (0.4 + tau * 0.7);
+        mundo = vec3(cos(a) * R, (fract(semilla * 29.0) - 0.5) * 0.3, sin(a) * 0.97 * R);
+        color = mix(ORO, PERLA, fract(semilla * 7.0)); brillo = pow(1.0 - tau / 6.0, 1.4) * 1.4; tam = 0.1;
       }
     } else {                                                             // ── El hilo que une la corona: un arco de motas de estrella a estrella
       float i = floor(aA.w), j = mod(i + 1.0, 13.0);
@@ -141,12 +164,14 @@ const VERTICE = /* glsl */`
       vec3 suelta = (fract(vec3(semilla * 17.3, semilla * 41.9, semilla * 73.1)) - 0.5) * 0.09;
       vista = vec4(mix((modelViewMatrix * vec4(enCorona(aA.w) + suelta, 1.0)).xyz, marcaFinal(aA.w) + suelta * uTexto * 0.1, uNombres), 1.0);
       enVista = true; color = mix(ORO, PERLA, 0.3); brillo = visible * (0.3 + 0.25 * sin(uT * 1.1 + semilla * 60.0)); tam = 0.03;
+      // Por donde ya han pasado los dos astros de la vuelta siguiente, el hilo queda encendido en oro y rosa.
+      if (uSegunda > 0.0 && aA.w < uSegunda) { color = fract(semilla * 3.0) < 0.5 ? ORO : ROSA; brillo = 0.95; tam = 0.036; }
     }
 
     if (brillo <= 0.002) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); gl_PointSize = 0.0; vColor = vec3(0.0); return; }
     if (!enVista) vista = modelViewMatrix * vec4(mundo, 1.0);
     gl_Position = projectionMatrix * vista;
-    gl_PointSize = clamp(uPx * tam / max(0.1, -vista.z), 1.05 * uPR, vForma > 0.5 ? 68.0 * uPR : 3.2 * uPR);
+    gl_PointSize = clamp(uPx * tam / max(0.1, -vista.z), (vForma > 0.5 ? 30.0 : 1.05) * uPR, vForma > 0.5 ? 68.0 * uPR : maxPx * uPR);
     vColor = color * min(brillo, 1.6) * uAtenua;
   }`;
 
@@ -158,8 +183,8 @@ const FRAGMENTO = /* glsl */`
     if (vForma > 0.5) {
       // Una estrella: núcleo nítido y cuatro rayos finos, sin resplandor.
       vec2 q = abs(p); float r = length(p);
-      float rayo = max((1.0 - smoothstep(0.0, 0.03, q.y)) * (1.0 - q.x), (1.0 - smoothstep(0.0, 0.03, q.x)) * (1.0 - q.y));
-      a = max((1.0 - smoothstep(0.07, 0.1, r)), rayo * rayo * rayo);
+      float rayo = max((1.0 - smoothstep(0.0, 0.045, q.y)) * (1.0 - q.x), (1.0 - smoothstep(0.0, 0.045, q.x)) * (1.0 - q.y));
+      a = max((1.0 - smoothstep(0.12, 0.17, r)), rayo * rayo);
     } else {
       a = (1.0 - smoothstep(0.72, 1.0, length(p)));
     }
@@ -178,10 +203,11 @@ export function crearLugarVuelta({ grupo, renderer, uPR, escala = 11 }) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(total * 3), 3));
   geo.setAttribute('aA', new THREE.BufferAttribute(A, 4)); geo.setAttribute('aG', new THREE.BufferAttribute(G, 3)); geo.setAttribute('aN', new THREE.BufferAttribute(new Float32Array(total * 3), 3));
-  const v = { value: 0 }, u = { uT: v, uFrente: { value: Math.PI * 2 + 0.01 }, uAbrir: { value: 0 }, uNombres: { value: 0 }, uOla: { value: -1 }, uEspera: { value: 0 }, uPx: { value: 1000 }, uTexto: { value: 1 }, uPR, uCoronaInicio: { value: 0 }, uCoronaPaso: { value: 1 }, uHayCorona: { value: 0 }, uChispaX: { value: 1 }, uChispaY: { value: 1 }, uChispaAbajo: { value: 0 }, uAtenua: { value: 0.55 } };
+  const v = { value: 0 }, u = { uT: v, uFrente: { value: Math.PI * 2 + 0.01 }, uAbrir: { value: 0 }, uNombres: { value: 0 }, uOla: { value: -1 }, uEspera: { value: 0 }, uPx: { value: 1000 }, uTexto: { value: 1 }, uPR, uCoronaInicio: { value: 0 }, uCoronaPaso: { value: 1 }, uHayCorona: { value: 0 }, uChispaX: { value: 1 }, uChispaY: { value: 1 }, uChispaAbajo: { value: 0 }, uAtenua: { value: 0.2 } };   // (muy atenuado: en el universo pasa por el bloom y no debe hacer halo)
   const puntos = new THREE.Points(geo, new THREE.ShaderMaterial({ vertexShader: VERTICE, fragmentShader: FRAGMENTO, uniforms: u, transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending, toneMapped: false }));
   puntos.frustumCulled = false; puntos.scale.setScalar(escala);
-  puntos.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), grupo.position.clone().negate().normalize());   // la órbita, de cara a casa grupo.add(puntos);
+  puntos.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), grupo.position.clone().negate().normalize());   // la órbita, de cara a casa
+  grupo.add(puntos);
   const tam = new THREE.Vector2();
   return { puntos, actualizar(t, camara) { renderer.getDrawingBufferSize(tam); v.value = t; u.uPx.value = tam.y / (2 * Math.tan(camara.fov * Math.PI / 360)) * escala; } };
 }
@@ -192,7 +218,7 @@ export function crearTeatroVuelta(renderer) {
   const u = {
     uT: { value: 0 }, uFrente: { value: 0 }, uAbrir: { value: 0 }, uNombres: { value: 0 }, uOla: { value: -1 }, uEspera: { value: 0 },
     uPx: { value: 1000 }, uTexto: { value: 10 }, uPR: { value: 1 }, uCoronaInicio: { value: 0 }, uCoronaPaso: { value: 1 }, uHayCorona: { value: 0 }, uChispaX: { value: 1 }, uChispaY: { value: 1 }, uChispaAbajo: { value: 1 },
-    uSep: { value: 1 }, uAng: { value: 0 }, uFlujo: { value: 0 }, uInfinito: { value: 0 }, uAtenua: { value: 1 }
+    uSep: { value: 1 }, uAng: { value: 0 }, uFlujo: { value: 0 }, uInfinito: { value: 0 }, uAtenua: { value: 1 }, uLatido: { value: 0 }, uSegunda: { value: 0 }, uOnda: { value: 0 }
   };
   const tam = new THREE.Vector2(), mira = new THREE.Vector3();
 
@@ -206,7 +232,7 @@ export function crearTeatroVuelta(renderer) {
     }
     const r = azar(20251215 + meses), conNombres = !!guion.corona;
     const nChispas = guion.chispas.length * N_POR_CHISPA, nHilo = conNombres ? N_HILO : 0;
-    const total = N_HEBRA * 2 + N_SOL + N_FONDO + 13 + 2 + nChispas + nHilo;
+    const nOnda = guion.onda ? N_ONDA : 0, total = N_HEBRA * 2 + N_SOL + N_FONDO + 13 + 2 + nChispas + nHilo + nOnda;
     const A = new Float32Array(total * 4), G = new Float32Array(total * 3), N = new Float32Array(total * 3);
     const sitios = conNombres ? await sitiosDeNombres(Math.round(N_HEBRA * 2 * 0.72), r) : null;
     let k = 0, s = 0;
@@ -231,13 +257,14 @@ export function crearTeatroVuelta(renderer) {
     for (let i = 0; i < N_FONDO; i++) { const d = esfera(); poner(0, r(), F_FONDO, 0, d[0], d[1], d[2]); }
     for (let i = 0; i < 13; i++) poner(0, r(), F_MARCA, i);
     poner(0, 0.5, F_PAR, 0); poner(0, 0.5, F_PAR, 1);
-    // Las chispas salen por 48 rayos, no por toda la esfera.
-    const esferaRayos = () => { const a = Math.floor(r() * 48) / 48 * Math.PI * 2, v = 0.8 + 0.2 * Math.abs(Math.sin(a * 23.7)); return [Math.cos(a) * v, Math.sin(a) * v]; };
+    // Las chispas salen por 38 rayos de largos distintos, no por toda la esfera: un estallido, no una rueda.
+    const esferaRayos = () => { const a = (Math.floor(r() * 38) + r() * 0.25) / 38 * Math.PI * 2, largo = 0.35 + 0.65 * Math.abs(Math.sin(Math.floor(a * 6.05) * 12.9898)), v = largo * (0.55 + 0.45 * Math.sqrt(r())); return [Math.cos(a) * v, Math.sin(a) * v]; };
     guion.chispas.forEach((t, b) => {
       const ox = (b % 2 ? 1 : -1) * (b % 4 < 2 ? 0.95 : 0.5), oy = b % 4 < 2 ? 1 : -1;
       for (let i = 0; i < N_POR_CHISPA; i++) { const d = esferaRayos(); poner(0, r(), F_CHISPA, t, d[0], d[1], 0, ox, oy, 0); }
     });
     for (let i = 0; i < nHilo; i++) poner(0, r(), F_HILO, (i + r()) / nHilo * 13);
+    for (let i = 0; i < nOnda; i++) poner((i + r()) / nOnda * Math.PI * 2, r(), F_ONDA, 0);
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(total * 3), 3));
     geo.setAttribute('aA', new THREE.BufferAttribute(A, 4)); geo.setAttribute('aG', new THREE.BufferAttribute(G, 3)); geo.setAttribute('aN', new THREE.BufferAttribute(N, 3));
@@ -248,20 +275,20 @@ export function crearTeatroVuelta(renderer) {
     fijar(0); renderer.compile(escena, camara);
     return true;
   }
-  // Pone la escena en ese segundo de la canción.
-  function fijar(s) {
+  // Pone la escena en ese segundo de la canción (vida: el titileo mientras espera a la canción en su primer cuadro).
+  function fijar(s, vida = s) {
     if (!guion) return;
     renderer.getDrawingBufferSize(tam);
     const aspecto = tam.x / Math.max(1, tam.y);
     if (Math.abs(camara.aspect - aspecto) > 1e-3) { camara.aspect = aspecto; camara.updateProjectionMatrix(); }
     // En vertical la órbita ha de caber a lo ancho: la cámara se aleja lo justo.
-    const lejos = guion.binaria ? Math.min(3.3, Math.max(1, 1.4 / aspecto)) : Math.min(2.3, Math.max(1, 1.12 / aspecto));
-    const c = guion.camara, az = c.az(s) * Math.PI / 180, el = c.el(s) * Math.PI / 180, d = c.dist(s) * lejos;
+    const lejos = guion.binaria ? Math.min(3.6, Math.max(1, 1.5 / aspecto)) : Math.min(2.7, Math.max(1, 1.25 / aspecto));
+    const c = guion.camara, az = c.az(s) * Math.PI / 180, el = c.el(s) * Math.PI / 180, d = c.dist(s) * (1 + (lejos - 1) * c.abre(s));
     mira.set(c.mira[0](s), c.mira[1](s), c.mira[2](s));
     camara.position.set(mira.x + Math.cos(el) * Math.cos(az) * d, mira.y + Math.sin(el) * d, mira.z + Math.cos(el) * Math.sin(az) * d);
     camara.lookAt(mira);
     const mediaAltura = Math.tan(camara.fov * Math.PI / 360);
-    u.uT.value = s; u.uFrente.value = guion.frente(s); u.uAbrir.value = guion.abrir(s); u.uNombres.value = guion.nombres(s); u.uOla.value = guion.ola(s); u.uEspera.value = guion.espera(s);
+    u.uT.value = vida; u.uLatido.value = guion.latido?.(s) ?? 0; u.uSegunda.value = guion.segunda?.(s) ?? 0; u.uOnda.value = guion.onda || 0; u.uFrente.value = guion.frente(s); u.uAbrir.value = guion.abrir(s); u.uNombres.value = guion.nombres(s); u.uOla.value = guion.ola(s); u.uEspera.value = guion.espera(s);
     if (guion.binaria) { u.uSep.value = guion.sep(s); u.uAng.value = guion.ang(s) * Math.PI / 180; u.uFlujo.value = guion.flujo(s); u.uInfinito.value = guion.infinito(s); }
     u.uPx.value = tam.y / (2 * mediaAltura); u.uPR.value = renderer.getPixelRatio();
     u.uTexto.value = Math.min(0.66, 0.86 * aspecto) * PROFUNDIDAD_TEXTO * mediaAltura;
