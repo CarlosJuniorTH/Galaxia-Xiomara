@@ -25,7 +25,7 @@ const CLAVE_CONSTELACION = 'xiomara:constelacion-vista';   // ya se vio aparecer
 // Trazo nítido en píxeles de pantalla (WebGL no deja líneas de más de 1 px de dispositivo: en un móvil de 3× serían
 // casi invisibles): cada tramo es un rectángulo de ANCHO px CSS con el borde suavizado medio píxel, sin halo. Los tramos
 // se acortan HUECO px por cada lado para no pisar el dibujo de las estrellas.
-const ANCHO = 1.25, HUECO = 9;
+const ANCHO = 0.8, HUECO = 9;
 function crearConstelacion(estrellas, pares, uPR) {
   const n = pares.length, a = new Float32Array(n * 12), b = new Float32Array(n * 12), lado = new Float32Array(n * 4), fin = new Float32Array(n * 4), indices = [];
   for (let k = 0; k < n; k++) { lado.set([-1, 1, -1, 1], k * 4); fin.set([0, 0, 1, 1], k * 4); const v = k * 4; indices.push(v, v + 2, v + 1, v + 1, v + 2, v + 3); }   // (en sentido antihorario en pantalla: si no, se descartan como caras traseras)
@@ -48,7 +48,7 @@ function crearConstelacion(estrellas, pares, uPR) {
         s += nn * vD; gl_Position = vec4(s / (uRes * 0.5) * p.w, p.z, p.w);
       }`,
     fragmentShader: /* glsl */`uniform float uOpacidad; uniform vec3 uColor; varying float vD; varying float vMedio;
-      void main(){ float borde = clamp(vMedio + 0.5 - abs(vD), 0.0, 1.0); gl_FragColor = vec4(uColor * uOpacidad * borde, 1.0); }`,
+      void main(){ float borde = clamp(vMedio + 0.5 - abs(vD), 0.0, 1.0); gl_FragColor = vec4(uColor * uOpacidad * borde * 0.32, 1.0); }`,   // (un hilo que se adivina: el año lo cuenta la guirnalda del corazón)
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
   }));
   malla.frustumCulled = false; malla.visible = false;

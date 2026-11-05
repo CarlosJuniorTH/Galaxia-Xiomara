@@ -29,8 +29,8 @@ import { crearPreparacion } from './carga/preparacion.js';
 import { crearTeatroVuelta, crearLugarVuelta } from './teatroVuelta.js';
 import { crearAnilloVuelta } from './anilloVuelta.js';
 import { crearLugarDosSoles } from './dosSoles.js';
-import { crearCrecimiento } from './crecimiento.js';
-import { mesesCumplidos } from '../util/tiempo.js';
+import { escalaGalaxia } from './crecimiento.js';
+import { mesesCumplidos, mesesConFraccion } from '../util/tiempo.js';
 import { matricesSoloVisibles, actualizarVisibles } from './matrices.js';
 import { crearRutas } from './camara/rutas.js';
 import { construirMaravillas } from './maravillas.js';
@@ -604,9 +604,9 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   // raya). Mientras se mira, casa se inclina hacia la cámara (como una foto desde arriba, ~45°) solo al dibujar: antes del
   // dibujo se gira alrededor de su centro y después vuelve a su sitio (la lógica de cada parte no lo nota).
   // Desde el mes 11, alrededor de casa, el trozo de órbita ya recorrido (se decide al cargar: un dibujo solo si toca).
-  const mesesAnillo = mesesCumplidos(config.fechaInicio, new Date()), anilloVuelta = mesesAnillo >= 11 ? crearAnilloVuelta({ scene, uPR: nucleo.uPR, meses: mesesAnillo }) : null;
-  // La galaxia crece cada mes (crecimiento.js), y los lugares que abre el tiempo (data/universo.js) traen su objeto.
-  crearCrecimiento({ grupo: galaxia.grupo, uPR: nucleo.uPR, meses: mesesAnillo });
+  const mesesVividos = mesesConFraccion(config.fechaInicio), crece = escalaGalaxia(mesesVividos), anilloVuelta = mesesVividos >= 11 ? crearAnilloVuelta({ padre: corazon.grupo, uPR: nucleo.uPR, meses: mesesVividos }) : null;
+  // La galaxia crece cada mes, toda ella (crecimiento.js), y los lugares que abre el tiempo (data/universo.js) traen su objeto.
+  galaxia.grupo.scale.setScalar(crece);
   const lugarDosSoles = mundos.grupos.has('dossoles') ? crearLugarDosSoles({ grupo: mundos.grupos.get('dossoles'), renderer, uPR: nucleo.uPR }) : null;
   const lugarVuelta = mundos.grupos.has('vuelta') ? crearLugarVuelta({ grupo: mundos.grupos.get('vuelta'), renderer, uPR: nucleo.uPR }) : null;
   const todaCasa = scene.children.filter(o => ['mundos', 'galaxia', 'amor', 'agujeroNegro', 'corazon', 'nombre', 'frases', 'secretas', 'polvo', 'marcaSolar'].includes(o.userData.capa) || o === marcaSolar);

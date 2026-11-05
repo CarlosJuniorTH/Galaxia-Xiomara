@@ -50,6 +50,7 @@ export function crearCorazon({ scene, uScale, uPR }) {
   grupo.add(brillo);
 
   return {
+    grupo,
     actualizar(t, dt, { pulso, camera, escala = 1, simbolos = 1 }) {
       mat.uniforms.uTime.value = t; mat.uniforms.uOp.value = simbolos; grupo.visible = simbolos > 0.003;
       // Latido "pum-pum"

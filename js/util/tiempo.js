@@ -25,6 +25,11 @@ export function mesesCumplidos(fechaInicio, ahora = new Date()) {
   const ultimo = new Date(Date.UTC(p.anio, p.mes, 0)).getUTCDate();
   return Math.max(0, (p.anio - a) * 12 + p.mes - m - (p.dia < Math.min(d, ultimo) ? 1 : 0));
 }
+// Los meses juntos con su fracción: el 25 de noviembre son 11 y un tercio (para lo que avanza día a día).
+export function mesesConFraccion(fechaInicio, ahora = new Date()) {
+  const dia = +String(fechaInicio).slice(8, 10) || 15, hoy = partesEnZona(ahora).dia;
+  return mesesCumplidos(fechaInicio, ahora) + Math.min(0.99, (hoy >= dia ? hoy - dia : hoy + 30 - dia) / 30);
+}
 export function estrellasDisponibles(fechaInicio, ahora = new Date()) {
   const meses = mesesCumplidos(fechaInicio, ahora);
   return Array.from({ length: meses + 1 }, (_, i) => {
