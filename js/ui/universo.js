@@ -516,6 +516,8 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
   async function verClip(m, { dentroDeCelebracion = false, alFinal } = {}) {
     if (!guionVuelta(m) || teatro.activo || (!dentroDeCelebracion && (celebrando || tour || escena.viajando))) return;
     if (!dentroDeCelebracion) { if (panel.open) cerrarPanel(); celebrando = true; }
+    // Si aún hay que prepararlo (desde el álbum), que se sepa: un toque sin respuesta parece un fallo.
+    if (!alFinal && escena.teatroVuelta.guion !== guionVuelta(m)) avisar('Preparando el videoclip… ♡');
     // (Se anota al verlo entero: si el teléfono lo interrumpe, no se pierde.)
     if (alFinal) await teatro.reproducir(m, { alFinal: () => { progreso.anotar('celebraciones', `clip-${m}`); alFinal(); } });
     else if (await teatro.reproducir(m)) progreso.anotar('celebraciones', `clip-${m}`);

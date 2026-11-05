@@ -99,7 +99,7 @@ GUIONES.dossoles = {
   camara: {
     az: pistaSuave([[0, 0], [20, 26], [46, 56], [59.28, 60]]),
     el: pistaSuave([[0, 30], [30, 42], [46, 72], [59.28, 78]]),
-    dist: pistaSuave([[0, 34], [20.62, 34], [30.93, 32], [46, 29], [59.28, 28]]),
+    dist: pistaSuave([[0, 44], [20.62, 40], [30.93, 34], [46, 29], [59.28, 28]]),
     distV: pistaSuave([[0, 62], [8, 63], [22, 86], [44, 92], [59.28, 92]]),   // las dos caben siempre, y al final el infinito a lo ancho
     abre: pistaSuave([[0, 0.12], [20, 0.25], [40, 1], [59.28, 1]]),
     mira: [() => 0, () => 0, () => 0]

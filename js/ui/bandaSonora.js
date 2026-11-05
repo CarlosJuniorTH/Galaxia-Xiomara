@@ -463,7 +463,8 @@ export function crearBandaSonora({ volumen = () => 0.85, cargaEn = null } = {}) 
     // ceremoniaPendiente(): al llegar, el lugar va a empezar su ceremonia (la supernova que aún no ha estallado); entonces
     // su canción espera a ella (ceremonia()) para que las fases caigan en sus marcas.
     viajar(id, { viajando, fin = () => null, ceremoniaPendiente = () => false }) {
-      const p = pistas.get(id); if (p) { if (p.estado === 'pendiente') descargar(p); else if (p.estado === 'guardada') decodificar(p); }
+      // (El vuelo de entrada acaba en el reposo, no en la canción de casa: no se pide nada, y la cola la traerá luego.)
+      const p = primeraLlegada && id === 'hogar' ? null : pistas.get(id); if (p) { if (p.estado === 'pendiente') descargar(p); else if (p.estado === 'guardada') decodificar(p); }
       // El segundo tramo de un viaje que cruza al sistema solar vuelve a avisar del mismo destino: el viaje sigue.
       if (viajeEnCurso && viajeEnCurso.id === id) return;
       const antes = objetivo;

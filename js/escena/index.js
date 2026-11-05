@@ -297,7 +297,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   velo.frustumCulled = false; velo.renderOrder = -5; velo.visible = false; scene.add(velo);
   // Cuánto se apaga el fondo en cada lugar: más donde el mensaje es un dibujo de luz.
   // Distancia mínima de la cámara a cada lugar (radio del objeto con margen).
-  const CERCA = { hogar: 300, rosa: 240, azul: 95, cartas: 195, constelacion: 260, suenos: 235, capsulas: 180, calma: 245, cometa: 170, dossoles: 300, vuelta: 260 };
+  const CERCA = { hogar: 300, rosa: 240, azul: 95, cartas: 195, constelacion: 260, suenos: 235, capsulas: 180, calma: 245, cometa: 170, dossoles: 420, vuelta: 300 };
   // Salto a la velocidad de la luz: estelas de estrellas alrededor de la cámara que se
   // alargan con la velocidad del viaje (y el campo de visión se abre un poco en el tramo
   // más rápido). Fuera de los vuelos, ocultas.

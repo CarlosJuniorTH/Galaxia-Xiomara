@@ -3,6 +3,15 @@
 Lo nuevo arriba. Se consulta con `grep`; no se lee entero. Resumen por temas de `git log --oneline` (los hashes
 permiten ver el detalle con `git show <hash>`).
 
+## 2026-11-05 · Revisión de los clips: soles sólidos, océano y galaxia
+
+- Soles (clips y lugares): esfera con plasma por píxel (`js/escena/estrellaSolida.js`), corona en chorros finos de motas; fuera las decenas de miles de motas de superficie.
+- Dos soles: el océano son ondas que nacen de cada sol y se encienden al cruzarse; corriente menos «cuerda»; viento más difuso; PC un poco más lejos al empezar (el sol cercano se cortaba).
+- Clip del año: galaxia con brazos más anchos que ya no se queman; corazón rosa; fuegos sin la mancha inicial (las motas sin salir estaban encendidas en el origen) y mayores.
+- Fondo con banda de estrellas (`direccionCielo`). Lugar del año visto de lejos: estrellas con tamaño mínimo 5 px (`uEstrellaMin`), sin rejilla de destellos. `CERCA`: dossoles 420, vuelta 300.
+- `hogar.m4a` ya no se pide en el vuelo de entrada (acaba en el reposo). Aviso «Preparando…» si un clip se abre sin estar preparado.
+- `encuadre` falla igual en `main` (mismos 11 fallos): no viene de estos cambios.
+
 ## 2026-11-05 · Estrenos tras la intro, sin negro, y tiara
 
 - Estrenos (`clipDeEstreno`): la intro sale como siempre con su música y, al pulsar para entrar, el clip sustituye al vuelo; al acabar, a casa. Una vez por dispositivo, anotada al verlo entero. Dos soles desde el 15/11 (hasta el 14/12) y el año desde el 15/12 (hasta el 14/01), esperando a la primera visita si no se entró ese día. Sustituye a la versión de abajo, que quitaba la intro.
