@@ -18,6 +18,11 @@ test('año: los soles van siempre sin saltos, se encuentran en el centro y acaba
   for (let s = 0.05; s <= g.duracion; s += 0.05) { const p = g.soles(s); assert.ok(Math.hypot(p.oro[0] - antes.oro[0], p.oro[1] - antes.oro[1]) < 0.5, `oro salta en ${s}`); assert.ok(Math.hypot(p.rosa[0] - antes.rosa[0], p.rosa[1] - antes.rosa[1]) < 0.5, `rosa salta en ${s}`); antes = p; }
   assert.ok(Math.hypot(...g.soles(60).oro) < 1); assert.equal(g.soles(60).junta, 1); assert.equal(g.soles(97).junta, 1);
 });
+test('Dos soles: la distancia baja sin volver atrás, de 10.466 km a cero en el contacto', () => {
+  const g = guionVuelta('dossoles'); let km = g.contador.km(0); assert.equal(km, 10466);
+  for (let s = 0.1; s <= 33; s += 0.1) { const v = g.contador.km(s); assert.ok(v <= km); km = v; }
+  assert.equal(g.contador.km(30.93), 0);
+});
 for (const m of MESES_CON_CLIP) test(`mes ${m}: la cámara gira en un solo sentido, despacio y sin saltos`, () => {
   const g = guionVuelta(m); let az = g.camara.az(0), d = g.camara.dist(0);
   for (let s = 0.1; s <= g.duracion; s += 0.1) {
