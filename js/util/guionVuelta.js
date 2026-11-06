@@ -51,6 +51,12 @@ function solesAnio(s, frente) {
   const a = ARRIBA_ANIO + (s - 93.5) * 0.11;   // y echan a andar otra vez
   return { centro: polar(a, R_CINTA), oro: polar(a, R_CINTA), rosa: polar(a, R_CINTA), junta: 1 };
 }
+// Dónde va cada sol de la pareja respecto a su centro: giran ALREDEDOR de la cinta, que pasa entre los dos como el eje de un tubo
+// (por fuera, por encima, por dentro, por debajo). Sin cinta debajo (en el centro de la galaxia), en el plano. Devuelve [x, y, z] del primero.
+export function giroPareja(centro, angulo, distancia) {
+  const r = Math.hypot(centro[0], centro[1]), c = Math.cos(angulo) * distancia, s = Math.sin(angulo) * distancia;
+  return r < 0.01 ? [c, 0, s] : [centro[0] / r * c, s, centro[1] / r * c];
+}
 const CHISPAS_ANIO = [78.04, 80.04, 82.01, 84.03, 86.03, 88.03, 90.02, 92.02];
 // Textos propios (BORRADOR: revisar Carlos). Ninguno cita la canción.
 const GUIONES = {
@@ -81,10 +87,10 @@ const GUIONES = {
     frente: pistaSuave([[0, 330 * GRADO], [3, 330 * GRADO], [14.02, 360 * GRADO], [98.01, 360 * GRADO]]),
     camara: {
       az: pistaSuave([[0, 306], [14, 342], [44, 402], [62, 446], [78, 472], [98.01, 492]]),
-      el: pistaSuave([[0, 16], [14, 20], [24, 25], [44, 30], [62, 34], [98.01, 38]]),   // (inclinada como la galaxia de casa, nunca de frente: es ella)
+      el: pistaSuave([[0, 16], [14, 22], [24, 32], [44, 44], [62, 54], [98.01, 62]]),   // (se va alzando sin llegar a ponerse de frente)
       // Junto a los dos soles hasta que la vuelta se cierra; entonces se abre, y sube hasta tener el anillo entero de frente.
       dist: pistaSuave([[0, 16], [10, 18], [28, 38], [62, 44], [98.01, 44]]),
-      distV: pistaSuave([[0, 23], [8, 26], [14, 34], [24, 58], [40, 64], [62, 66], [98.01, 67]]),
+      distV: pistaSuave([[0, 23], [8, 26], [14, 34], [24, 59], [32, 64], [62, 67], [98.01, 68]]),
       abre: pistaSuave([[0, 0], [12.5, 0], [23, 1], [98.01, 1]])
     },
     meses: null,
@@ -93,7 +99,7 @@ const GUIONES = {
       { desde: 14.2, hasta: 17.8, clase: 'grande', texto: 'Una vuelta al Sol' },
       { desde: 14.6, hasta: 17.8, clase: 'pie', texto: '940 millones de kilómetros, juntos.' },
       { desde: 45, hasta: 58, clase: 'pie', texto: 'Y todo lo recorrido cae hacia el centro…' },
-      { desde: 64, hasta: 76, clase: 'pie', texto: 'La misma galaxia que abres cada día.' },
+      { desde: 64, hasta: 76, clase: 'pie', texto: 'Esto hicimos en un año.' },
       { desde: 78.1, hasta: 91.6, clase: 'grande abajo', texto: 'Un año' },
       { desde: 79.6, hasta: 91.6, clase: 'pie abajo', texto: '15 · 12 · 2025 — 15 · 12 · 2026' },
       { desde: 92.4, hasta: 96.8, clase: 'grande abajo', texto: 'Y solo es la primera.' }

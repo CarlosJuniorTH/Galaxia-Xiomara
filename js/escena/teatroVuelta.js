@@ -2,7 +2,7 @@
 // gobernada por el guion (js/util/guionVuelta.js): pocos dibujos, repetible al cuadro, sin posproceso. Se construye antes de
 // empezar y se libera al terminar. El lugar del año (crearLugarVuelta) usa la misma luz, dentro del universo.
 import * as THREE from 'three';
-import { guionVuelta, radioFrente, FASE_BRAZOS } from '../util/guionVuelta.js';
+import { guionVuelta, radioFrente, giroPareja, FASE_BRAZOS } from '../util/guionVuelta.js';
 import { crearEstrella } from './estrellaSolida.js';
 import { crearCieloClip } from './mundoClip.js';
 import { crearPlasmaDosSoles, crearPlasmaVuelta, crearCorona, crearFuego, crearVelo, R_VUELTA } from './tejidoLuz.js';
@@ -23,7 +23,7 @@ const VERT_MARCAS = /* glsl */`
     if (uOla >= 0.0) t += 0.9 * (1.0 - smoothstep(0.0, 0.5, abs(mod(uOla - angulo + 3.14159, 6.2831853) - 3.14159)));
     if (uOla2 >= 0.0) t += 0.9 * (1.0 - smoothstep(0.0, 0.5, abs(mod(uOla2 - angulo + 3.14159, 6.2831853) - 3.14159)));
     vec4 v = modelViewMatrix * vec4(cos(angulo) * uR, 0.0, sin(angulo) * uR, 1.0); gl_Position = projectionMatrix * v;
-    gl_PointSize = clamp(uPx * t * 2.1 / max(0.1, -v.z), 16.0 * uPR, 88.0 * uPR); vB = b; vC = aI < 0.5 ? vec3(1.0, 0.82, 0.5) : vec3(1.0, 0.95, 0.88);
+    gl_PointSize = clamp(uPx * t * 3.0 / max(0.1, -v.z), 22.0 * uPR, 96.0 * uPR); vB = b; vC = aI < 0.5 ? vec3(1.0, 0.82, 0.5) : vec3(1.0, 0.95, 0.88);
     if (b <= 0.0) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); gl_PointSize = 0.0; }
   }`;
 const FRAG_MARCAS = /* glsl */`precision highp float; varying float vB; varying vec3 vC;
@@ -92,15 +92,13 @@ export function crearTeatroVuelta(renderer, { cielo: cieloDe = () => null } = {}
       const fr = guion.frente(s), abrir = guion.abrir(s), sol = lugarSoles;
       const pu = plasma.u; pu.uT.value = vida; pu.uFrente.value = fr; pu.uLlena.value = Math.min(1, fr / (Math.PI * 2)); pu.uAbrir.value = abrir; pu.uFrenteR.value = guion.corona ? radioFrente(s) : R_VUELTA; pu.uNucleo.value = guion.nucleo?.(s) ?? 0; pu.uEncuentro.value = guion.encuentro && s >= guion.encuentro ? s - guion.encuentro : -1; pu.uRSol.value = guion.rSol?.(s) ?? -1; pu.uOla.value = guion.ola(s); pu.uOla2.value = -1; pu.uEspera.value = guion.espera(s); pu.uOnda.value = guion.onda && s >= guion.onda ? s - guion.onda : -1; pu.uLatido.value = guion.latido?.(s) ?? 0;
       // Los dos soles: juntos, giran despacio el uno alrededor del otro con su infinito; separados, cada uno en su camino.
-      const j = sol.junta, ga = vida * GIRO_PAREJA, rx = Math.cos(ga) * DIST_PAREJA, rz = Math.sin(ga) * DIST_PAREJA, radio = R_SOLO + (R_PAREJA - R_SOLO) * j;
-      estrellas[0].malla.position.set(sol.oro[0] + (sol.centro[0] - sol.oro[0]) * j + rx * j, 0, sol.oro[1] + (sol.centro[1] - sol.oro[1]) * j + rz * j);
-      estrellas[1].malla.position.set(sol.rosa[0] + (sol.centro[0] - sol.rosa[0]) * j - rx * j, 0, sol.rosa[1] + (sol.centro[1] - sol.rosa[1]) * j - rz * j);
+      const j = sol.junta, [rx, ry, rz] = giroPareja(sol.centro, vida * GIRO_PAREJA, DIST_PAREJA), radio = R_SOLO + (R_PAREJA - R_SOLO) * j;
+      estrellas[0].malla.position.set(sol.oro[0] + (sol.centro[0] - sol.oro[0]) * j + rx * j, ry * j, sol.oro[1] + (sol.centro[1] - sol.oro[1]) * j + rz * j);
+      estrellas[1].malla.position.set(sol.rosa[0] + (sol.centro[0] - sol.rosa[0]) * j - rx * j, -ry * j, sol.rosa[1] + (sol.centro[1] - sol.rosa[1]) * j - rz * j);
       estrellas.forEach((e, i) => { e.malla.scale.setScalar(radio); coronas[i].u.uEsc.value = radio * 2.5; });
       UM.uT.value = vida; UM.uFrente.value = fr; UM.uEspera.value = guion.espera(s); UM.uOla.value = guion.ola(s); UM.uOla2.value = -1;
       // Velos de polvo sobre la galaxia que nace: profundidad, y solo cuando ya la hay.
       velos.forEach(v => { v.u.uT.value = vida; v.u.uSep.value = 7; v.u.uAng.value = vida * 0.02; v.u.uLuz.value = abrir * 0.8; v.malla.visible = abrir > 0.01; });
-      // Cada mes, su onda.
-      if (guion.corona) { const tm = s - guion.corona.inicio, im = Math.floor(tm / guion.corona.paso), activa = tm >= 0 && im < 12; pu.uMesT.value = activa ? tm - im * guion.corona.paso : -1; pu.uMesA.value = im * Math.PI / 6; }
       // Ya en el anillo, cada sol enciende la cinta y las estrellas por donde pasa.
       if (guion.corona && (s >= 72 || (s >= 18 && s < 24))) { const dpi = Math.PI * 2, ao = (Math.atan2(sol.oro[1], sol.oro[0]) + dpi) % dpi, ar = (Math.atan2(sol.rosa[1], sol.rosa[0]) + dpi) % dpi; pu.uOla.value = UM.uOla.value = ao; pu.uOla2.value = UM.uOla2.value = ar; } UM.uPx.value = tam.y / (2 * mediaAltura); UM.uPR.value = renderer.getPixelRatio();
       // Los fuegos: cada uno en un sitio fuera del anillo, a su tiempo.
@@ -156,7 +154,7 @@ export function crearLugarVuelta({ grupo, renderer, uPR, escala = 11 }) {
   const tam = new THREE.Vector2();
   return { puntos: raiz, actualizar(t, camara) {
     renderer.getDrawingBufferSize(tam); pu.uT.value = t; um.uT.value = t; um.uPx.value = tam.y / (2 * Math.tan(camara.fov * Math.PI / 360)) * escala;
-    const a = (t * 0.09) % (Math.PI * 2), x = R_VUELTA * Math.cos(a), z = R_VUELTA * Math.sin(a), gi = t * 1.1, rx = Math.cos(gi) * R_PAREJA * 1.55, rz = Math.sin(gi) * R_PAREJA * 1.55;
-    pu.uOla.value = a; estrellas[0].malla.position.set(x + rx, 0, z + rz); estrellas[1].malla.position.set(x - rx, 0, z - rz); for (const e of estrellas) e.u.uT.value = t;
+    const a = (t * 0.09) % (Math.PI * 2), x = R_VUELTA * Math.cos(a), z = R_VUELTA * Math.sin(a), [rx, ry, rz] = giroPareja([x, z], t * 1.1, R_PAREJA * 1.55);
+    pu.uOla.value = a; estrellas[0].malla.position.set(x + rx, ry, z + rz); estrellas[1].malla.position.set(x - rx, -ry, z - rz); for (const e of estrellas) e.u.uT.value = t;
   } };
 }

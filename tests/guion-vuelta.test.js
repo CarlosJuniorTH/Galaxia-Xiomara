@@ -71,3 +71,14 @@ test('evento: nada antes de su día, una sola vez y deja un lugar nuevo', () => 
   assert.equal(clipDeEstreno('2026-12-15'), 12);
   assert.equal(novedadDeEstreno('dossoles').lugar, 'dossoles'); assert.equal(novedadDeEstreno(12).lugar, 'vuelta');
 });
+
+test('los dos soles giran alrededor de la cinta, no a través de ella', async () => {
+  const { giroPareja } = await import('../js/util/guionVuelta.js');
+  const centro = [6, 8], tangente = [-0.8, 0.6];   // (la cinta, en ese punto)
+  for (let a = 0; a < 7; a += 0.37) {
+    const [x, y, z] = giroPareja(centro, a, 1.75);
+    assert.ok(Math.abs(Math.hypot(x, y, z) - 1.75) < 1e-9);          // siempre a la misma distancia de la línea
+    assert.ok(Math.abs(x * tangente[0] + z * tangente[1]) < 1e-9);   // en el plano perpendicular a la línea
+  }
+  assert.equal(giroPareja([0, 0], 0, 1.75)[1], 0);                   // en el centro de la galaxia no hay línea: en el plano
+});
