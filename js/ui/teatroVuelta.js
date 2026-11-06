@@ -38,11 +38,11 @@ export function crearTeatroUI({ escena, banda, config, estrellas }) {
     // Los nombres sobre sus ciudades: solo cambia su transform en cada cuadro (sin recalcular la página).
     const etiquetas = guion.etiquetas ? guion.etiquetas.textos.map((t, i) => { const d = document.createElement('div'); d.className = `teatro-ciudad ${i ? 'rosa' : 'oro'}`; d.textContent = t; textos.append(d); return d; }) : [];
     let etiquetasPuestas = false, lados = null;
-    // Los nombres y el corazón del final: letra de verdad y un corazón con su volumen, dentro del anillo de las doce estrellas.
+    // Los nombres y el corazón del final: una sola línea en el negro de arriba, sin tapar la galaxia.
     let nombres = null, corazon = null, nombresPuestos = false, latidoPuesto = -1;
     if (guion.corona) {
       nombres = document.createElement('div'); nombres.className = 'teatro-nombres';
-      nombres.innerHTML = '<svg viewBox="-20 -20 40 38" aria-hidden="true"><defs><radialGradient id="cz" cx="38%" cy="28%" r="85%"><stop offset="0" stop-color="#ffd9e8"/><stop offset=".38" stop-color="#ff6fa8"/><stop offset="1" stop-color="#b3124f"/></radialGradient></defs><path fill="url(#cz)" d="M0 15C-9 8-17 2-17-7c0-5 4-9 9-9 3.300 0 6.200 1.800 8 4.500C1.800-14.200 4.700-16 8-16c5 0 9 4 9 9 0 9-8 15-17 22z"/></svg><strong>Carlos</strong><span>&amp;</span><strong>Xiomara</strong>';
+      nombres.innerHTML = '<strong>Carlos</strong><svg viewBox="-20 -20 40 38" aria-hidden="true"><defs><radialGradient id="cz" cx="38%" cy="28%" r="85%"><stop offset="0" stop-color="#ffd9e8"/><stop offset=".38" stop-color="#ff6fa8"/><stop offset="1" stop-color="#b3124f"/></radialGradient></defs><path fill="url(#cz)" d="M0 15C-9 8-17 2-17-7c0-5 4-9 9-9 3.300 0 6.200 1.800 8 4.500C1.800-14.200 4.700-16 8-16c5 0 9 4 9 9 0 9-8 15-17 22z"/></svg><strong>Xiomara</strong>';
       corazon = nombres.querySelector('svg'); textos.append(nombres);
     }
     let mesPuesto = -1, cancionLista = false;

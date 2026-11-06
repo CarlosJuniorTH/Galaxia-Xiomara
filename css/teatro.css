@@ -14,10 +14,10 @@ body.en-teatro>*:not(#galaxia):not(#teatro):not(script):not(style){visibility:hi
 .teatro-ciudad.visible{opacity:1}
 .teatro-ciudad.oro{color:#ffd893}
 .teatro-ciudad.rosa{color:#ffb4d0}
-.teatro-nombres{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:max-content;text-align:center;opacity:0;transition:opacity 2.4s ease;text-shadow:0 2px 6px rgba(0,0,0,.75),0 0 2px rgba(0,0,0,.8)}
+.teatro-nombres{position:absolute;left:50%;top:13vh;transform:translateX(-50%);display:flex;align-items:center;gap:.5em;width:max-content;text-align:center;opacity:0;transition:opacity 2.4s ease;text-shadow:0 2px 6px rgba(0,0,0,.75),0 0 2px rgba(0,0,0,.8)}
 .teatro-nombres.visible{opacity:1}
-.teatro-nombres svg{display:block;width:clamp(44px,13vmin,110px);height:auto;margin:0 auto 2px;transform-origin:50% 55%;will-change:transform}
-.teatro-nombres strong{display:block;font:400 clamp(2.9rem,14.4vmin,7.6rem)/1.02 'Great Vibes',cursive;color:#ffe3b0}
+.teatro-nombres svg{display:block;width:clamp(20px,5.4vmin,40px);height:auto;transform-origin:50% 55%;will-change:transform}
+.teatro-nombres strong{display:block;font:400 clamp(2.3rem,10.5vmin,4.6rem)/1.1 'Great Vibes',cursive;color:#ffe3b0}
 .teatro-nombres span{display:block;font:italic 500 clamp(1.1rem,5vmin,2.4rem)/1 'Cormorant Garamond',Georgia,serif;color:#ffc3da}
 .teatro-linea.grande{top:15vh;font:italic 500 clamp(2.1rem,9.5vw,3.5rem)/1.1 'Cormorant Garamond',Georgia,serif;color:#fff6ec}
 .teatro-linea.pie{bottom:calc(env(safe-area-inset-bottom,0px) + 12vh);font:italic 500 clamp(1.3rem,5.6vw,2rem)/1.2 'Cormorant Garamond',Georgia,serif;color:#f4d9b4}

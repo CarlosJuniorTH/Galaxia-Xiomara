@@ -81,7 +81,7 @@ const GUIONES = {
     frente: pistaSuave([[0, 330 * GRADO], [3, 330 * GRADO], [14.02, 360 * GRADO], [98.01, 360 * GRADO]]),
     camara: {
       az: pistaSuave([[0, 306], [14, 342], [44, 402], [62, 446], [78, 472], [98.01, 492]]),
-      el: pistaSuave([[0, 22], [14, 28], [24, 36], [44, 46], [62, 76], [98.01, 87]]),
+      el: pistaSuave([[0, 16], [14, 20], [24, 25], [44, 30], [62, 34], [98.01, 38]]),   // (inclinada como la galaxia de casa, nunca de frente: es ella)
       // Junto a los dos soles hasta que la vuelta se cierra; entonces se abre, y sube hasta tener el anillo entero de frente.
       dist: pistaSuave([[0, 16], [10, 18], [28, 38], [62, 44], [98.01, 44]]),
       distV: pistaSuave([[0, 23], [8, 26], [14, 34], [24, 58], [40, 64], [62, 66], [98.01, 67]]),
@@ -93,21 +93,22 @@ const GUIONES = {
       { desde: 14.2, hasta: 17.8, clase: 'grande', texto: 'Una vuelta al Sol' },
       { desde: 14.6, hasta: 17.8, clase: 'pie', texto: '940 millones de kilómetros, juntos.' },
       { desde: 45, hasta: 58, clase: 'pie', texto: 'Y todo lo recorrido cae hacia el centro…' },
+      { desde: 64, hasta: 76, clase: 'pie', texto: 'La misma galaxia que abres cada día.' },
       { desde: 78.1, hasta: 91.6, clase: 'grande abajo', texto: 'Un año' },
       { desde: 79.6, hasta: 91.6, clase: 'pie abajo', texto: '15 · 12 · 2025 — 15 · 12 · 2026' },
       { desde: 92.4, hasta: 96.8, clase: 'grande abajo', texto: 'Y solo es la primera.' }
     ],
     // La galaxia la dibujan los dos soles al bajar (radioFrente); al encontrarse en el centro, se enciende.
-    abrir: s => 1 - radioFrente(s) / R_CINTA, nucleo: s => suave(59.5, 62, s), encuentro: 60, explota: 60, rSol: s => s < 24 || s >= 72 ? -1 : s < 60 ? rBaja(s) : rSube(s), soles: s => solesAnio(s, GUIONES[12].frente),
+    abrir: s => 1 - radioFrente(s) / R_CINTA, nucleo: s => suave(59.5, 62, s), encuentro: 60, rSol: s => s < 24 || s >= 72 ? -1 : s < 60 ? rBaja(s) : rSube(s), soles: s => solesAnio(s, GUIONES[12].frente),
     nombres: s => suave(62, 72, s),
-    cielo: pistaSuave([[0, 0.4], [44, 0.42], [62, 0.5], [98.01, 0.34]]),
+    cielo: () => 0.05,   // (sus nebulosas, tan cerca, se leían como rocas: js/escena/mundoClip.js)
     // Mientras suben las estrellas, lo que escribió Carlos de cada mes (js/config.js): [desde, hasta, mes].
     frases: [[18, 22, 0], [22.2, 25.4, 2], [25.6, 28.8, 3], [29, 32.2, 5], [32.4, 35.6, 7], [35.8, 39, 8], [39.2, 42.8, 10]],
     // La luz que recorre la órbita recién cerrada, dos vueltas (en radianes; −1 = apagada).
     ola: s => s < 14.02 || s > 18.5 ? -1 : (s - 14.02) / 4.48 * 2 * VUELTA,
     // Cada estrella sube de la órbita en su compás: de la primera (18 s) a la decimotercera (42 s).
     corona: { inicio: 18, paso: 2 },
-    chispas: CHISPAS_ANIO,
+    chispas: [],
     // La estrella que falta espera hasta que llegan; al cerrarse, una onda de luz sale de la órbita.
     espera: s => 1 - suave(13.2, 14.4, s), onda: 14.02,
     // El corazón late con cada golpe del estribillo final.
@@ -130,16 +131,16 @@ GUIONES.dossoles = {
   // Antes de tocarse, cada uno lanza un brazo de plasma hacia el otro: se buscan, y llegan a la vez, en el golpe.
   alcance: pistaSuave([[0, 0], [3, 0], [14, 0.46], [22, 0.66], [28, 0.86], [30.93, 1], [59.28, 1]]),
   // Al compás (2,58 s) desde que se tocan: toda la luz late con la canción. Y su materia sale al espacio en dos espirales.
-  pulso: s => s < 30.93 ? 0 : Math.exp(-((s - 30.93) % 2.5775) * 2.8), espiral: s => suave(33, 48, s), explota: 30.93,
+  pulso: s => s < 30.93 ? 0 : Math.exp(-((s - 30.93) % 2.5775) * 2.8), espiral: s => suave(33, 48, s),
   // Sus nombres, sobre cada uno, mientras aún están lejos.
   etiquetas: { desde: 0.6, hasta: 20, textos: ['Carlos · Barcelona', 'Xiomara · Buenos Aires'] },
-  cielo: pistaSuave([[0, 0.34], [20, 0.42], [59.28, 0.46]]),
+  cielo: () => 0.05,
   // Empieza mirando a lo largo de la pareja (una cerca y otra lejos, que caben en vertical) y acaba de cara al infinito.
   camara: {
     az: pistaSuave([[0, 0], [20, 26], [46, 56], [59.28, 60]]),
     el: pistaSuave([[0, 30], [30, 42], [46, 72], [59.28, 80]]),
     dist: pistaSuave([[0, 64], [20.62, 58], [30.93, 46], [46, 36], [59.28, 34]]),
-    distV: pistaSuave([[0, 56], [8, 57], [22, 66], [44, 72], [59.28, 74]]),
+    distV: pistaSuave([[0, 56], [8, 57], [22, 66], [44, 74], [59.28, 79]]),
     abre: () => 1,
     mira: [() => 0, () => 0, () => 0]
   },

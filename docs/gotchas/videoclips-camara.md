@@ -46,5 +46,6 @@
 - Formas principales como superficies por píxel, no Points: se dibujan directo a pantalla, en colores de pantalla, con alfa premultiplicado (el polvo tapa y la luz se suma).
 - Las hebras han de correr a lo largo de la forma: en círculo, la galaxia parecía un túnel. Ver la `q` de cada plasma.
 - Si sube la exposición, el centro se quema a blanco y se pierde el infinito: su forma se lee por contraste con lo de fuera, no por una línea encima.
-- El cielo (`guion.cielo` ≈ 0,4): más alto, sus paredes de fuego tapan soles y texto.
+- Mismo mundo que casa: paleta rosa, crema y malva, mucho negro y cámara inclinada como la galaxia de casa (el año acaba siendo esa galaxia). Nada de azul ni violeta neón, ni planos de frente.
+- El cielo (`guion.cielo` ≈ 0,05): sus nebulosas de cerca se leen como rocas; las estrellas las pone `js/escena/mundoClip.js`.
 - Coste: unas 8–10 lecturas de la tabla de ruido por píxel; se descarta lo enmascarado antes de calcular. Medir en teléfono real tras subir la exposición o el tamaño.
