@@ -91,6 +91,17 @@ export function crearEntrada(config, { viaje, banda, estreno = null } = {}) {   
     conCancion = !!sonar;
     if (conCancion) { banda.ir('inicio', { desde: 0 }); banda.activar(true); }
   }
+  // Saltar la intro: la canción salta al compás de la tarjeta y sigue desde ahí, con su reloj, como si el clip hubiera llegado
+  // solo. (Mientras la canción se recoloca, el clip se queda quieto en ese punto: si no, volvería un instante a su principio.)
+  let saltada = false;
+  $('#btn-saltar-intro').addEventListener('click', () => {
+    if (!empezado || saltada || entrada.classList.contains('formado')) return;
+    saltada = true; fijo = HITOS.tarjeta + 0.05;
+    const enCompas = conCancion && propio === null && Number.isFinite(marcas.tarjeta);
+    if (enCompas) banda.ceremonia('inicio', marcas.tarjeta);
+    else propio = relojMaestro.ahora() - HITOS.tarjeta;
+    setTimeout(() => { fijo = null; }, 450);
+  });
   // Al terminar la carga: la canción ya debería estar (va la primera y cuenta en los MB); si aún llega, se la espera.
   function cuandoCancion(fn) {
     if (!cancion) { setTimeout(() => fn(false), 500); return; }

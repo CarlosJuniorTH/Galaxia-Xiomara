@@ -12,6 +12,7 @@ permiten ver el detalle con `git show <hash>`).
 - Corona en arcos (`GLSL_ARCO`), no en pinchos; anillo apagado mientras viaja a rodear los nombres.
 - Evento: al llegar tras el clip, tarjeta con el lugar nuevo (`novedadDeEstreno`, `anunciarEvento`).
 - `js/util/horaReal.js`: HEAD a la propia web y cabecera Date; corrige Date si el reloj difiere más de 2 min (solo en github.io). Sin IP: Pages no tiene servidor propio y la marca de visto es por dispositivo.
+- Intro: botón «Saltar intro» durante el clip; la canción salta al compás de la tarjeta (`tests/navegador/saltarIntro.mjs`).
 - `tests/navegador/fpsClip.mjs`: fluidez de un clip en móvil emulado con CPU a un cuarto.
 
 ## 2026-11-05 · Revisión de los clips: soles sólidos, océano y galaxia

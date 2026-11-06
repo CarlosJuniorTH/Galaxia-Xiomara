@@ -177,3 +177,8 @@
 .toque:focus-visible .toque-texto{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:8px;}
 #entrada.con-toque .carga{opacity:0;}
 @media (prefers-reduced-motion:reduce){.nombre::after{animation:none;}}
+/* Saltar la intro: discreto, arriba a la derecha, solo mientras corre el clip. */
+.saltar-intro{position:absolute;z-index:6;top:calc(env(safe-area-inset-top,0px) + 14px);right:14px;min-height:44px;padding:0 16px;border:1px solid #e7cee540;border-radius:999px;background:#120b20b3;color:#f3e4ee;font:600 .82rem 'Quicksand',sans-serif;letter-spacing:.02em;cursor:pointer;opacity:0;visibility:hidden;transition:opacity .5s ease,visibility .5s;-webkit-tap-highlight-color:transparent}
+.saltar-intro b{font-weight:600;margin-left:2px}
+#entrada.clip:not(.formado):not(.previa) .saltar-intro{opacity:1;visibility:visible}
+
