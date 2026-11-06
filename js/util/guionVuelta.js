@@ -26,6 +26,31 @@ export function pistaSuave(claves) {
 }
 const suave = (a, b, s) => { const k = Math.min(1, Math.max(0, (s - a) / (b - a))); return k * k * k * (k * (k * 6 - 15) + 10); };
 
+// Los dos soles en la cinta: [ángulo de la cabeza, radio] y cuánto van juntos (junta 1: girando el uno alrededor del otro, con su
+// infinito; 0: cada uno por su cuenta). Devuelve dónde está cada uno, en el plano. La galaxia del año la dibujan ellos: al cerrarse
+// la vuelta se separan y bajan en espiral por la cresta de cada brazo (js/escena/tejidoLuz.js, misma fórmula), hasta encontrarse
+// en el centro y encenderlo; luego suben por los mismos brazos y se reúnen arriba para empezar la vuelta siguiente.
+export const R_CINTA = 10, ENROSQUE = 3.3, GIRO_BRAZOS = 0.035, FASE_BRAZOS = Math.PI / 2 - 24 * GIRO_BRAZOS;
+const rBaja = pistaSuave([[24, R_CINTA], [38, 7.2], [50, 3.6], [60, 0.7]]), rSube = pistaSuave([[60, 0.7], [66, 2.6], [72, R_CINTA]]);
+export const radioFrente = s => s < 24 ? R_CINTA : s < 60 ? rBaja(s) : 0;   // hasta dónde han llegado: de ahí hacia fuera, galaxia encendida
+const ARRIBA_ANIO = 308 * GRADO;   // lo que queda arriba en la pantalla con la cámara del final
+const angBrazo = (s, r) => FASE_BRAZOS + GIRO_BRAZOS * s + Math.log(r / R_CINTA) * ENROSQUE;
+const ANG_72 = angBrazo(72, R_CINTA), oroArriba = pistaSuave([[72, ANG_72], [93.5, ARRIBA_ANIO]]);   // (por el camino más corto: uno por cada lado)
+const rosaArriba = pistaSuave([[72, ANG_72 + Math.PI], [93.5, ARRIBA_ANIO]]);
+function solesAnio(s, frente) {
+  const polar = (a, r) => [Math.cos(a) * r, Math.sin(a) * r];
+  if (s < 24) {
+    const k = suave(18, 24, s), head = frente(s), a = k * Math.PI / 2;
+    return { centro: polar(head, R_CINTA), oro: polar(head + a, R_CINTA), rosa: polar(head - a, R_CINTA), junta: 1 - suave(18, 20.5, s) };
+  }
+  if (s < 72) {
+    const r = s < 60 ? rBaja(s) : rSube(s), a = angBrazo(s, r), j = s < 60 ? suave(57.5, 60, s) : 1 - suave(60, 62.5, s);
+    return { centro: [0, 0], oro: polar(a, r), rosa: polar(a + Math.PI, r), junta: j };
+  }
+  if (s < 93.5) { const j = suave(91.5, 93.5, s), oa = oroArriba(s), ra = rosaArriba(s); return { centro: polar(ARRIBA_ANIO, R_CINTA), oro: polar(oa, R_CINTA), rosa: polar(ra, R_CINTA), junta: j }; }
+  const a = ARRIBA_ANIO + (s - 93.5) * 0.11;   // y echan a andar otra vez
+  return { centro: polar(a, R_CINTA), oro: polar(a, R_CINTA), rosa: polar(a, R_CINTA), junta: 1 };
+}
 const CHISPAS_ANIO = [78.04, 80.04, 82.01, 84.03, 86.03, 88.03, 90.02, 92.02];
 // Textos propios (BORRADOR: revisar Carlos). Ninguno cita la canción.
 const GUIONES = {
@@ -37,10 +62,9 @@ const GUIONES = {
     camara: {
       az: pistaSuave([[0, 10], [14, 60], [28, 120], [38.85, 160]]),
       el: pistaSuave([[0, 20], [16, 40], [38.85, 62]]),
-      dist: pistaSuave([[0, 13], [16, 22], [38.85, 27]]),
-      distV: pistaSuave([[0, 40], [16, 54], [38.85, 66]]),   // en vertical, de cerca de la pareja hasta ver la cinta entera
-      abre: pistaSuave([[0, 0], [5, 0.05], [18, 1], [38.85, 1]]),
-      mira: [pistaSuave([[0, 6], [9, 0.8], [16, 0], [38.85, 0]]), pistaSuave([[0, 0], [38.85, 0]]), pistaSuave([[0, 0], [38.85, 0]])]
+      dist: pistaSuave([[0, 15], [8, 17], [18, 30], [38.85, 36]]),
+      distV: pistaSuave([[0, 26], [6, 29], [20, 58], [38.85, 66]]),   // en vertical, junto a la pareja hasta ver la cinta entera
+      abre: pistaSuave([[0, 0], [8, 0], [18, 1], [38.85, 1]])            // sigue a los dos soles y luego los suelta
     },
     meses: { desde: 0.4, hasta: 33.2 },
     textos: [
@@ -48,6 +72,7 @@ const GUIONES = {
       { desde: 34.6, hasta: 38.2, clase: 'pie abajo letra', texto: 'Falta una luz.' }
     ],
     abrir: () => 0, nombres: () => 0, ola: () => -1, corona: null, chispas: [], onda: 0, cielo: () => 0.4,
+    soles: s => { const a = GUIONES[11].frente(s), p = [Math.cos(a) * R_CINTA, Math.sin(a) * R_CINTA]; return { centro: p, oro: p, rosa: p, junta: 1 }; },
     espera: s => suave(30, 33, s)
   },
   12: {
@@ -56,27 +81,24 @@ const GUIONES = {
     frente: pistaSuave([[0, 330 * GRADO], [3, 330 * GRADO], [14.02, 360 * GRADO], [98.01, 360 * GRADO]]),
     camara: {
       az: pistaSuave([[0, 306], [14, 342], [44, 402], [62, 446], [78, 472], [98.01, 492]]),
-      el: pistaSuave([[0, 16], [14, 24], [44, 42], [62, 76], [98.01, 87]]),
-      dist: pistaSuave([[0, 12.5], [14, 20], [44, 30], [62, 40], [98.01, 44]]),
-      // En vertical, los dos soles vienen hacia nosotros y cierran la vuelta; luego la cámara sube hasta tener el anillo entero de frente.
-      distV: pistaSuave([[0, 38], [14, 46], [30, 62], [62, 66], [98.01, 67]]),
-      // De cerca hasta que la órbita se cierra: entonces la cámara se abre y se ve entera.
-      abre: pistaSuave([[0, 0], [11, 0.05], [20, 1], [98.01, 1]]),
-      // Mira primero al tramo que falta y, una vez cerrada, al Sol.
-      mira: [pistaSuave([[0, 7.4], [14, 6], [24, 0], [98.01, 0]]), pistaSuave([[0, 0], [18, 0], [32, 2.5], [48, 2.5], [62, 0], [98.01, 0]]), pistaSuave([[0, -4.8], [14, -1.5], [24, 0], [98.01, 0]])]
+      el: pistaSuave([[0, 22], [14, 28], [24, 36], [44, 46], [62, 76], [98.01, 87]]),
+      // Junto a los dos soles hasta que la vuelta se cierra; entonces se abre, y sube hasta tener el anillo entero de frente.
+      dist: pistaSuave([[0, 16], [10, 18], [28, 38], [62, 44], [98.01, 44]]),
+      distV: pistaSuave([[0, 23], [8, 26], [14, 34], [24, 58], [40, 64], [62, 66], [98.01, 67]]),
+      abre: pistaSuave([[0, 0], [12.5, 0], [23, 1], [98.01, 1]])
     },
     meses: null,
     textos: [
       { desde: 0.8, hasta: 7.5, clase: 'pie', texto: 'Faltaba una luz…' },
       { desde: 14.2, hasta: 17.8, clase: 'grande', texto: 'Una vuelta al Sol' },
       { desde: 14.6, hasta: 17.8, clase: 'pie', texto: '940 millones de kilómetros, juntos.' },
-      { desde: 45, hasta: 57, clase: 'pie', texto: 'Y lo recorrido cayó hacia dentro, y se encendió.' },
+      { desde: 45, hasta: 58, clase: 'pie', texto: 'Y todo lo recorrido cae hacia el centro…' },
       { desde: 78.1, hasta: 91.6, clase: 'grande abajo', texto: 'Un año' },
       { desde: 79.6, hasta: 91.6, clase: 'pie abajo', texto: '15 · 12 · 2025 — 15 · 12 · 2026' },
       { desde: 92.4, hasta: 96.8, clase: 'grande abajo', texto: 'Y solo es la primera.' }
     ],
-    // Al cerrarse, la materia de la cinta empieza a caer en espiral; llega al centro y lo enciende (ver tejidoLuz.js).
-    abrir: s => suave(22, 60, s),
+    // La galaxia la dibujan los dos soles al bajar (radioFrente); al encontrarse en el centro, se enciende.
+    abrir: s => 1 - radioFrente(s) / R_CINTA, nucleo: s => suave(59.5, 62, s), encuentro: 60, soles: s => solesAnio(s, GUIONES[12].frente),
     nombres: s => suave(62, 72, s),
     cielo: pistaSuave([[0, 0.4], [44, 0.42], [62, 0.5], [98.01, 0.34]]),
     // Mientras suben las estrellas, lo que escribió Carlos de cada mes (js/config.js): [desde, hasta, mes].
@@ -90,8 +112,8 @@ const GUIONES = {
     espera: s => 1 - suave(13.2, 14.4, s), onda: 14.02,
     // El corazón late con cada golpe del estribillo final.
     latido: s => { let ultimo = -9; for (const c of CHISPAS_ANIO) if (c <= s) ultimo = c; return Math.exp(-(s - ultimo) * 4.2); },
-    // La vuelta siguiente: los dos astros echan a andar alrededor de los nombres (en estrellas de la corona).
-    segunda: pistaSuave([[0, 0], [86, 0], [98.01, 4.6]])
+    // (Los soles recorren la cinta otra vez al final: solesAnio.)
+    segunda: () => 0
   }
 };
 export const SEP_FINAL = 17;   // las dos estrellas, cada una en el centro de su lóbulo del infinito
@@ -103,8 +125,12 @@ GUIONES.dossoles = {
   frente: () => 0, abrir: () => 0, nombres: () => 0, ola: () => -1, espera: () => 0, corona: null, chispas: [], meses: null, onda: 0,
   // Cada uno con su disco; la gravedad los acerca, los discos crecen hasta tocarse en el golpe de la canción (30,93 s) y desde ahí el
   // flujo común traza el infinito (la física, en js/escena/tejidoLuz.js).
-  disco: pistaSuave([[0, 8.5], [20.62, 9.5], [30.93, 26], [46, 46], [59.28, 46]]), contacto: s => s < 30.93 ? -1 : s - 30.93,
+  disco: pistaSuave([[0, 7.6], [20.62, 8.4], [28, 9.6], [30.93, 18], [36, 30], [46, 46], [59.28, 46]]), contacto: s => s < 30.93 ? -1 : s - 30.93,
   flujo: s => suave(30.93, 36, s), infinito: s => suave(31.5, 46, s),
+  // Antes de tocarse, cada uno lanza un brazo de plasma hacia el otro: se buscan, y llegan a la vez, en el golpe.
+  alcance: pistaSuave([[0, 0], [3, 0], [14, 0.46], [22, 0.66], [28, 0.86], [30.93, 1], [59.28, 1]]),
+  // Al compás (2,58 s) desde que se tocan: toda la luz late con la canción. Y su materia sale al espacio en dos espirales.
+  pulso: s => s < 30.93 ? 0 : Math.exp(-((s - 30.93) % 2.5775) * 2.8), espiral: s => suave(33, 48, s), explota: 30.93,
   // Sus nombres, sobre cada uno, mientras aún están lejos.
   etiquetas: { desde: 0.6, hasta: 20, textos: ['Carlos · Barcelona', 'Xiomara · Buenos Aires'] },
   cielo: pistaSuave([[0, 0.34], [20, 0.42], [59.28, 0.46]]),
@@ -118,7 +144,8 @@ GUIONES.dossoles = {
     mira: [() => 0, () => 0, () => 0]
   },
   sep: pistaSuave([[0, 24], [20.62, 23], [30.93, 18], [46, SEP_FINAL], [59.28, SEP_FINAL]]),
-  ang: pistaSuave([[0, 0], [20, 60], [31, 230], [46, 500], [59.28, 510]]),   // en grados
+  // En grados. Despacio y en diagonal hasta tocarse (caben en vertical); al tocarse, el giro se dispara.
+  ang: pistaSuave([[0, 0], [20, 24], [30.93, 72], [46, 500], [59.28, 510]]),
   textos: [
     { desde: 1, hasta: 7.6, clase: 'grande', texto: '10.466 km' },
     { desde: 2.2, hasta: 7.6, clase: 'pie', texto: 'Un océano en medio.' },

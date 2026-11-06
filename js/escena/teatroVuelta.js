@@ -2,12 +2,12 @@
 // gobernada por el guion (js/util/guionVuelta.js): pocos dibujos, repetible al cuadro, sin posproceso. Se construye antes de
 // empezar y se libera al terminar. El lugar del año (crearLugarVuelta) usa la misma luz, dentro del universo.
 import * as THREE from 'three';
-import { guionVuelta } from '../util/guionVuelta.js';
+import { guionVuelta, radioFrente, FASE_BRAZOS } from '../util/guionVuelta.js';
 import { crearEstrella } from './estrellaSolida.js';
 import { crearCieloClip } from './mundoClip.js';
-import { crearPlasmaDosSoles, crearPlasmaVuelta, crearCorona, crearFuego, R_VUELTA } from './tejidoLuz.js';
+import { crearPlasmaDosSoles, crearPlasmaVuelta, crearCorona, crearFuego, crearVelo, R_VUELTA } from './tejidoLuz.js';
 
-const R_DOS_SOLES = 3.2, R_PAREJA = 0.8;   // (de tamaño artístico: a escala no se verían)
+const R_DOS_SOLES = 3.2, R_PAREJA = 0.8, R_SOLO = 1.15, GIRO_PAREJA = 0.9, DIST_PAREJA = 1.9, ESC_MINI = 0.32;   // (de tamaño artístico: a escala no se verían)
 const PROFUNDIDAD_TEXTO = 30;
 
 // ── El teatro de los videoclips ──
@@ -30,7 +30,7 @@ const FRAG_MARCAS = /* glsl */`precision highp float; varying float vB; varying 
 
 export function crearTeatroVuelta(renderer, { cielo: cieloDe = () => null } = {}) {
   const escena = new THREE.Scene(), camara = new THREE.PerspectiveCamera(40, 1, 0.1, 900); escena.add(camara);
-  let guion = null, cielo = null, plasma = null, estrellas = [], coronas = [], marcas = null, fuegos = [];
+  let guion = null, cielo = null, plasma = null, mini = null, estrellas = [], coronas = [], marcas = null, fuegos = [], velos = [], estallido = null;
   const tam = new THREE.Vector2(), mira = new THREE.Vector3(), p = new THREE.Vector3(), UM = { uT: { value: 0 }, uFrente: { value: 0 }, uEspera: { value: 0 }, uOla: { value: -1 }, uInicio: { value: 0 }, uPaso: { value: 1 }, uHay: { value: 0 }, uPx: { value: 1000 }, uPR: { value: 1 }, uR: { value: R_VUELTA } };
   const ORO = { color: [1, 0.72, 0.3], borde: [1, 0.3, 0.05] }, ROSA = { color: [1, 0.46, 0.68], borde: [0.78, 0.1, 0.42] };
   const pareja = radio => [ORO, ROSA].map(c => {
@@ -41,9 +41,16 @@ export function crearTeatroVuelta(renderer, { cielo: cieloDe = () => null } = {}
     liberar();
     guion = guionVuelta(meses); if (!guion) return false;
     const tex = cieloDe(); if (tex) { cielo = crearCieloClip(tex); escena.add(cielo.malla); }
-    if (guion.binaria) { plasma = crearPlasmaDosSoles(); plasma.u.uR.value = R_DOS_SOLES; escena.add(plasma.malla); pareja(R_DOS_SOLES); }
+    if (guion.binaria) {
+      plasma = crearPlasmaDosSoles(); plasma.u.uR.value = R_DOS_SOLES; escena.add(plasma.malla); pareja(R_DOS_SOLES);
+      velos = [crearVelo(4.2, 1.7), crearVelo(-4.2, 6.3)]; for (const v of velos) escena.add(v.malla);
+      estallido = crearFuego(); camara.add(estallido.malla);
+    }
     else {
-      plasma = crearPlasmaVuelta(); escena.add(plasma.malla); pareja(R_PAREJA);
+      plasma = crearPlasmaVuelta(); plasma.u.uFase.value = FASE_BRAZOS; escena.add(plasma.malla); pareja(R_SOLO);
+      // Los dos soles juntos llevan el mismo infinito que en «Dos soles», en pequeño.
+      mini = crearPlasmaDosSoles(); mini.malla.scale.setScalar(ESC_MINI); mini.malla.renderOrder = 1;
+      mini.u.uSep.value = 2 * DIST_PAREJA / ESC_MINI; mini.u.uRd.value = 46; mini.u.uFlujo.value = 1; mini.u.uInfinito.value = 1; mini.u.uEspiral.value = 0.7; mini.u.uR.value = R_PAREJA / ESC_MINI; escena.add(mini.malla);
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(36), 3)); g.setAttribute('aI', new THREE.BufferAttribute(Float32Array.from({ length: 12 }, (_, i) => i), 1));
       marcas = new THREE.Points(g, new THREE.ShaderMaterial({ uniforms: UM, vertexShader: VERT_MARCAS, fragmentShader: FRAG_MARCAS, transparent: true, depthWrite: false, depthTest: false, toneMapped: false, premultipliedAlpha: true, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor }));
       marcas.frustumCulled = false; marcas.renderOrder = 40; escena.add(marcas);
@@ -62,27 +69,37 @@ export function crearTeatroVuelta(renderer, { cielo: cieloDe = () => null } = {}
     const c = guion.camara, az = c.az(s) * Math.PI / 180, el = c.el(s) * Math.PI / 180, vertical = aspecto < 1;
     // En horizontal, sus planos; en vertical, con su propia distancia, para que todo quepa a lo ancho.
     const d = vertical ? Math.max(c.dist(s), c.distV(s) * 0.46 / aspecto) : c.dist(s);
-    mira.set(vertical ? 0 : c.mira[0](s), c.mira[1](s), vertical ? 0 : c.mira[2](s));
+    // En «La primera vuelta», la cámara sigue a los dos soles y luego los suelta para mirar al centro.
+    const lugarSoles = guion.soles?.(s) ?? null, suelta = c.abre(s);
+    if (lugarSoles) mira.set(lugarSoles.centro[0] * (1 - suelta), 0, lugarSoles.centro[1] * (1 - suelta)); else mira.set(0, 0, 0);
     camara.position.set(mira.x + Math.cos(el) * Math.cos(az) * d, mira.y + Math.sin(el) * d, mira.z + Math.cos(el) * Math.sin(az) * d);
     camara.lookAt(mira); camara.updateMatrixWorld();
-    cielo?.fijar(guion.cielo?.(s) ?? 0.4, vida * 0.0035);
+    cielo?.fijar(guion.cielo?.(s) ?? 0.4, vida * 0.006);
     const mediaAltura = Math.tan(camara.fov * Math.PI / 360);
     for (const e of estrellas) { e.u.uT.value = vida; e.u.uAlfa.value = 1; }
     for (const k of coronas) k.u.uT.value = vida;
     if (guion.binaria) {
       const sep = guion.sep(s), ang = guion.ang(s) * Math.PI / 180, x = Math.cos(ang) * sep * 0.5, z = Math.sin(ang) * sep * 0.5, flujo = guion.flujo(s);
-      const pu = plasma.u; pu.uT.value = vida; pu.uSep.value = sep; pu.uAng.value = ang; pu.uRd.value = guion.disco(s); pu.uFlujo.value = flujo; pu.uInfinito.value = guion.infinito(s); pu.uOnda.value = guion.contacto(s);
+      const pu = plasma.u; pu.uT.value = vida; pu.uSep.value = sep; pu.uAng.value = ang; pu.uRd.value = guion.disco(s); pu.uFlujo.value = flujo; pu.uInfinito.value = guion.infinito(s); pu.uOnda.value = guion.contacto(s); pu.uAlcance.value = guion.alcance(s); pu.uPulso.value = guion.pulso(s); pu.uEspiral.value = guion.espiral(s);
       estrellas[0].malla.position.set(x, 0, z); estrellas[1].malla.position.set(-x, 0, -z);
       estrellas[0].u.uDir.value.set(-Math.cos(ang), 0, -Math.sin(ang)); estrellas[1].u.uDir.value.set(Math.cos(ang), 0, Math.sin(ang));
       const inf = pu.uInfinito.value, radio = R_DOS_SOLES * (1 - 0.24 * inf);   // cada uno le da al otro parte de su luz: mengua, y el infinito respira
       pu.uR.value = radio;
-      estrellas.forEach((e, i) => { e.u.uMarea.value = flujo * 0.2; e.malla.scale.setScalar(radio); coronas[i].u.uEsc.value = radio * 2.5; });
+      const late = pu.uPulso.value, tau = s - guion.explota;
+      estrellas.forEach((e, i) => { e.u.uMarea.value = flujo * 0.2; e.malla.scale.setScalar(radio); coronas[i].u.uEsc.value = radio * 2.5; coronas[i].u.uLuz.value = 1 + 0.5 * late; coronas[i].u.uArrebato.value = Math.max(late * 0.8, Math.min(1, Math.max(0, (s - 22) / 8)) * 0.7); });
+      velos.forEach(v => { v.u.uT.value = vida; v.u.uSep.value = sep; v.u.uAng.value = ang; v.u.uLuz.value = 0.5 + 0.5 * Math.min(1, s / 12); });
+      // El contacto: un estallido de hilos de luz que sale del punto en que se tocan.
+      const ve = tau >= 0 && tau < 2.8 && estallido; if (estallido) estallido.malla.visible = !!ve;
+      if (ve) { const alto = PROFUNDIDAD_TEXTO * mediaAltura; estallido.u.uTau.value = tau; estallido.u.uSem.value = 4; estallido.malla.position.set(0, 0, -PROFUNDIDAD_TEXTO); estallido.malla.scale.setScalar(vertical ? alto * aspecto * 1.25 : alto * 1.05); }
     } else {
-      const fr = guion.frente(s), abrir = guion.abrir(s), seg = guion.segunda?.(s) ?? 0, a2 = seg > 0 ? seg / 12 * Math.PI * 2 : fr;
-      const pu = plasma.u; pu.uT.value = vida; pu.uFrente.value = fr; pu.uLlena.value = Math.min(1, fr / (Math.PI * 2)); pu.uAbrir.value = abrir; pu.uOla.value = guion.ola(s); pu.uEspera.value = guion.espera(s); pu.uOnda.value = guion.onda && s >= guion.onda ? s - guion.onda : -1; pu.uSegunda.value = seg > 0 ? a2 : 0; pu.uLuz.value = 1 - 0.42 * guion.nombres(s);   // (a media luz bajo los nombres: se leen sin caja detrás)
-      // Los dos soles, a la cabeza de la cinta, girando el uno alrededor del otro.
-      const giro = vida * 1.1, cx = R_VUELTA * Math.cos(a2), cz = R_VUELTA * Math.sin(a2), rx = Math.cos(giro) * R_PAREJA * 1.55, rz = Math.sin(giro) * R_PAREJA * 1.55;
-      estrellas[0].malla.position.set(cx + rx, 0, cz + rz); estrellas[1].malla.position.set(cx - rx, 0, cz - rz);
+      const fr = guion.frente(s), abrir = guion.abrir(s), sol = lugarSoles;
+      const pu = plasma.u; pu.uT.value = vida; pu.uFrente.value = fr; pu.uLlena.value = Math.min(1, fr / (Math.PI * 2)); pu.uAbrir.value = abrir; pu.uFrenteR.value = guion.corona ? radioFrente(s) : R_VUELTA; pu.uNucleo.value = guion.nucleo?.(s) ?? 0; pu.uEncuentro.value = guion.encuentro && s >= guion.encuentro ? s - guion.encuentro : -1; pu.uOla.value = guion.ola(s); pu.uEspera.value = guion.espera(s); pu.uOnda.value = guion.onda && s >= guion.onda ? s - guion.onda : -1; pu.uLuz.value = 1 - 0.42 * guion.nombres(s);   // (a media luz bajo los nombres: se leen sin caja detrás)
+      // Los dos soles: juntos, giran despacio el uno alrededor del otro con su infinito; separados, cada uno en su camino.
+      const j = sol.junta, ga = vida * GIRO_PAREJA, rx = Math.cos(ga) * DIST_PAREJA, rz = Math.sin(ga) * DIST_PAREJA, radio = R_SOLO + (R_PAREJA - R_SOLO) * j;
+      estrellas[0].malla.position.set(sol.oro[0] + (sol.centro[0] - sol.oro[0]) * j + rx * j, 0, sol.oro[1] + (sol.centro[1] - sol.oro[1]) * j + rz * j);
+      estrellas[1].malla.position.set(sol.rosa[0] + (sol.centro[0] - sol.rosa[0]) * j - rx * j, 0, sol.rosa[1] + (sol.centro[1] - sol.rosa[1]) * j - rz * j);
+      estrellas.forEach((e, i) => { e.malla.scale.setScalar(radio); coronas[i].u.uEsc.value = radio * 2.5; });
+      mini.malla.visible = j > 0.01; mini.malla.position.set(sol.centro[0], 0.01, sol.centro[1]); mini.u.uT.value = vida; mini.u.uAng.value = ga; mini.u.uLuz.value = j;
       UM.uT.value = vida; UM.uFrente.value = fr; UM.uEspera.value = guion.espera(s); UM.uOla.value = guion.ola(s); UM.uPx.value = tam.y / (2 * mediaAltura); UM.uPR.value = renderer.getPixelRatio();
       // Los fuegos: cada uno en un sitio fuera del anillo, a su tiempo.
       if (fuegos.length) {
@@ -104,9 +121,9 @@ export function crearTeatroVuelta(renderer, { cielo: cieloDe = () => null } = {}
     r.setRenderTarget(null); r.clear(); r.render(escena, camara); r.toneMapping = tm;
   }
   function liberar() {
-    cielo?.liberar(); cielo = null; plasma?.liberar(); plasma = null;
-    for (const x of [...estrellas, ...coronas, ...fuegos]) x.liberar();
-    estrellas = []; coronas = []; fuegos = [];
+    cielo?.liberar(); cielo = null; plasma?.liberar(); plasma = null; mini?.liberar(); mini = null; estallido?.liberar(); estallido = null;
+    for (const x of [...estrellas, ...coronas, ...fuegos, ...velos]) x.liberar();
+    estrellas = []; coronas = []; fuegos = []; velos = [];
     if (marcas) { escena.remove(marcas); marcas.geometry.dispose(); marcas.material.dispose(); marcas = null; }
     guion = null;
   }
@@ -124,7 +141,7 @@ export function crearLugarVuelta({ grupo, renderer, uPR, escala = 11 }) {
   const raiz = new THREE.Group(); raiz.scale.setScalar(escala);
   raiz.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), grupo.position.clone().negate().normalize());   // de cara a casa
   grupo.add(raiz);
-  const plasma = crearPlasmaVuelta(), pu = plasma.u; pu.uLineal.value = 1; pu.uFrente.value = Math.PI * 2 + 0.01; pu.uLlena.value = 1; pu.uAbrir.value = 1; pu.uLuz.value = 0.7; raiz.add(plasma.malla);
+  const plasma = crearPlasmaVuelta(), pu = plasma.u; pu.uLineal.value = 1; pu.uFrente.value = Math.PI * 2 + 0.01; pu.uLlena.value = 1; pu.uAbrir.value = 1; pu.uFrenteR.value = 0; pu.uNucleo.value = 1; pu.uLuz.value = 0.7; raiz.add(plasma.malla);
   const estrellas = [[1, 0.72, 0.3, 1, 0.3, 0.05], [1, 0.46, 0.68, 0.78, 0.1, 0.42]].map(c => { const e = crearEstrella({ radio: R_PAREJA, color: c.slice(0, 3), borde: c.slice(3), brillo: 0.56 }); raiz.add(e.malla); return e; });
   const um = { uT: { value: 0 }, uFrente: { value: 7 }, uEspera: { value: 0 }, uOla: { value: -1 }, uInicio: { value: 0 }, uPaso: { value: 1 }, uHay: { value: 0 }, uPx: { value: 1000 }, uPR, uR: { value: R_VUELTA } };
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(36), 3)); g.setAttribute('aI', new THREE.BufferAttribute(Float32Array.from({ length: 12 }, (_, i) => i), 1));

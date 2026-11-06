@@ -27,9 +27,13 @@ export function crearEstrella({ radio, color, borde, brillo = 1 }) {
         float g = uT * 0.1, c = cos(g), s = sin(g);
         d = vec3(c * d.x - s * d.z, d.y, s * d.x + c * d.z);
         // El plasma: células grandes que se mueven despacio y granos finos encima.
-        float q = 0.55 * n(d * 5.0, uT * 0.3) + 0.3 * n(d * 11.0 + 3.0, uT * 0.45) + 0.15 * n(d * 23.0 + 7.0, uT * 0.6);
-        float calor = clamp(0.5 + q * 0.95, 0.0, 1.0);
-        vec3 centro = mix(uColor, vec3(1.0, 0.95, 0.86), calor * calor);
+        float q = 0.42 * n(d * 6.5, uT * 0.3) + 0.34 * n(d * 14.0 + 3.0, uT * 0.45) + 0.24 * n(d * 29.0 + 7.0, uT * 0.6);
+        float calor = clamp(0.56 + q * 0.8, 0.0, 1.0);
+        // Filamentos oscuros que serpentean entre las células y zonas activas: una superficie viva, no una bola moteada.
+        float fila = pow(1.0 - abs(n(d * 8.0 + 11.0, uT * 0.22)), 7.0), activa = smoothstep(0.34, 0.78, n(d * 2.7 + 5.0, uT * 0.12));
+        vec3 centro = mix(mix(uBorde, uColor, smoothstep(-0.05, 0.42, calor)), vec3(1.0, 0.95, 0.84), calor * calor * calor);
+        centro = mix(centro, uBorde * 0.7, fila * (1.0 - calor) * 0.45);
+        centro += vec3(1.0, 0.9, 0.72) * activa * pow(max(0.0, q + 0.25), 2.0) * 0.32;
         vec3 col = mix(uBorde, centro, smoothstep(0.0, 0.62, mu)) * (0.62 + 0.48 * pow(mu, 0.45));
         gl_FragColor = vec4(col * uBrillo, uAlfa * smoothstep(0.0, 0.07, mu));
       }`

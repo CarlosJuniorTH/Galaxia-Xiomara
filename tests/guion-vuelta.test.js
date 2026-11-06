@@ -9,6 +9,15 @@ test('pistaSuave no rebasa ninguna clave ni da marcha atrás', () => {
   const p = pistaSuave([[0, 0], [1, 5], [2, 5], [9, 40]]); let antes = -1;
   for (let s = 0; s <= 9; s += 0.01) { const v = p(s); assert.ok(v >= antes - 1e-9 && v <= 40 + 1e-9); antes = v; }
 });
+for (const m of [...MESES_CON_CLIP, 'dossoles']) test(`${m}: en vertical la cámara se aleja despacio, sin volver atrás`, () => {
+  const c = guionVuelta(m).camara; let d = c.distV(0);
+  for (let s = 0.1; s <= guionVuelta(m).duracion; s += 0.1) { const v = c.distV(s); assert.ok(v >= d - 1e-9 && v - d < 0.32, `distV en ${s}: ${d} → ${v}`); d = v; }
+});
+test('año: los soles van siempre sin saltos, se encuentran en el centro y acaban juntos', () => {
+  const g = guionVuelta(12); let antes = g.soles(0);
+  for (let s = 0.05; s <= g.duracion; s += 0.05) { const p = g.soles(s); assert.ok(Math.hypot(p.oro[0] - antes.oro[0], p.oro[1] - antes.oro[1]) < 0.5, `oro salta en ${s}`); assert.ok(Math.hypot(p.rosa[0] - antes.rosa[0], p.rosa[1] - antes.rosa[1]) < 0.5, `rosa salta en ${s}`); antes = p; }
+  assert.ok(Math.hypot(...g.soles(60).oro) < 1); assert.equal(g.soles(60).junta, 1); assert.equal(g.soles(97).junta, 1);
+});
 for (const m of MESES_CON_CLIP) test(`mes ${m}: la cámara gira en un solo sentido, despacio y sin saltos`, () => {
   const g = guionVuelta(m); let az = g.camara.az(0), d = g.camara.dist(0);
   for (let s = 0.1; s <= g.duracion; s += 0.1) {
