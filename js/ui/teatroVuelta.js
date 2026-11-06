@@ -38,9 +38,6 @@ export function crearTeatroUI({ escena, banda, config, estrellas }) {
     // Los nombres sobre sus ciudades: solo cambia su transform en cada cuadro (sin recalcular la página).
     const etiquetas = guion.etiquetas ? guion.etiquetas.textos.map((t, i) => { const d = document.createElement('div'); d.className = `teatro-ciudad ${i ? 'rosa' : 'oro'}`; d.textContent = t; textos.append(d); return d; }) : [];
     let etiquetasPuestas = false, lados = null;
-    // El contador de kilómetros (en cifras del mismo ancho: no baila) se reescribe solo si cambia, y no más de diez veces por segundo.
-    let contador = null, contadorPuesto = false, kmPuesto = -1, kmCuando = -1;
-    if (guion.contador) { contador = document.createElement('div'); contador.className = 'teatro-linea grande teatro-km'; textos.append(contador); }
     // Los nombres y el corazón del final: letra de verdad y un corazón con su volumen, dentro del anillo de las doce estrellas.
     let nombres = null, corazon = null, nombresPuestos = false, latidoPuesto = -1;
     if (guion.corona) {
@@ -74,10 +71,6 @@ export function crearTeatroUI({ escena, banda, config, estrellas }) {
           if (!!pos !== etiquetasPuestas) { etiquetasPuestas = !!pos; for (const d of etiquetas) d.classList.toggle('visible', etiquetasPuestas); }
           // Fuera del disco de cada uno: encima el de arriba y debajo el de abajo (decidido una vez: no salta al girar).
           if (pos) { lados ||= pos.map(c => (c[1] < 0.5 ? -1 : 1)); etiquetas.forEach((d, i) => { d.style.transform = `translate(${(Math.min(0.76, Math.max(0.24, pos[i][0])) * innerWidth).toFixed(1)}px,${((pos[i][1] + lados[i] * (innerWidth < innerHeight ? 0.155 : 0.135)) * innerHeight).toFixed(1)}px) translate(-50%,-50%)`; }); }
-        }
-        if (contador) {
-          const v = s >= guion.contador.desde && s < guion.contador.hasta; if (v !== contadorPuesto) { contadorPuesto = v; contador.classList.toggle('visible', v); }
-          if (v && s - kmCuando > 0.1) { const km = guion.contador.km(s); if (km !== kmPuesto) { kmPuesto = km; kmCuando = s; contador.textContent = `${km.toLocaleString('es-ES', { useGrouping: 'always' })} km`; } }
         }
         if (nombres) {
           const v = guion.nombres(s) > 0.1; if (v !== nombresPuestos) { nombresPuestos = v; nombres.classList.toggle('visible', v); }

@@ -129,8 +129,6 @@ GUIONES.dossoles = {
   flujo: s => suave(30.93, 36, s), infinito: s => suave(31.5, 46, s),
   // Antes de tocarse, cada uno lanza un brazo de plasma hacia el otro: se buscan, y llegan a la vez, en el golpe.
   alcance: pistaSuave([[0, 0], [3, 0], [14, 0.46], [22, 0.66], [28, 0.86], [30.93, 1], [59.28, 1]]),
-  // La distancia que queda entre los dos, en kilómetros: baja mientras se buscan y llega a cero al tocarse.
-  contador: { desde: 0.8, hasta: 33.2, km: s => Math.round(10466 * (1 - GUIONES.dossoles.alcance(s)) / 2) * 2 },
   // Al compás (2,58 s) desde que se tocan: toda la luz late con la canción. Y su materia sale al espacio en dos espirales.
   pulso: s => s < 30.93 ? 0 : Math.exp(-((s - 30.93) % 2.5775) * 2.8), espiral: s => suave(33, 48, s), explota: 30.93,
   // Sus nombres, sobre cada uno, mientras aún están lejos.
@@ -149,6 +147,7 @@ GUIONES.dossoles = {
   // En grados. Despacio y en diagonal hasta tocarse (caben en vertical); al tocarse, el giro se dispara.
   ang: pistaSuave([[0, 0], [20, 24], [30.93, 72], [46, 500], [59.28, 510]]),
   textos: [
+    { desde: 1, hasta: 7.6, clase: 'grande', texto: '10.466 km' },
     { desde: 2.2, hasta: 7.6, clase: 'pie', texto: 'Un océano en medio.' },
     { desde: 9, hasta: 17.5, clase: 'pie', texto: 'Y aun así, dos soles que se buscan.' },
     { desde: 21, hasta: 29.5, clase: 'pie', texto: 'La gravedad no entiende de distancias.' },

@@ -14,7 +14,6 @@ body.en-teatro>*:not(#galaxia):not(#teatro):not(script):not(style){visibility:hi
 .teatro-ciudad.visible{opacity:1}
 .teatro-ciudad.oro{color:#ffd893}
 .teatro-ciudad.rosa{color:#ffb4d0}
-.teatro-km{font-variant-numeric:tabular-nums lining-nums}
 .teatro-nombres{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:max-content;text-align:center;opacity:0;transition:opacity 2.4s ease;text-shadow:0 2px 6px rgba(0,0,0,.75),0 0 2px rgba(0,0,0,.8)}
 .teatro-nombres.visible{opacity:1}
 .teatro-nombres svg{display:block;width:clamp(44px,13vmin,110px);height:auto;margin:0 auto 2px;transform-origin:50% 55%;will-change:transform}

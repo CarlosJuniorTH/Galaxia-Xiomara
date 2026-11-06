@@ -55,39 +55,39 @@ export function crearPlasmaDosSoles() {
       float h = hebra(fbm3(q * vec3(1.25, 1.25, 4.2)), 7.0);
       float nitido = 1.0 - smoothstep(0.3, 1.1, fwidth(nivel * 13.0)), fino = mix(0.0, hebra(rn3(q * vec3(2.4, 2.4, 13.0)), 9.0), nitido);
       // Color: cada lado, del de su estrella (blanco, oro, fuego, granate / blanco, rosa, fucsia, violeta); fuera, azul de nebulosa.
-      float t = clamp(rmin / max(a * 1.05, uRd * 0.8), 0.0, 1.0), lado = smoothstep(-0.14, 0.14, (r2 - r1) / (r1 + r2));
-      vec3 c = mix(rampa(t, vec3(1.0, 0.86, 0.95), vec3(1.0, 0.42, 0.72), vec3(0.86, 0.12, 0.54), vec3(0.42, 0.08, 0.58)),
-                   rampa(t, vec3(1.0, 0.95, 0.74), vec3(1.0, 0.72, 0.22), vec3(0.98, 0.32, 0.06), vec3(0.6, 0.07, 0.12)), lado);
+      float t = clamp(rmin / max(a * 1.05, uRd * 0.8), 0.0, 1.0), lado = smoothstep(-0.34, 0.34, (r2 - r1) / (r1 + r2) + (fbm3(q * vec3(1.1, 1.1, 2.6) + 8.0) - 0.5) * 0.62);   // (oro y rosa se mezclan hebra a hebra, sin frontera)
+      vec3 c = mix(rampa(t, vec3(1.0, 0.66, 0.84), vec3(1.0, 0.36, 0.68), vec3(0.84, 0.1, 0.52), vec3(0.42, 0.07, 0.58)),
+                   rampa(t, vec3(1.0, 0.84, 0.48), vec3(1.0, 0.64, 0.16), vec3(0.98, 0.3, 0.05), vec3(0.6, 0.07, 0.12)), lado);
       c = mix(c, vec3(0.3, 0.34, 0.95), smoothstep(0.05, 1.5, nivel));
-      c = mix(c, c * 0.72 + vec3(0.3, 0.32, 0.46), h * 0.42);
-      float b = (0.16 + 0.82 * masa * masa + 0.78 * h + 0.36 * fino) * (0.72 + 0.34 * exp(-t * 3.0));
+      c = mix(c, c * 0.9 + vec3(0.12, 0.1, 0.12), h * 0.3);
+      float b = (0.2 + 0.62 * masa * masa + 0.62 * h + 0.16 * fino) * (0.72 + 0.24 * exp(-t * 3.0));
       if (brazoD > 0.01) {
         float tira = hebra(fbm3(vec3(p.x * 0.42 - uT * 0.75 * sign(p.x), p.y * 2.8, 2.0)), 4.0), k = brazoD * (1.0 - uFlujo);
         mascara = max(mascara, k); b += k * (0.55 + 1.7 * tira) / max(mascara, 0.2); c = mix(c, mix(vec3(1.0, 0.42, 0.72), vec3(1.0, 0.72, 0.26), lado), k * 0.8);
       }
       // El puente: la materia que cae de una a otra por el punto en que se tocan, con su propia hebra.
       if (uFlujo > 0.0 && abs(p.x) < a) {
-        float ancho = (0.42 + 0.5 * (1.0 - abs(p.x) / a)) * (1.0 - 0.45 * uInfinito), hilo = exp(-pow((p.y + 0.4 * sin(p.x * 0.7 + uT * 0.8)) / ancho, 2.0));
-        // Dos corrientes a la vista, una junto a la otra: la luz de ella hacia él y la de él hacia ella.
-        float dir = sign(p.y + 0.001), tira = hebra(fbm3(vec3(p.x * 0.5 - uT * 0.9 * dir, p.y * 2.6, uT * 0.1)), 4.0);
-        float grumo = pow(0.5 + 0.5 * cos(p.x * 1.15 - uT * 2.6 * dir + dir), 7.0);
-        b += uFlujo * hilo * (0.22 + 0.85 * tira + 1.3 * grumo) * (1.0 - 0.5 * uInfinito);
-        c = mix(c, dir > 0.0 ? vec3(1.0, 0.74, 0.3) : vec3(1.0, 0.42, 0.7), uFlujo * hilo * 0.72); c = mix(c, vec3(1.0, 0.95, 0.86), uFlujo * hilo * grumo * 0.7);
+        // Dos corrientes entrelazadas, oro hacia ella y rosa hacia él, cada una con su forma: se cruzan sin ninguna frontera entre las dos.
+        float ancho = (0.5 + 0.55 * (1.0 - abs(p.x) / a)) * (1.0 - 0.3 * uInfinito), onda = 0.34 * sin(p.x * 0.62 + uT * 0.9);
+        float ho = exp(-pow((p.y - onda) / ancho, 2.0)), hr = exp(-pow((p.y + onda) / ancho, 2.0));
+        float to = hebra(fbm3(vec3(p.x * 0.42 + uT * 0.8, (p.y - onda) * 2.2, 1.0)), 3.0), tr = hebra(fbm3(vec3(p.x * 0.42 - uT * 0.8, (p.y + onda) * 2.2, 6.0)), 3.0);
+        float lo = ho * (0.12 + 0.62 * to), lr = hr * (0.12 + 0.62 * tr), suma = lo + lr + 0.001;
+        b += uFlujo * (lo + lr) * (1.0 - 0.45 * uInfinito);
+        c = mix(c, (vec3(1.0, 0.68, 0.26) * lo + vec3(1.0, 0.38, 0.68) * lr) / suma, uFlujo * min(1.0, suma * 1.5) * 0.85);
       }
-      // Cada uno se queda con parte de la luz del otro: hebras del otro color en el borde de cada lóbulo.
-      c = mix(c, mix(vec3(1.0, 0.78, 0.34), vec3(1.0, 0.42, 0.7), lado), h * smoothstep(0.34, 0.9, t) * uInfinito * 0.85);
       // El infinito: se enciende desde el punto de contacto y dos luces lo recorren sin parar.
       float vista = 1.0 - smoothstep(uInfinito * 1.5 * a - a * 0.12, uInfinito * 1.5 * a, length(p));
       if (vista > 0.0) {
         float w = max(0.034, fwidth(nivel) * 1.4), linea = exp(-pow(nivel / w, 2.0)) * vista, corre = pow(0.5 + 0.5 * cos(th - uT * 0.85), 10.0);
-        b += linea * (0.75 + 1.2 * corre) + exp(-pow(nivel / (w * 4.0), 2.0)) * vista * 0.24;
-        c = mix(c, mix(mix(vec3(1.0, 0.52, 0.76), vec3(1.0, 0.8, 0.42), lado), vec3(1.0, 0.96, 0.9), corre), min(1.0, linea * 1.3));
+        b += linea * (0.42 + 0.9 * corre);
+        c = mix(c, mix(mix(vec3(1.0, 0.5, 0.76), vec3(1.0, 0.76, 0.36), lado), vec3(1.0, 0.92, 0.82), corre), min(1.0, linea * 1.2));
       }
       // La onda del primer contacto, que sale por la envoltura.
       if (uOnda >= 0.0) { float f = abs(nivel - uOnda * 0.55 + 0.2); b += exp(-f * f * 40.0) * exp(-uOnda * 0.55) * 1.6; }
       // Late con la canción.
       b *= mascara * uLuz * (1.0 + 0.34 * uPulso);
-      gl_FragColor = vec4(salida(c * min(b, 1.5)), min(1.0, b * 1.15));
+      // Exposición suave: mucha luz satura hacia su color, no a una mancha blanca plana.
+      gl_FragColor = vec4(salida(1.0 - exp(-c * b * 3.3)), min(1.0, b * 1.15));
     }`);
 }
 
@@ -104,7 +104,7 @@ export function crearVelo(altura, semilla) {
       float f = fbm3(vec3(cos(th) * 1.6 + uSem, sin(th) * 1.6, nivel * 3.0 + uSem));
       float b = smoothstep(0.5, 0.78, f) * m; if (b < 0.008) discard;
       vec3 c = mix(vec3(0.5, 0.28, 0.92), vec3(0.95, 0.45, 0.62), smoothstep(0.55, 0.8, f));
-      gl_FragColor = vec4(c * b * 0.62, b * 0.5);
+      gl_FragColor = vec4(c * b * 0.4, b * 0.36);
     }`);
   v.malla.position.y = altura; v.malla.renderOrder = altura > 0 ? 3 : -2;
   return v;
