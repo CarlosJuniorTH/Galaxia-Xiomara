@@ -41,9 +41,10 @@
   (7715786). El paso al sistema solar cambia de escena con la pantalla ya negra (e4c0fd6).
 - Superficie de los soles: `js/escena/estrellaSolida.js` (malla, no motas). En los clips las motas usan prueba de profundidad contra ella; los textos van en el plano a 30 unidades, delante del Sol.
 
-## Mundo de los clips (mundoClip.js)
+## Luz de los clips (tejidoLuz.js)
 
-- La Tierra y el cielo se reutilizan de la escena: `preparar` espera las texturas de la Tierra (tope 9 s) porque durante el clip no entra nada en la GPU.
-- El cielo se dibuja directo a pantalla: lo devuelve a sRGB y va atenuado (`guion.cielo` ≈ 0,4); más alto, sus paredes de fuego tapan soles y texto.
-- Tierra a contraluz en el clip del año: su luz mezcla Sol y cámara, o sería un disco negro.
-
+- Formas principales como superficies por píxel, no Points: se dibujan directo a pantalla, en colores de pantalla, con alfa premultiplicado (el polvo tapa y la luz se suma).
+- Las hebras han de correr a lo largo de la forma: en círculo, la galaxia parecía un túnel. Ver la `q` de cada plasma.
+- Si sube la exposición, el centro se quema a blanco y se pierde el infinito: su forma se lee por contraste con lo de fuera, no por una línea encima.
+- El cielo (`guion.cielo` ≈ 0,4): más alto, sus paredes de fuego tapan soles y texto.
+- Coste: unas 8–10 lecturas de la tabla de ruido por píxel; se descarta lo enmascarado antes de calcular. Medir en teléfono real tras subir la exposición o el tamaño.

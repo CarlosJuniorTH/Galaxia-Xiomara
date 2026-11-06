@@ -38,9 +38,9 @@ export default async function ({ base, informe: inf }) {
       const tras = await pagina.evaluate(k => ({ anotado: window.__galaxia.progreso.tiene('celebraciones', `clip-${k}`), entrada: getComputedStyle(document.getElementById('entrada')).display, lugar: JSON.parse(localStorage.getItem('xiomara:universo:v2:lugar') || '{}').destino, nombre: document.getElementById('lugar-nombre')?.textContent || '' }), clave);
       inf.comprobar(tras.anotado && tras.entrada === 'none' && tras.lugar === 'hogar', `${nombre}: al acabar, en la galaxia y anotado`, tras);
       // El evento deja algo en el universo y lo dice, sin bloquear.
-      await pagina.waitForSelector('.evento-novedad.visible', { timeout: 9000 }).catch(() => {});
-      const aviso = await pagina.evaluate(() => { const c = document.querySelector('.evento-novedad.visible'); if (!c) return null; const r = c.getBoundingClientRect(); return { nombre: c.querySelector('strong').textContent, cabe: r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight }; });
-      inf.comprobar(aviso?.cabe && aviso.nombre === (nombre === 'año' ? 'Nuestra primera vuelta' : 'Dos soles'), `${nombre}: al llegar, anuncia el lugar nuevo`, aviso);
+      await pagina.waitForSelector('.evento-aviso.visible', { timeout: 9000 }).catch(() => {});
+      const aviso = await pagina.evaluate(() => { const c = document.querySelector('.evento-aviso.visible'); if (!c) return null; const r = c.getBoundingClientRect(), m = document.getElementById('muelle').getBoundingClientRect(); return { nombre: c.textContent, cabe: r.left >= 0 && r.right <= innerWidth && r.bottom <= m.top, alto: r.height }; });
+      inf.comprobar(aviso?.cabe && aviso.nombre.includes(nombre === 'año' ? 'Nuestra primera vuelta' : 'Dos soles'), `${nombre}: al llegar, anuncia el lugar nuevo sin tapar el muelle`, aviso);
       await pagina.screenshot({ path: `${CAP}-${perfil}-casa.png` });
       // Segunda visita: intro y, al pulsar, el vuelo; ya no el clip.
       await pagina.reload();

@@ -37,25 +37,3 @@ export function crearEstrella({ radio, color, borde, brillo = 1 }) {
   malla.scale.setScalar(radio); malla.frustumCulled = false; malla.renderOrder = -1;
   return { malla, u, liberar() { malla.parent?.remove(malla); malla.geometry.dispose(); malla.material.dispose(); } };
 }
-// La corona como de verdad se ve: arcos de plasma anclados a la superficie, que suben y vuelven a bajar (los chorros rectos
-// de antes se leían como pinchos). d: dirección del ancla · devuelve el punto (radio 1) y deja en `vida` su avance por el arco.
-export const GLSL_ARCO = /* glsl */`
-  vec3 arcoCorona(vec3 d, float semilla, float t, out float vida) {
-    vec3 lado = normalize(cross(d, normalize(vec3(fract(semilla * 3.1) - 0.5, 0.87, fract(semilla * 5.3) - 0.5))));
-    vida = fract(t * (0.035 + fract(semilla * 7.0) * 0.045) + semilla * 17.0);
-    float grande = fract(floor(semilla * 9.0) * 0.618); grande = grande * grande;
-    float ancho = 0.1 + 0.36 * grande, alto = 0.02 + 0.3 * grande;
-    return normalize(d + lado * (vida - 0.5) * ancho) * (1.0 + sin(vida * 3.14159265) * alto);
-  }`;
-// Direcciones de la corona: chorros finos que salen de puntos fijos de la superficie, no una pelusa uniforme.
-export function fuentesCorona(r, cuantas = 80) {
-  const lista = Array.from({ length: cuantas }, (_, i) => { const y = 1 - 2 * (i + r()) / cuantas, q = Math.sqrt(Math.max(0, 1 - y * y)), f = i * 2.399963 + r(); return [q * Math.cos(f), y, q * Math.sin(f)]; });
-  return () => { const b = lista[Math.floor(r() * cuantas)], e = 0.016; const x = b[0] + (r() - 0.5) * e, y = b[1] + (r() - 0.5) * e, z = b[2] + (r() - 0.5) * e, l = Math.hypot(x, y, z); return [x / l, y / l, z / l]; };
-}
-// Un cielo con su banda de estrellas (como la Vía Láctea, en diagonal), no un negro vacío: más de la mitad, cerca de ese plano.
-export function direccionCielo(r) {
-  if (r() < 0.42) { const y = r() * 2 - 1, f = r() * Math.PI * 2, q = Math.sqrt(1 - y * y); return [q * Math.cos(f), y, q * Math.sin(f)]; }
-  const f = r() * Math.PI * 2, y = (r() + r() + r() - 1.5) * 0.17, q = Math.sqrt(1 - y * y), a = q * Math.cos(f), b = y, c = q * Math.sin(f);
-  const t = 0.9, ct = Math.cos(t), st = Math.sin(t);   // (inclinada)
-  return [ct * a - st * b, st * a + ct * b, c];
-}

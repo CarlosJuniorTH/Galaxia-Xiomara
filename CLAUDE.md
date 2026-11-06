@@ -24,6 +24,7 @@ acumules: lo que deja de ser cierto se reescribe aquí y la historia va a `docs/
 - **60 FPS en móvil de gama media con el MISMO contenido que el PC.** Sin selector de calidad, sin resolución dinámica,
   sin bajadas automáticas ni paso a 30 FPS. Medir antes y después de cada cambio de rendimiento y comparar capturas.
 - Nada de halos ni brillos difusos: luz con motas nítidas, rayos finos, sin tapar a los gigantes.
+- Clips: superficies continuas y ricas como el cuásar (`js/escena/tejidoLuz.js`), nunca nubes de puntos; cada cambio con causa visible.
 - Todo debe verse bien en el móvil (referencia 430×932, vertical) además del PC.
 - Videoclips: cámara lenta, suave, centrada en el móvil y siempre en un solo sentido; cada clip cuenta lo que hace
   físicamente el objeto siguiendo la canción.

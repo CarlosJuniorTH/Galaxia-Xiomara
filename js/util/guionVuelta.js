@@ -38,7 +38,7 @@ const GUIONES = {
       az: pistaSuave([[0, 10], [14, 60], [28, 120], [38.85, 160]]),
       el: pistaSuave([[0, 20], [16, 40], [38.85, 62]]),
       dist: pistaSuave([[0, 13], [16, 22], [38.85, 27]]),
-      distV: pistaSuave([[0, 44], [16, 52], [38.85, 66]]),   // en vertical, la órbita se abre desde la Tierra hasta verse entera
+      distV: pistaSuave([[0, 40], [16, 54], [38.85, 66]]),   // en vertical, de cerca de la pareja hasta ver la cinta entera
       abre: pistaSuave([[0, 0], [5, 0.05], [18, 1], [38.85, 1]]),
       mira: [pistaSuave([[0, 6], [9, 0.8], [16, 0], [38.85, 0]]), pistaSuave([[0, 0], [38.85, 0]]), pistaSuave([[0, 0], [38.85, 0]])]
     },
@@ -56,10 +56,10 @@ const GUIONES = {
     frente: pistaSuave([[0, 330 * GRADO], [3, 330 * GRADO], [14.02, 360 * GRADO], [98.01, 360 * GRADO]]),
     camara: {
       az: pistaSuave([[0, 306], [14, 342], [44, 402], [62, 446], [78, 472], [98.01, 492]]),
-      el: pistaSuave([[0, 16], [14, 24], [44, 34], [62, 66], [98.01, 72]]),
+      el: pistaSuave([[0, 16], [14, 24], [44, 42], [62, 76], [98.01, 87]]),
       dist: pistaSuave([[0, 12.5], [14, 20], [44, 30], [62, 40], [98.01, 44]]),
-      // En vertical, la Tierra viene hacia nosotros y cierra la vuelta; luego todo se abre hasta llenar la pantalla de galaxia.
-      distV: pistaSuave([[0, 40], [14, 46], [30, 70], [62, 86], [98.01, 92]]),
+      // En vertical, los dos soles vienen hacia nosotros y cierran la vuelta; luego la cámara sube hasta tener el anillo entero de frente.
+      distV: pistaSuave([[0, 38], [14, 46], [30, 62], [62, 66], [98.01, 67]]),
       // De cerca hasta que la órbita se cierra: entonces la cámara se abre y se ve entera.
       abre: pistaSuave([[0, 0], [11, 0.05], [20, 1], [98.01, 1]]),
       // Mira primero al tramo que falta y, una vez cerrada, al Sol.
@@ -70,13 +70,14 @@ const GUIONES = {
       { desde: 0.8, hasta: 7.5, clase: 'pie', texto: 'Faltaba una luz…' },
       { desde: 14.2, hasta: 17.8, clase: 'grande', texto: 'Una vuelta al Sol' },
       { desde: 14.6, hasta: 17.8, clase: 'pie', texto: '940 millones de kilómetros, juntos.' },
-      { desde: 46, hasta: 56, clase: 'pie', texto: 'De una órbita nació un universo.' },
+      { desde: 45, hasta: 57, clase: 'pie', texto: 'Y lo recorrido cayó hacia dentro, y se encendió.' },
       { desde: 78.1, hasta: 91.6, clase: 'grande abajo', texto: 'Un año' },
       { desde: 79.6, hasta: 91.6, clase: 'pie abajo', texto: '15 · 12 · 2025 — 15 · 12 · 2026' },
       { desde: 92.4, hasta: 96.8, clase: 'grande abajo', texto: 'Y solo es la primera.' }
     ],
-    abrir: s => suave(44, 62, s),
-    nombres: s => suave(62, 78, s),
+    // Al cerrarse, la materia de la cinta empieza a caer en espiral; llega al centro y lo enciende (ver tejidoLuz.js).
+    abrir: s => suave(22, 60, s),
+    nombres: s => suave(62, 72, s),
     cielo: pistaSuave([[0, 0.4], [44, 0.42], [62, 0.5], [98.01, 0.34]]),
     // Mientras suben las estrellas, lo que escribió Carlos de cada mes (js/config.js): [desde, hasta, mes].
     frases: [[18, 22, 0], [22.2, 25.4, 2], [25.6, 28.8, 3], [29, 32.2, 5], [32.4, 35.6, 7], [35.8, 39, 8], [39.2, 42.8, 10]],
@@ -100,29 +101,28 @@ GUIONES.dossoles = {
   id: 'mes-dossoles', titulo: 'Dos soles', duracion: 59.28, binaria: true,
   // En cada segundo: la cámara, más arriba al final para leer el infinito.
   frente: () => 0, abrir: () => 0, nombres: () => 0, ola: () => -1, espera: () => 0, corona: null, chispas: [], meses: null, onda: 0,
-  // Empieza donde estáis de verdad: la Tierra, con Barcelona y Buenos Aires. Un hilo de luz cruza el Atlántico, dos luces suben
-  // de las dos ciudades, y arriba son dos soles.
-  tierra: s => 1 - suave(7, 21, s), tierraAlfa: s => 1 - suave(25, 31, s), hilo: s => suave(2.5, 8, s), sube: s => suave(8, 18.5, s), soles: s => suave(15, 19, s), disco: s => suave(13, 28, s),
-  // Sus nombres, sobre sus ciudades, mientras están allí abajo.
-  etiquetas: { desde: 0.6, hasta: 8.6, textos: ['Carlos · Barcelona', 'Xiomara · Buenos Aires'] },
+  // Cada uno con su disco; la gravedad los acerca, los discos crecen hasta tocarse en el golpe de la canción (30,93 s) y desde ahí el
+  // flujo común traza el infinito (la física, en js/escena/tejidoLuz.js).
+  disco: pistaSuave([[0, 8.5], [20.62, 9.5], [30.93, 26], [46, 46], [59.28, 46]]), contacto: s => s < 30.93 ? -1 : s - 30.93,
+  flujo: s => suave(30.93, 36, s), infinito: s => suave(31.5, 46, s),
+  // Sus nombres, sobre cada uno, mientras aún están lejos.
+  etiquetas: { desde: 0.6, hasta: 20, textos: ['Carlos · Barcelona', 'Xiomara · Buenos Aires'] },
   cielo: pistaSuave([[0, 0.34], [20, 0.42], [59.28, 0.46]]),
   // Empieza mirando a lo largo de la pareja (una cerca y otra lejos, que caben en vertical) y acaba de cara al infinito.
   camara: {
     az: pistaSuave([[0, 0], [20, 26], [46, 56], [59.28, 60]]),
-    el: pistaSuave([[0, 30], [30, 42], [46, 72], [59.28, 78]]),
-    dist: pistaSuave([[0, 44], [20.62, 40], [30.93, 34], [46, 29], [59.28, 28]]),
-    distV: pistaSuave([[0, 62], [8, 63], [22, 86], [44, 92], [59.28, 92]]),   // las dos caben siempre, y al final el infinito a lo ancho
-    abre: pistaSuave([[0, 0.12], [20, 0.25], [40, 1], [59.28, 1]]),
+    el: pistaSuave([[0, 30], [30, 42], [46, 72], [59.28, 80]]),
+    dist: pistaSuave([[0, 64], [20.62, 58], [30.93, 46], [46, 36], [59.28, 34]]),
+    distV: pistaSuave([[0, 56], [8, 57], [22, 66], [44, 72], [59.28, 74]]),
+    abre: () => 1,
     mira: [() => 0, () => 0, () => 0]
   },
   sep: pistaSuave([[0, 24], [20.62, 23], [30.93, 18], [46, SEP_FINAL], [59.28, SEP_FINAL]]),
   ang: pistaSuave([[0, 0], [20, 60], [31, 230], [46, 500], [59.28, 510]]),   // en grados
-  flujo: s => suave(22, 33, s),
-  infinito: s => suave(33, 46, s),
   textos: [
     { desde: 1, hasta: 7.6, clase: 'grande', texto: '10.466 km' },
     { desde: 2.2, hasta: 7.6, clase: 'pie', texto: 'Un océano en medio.' },
-    { desde: 9, hasta: 17.5, clase: 'pie', texto: 'Y aun así, dos luces que se buscan.' },
+    { desde: 9, hasta: 17.5, clase: 'pie', texto: 'Y aun así, dos soles que se buscan.' },
     { desde: 21, hasta: 29.5, clase: 'pie', texto: 'La gravedad no entiende de distancias.' },
     { desde: 34, hasta: 44, clase: 'pie', texto: 'Cada uno le da al otro parte de su luz.' },
     { desde: 47.5, hasta: 57.5, clase: 'grande', texto: 'Nuestro pequeño infinito' },

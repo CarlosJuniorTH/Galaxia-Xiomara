@@ -651,8 +651,7 @@ export function* construirPlanetas({ scene, uScale, uPR }, fechaTexto) {
   }));
   atmosferaTierra.renderOrder = 2;
   giroAzul.add(azul, atmosferaTierra);
-  const texturaNubes = texNubes(5);
-  const nubes = new THREE.Mesh(new THREE.SphereGeometry(RA * 1.012, 96, 64), materialNubes(texturaNubes, { sol: solTierra }));
+  const nubes = new THREE.Mesh(new THREE.SphereGeometry(RA * 1.012, 96, 64), materialNubes(texNubes(5), { sol: solTierra }));
   nubes.renderOrder = 1; giroAzul.add(nubes);
   yield;
   // Atmósfera fina (borde) en lugar de un gran halo.
@@ -701,8 +700,6 @@ export function* construirPlanetas({ scene, uScale, uPR }, fechaTexto) {
       return planeta.position.clone().addScaledVector(enPlano, R * 3.3).addScaledVector(normal, R * 0.35);
     },
     radioRosa: R, radioAzul: RA,
-    // (Los videoclips muestran la misma Tierra: js/escena/mundoClip.js.)
-    texturasTierra: { superficie, mascara, nubes: texturaNubes },
     // Dirección (en el mundo) desde el centro de la Tierra hacia el Atlántico, entre las dos orillas.
     atlantico() { azul.updateWorldMatrix(true, false); const c = azul.getWorldPosition(new THREE.Vector3()); return azul.localToWorld(atlantico.clone().multiplyScalar(RA)).sub(c).normalize(); },
     actualizar(t, dt, ctx) {

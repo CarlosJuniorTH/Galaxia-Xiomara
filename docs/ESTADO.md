@@ -3,17 +3,16 @@
 Lo nuevo arriba. Se consulta con `grep`; no se lee entero. Resumen por temas de `git log --oneline` (los hashes
 permiten ver el detalle con `git show <hash>`).
 
-## 2026-11-06 · Los clips cuentan vuestra historia y los estrenos son eventos
+## 2026-11-06 · Los clips, tejidos en luz como el cuásar; los estrenos son eventos
 
-- Motivo: a Xiomara no le emocionó el adelanto. Los clips eran dibujos sobre negro, por debajo de la galaxia de un día normal.
-- `js/escena/mundoClip.js`: cielo de nebulosas de casa y Tierra real (texturas del sistema solar, sin descargas nuevas).
-- Dos soles empieza en la Tierra: Barcelona y Buenos Aires con sus nombres (`etiquetas`), hilo sobre el Atlántico, dos luces que suben y son los soles; disco de polvo en lugar de las ondas.
-- Clip del año y mes 11: la Tierra recorre la órbita, cinta en vez de alambre; en el del año, frases de `config.recuerdos` mientras suben las estrellas (`frases`).
-- Corona en arcos (`GLSL_ARCO`), no en pinchos; anillo apagado mientras viaja a rodear los nombres.
-- Evento: al llegar tras el clip, tarjeta con el lugar nuevo (`novedadDeEstreno`, `anunciarEvento`).
+- Motivo: el adelanto no gustó, y la primera versión con Tierra tampoco: «puntitos mal hechos», Tierra de dibujos, un sol que se volvía galaxia sin sentido.
+- `js/escena/tejidoLuz.js`: superficies por píxel con hebras, sin nubes de puntos. `crearPlasmaDosSoles` usa w = log(z² − a²): sus líneas de nivel son óvalos de Cassini y la que pasa entre las estrellas es la lemniscata, así que el flujo traza el infinito. `crearPlasmaVuelta`: cinta, galaxia que cae en espiral desde ella. `crearCorona`, `crearFuego`.
+- Dos soles: discos que crecen hasta tocarse a los 30,93 s, puente de materia, soles que menguan; nombres sobre cada sol. Año: dos soles recorren la cinta, el interior se llena mes a mes y al cerrarse la materia cae hasta encenderse; nombres y corazón en DOM dentro del anillo, frases de `config.recuerdos`.
+- Lugares `dossoles` y `vuelta`: la misma luz (`uLineal`, atenuada por el bloom). Fuera todo el código de motas de los clips y la Tierra. `js/escena/mundoClip.js` solo da el cielo de casa.
+- Evento: pastilla pequeña «Se abrió…» encima del muelle, sin tapar nada (`anunciarEvento`).
 - `js/util/horaReal.js`: HEAD a la propia web y cabecera Date; corrige Date si el reloj difiere más de 2 min (solo en github.io). Sin IP: Pages no tiene servidor propio y la marca de visto es por dispositivo.
 - Intro: botón «Saltar intro» durante el clip; la canción salta al compás de la tarjeta (`tests/navegador/saltarIntro.mjs`).
-- `tests/navegador/fpsClip.mjs`: fluidez de un clip en móvil emulado con CPU a un cuarto.
+- `tests/navegador/fpsClip.mjs`: fluidez de un clip en móvil emulado con CPU a un cuarto. El coste real está en los píxeles: falta medir en teléfono.
 
 ## 2026-11-05 · Revisión de los clips: soles sólidos, océano y galaxia
 

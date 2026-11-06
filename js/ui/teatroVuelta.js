@@ -37,7 +37,14 @@ export function crearTeatroUI({ escena, banda, config, estrellas }) {
     const lineas = guion.textos.map(t => { const d = document.createElement('div'); d.className = `teatro-linea ${t.clase}`; d.textContent = t.texto; textos.append(d); return { ...t, el: d, puesta: false }; });
     // Los nombres sobre sus ciudades: solo cambia su transform en cada cuadro (sin recalcular la página).
     const etiquetas = guion.etiquetas ? guion.etiquetas.textos.map((t, i) => { const d = document.createElement('div'); d.className = `teatro-ciudad ${i ? 'rosa' : 'oro'}`; d.textContent = t; textos.append(d); return d; }) : [];
-    let etiquetasPuestas = false;
+    let etiquetasPuestas = false, lados = null;
+    // Los nombres y el corazón del final: letra de verdad y un corazón con su volumen, dentro del anillo de las doce estrellas.
+    let nombres = null, corazon = null, nombresPuestos = false, latidoPuesto = -1;
+    if (guion.corona) {
+      nombres = document.createElement('div'); nombres.className = 'teatro-nombres';
+      nombres.innerHTML = '<svg viewBox="-20 -20 40 38" aria-hidden="true"><defs><radialGradient id="cz" cx="38%" cy="28%" r="85%"><stop offset="0" stop-color="#ffd9e8"/><stop offset=".38" stop-color="#ff6fa8"/><stop offset="1" stop-color="#b3124f"/></radialGradient></defs><path fill="url(#cz)" d="M0 15C-9 8-17 2-17-7c0-5 4-9 9-9 3.300 0 6.200 1.800 8 4.500C1.800-14.200 4.700-16 8-16c5 0 9 4 9 9 0 9-8 15-17 22z"/></svg><strong>Carlos</strong><span>&amp;</span><strong>Xiomara</strong>';
+      corazon = nombres.querySelector('svg'); textos.append(nombres);
+    }
     let mesPuesto = -1, cancionLista = false;
     const conSonido = banda.activa && banda.tiene(guion.id);
     if (conSonido) banda.preparada(guion.id, 8000).then(ok => { cancionLista = ok; });
@@ -62,7 +69,13 @@ export function crearTeatroUI({ escena, banda, config, estrellas }) {
         if (etiquetas.length) {
           const ve = s >= guion.etiquetas.desde && s < guion.etiquetas.hasta, pos = ve ? escena.teatroVuelta.ciudades() : null;
           if (!!pos !== etiquetasPuestas) { etiquetasPuestas = !!pos; for (const d of etiquetas) d.classList.toggle('visible', etiquetasPuestas); }
-          if (pos) etiquetas.forEach((d, i) => { d.style.transform = `translate(${(Math.min(0.97, Math.max(0.03, pos[i][0])) * innerWidth).toFixed(1)}px,${(pos[i][1] * innerHeight).toFixed(1)}px) translate(${pos[i][0] < 0.5 ? '-6%' : '-94%'},-170%)`; });
+          // Fuera del disco de cada uno: encima el de arriba y debajo el de abajo (decidido una vez: no salta al girar).
+          if (pos) { lados ||= pos.map(c => (c[1] < 0.5 ? -1 : 1)); etiquetas.forEach((d, i) => { d.style.transform = `translate(${(Math.min(0.76, Math.max(0.24, pos[i][0])) * innerWidth).toFixed(1)}px,${((pos[i][1] + lados[i] * (innerWidth < innerHeight ? 0.155 : 0.135)) * innerHeight).toFixed(1)}px) translate(-50%,-50%)`; }); }
+        }
+        if (nombres) {
+          const v = guion.nombres(s) > 0.1; if (v !== nombresPuestos) { nombresPuestos = v; nombres.classList.toggle('visible', v); }
+          // El corazón late con cada golpe: solo su transform (y solo si cambia de verdad).
+          if (v) { const l = Math.round((guion.latido?.(s) ?? 0) * 50) / 50; if (l !== latidoPuesto) { latidoPuesto = l; corazon.style.transform = `scale(${(1 + l * 0.16).toFixed(3)})`; } }
         }
         const frase = fraseEnEscena(guion, s), m = guion.frases ? (frase ? frase.mes : -1) : mesEnEscena(guion, s);
         if (m !== mesPuesto) {

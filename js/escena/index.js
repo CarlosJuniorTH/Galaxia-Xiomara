@@ -1199,7 +1199,7 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
   let nivelEnsayo = 0, cuentaEnsayo = 0, ultimoEnsayo = -Infinity;   // 3D detrás de la portada (precalentar)
   const tmpPunto = new THREE.Vector3(), tmpDesvioVuelo = new THREE.Vector3(), tmpMirada = new THREE.Vector3();
   const tmpDir = new THREE.Vector3(), tmpProy = new THREE.Vector3();   // temporales del bucle (sin crear objetos en cada cuadro)
-  const teatroVuelta = crearTeatroVuelta(renderer, { cielo: () => cieloProfundo?.textura, tierra: () => planetas?.texturasTierra });
+  const teatroVuelta = crearTeatroVuelta(renderer, { cielo: () => cieloProfundo?.textura });
   let cuadroTeatro = null;
   function animar(ahora) {
     requestAnimationFrame(animar);

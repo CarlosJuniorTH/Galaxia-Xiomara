@@ -14,6 +14,11 @@ body.en-teatro>*:not(#galaxia):not(#teatro):not(script):not(style){visibility:hi
 .teatro-ciudad.visible{opacity:1}
 .teatro-ciudad.oro{color:#ffd893}
 .teatro-ciudad.rosa{color:#ffb4d0}
+.teatro-nombres{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:max-content;text-align:center;opacity:0;transition:opacity 2.4s ease;text-shadow:0 2px 6px rgba(0,0,0,.75),0 0 2px rgba(0,0,0,.8)}
+.teatro-nombres.visible{opacity:1}
+.teatro-nombres svg{display:block;width:clamp(44px,13vmin,110px);height:auto;margin:0 auto 2px;transform-origin:50% 55%;will-change:transform}
+.teatro-nombres strong{display:block;font:400 clamp(2.9rem,14.4vmin,7.6rem)/1.02 'Great Vibes',cursive;color:#ffe3b0}
+.teatro-nombres span{display:block;font:italic 500 clamp(1.1rem,5vmin,2.4rem)/1 'Cormorant Garamond',Georgia,serif;color:#ffc3da}
 .teatro-linea.grande{top:15vh;font:italic 500 clamp(2.1rem,9.5vw,3.5rem)/1.1 'Cormorant Garamond',Georgia,serif;color:#fff6ec}
 .teatro-linea.pie{bottom:calc(env(safe-area-inset-bottom,0px) + 12vh);font:italic 500 clamp(1.3rem,5.6vw,2rem)/1.2 'Cormorant Garamond',Georgia,serif;color:#f4d9b4}
 .teatro-linea.grande.abajo{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 9.5vh);color:#f6d595}
@@ -36,13 +41,7 @@ body.dia-anio .papel-especial{border-color:#d9ae62}
 body.dia-anio #celebracion-titulo,body.dia-anio .firma{color:#f2c777}
 body.dia-anio #btn-entrar{border-color:#d9ae62}
 @media (prefers-reduced-motion:reduce){#dial-vuelta .espera{animation:none}}
-/* Lo que deja el evento: se anuncia al llegar a casa. Sin bloquear, con líneas nítidas. */
-.evento-novedad{position:fixed;z-index:60;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 22px);width:min(92vw,420px);box-sizing:border-box;padding:18px 20px 16px;border:1px solid #e8c6a066;border-radius:18px;background:#120b20f2;color:#fff6ec;text-align:center;opacity:0;transform:translate(-50%,14px);transition:opacity .7s ease,transform .7s ease}
-.evento-novedad.visible{opacity:1;transform:translate(-50%,0)}
-.evento-novedad small{display:block;font:500 clamp(.64rem,2.6vw,.74rem)/1.4 'Quicksand',sans-serif;letter-spacing:.2em;text-transform:uppercase;color:#e8c6a0}
-.evento-novedad strong{display:block;margin:.25em 0 .2em;font:italic 500 clamp(1.7rem,7.4vw,2.3rem)/1.1 'Cormorant Garamond',Georgia,serif;color:#fff}
-.evento-novedad p{margin:0 0 14px;font:500 clamp(.84rem,3.5vw,.95rem)/1.4 'Quicksand',sans-serif;color:#d9cbe0}
-.evento-novedad div{display:flex;gap:10px;justify-content:center}
-.evento-novedad button{min-height:44px;padding:0 20px;border-radius:999px;font:600 .92rem 'Quicksand',sans-serif;cursor:pointer}
-.evento-ir{border:0;background:linear-gradient(135deg,#ffcf8f,#ff86bd);color:#22101f}
-.evento-luego{border:1px solid #e7cee533;background:transparent;color:#d9cbe0}
+/* Lo que deja el evento: una pastilla como la del cometa, a la izquierda de donde sale ella, sin tapar nada. */
+.evento-aviso{right:auto;left:18px;opacity:0;transform:translateY(8px);transition:opacity .7s ease,transform .7s ease}
+.evento-aviso.visible{opacity:1;transform:none}
+body.en-ruta .evento-aviso,body.en-calma .evento-aviso{display:none}

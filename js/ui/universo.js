@@ -525,18 +525,14 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     const lugar = Object.keys(CLIP_DE_LUGAR).find(l => CLIP_DE_LUGAR[l] === m);
     if (lugar && actual === lugar) setTimeout(() => { if (actual === lugar && !escena.viajando) teatro.anticipar(m); }, 1200);
   }
-  // El final del evento: el universo ha cambiado y se dice, con la puerta abierta para ir ya. Sin bloquear nada: quien prefiera
-  // quedarse en casa la cierra (o se va sola), y el lugar sigue en Explorar.
-  function anunciarEvento({ novedad, nombre, texto, lugar }) {
-    const caja = document.createElement('aside'); caja.className = 'evento-novedad'; caja.setAttribute('role', 'status');
-    const cerrar = () => { clearTimeout(reloj); caja.classList.remove('visible'); setTimeout(() => caja.remove(), 700); };
-    const accion = (etiqueta, clase, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = clase; b.textContent = etiqueta; b.addEventListener('click', fn); return b; };
-    const p = (etiqueta, t) => { const e = document.createElement(etiqueta); e.textContent = t; return e; };
-    const botones = document.createElement('div');
-    botones.append(accion('Ir ahora ✦', 'evento-ir', () => { cerrar(); visitar(lugar); }), accion('Más tarde', 'evento-luego', cerrar));
-    caja.append(p('small', novedad), p('strong', nombre), p('p', texto), botones);
-    document.body.append(caja);
-    const reloj = setTimeout(cerrar, 24000);
+  // El final del evento: el universo ha cambiado y se dice con una pastilla pequeña, como la del cometa, que no tapa el muelle ni
+  // nada de la pantalla. Se queda hasta que se va al lugar, y el lugar sigue también en Explorar.
+  function anunciarEvento({ nombre, lugar }) {
+    const caja = document.createElement('div'); caja.className = 'cometa-aviso evento-aviso'; caja.id = 'evento-aviso';
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = `✦ Se abrió «${nombre}» `;
+    const flecha = document.createElement('span'); flecha.textContent = '↗'; b.append(flecha);
+    b.addEventListener('click', () => { caja.remove(); visitar(lugar); });
+    caja.append(b); $('hud').append(caja);
     requestAnimationFrame(() => requestAnimationFrame(() => caja.classList.add('visible')));
   }
   async function celebrar() {
