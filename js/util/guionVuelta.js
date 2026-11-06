@@ -38,7 +38,7 @@ const GUIONES = {
       az: pistaSuave([[0, 10], [14, 60], [28, 120], [38.85, 160]]),
       el: pistaSuave([[0, 20], [16, 40], [38.85, 62]]),
       dist: pistaSuave([[0, 13], [16, 22], [38.85, 27]]),
-      distV: pistaSuave([[0, 68], [38.85, 76]]),   // en vertical se ve entera desde el principio
+      distV: pistaSuave([[0, 44], [16, 52], [38.85, 66]]),   // en vertical, la órbita se abre desde la Tierra hasta verse entera
       abre: pistaSuave([[0, 0], [5, 0.05], [18, 1], [38.85, 1]]),
       mira: [pistaSuave([[0, 6], [9, 0.8], [16, 0], [38.85, 0]]), pistaSuave([[0, 0], [38.85, 0]]), pistaSuave([[0, 0], [38.85, 0]])]
     },
@@ -47,7 +47,7 @@ const GUIONES = {
       { desde: 33.2, hasta: 38.2, clase: 'grande abajo', texto: 'Once meses.' },
       { desde: 34.6, hasta: 38.2, clase: 'pie abajo letra', texto: 'Falta una luz.' }
     ],
-    abrir: () => 0, nombres: () => 0, ola: () => -1, corona: null, chispas: [], onda: 0,
+    abrir: () => 0, nombres: () => 0, ola: () => -1, corona: null, chispas: [], onda: 0, cielo: () => 0.4,
     espera: s => suave(30, 33, s)
   },
   12: {
@@ -58,7 +58,8 @@ const GUIONES = {
       az: pistaSuave([[0, 306], [14, 342], [44, 402], [62, 446], [78, 472], [98.01, 492]]),
       el: pistaSuave([[0, 16], [14, 24], [44, 34], [62, 66], [98.01, 72]]),
       dist: pistaSuave([[0, 12.5], [14, 20], [44, 30], [62, 40], [98.01, 44]]),
-      distV: pistaSuave([[0, 68], [14, 70], [30, 82], [62, 108], [98.01, 118]]),
+      // En vertical, la Tierra viene hacia nosotros y cierra la vuelta; luego todo se abre hasta llenar la pantalla de galaxia.
+      distV: pistaSuave([[0, 40], [14, 46], [30, 70], [62, 86], [98.01, 92]]),
       // De cerca hasta que la órbita se cierra: entonces la cámara se abre y se ve entera.
       abre: pistaSuave([[0, 0], [11, 0.05], [20, 1], [98.01, 1]]),
       // Mira primero al tramo que falta y, una vez cerrada, al Sol.
@@ -68,6 +69,7 @@ const GUIONES = {
     textos: [
       { desde: 0.8, hasta: 7.5, clase: 'pie', texto: 'Faltaba una luz…' },
       { desde: 14.2, hasta: 17.8, clase: 'grande', texto: 'Una vuelta al Sol' },
+      { desde: 14.6, hasta: 17.8, clase: 'pie', texto: '940 millones de kilómetros, juntos.' },
       { desde: 46, hasta: 56, clase: 'pie', texto: 'De una órbita nació un universo.' },
       { desde: 78.1, hasta: 91.6, clase: 'grande abajo', texto: 'Un año' },
       { desde: 79.6, hasta: 91.6, clase: 'pie abajo', texto: '15 · 12 · 2025 — 15 · 12 · 2026' },
@@ -75,6 +77,9 @@ const GUIONES = {
     ],
     abrir: s => suave(44, 62, s),
     nombres: s => suave(62, 78, s),
+    cielo: pistaSuave([[0, 0.4], [44, 0.42], [62, 0.5], [98.01, 0.34]]),
+    // Mientras suben las estrellas, lo que escribió Carlos de cada mes (js/config.js): [desde, hasta, mes].
+    frases: [[18, 22, 0], [22.2, 25.4, 2], [25.6, 28.8, 3], [29, 32.2, 5], [32.4, 35.6, 7], [35.8, 39, 8], [39.2, 42.8, 10]],
     // La luz que recorre la órbita recién cerrada, dos vueltas (en radianes; −1 = apagada).
     ola: s => s < 14.02 || s > 18.5 ? -1 : (s - 14.02) / 4.48 * 2 * VUELTA,
     // Cada estrella sube de la órbita en su compás: de la primera (18 s) a la decimotercera (42 s).
@@ -95,6 +100,12 @@ GUIONES.dossoles = {
   id: 'mes-dossoles', titulo: 'Dos soles', duracion: 59.28, binaria: true,
   // En cada segundo: la cámara, más arriba al final para leer el infinito.
   frente: () => 0, abrir: () => 0, nombres: () => 0, ola: () => -1, espera: () => 0, corona: null, chispas: [], meses: null, onda: 0,
+  // Empieza donde estáis de verdad: la Tierra, con Barcelona y Buenos Aires. Un hilo de luz cruza el Atlántico, dos luces suben
+  // de las dos ciudades, y arriba son dos soles.
+  tierra: s => 1 - suave(7, 21, s), tierraAlfa: s => 1 - suave(25, 31, s), hilo: s => suave(2.5, 8, s), sube: s => suave(8, 18.5, s), soles: s => suave(15, 19, s), disco: s => suave(13, 28, s),
+  // Sus nombres, sobre sus ciudades, mientras están allí abajo.
+  etiquetas: { desde: 0.6, hasta: 8.6, textos: ['Carlos · Barcelona', 'Xiomara · Buenos Aires'] },
+  cielo: pistaSuave([[0, 0.34], [20, 0.42], [59.28, 0.46]]),
   // Empieza mirando a lo largo de la pareja (una cerca y otra lejos, que caben en vertical) y acaba de cara al infinito.
   camara: {
     az: pistaSuave([[0, 0], [20, 26], [46, 56], [59.28, 60]]),
@@ -109,10 +120,13 @@ GUIONES.dossoles = {
   flujo: s => suave(22, 33, s),
   infinito: s => suave(33, 46, s),
   textos: [
-    { desde: 2.5, hasta: 10, clase: 'pie', texto: 'Dos soles, con un océano en medio.' },
-    { desde: 21, hasta: 29.5, clase: 'pie', texto: 'Pero la gravedad no entiende de distancias.' },
+    { desde: 1, hasta: 7.6, clase: 'grande', texto: '10.466 km' },
+    { desde: 2.2, hasta: 7.6, clase: 'pie', texto: 'Un océano en medio.' },
+    { desde: 9, hasta: 17.5, clase: 'pie', texto: 'Y aun así, dos luces que se buscan.' },
+    { desde: 21, hasta: 29.5, clase: 'pie', texto: 'La gravedad no entiende de distancias.' },
     { desde: 34, hasta: 44, clase: 'pie', texto: 'Cada uno le da al otro parte de su luz.' },
-    { desde: 47.5, hasta: 57.5, clase: 'grande', texto: 'Nuestro pequeño infinito' }
+    { desde: 47.5, hasta: 57.5, clase: 'grande', texto: 'Nuestro pequeño infinito' },
+    { desde: 49.5, hasta: 57.5, clase: 'pie', texto: 'Once meses. Un solo cielo.' }
   ]
 };
 export const guionVuelta = clave => GUIONES[clave] || null;
@@ -120,10 +134,18 @@ export const MESES_CON_CLIP = [11, 12];
 // Los estrenos: desde su fecha (de Argentina, 'AAAA-MM-DD'), la primera vez que se entra en cada dispositivo la intro sale como
 // siempre y, al pulsar para entrar, su videoclip sustituye al vuelo; luego se llega a la galaxia. Una sola vez. Si ese día no se
 // entró, espera a la primera visita dentro de su plazo: un regalo así no se pierde por no abrirlo a tiempo.
-const ESTRENOS = [{ clave: 12, desde: '2026-12-15', hasta: '2027-01-14' }, { clave: 'dossoles', desde: '2026-11-15', hasta: '2026-12-14' }];
+const ESTRENOS = [
+  { clave: 12, desde: '2026-12-15', hasta: '2027-01-14', lugar: 'vuelta', novedad: 'Se ha abierto un lugar nuevo', nombre: 'Nuestra primera vuelta', texto: 'Una órbita cerrada, con sus trece estrellas, que seguirá aquí todos los años que vengan.' },
+  { clave: 'dossoles', desde: '2026-11-15', hasta: '2026-12-14', lugar: 'dossoles', novedad: 'Se ha abierto un lugar nuevo', nombre: 'Dos soles', texto: 'Las dos estrellas que acabas de ver ya viven en tu universo, girando juntas para siempre.' }
+];
+// Lo que el evento deja en el universo: se anuncia al llegar a casa, como cuando un juego abre un mundo nuevo.
+export const novedadDeEstreno = clave => ESTRENOS.find(e => e.clave === clave) || null;
 export const clipDeEstreno = (fecha, visto = () => false) => ESTRENOS.find(e => fecha >= e.desde && fecha <= e.hasta && !visto(e.clave))?.clave ?? 0;
 // «Falta una luz» se ve una sola vez, al encontrar la estrella del mes 11; desde el año, los dos se pueden repetir en el álbum.
 export const clipEnAlbum = fecha => fecha >= '2026-12-15';
+
+// La frase del mes que toca en ese segundo (null si ninguna): { mes }.
+export function fraseEnEscena(guion, s) { const f = guion.frases?.find(x => s >= x[0] && s < x[1]); return f ? { mes: f[2], id: f[0] } : null; }
 
 // El mes que se está nombrando en ese segundo (−1 si ninguno).
 export function mesEnEscena(guion, s) {

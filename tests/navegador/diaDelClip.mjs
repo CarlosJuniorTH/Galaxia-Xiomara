@@ -28,6 +28,7 @@ export default async function ({ base, informe: inf }) {
       inf.nota(`luz máxima del primer cuadro: ${luz}`);
       inf.comprobar(pedidas.includes(`${pista}.m4a`), `${nombre}: con su canción`, { pedidas: pedidas.slice(0, 5) });
       await pagina.waitForTimeout(2000);
+      await pagina.screenshot({ path: `.pruebas/capturas/estreno-${nombre.replace(/ /g, '-')}.png` });   // (el primer plano real del evento: la Tierra con sus texturas, no una bola lisa)
       await pagina.screenshot({ path: `${CAP}-${perfil}.png` });
       inf.comprobar(await pagina.evaluate(k => !window.__galaxia.progreso.tiene('celebraciones', `clip-${k}`) && !document.body.classList.contains('dentro'), clave), `${nombre}: durante el clip aún no está dentro ni anotado`);
       await pagina.evaluate(d => window.__galaxia.interfaz.teatro.saltar(d), dura - 6);
@@ -36,6 +37,10 @@ export default async function ({ base, informe: inf }) {
       await pagina.waitForTimeout(1500);
       const tras = await pagina.evaluate(k => ({ anotado: window.__galaxia.progreso.tiene('celebraciones', `clip-${k}`), entrada: getComputedStyle(document.getElementById('entrada')).display, lugar: JSON.parse(localStorage.getItem('xiomara:universo:v2:lugar') || '{}').destino, nombre: document.getElementById('lugar-nombre')?.textContent || '' }), clave);
       inf.comprobar(tras.anotado && tras.entrada === 'none' && tras.lugar === 'hogar', `${nombre}: al acabar, en la galaxia y anotado`, tras);
+      // El evento deja algo en el universo y lo dice, sin bloquear.
+      await pagina.waitForSelector('.evento-novedad.visible', { timeout: 9000 }).catch(() => {});
+      const aviso = await pagina.evaluate(() => { const c = document.querySelector('.evento-novedad.visible'); if (!c) return null; const r = c.getBoundingClientRect(); return { nombre: c.querySelector('strong').textContent, cabe: r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight }; });
+      inf.comprobar(aviso?.cabe && aviso.nombre === (nombre === 'año' ? 'Nuestra primera vuelta' : 'Dos soles'), `${nombre}: al llegar, anuncia el lugar nuevo`, aviso);
       await pagina.screenshot({ path: `${CAP}-${perfil}-casa.png` });
       // Segunda visita: intro y, al pulsar, el vuelo; ya no el clip.
       await pagina.reload();

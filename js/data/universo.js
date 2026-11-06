@@ -2,6 +2,7 @@
 // Las cartas y cápsulas son editables aquí. Las cápsulas son una sorpresa narrativa,
 // no un almacén secreto: su texto forma parte de estos archivos públicos.
 // Cas en Barcelona (misma zona que Madrid) y Xio en Buenos Aires.
+import '../util/horaReal.js';   // (lo primero: todo lo que mira la fecha, ya con la hora real)
 export const ZONAS = { carlos: 'Europe/Madrid', xiomara: 'America/Argentina/Buenos_Aires' };
 export const DESTINOS = [
   { id: 'hogar', icono: '✧', nombre: 'Nuestra galaxia', tipo: 'El comienzo de todo', posicion: [0, 70, 0], distancia: 1350, color: '#ff93c7', texto: 'Un universo hecho para ti. Gira despacio, sigue los destellos rosas y encuentra una estrella por cada mes de nuestra historia.', detalle: 'Cada estrella dorada es un recuerdo que ya encontraste.', accion: 'Buscar una estrella' },

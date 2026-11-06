@@ -3,6 +3,17 @@
 Lo nuevo arriba. Se consulta con `grep`; no se lee entero. Resumen por temas de `git log --oneline` (los hashes
 permiten ver el detalle con `git show <hash>`).
 
+## 2026-11-06 · Los clips cuentan vuestra historia y los estrenos son eventos
+
+- Motivo: a Xiomara no le emocionó el adelanto. Los clips eran dibujos sobre negro, por debajo de la galaxia de un día normal.
+- `js/escena/mundoClip.js`: cielo de nebulosas de casa y Tierra real (texturas del sistema solar, sin descargas nuevas).
+- Dos soles empieza en la Tierra: Barcelona y Buenos Aires con sus nombres (`etiquetas`), hilo sobre el Atlántico, dos luces que suben y son los soles; disco de polvo en lugar de las ondas.
+- Clip del año y mes 11: la Tierra recorre la órbita, cinta en vez de alambre; en el del año, frases de `config.recuerdos` mientras suben las estrellas (`frases`).
+- Corona en arcos (`GLSL_ARCO`), no en pinchos; anillo apagado mientras viaja a rodear los nombres.
+- Evento: al llegar tras el clip, tarjeta con el lugar nuevo (`novedadDeEstreno`, `anunciarEvento`).
+- `js/util/horaReal.js`: HEAD a la propia web y cabecera Date; corrige Date si el reloj difiere más de 2 min (solo en github.io). Sin IP: Pages no tiene servidor propio y la marca de visto es por dispositivo.
+- `tests/navegador/fpsClip.mjs`: fluidez de un clip en móvil emulado con CPU a un cuarto.
+
 ## 2026-11-05 · Revisión de los clips: soles sólidos, océano y galaxia
 
 - Soles (clips y lugares): esfera con plasma por píxel (`js/escena/estrellaSolida.js`), corona en chorros finos de motas; fuera las decenas de miles de motas de superficie.

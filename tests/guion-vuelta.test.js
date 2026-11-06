@@ -1,6 +1,7 @@
+import { desfaseReal, TOLERANCIA_MS } from '../js/util/horaReal.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { guionVuelta, mesEnEscena, pistaSuave, MESES_CON_CLIP, clipDeEstreno, clipEnAlbum } from '../js/util/guionVuelta.js';
+import { guionVuelta, mesEnEscena, pistaSuave, MESES_CON_CLIP, clipDeEstreno, clipEnAlbum, novedadDeEstreno } from '../js/util/guionVuelta.js';
 import { escalaGalaxia } from '../js/escena/crecimiento.js';
 import { mesesConFraccion } from '../js/util/tiempo.js';
 
@@ -44,4 +45,20 @@ test('los meses con fracción avanzan a diario y no llegan al mes siguiente', ()
   const m = f => mesesConFraccion('2025-12-15', new Date(f));
   assert.equal(m('2026-11-15T12:00:00-03:00'), 11); assert.ok(Math.abs(m('2026-11-30T12:00:00-03:00') - 11.5) < 1e-9);
   assert.ok(m('2026-12-14T12:00:00-03:00') < 12); assert.equal(m('2026-12-15T12:00:00-03:00'), 12);
+});
+
+test('hora real: corrige un reloj adelantado o atrasado, respeta uno bueno y no falla sin cabecera', () => {
+  const ahora = Date.parse('2026-11-14T12:00:00Z');
+  assert.equal(desfaseReal('Sat, 14 Nov 2026 12:00:30 GMT', ahora), 0);
+  assert.equal(desfaseReal('Sat, 14 Nov 2026 12:00:00 GMT', ahora + TOLERANCIA_MS + 1000), -(TOLERANCIA_MS + 1000));
+  assert.equal(desfaseReal('Sat, 14 Nov 2026 12:00:00 GMT', ahora - 864e5), 864e5);
+  assert.equal(desfaseReal(null, ahora), 0); assert.equal(desfaseReal('basura', ahora), 0);
+});
+test('evento: nada antes de su día, una sola vez y deja un lugar nuevo', () => {
+  assert.equal(clipDeEstreno('2026-11-14'), 0);
+  assert.equal(clipDeEstreno('2026-11-15'), 'dossoles');
+  assert.equal(clipDeEstreno('2026-11-15', c => c === 'dossoles'), 0);
+  assert.equal(clipDeEstreno('2026-12-14'), 'dossoles');
+  assert.equal(clipDeEstreno('2026-12-15'), 12);
+  assert.equal(novedadDeEstreno('dossoles').lugar, 'dossoles'); assert.equal(novedadDeEstreno(12).lugar, 'vuelta');
 });

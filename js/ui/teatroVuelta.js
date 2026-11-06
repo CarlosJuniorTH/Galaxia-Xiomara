@@ -3,7 +3,7 @@
 // no está, con lo que había a la vista; el corte es directo a su primer cuadro, aunque la canción tarde un poco en entrar. El
 // segundo del guion es el de la canción (reloj maestro); sin música, el clip lleva el mismo reloj. Se libera al terminar.
 import { relojMaestro } from '../util/relojMaestro.js';
-import { guionVuelta, mesEnEscena } from '../util/guionVuelta.js';
+import { guionVuelta, mesEnEscena, fraseEnEscena } from '../util/guionVuelta.js';
 import { fechaBonita } from '../util/tiempo.js';
 import { ocupado } from '../util/descargas.js';
 
@@ -35,6 +35,9 @@ export function crearTeatroUI({ escena, banda, config, estrellas }) {
     // Sus textos, ya escritos y sin mostrar: en cada cuadro solo cambia una clase si toca.
     textos.textContent = '';
     const lineas = guion.textos.map(t => { const d = document.createElement('div'); d.className = `teatro-linea ${t.clase}`; d.textContent = t.texto; textos.append(d); return { ...t, el: d, puesta: false }; });
+    // Los nombres sobre sus ciudades: solo cambia su transform en cada cuadro (sin recalcular la página).
+    const etiquetas = guion.etiquetas ? guion.etiquetas.textos.map((t, i) => { const d = document.createElement('div'); d.className = `teatro-ciudad ${i ? 'rosa' : 'oro'}`; d.textContent = t; textos.append(d); return d; }) : [];
+    let etiquetasPuestas = false;
     let mesPuesto = -1, cancionLista = false;
     const conSonido = banda.activa && banda.tiene(guion.id);
     if (conSonido) banda.preparada(guion.id, 8000).then(ok => { cancionLista = ok; });
@@ -56,13 +59,20 @@ export function crearTeatroUI({ escena, banda, config, estrellas }) {
         if (s >= guion.duracion) { fin(); return; }
         if (!fundiendo && s >= guion.duracion - 1.1) { fundiendo = true; negro.classList.add('activo'); }
         escena.teatroVuelta.fijar(s); escena.teatroVuelta.dibujar();
-        const m = mesEnEscena(guion, s);
+        if (etiquetas.length) {
+          const ve = s >= guion.etiquetas.desde && s < guion.etiquetas.hasta, pos = ve ? escena.teatroVuelta.ciudades() : null;
+          if (!!pos !== etiquetasPuestas) { etiquetasPuestas = !!pos; for (const d of etiquetas) d.classList.toggle('visible', etiquetasPuestas); }
+          if (pos) etiquetas.forEach((d, i) => { d.style.transform = `translate(${(Math.min(0.97, Math.max(0.03, pos[i][0])) * innerWidth).toFixed(1)}px,${(pos[i][1] * innerHeight).toFixed(1)}px) translate(${pos[i][0] < 0.5 ? '-6%' : '-94%'},-170%)`; });
+        }
+        const frase = fraseEnEscena(guion, s), m = guion.frases ? (frase ? frase.mes : -1) : mesEnEscena(guion, s);
         if (m !== mesPuesto) {
           mesPuesto = m; caja.classList.toggle('visible', m >= 0);
           if (m >= 0) {
             const r = config.recuerdos[m], id = estrellas[m]?.id;
             fecha.textContent = m === 0 ? `El comienzo · ${fechaBonita(id)}` : m === 12 ? '15 de diciembre de 2026' : `Mes ${m} · ${fechaBonita(id)}`;
-            nombre.textContent = m === 12 ? 'Nuestra primera vuelta' : r?.titulo || 'Una estrella más';
+            // En el clip del año, sus palabras de ese mes; en el del mes 11, que corre más, solo su título.
+            nombre.classList.toggle('frase', !!guion.frases);
+            nombre.textContent = guion.frases ? r?.texto || r?.titulo || '' : m === 12 ? 'Nuestra primera vuelta' : r?.titulo || 'Una estrella más';
           }
         }
         for (const l of lineas) { const v = s >= l.desde && s < l.hasta; if (v !== l.puesta) { l.puesta = v; l.el.classList.toggle('visible', v); } }

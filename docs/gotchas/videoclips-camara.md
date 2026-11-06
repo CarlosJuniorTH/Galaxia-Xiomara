@@ -40,3 +40,10 @@
 - 10–15 s en un movimiento continuo, recorridos por distancia real (7b69846). Plan del vuelo en un obrero desde el clic
   (7715786). El paso al sistema solar cambia de escena con la pantalla ya negra (e4c0fd6).
 - Superficie de los soles: `js/escena/estrellaSolida.js` (malla, no motas). En los clips las motas usan prueba de profundidad contra ella; los textos van en el plano a 30 unidades, delante del Sol.
+
+## Mundo de los clips (mundoClip.js)
+
+- La Tierra y el cielo se reutilizan de la escena: `preparar` espera las texturas de la Tierra (tope 9 s) porque durante el clip no entra nada en la GPU.
+- El cielo se dibuja directo a pantalla: lo devuelve a sRGB y va atenuado (`guion.cielo` ≈ 0,4); más alto, sus paredes de fuego tapan soles y texto.
+- Tierra a contraluz en el clip del año: su luz mezcla Sol y cámara, o sería un disco negro.
+

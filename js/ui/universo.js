@@ -525,6 +525,20 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     const lugar = Object.keys(CLIP_DE_LUGAR).find(l => CLIP_DE_LUGAR[l] === m);
     if (lugar && actual === lugar) setTimeout(() => { if (actual === lugar && !escena.viajando) teatro.anticipar(m); }, 1200);
   }
+  // El final del evento: el universo ha cambiado y se dice, con la puerta abierta para ir ya. Sin bloquear nada: quien prefiera
+  // quedarse en casa la cierra (o se va sola), y el lugar sigue en Explorar.
+  function anunciarEvento({ novedad, nombre, texto, lugar }) {
+    const caja = document.createElement('aside'); caja.className = 'evento-novedad'; caja.setAttribute('role', 'status');
+    const cerrar = () => { clearTimeout(reloj); caja.classList.remove('visible'); setTimeout(() => caja.remove(), 700); };
+    const accion = (etiqueta, clase, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = clase; b.textContent = etiqueta; b.addEventListener('click', fn); return b; };
+    const p = (etiqueta, t) => { const e = document.createElement(etiqueta); e.textContent = t; return e; };
+    const botones = document.createElement('div');
+    botones.append(accion('Ir ahora ✦', 'evento-ir', () => { cerrar(); visitar(lugar); }), accion('Más tarde', 'evento-luego', cerrar));
+    caja.append(p('small', novedad), p('strong', nombre), p('p', texto), botones);
+    document.body.append(caja);
+    const reloj = setTimeout(cerrar, 24000);
+    requestAnimationFrame(() => requestAnimationFrame(() => caja.classList.add('visible')));
+  }
   async function celebrar() {
     if (celebrando) return; celebrando = true;
     const version = ++celebracionRevision, sigue = () => version === celebracionRevision;
@@ -650,5 +664,5 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
   }
   let tickActivo = false;
   const despertarTick = () => { if (tickActivo) return; tickActivo = true; ultimo = performance.now(); requestAnimationFrame(tick); };
-  return { verClip, clipPendiente, teatro, get contemplando() { return contemplando || performance.now() - salidaContemplar < 700; }, contemplar, abrirCieloNoche: () => cieloNoche.abrir(), get celebrando() { return celebrando; }, actualizarAlbum() { if (panelActual === 'album') abrirPanel('album'); }, avisar, get enLasGrandes() { return enLasGrandes(); }, situar, visitar, llegada, escenaEnCurso, terminarEscena, get escenaActual() { return escenaActual ? { id: escenaActual.id, restante: Math.max(0, (escenaActual.fin - performance.now()) / 1000) } : null; }, alConstelar, tocarNodo, celebrar, abrirPanel, sorpresa, pausarRuta, iniciarRuta, get enRuta() { return tour; } };
+  return { verClip, anunciarEvento, clipPendiente, teatro, get contemplando() { return contemplando || performance.now() - salidaContemplar < 700; }, contemplar, abrirCieloNoche: () => cieloNoche.abrir(), get celebrando() { return celebrando; }, actualizarAlbum() { if (panelActual === 'album') abrirPanel('album'); }, avisar, get enLasGrandes() { return enLasGrandes(); }, situar, visitar, llegada, escenaEnCurso, terminarEscena, get escenaActual() { return escenaActual ? { id: escenaActual.id, restante: Math.max(0, (escenaActual.fin - performance.now()) / 1000) } : null; }, alConstelar, tocarNodo, celebrar, abrirPanel, sorpresa, pausarRuta, iniciarRuta, get enRuta() { return tour; } };
 }
