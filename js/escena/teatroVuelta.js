@@ -50,6 +50,7 @@ export function crearTeatroVuelta(renderer, { cielo: cieloDe = () => null } = {}
     else {
       plasma = crearPlasmaVuelta(); plasma.u.uFase.value = FASE_BRAZOS; escena.add(plasma.malla); pareja(R_SOLO);
       estallido = crearFuego(); camara.add(estallido.malla);
+      if (guion.corona) { velos = [crearVelo(1.6, 2.9), crearVelo(-1.6, 7.7)]; for (const v of velos) escena.add(v.malla); }
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(36), 3)); g.setAttribute('aI', new THREE.BufferAttribute(Float32Array.from({ length: 12 }, (_, i) => i), 1));
       marcas = new THREE.Points(g, new THREE.ShaderMaterial({ uniforms: UM, vertexShader: VERT_MARCAS, fragmentShader: FRAG_MARCAS, transparent: true, depthWrite: false, depthTest: false, toneMapped: false, premultipliedAlpha: true, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor }));
       marcas.frustumCulled = false; marcas.renderOrder = 40; escena.add(marcas);
@@ -96,8 +97,12 @@ export function crearTeatroVuelta(renderer, { cielo: cieloDe = () => null } = {}
       estrellas[1].malla.position.set(sol.rosa[0] + (sol.centro[0] - sol.rosa[0]) * j - rx * j, 0, sol.rosa[1] + (sol.centro[1] - sol.rosa[1]) * j - rz * j);
       estrellas.forEach((e, i) => { e.malla.scale.setScalar(radio); coronas[i].u.uEsc.value = radio * 2.5; });
       UM.uT.value = vida; UM.uFrente.value = fr; UM.uEspera.value = guion.espera(s); UM.uOla.value = guion.ola(s); UM.uOla2.value = -1;
+      // Velos de polvo sobre la galaxia que nace: profundidad, y solo cuando ya la hay.
+      velos.forEach(v => { v.u.uT.value = vida; v.u.uSep.value = 7; v.u.uAng.value = vida * 0.02; v.u.uLuz.value = abrir * 0.8; v.malla.visible = abrir > 0.01; });
+      // Cada mes, su onda.
+      if (guion.corona) { const tm = s - guion.corona.inicio, im = Math.floor(tm / guion.corona.paso), activa = tm >= 0 && im < 12; pu.uMesT.value = activa ? tm - im * guion.corona.paso : -1; pu.uMesA.value = im * Math.PI / 6; }
       // Ya en el anillo, cada sol enciende la cinta y las estrellas por donde pasa.
-      if (guion.corona && s >= 72) { const dpi = Math.PI * 2, ao = (Math.atan2(sol.oro[1], sol.oro[0]) + dpi) % dpi, ar = (Math.atan2(sol.rosa[1], sol.rosa[0]) + dpi) % dpi; pu.uOla.value = UM.uOla.value = ao; pu.uOla2.value = UM.uOla2.value = ar; } UM.uPx.value = tam.y / (2 * mediaAltura); UM.uPR.value = renderer.getPixelRatio();
+      if (guion.corona && (s >= 72 || (s >= 18 && s < 24))) { const dpi = Math.PI * 2, ao = (Math.atan2(sol.oro[1], sol.oro[0]) + dpi) % dpi, ar = (Math.atan2(sol.rosa[1], sol.rosa[0]) + dpi) % dpi; pu.uOla.value = UM.uOla.value = ao; pu.uOla2.value = UM.uOla2.value = ar; } UM.uPx.value = tam.y / (2 * mediaAltura); UM.uPR.value = renderer.getPixelRatio();
       // Los fuegos: cada uno en un sitio fuera del anillo, a su tiempo.
       if (fuegos.length) {
         for (const f of fuegos) f.malla.visible = false;
@@ -106,7 +111,7 @@ export function crearTeatroVuelta(renderer, { cielo: cieloDe = () => null } = {}
           const tau = s - t; if (tau < 0 || tau >= 2.8 || n >= fuegos.length) return;
           const f = fuegos[n++], lado = b % 2 ? 1 : -1, arriba = b % 4 < 2 ? 1 : -1;
           f.malla.visible = true; f.u.uTau.value = tau; f.u.uSem.value = b + 1;
-          f.malla.position.set(vertical ? lado * ancho * 0.44 : lado * ancho * 0.72, vertical ? arriba * alto * 0.7 : arriba * alto * 0.42, -PROFUNDIDAD_TEXTO);
+          f.malla.position.set(vertical ? lado * ancho * 0.44 : lado * ancho * 0.72, vertical ? alto * (0.66 + (arriba > 0 ? 0.08 : -0.04)) : arriba * alto * 0.42, -PROFUNDIDAD_TEXTO);
           f.malla.scale.setScalar(vertical ? ancho * 0.62 : alto * 0.62);
         });
       }

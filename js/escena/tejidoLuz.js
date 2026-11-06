@@ -115,9 +115,9 @@ export function crearVelo(altura, semilla) {
 // espiral desde la cinta (uAbrir, un frente que avanza hacia el centro) hasta encenderlo: la galaxia nace de lo recorrido.
 export const R_VUELTA = 10;
 export function crearPlasmaVuelta() {
-  return plano(260, { uT: { value: 0 }, uFrente: { value: 0 }, uLlena: { value: 0 }, uAbrir: { value: 0 }, uOla: { value: -1 }, uOnda: { value: -1 }, uSegunda: { value: 0 }, uLuz: { value: 1 }, uEspera: { value: 0 }, uFrenteR: { value: R_VUELTA }, uFase: { value: 0 }, uNucleo: { value: 0 }, uEncuentro: { value: -1 }, uRSol: { value: -1 }, uOla2: { value: -1 } }, /* glsl */`
+  return plano(260, { uT: { value: 0 }, uFrente: { value: 0 }, uLlena: { value: 0 }, uAbrir: { value: 0 }, uOla: { value: -1 }, uOnda: { value: -1 }, uSegunda: { value: 0 }, uLuz: { value: 1 }, uEspera: { value: 0 }, uFrenteR: { value: R_VUELTA }, uFase: { value: 0 }, uNucleo: { value: 0 }, uEncuentro: { value: -1 }, uRSol: { value: -1 }, uOla2: { value: -1 }, uMesA: { value: 0 }, uMesT: { value: -1 } }, /* glsl */`
     precision highp float;
-    uniform float uT, uFrente, uLlena, uAbrir, uOla, uOnda, uSegunda, uLuz, uEspera, uFrenteR, uFase, uNucleo, uEncuentro, uRSol, uOla2; varying vec2 vP; ${RUIDO} ${SALIDA}
+    uniform float uT, uFrente, uLlena, uAbrir, uOla, uOnda, uSegunda, uLuz, uEspera, uFrenteR, uFase, uNucleo, uEncuentro, uRSol, uOla2, uMesA, uMesT; varying vec2 vP; ${RUIDO} ${SALIDA}
     const float R = ${R_VUELTA}.0, DPI = 6.2831853;
     void main() {
       float r = length(vP); if (r > 42.0) discard;
@@ -126,7 +126,8 @@ export function crearPlasmaVuelta() {
       // La galaxia: dos brazos en espiral separados por vacío, con las hebras A LO LARGO del brazo (corriendo en círculo era un túnel).
       // Encendida de los soles hacia fuera: lo que ya han recorrido al bajar por cada brazo.
       float encendido = 0.025 * uLlena + (0.2 + 0.96 * smoothstep(0.0, 0.25, uAbrir)) * smoothstep(uFrenteR - 0.1, uFrenteR + 1.5, r) * step(0.001, uAbrir);
-      float afuera = 1.0 - smoothstep(R * 0.99, R * (1.03 + 0.34 * uAbrir), r);
+      // (Más allá del anillo solo cuando ya se está haciendo la galaxia: el principio son las dos estrellas y su cinta.)
+      float afuera = (1.0 - smoothstep(R * 0.99, R * (1.03 + 2.5 * uAbrir), r)) * (r > R ? exp(-(x - 1.0) * 0.95) : 1.0);
       float mascara = max(encendido * afuera, 0.0) * smoothstep(0.1, 0.6, r);
       if (mascara > 0.004) {
         float lr = log(max(r, 0.3) / R), s = ang - lr * 3.3 - uT * 0.035 - uFase;   // (la misma espiral que recorren los soles: js/util/guionVuelta.js)
@@ -135,17 +136,24 @@ export function crearPlasmaVuelta() {
         float brazo = pow(0.5 + 0.5 * cos(2.0 * s + dobla), 1.5);
         float masa = smoothstep(0.38, 0.62, fbm3(q * vec3(1.6, 1.6, 2.6) + vec3(0.0, 0.0, dobla))), h = hebra(fbm3(q * vec3(2.2, 2.2, 1.4) + 2.0), 7.0), polvo = smoothstep(0.42, 0.6, fbm3(q * vec3(3.4, 3.4, 5.0) + 11.0));
         float nitido = 1.0 - smoothstep(0.3, 1.1, fwidth(s * 22.0)), fino = mix(0.0, hebra(rn3(vec3(cos(s) * 34.0, sin(s) * 34.0, lr * 7.0)), 7.0), nitido);
-        vec3 c = mix(vec3(1.0, 0.92, 0.74), vec3(1.0, 0.66, 0.2), smoothstep(0.05, 0.26, x));
-        c = mix(c, vec3(0.98, 0.3, 0.3), smoothstep(0.26, 0.5, x)); c = mix(c, vec3(0.94, 0.2, 0.62), smoothstep(0.46, 0.76, x)); c = mix(c, vec3(0.56, 0.36, 1.0), smoothstep(0.76, 1.1, x));
-        c = mix(c, c * 0.62 + vec3(0.4, 0.38, 0.46), h * 0.5);
-        // (El polvo muerde el brazo: jirones oscuros, como las franjas del cuásar.)
-        float b = (0.05 + brazo * (0.12 + 0.95 * masa * masa + 0.95 * h + 0.75 * fino) * mix(0.38, 1.0, polvo)) * mascara;
+        // Cada brazo, del color del sol que lo pintó: oro, fuego y granate / rosa, fucsia y violeta. Fuera del anillo, azules de nebulosa.
+        vec3 co = mix(vec3(1.0, 0.86, 0.5), vec3(1.0, 0.62, 0.14), smoothstep(0.05, 0.3, x)); co = mix(co, vec3(0.98, 0.28, 0.08), smoothstep(0.3, 0.62, x)); co = mix(co, vec3(0.78, 0.1, 0.26), smoothstep(0.62, 1.0, x));
+        vec3 cr = mix(vec3(1.0, 0.72, 0.84), vec3(1.0, 0.36, 0.68), smoothstep(0.05, 0.3, x)); cr = mix(cr, vec3(0.88, 0.12, 0.58), smoothstep(0.3, 0.62, x)); cr = mix(cr, vec3(0.5, 0.18, 0.86), smoothstep(0.62, 1.0, x));
+        vec3 c = mix(cr, co, smoothstep(-0.55, 0.55, cos(s + dobla * 0.25) + (fbm3(q * vec3(1.3, 1.3, 2.0) + 15.0) - 0.5) * 0.7));
+        c = mix(c, vec3(0.26, 0.36, 0.9), smoothstep(1.0, 1.9, x));
+        c = mix(c, c * 0.86 + vec3(0.16, 0.14, 0.17), h * 0.36);
+        float b = (0.07 + brazo * (0.16 + 0.8 * masa * masa + 0.72 * h + 0.42 * fino * (1.0 - 0.75 * smoothstep(0.95, 1.2, x))) * mix(0.42, 1.0, polvo)) * mascara;
         // Nudos de estrellas nacientes a lo largo de los brazos, nítidos, rosas y blancos.
-        float nudo = smoothstep(0.82, 0.9, rn3(vec3(cos(s) * 30.0, sin(s) * 30.0, lr * 22.0))) * brazo * nitido * mascara;
+        float nudo = smoothstep(0.82, 0.9, rn3(vec3(cos(s) * 30.0, sin(s) * 30.0, lr * 22.0))) * brazo * nitido * mascara * (1.0 - smoothstep(0.95, 1.15, x));
         b += nudo * 1.1; c = mix(c, mix(vec3(1.0, 0.62, 0.82), vec3(1.0, 0.96, 0.92), fract(lr * 9.0)), min(1.0, nudo * 1.6));
         // El trazo de cada sol: junto a él la materia está incandescente, y se enfría brazo arriba. Se ve que la va pintando.
         if (uRSol > 0.0) { float tras = abs(log(max(r, 0.3) / uRSol)), trazo = exp(-tras * 3.4) * pow(0.5 + 0.5 * cos(2.0 * s + dobla * 0.4), 9.0); b += trazo * (0.75 + 0.9 * h); c = mix(c, vec3(1.0, 0.94, 0.8), min(1.0, trazo * 1.1)); }
         col += c * b; bT += b; alfa = max(alfa, min(1.0, b * 1.25));
+      }
+      // Cada mes, al subir su estrella, manda una onda que recorre la materia desde la cinta.
+      if (uMesT >= 0.0) {
+        vec2 centroMes = vec2(cos(uMesA), sin(uMesA)) * R; float dM = length(vP - centroMes), Rm = 1.0 + uMesT * 3.4, f = exp(-pow((dM - Rm) / 0.2, 2.0)) * pow(max(0.0, 1.0 - uMesT / 2.4), 1.5) * (0.5 + 0.7 * hebra(rn3(vec3(vP * 1.5, uT * 0.3)), 2.0)) * (1.0 - smoothstep(R * 0.98, R * 1.4, r));
+        col += vec3(1.0, 0.86, 0.72) * f * 0.7; alfa = max(alfa, min(1.0, f * 0.6));
       }
       // El corazón de la galaxia, que se enciende cuando los dos soles se encuentran, y la onda que eso manda hacia fuera.
       if (uNucleo > 0.0) { float nucleo = exp(-pow(r / 1.25, 2.0)) * uNucleo; col += vec3(1.0, 0.82, 0.54) * nucleo * 1.05; alfa = max(alfa, min(1.0, nucleo * 1.4)); }
@@ -155,16 +163,20 @@ export function crearPlasmaVuelta() {
       }
       // La cinta: dos hebras gruesas, oro por fuera y rosa por dentro, donde ya se ha pasado.
       float dr = r - R;
-      if (abs(dr) < 2.6) {
-        float recorrido = smoothstep(0.0, 0.015, uFrente - a) + step(DPI, uFrente);
+      if (abs(dr) < 3.2) {
+        float recorrido = smoothstep(0.0, 0.1, uFrente - a) + step(6.2831, uFrente);
         vec3 q = vec3(cos(ang) * 7.0, sin(ang) * 7.0, dr * 3.0 - uT * 0.12);
         float h = hebra(fbm3(q * vec3(1.0, 1.0, 1.0)), 5.0), masa = smoothstep(0.32, 0.62, fbm3(q * 0.6 + 9.0));
-        float perfil = exp(-pow(dr / (0.2 + 0.26 * masa), 2.0));
-        float calor = exp(-max(0.0, uFrente - a) * 3.6) * step(a, uFrente);
+        // Más ancha junto a los soles, como la cola de un cometa: se afina en la punta y desaparece al cerrarse la vuelta (si no, el principio
+        // y el final de la cinta, que se tocan en el ángulo 0, formaban un corte recto).
+        float cierre = 1.0 - smoothstep(5.95, 6.25, uFrente), detras = uFrente - a;
+        float cerca = exp(-max(0.0, detras) * 1.5) * step(0.0, detras) * cierre * smoothstep(0.0, 0.3, detras);
+        float perfil = exp(-pow(dr / ((0.26 + 0.3 * masa) * (1.0 + 1.1 * cerca)), 2.0));
+        float calor = exp(-max(0.0, uFrente - a) * 3.6) * step(a, uFrente) * (1.0 - smoothstep(5.95, 6.25, uFrente));
         float ola = uOla >= 0.0 ? exp(-pow(abs(mod(uOla - a + 3.14159265, DPI) - 3.14159265) / 0.45, 2.0)) : 0.0;
         if (uOla2 >= 0.0) ola += exp(-pow(abs(mod(uOla2 - a + 3.14159265, DPI) - 3.14159265) / 0.45, 2.0));
         float seg = uSegunda > 0.0 ? smoothstep(0.0, 0.5, uSegunda - a) : 0.0;
-        float b = min(1.0, recorrido) * perfil * (0.3 + 0.56 * masa + 0.72 * h) * (1.0 + 0.3 * calor + 1.2 * ola + 0.42 * seg);
+        float b = min(1.0, recorrido) * perfil * (0.34 + 0.6 * masa + 0.7 * h) * (1.0 + 0.3 * calor + 1.2 * ola + 0.42 * seg);
         vec3 c = mix(vec3(1.0, 0.36, 0.68), vec3(1.0, 0.72, 0.28), smoothstep(-0.16, 0.16, dr + (h - 0.5) * 0.14));
         c = mix(c, vec3(1.0, 0.95, 0.86), min(1.0, calor * 0.16 + ola * 0.6 + h * 0.2 + seg * 0.14));
         // Lo que aún falta: una sola línea finísima que late hacia la estrella que espera.
@@ -178,7 +190,8 @@ export function crearPlasmaVuelta() {
         col += vec3(1.0, 0.86, 0.68) * f; alfa = max(alfa, min(1.0, f));
       }
       if (alfa <= 0.003) discard;
-      gl_FragColor = vec4(salida(min(col * uLuz, vec3(1.3))), alfa);
+      // Exposición suave, como en «Dos soles»: la luz satura hacia su color, no a blanco plano.
+      gl_FragColor = vec4(salida(1.0 - exp(-col * uLuz * 2.5)), alfa);
     }`);
 }
 
