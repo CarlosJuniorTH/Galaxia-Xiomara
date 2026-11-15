@@ -145,11 +145,11 @@ export function crearEstrellasSecretas({ scene, camera, uScale, uPR }, cantidad,
     hiloReunion.material.uniforms.uOpacidad.value = 0; grupo.add(hiloReunion);
   }
   let hiloReunion = null;
-  // Zona señalada (pistas 2 a 4): un anillo nítido que se cierra sobre la estrella tres veces y se apaga. Sin resplandor (era un
+  // La pista: un anillo nítido que se cierra sobre la estrella cinco veces seguidas y se apaga. Sin resplandor (era un
   // halo que no dejaba de brillar) y sin quedarse encendido: cada pista lo vuelve a lanzar.
   const onda = new THREE.Sprite(new THREE.SpriteMaterial({ map: texAnillo(), color: '#fff0c8', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
   grupo.add(onda);
-  const ZONA_T = 5.6;   // (tres cierres de 1,8 s y el fundido)
+  const ZONA_T = 9.4;   // (cinco cierres de 1,8 s, uno tras otro, y el fundido)
   let zonaT = 0, zonaIndice = -1;
   const centroZona = i => estrellas[i].position.clone();
   return {

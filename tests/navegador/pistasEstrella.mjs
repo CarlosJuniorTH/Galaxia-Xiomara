@@ -1,5 +1,5 @@
-// Las cuatro pistas para encontrar una estrella (no es de la batería): ninguna es un viaje (sin su música), la onda se apaga
-// sola y la estrella no se marca sola. node tests/navegador/pistasEstrella.mjs
+// La pista para encontrar una estrella (no es de la batería): no es un viaje ni mueve la cámara, el anillo se apaga solo y la
+// estrella no se marca sola. node tests/navegador/pistasEstrella.mjs
 import { lanzar, fijarFecha } from './arnes.mjs';
 import { spawn } from 'node:child_process';
 const puerto = 8094, servidor = spawn('python3', ['scripts/servir.py', '--port', String(puerto)], { stdio: 'ignore' });
@@ -15,13 +15,13 @@ try {
   await pagina.waitForFunction(() => document.body.classList.contains('dentro') && !window.__galaxia.escena.viajando, null, { timeout: 60000 });
   await pagina.waitForTimeout(2500);
   const encontradasAntes = await pagina.evaluate(() => JSON.stringify(window.__galaxia.progreso.estado?.estrellas ?? null));
-  for (let n = 1; n <= 4; n++) {
+  const lienzo = async () => (await pagina.locator('canvas').first().screenshot()).length;
+  for (let n = 1; n <= 2; n++) {
     await pagina.evaluate(() => document.getElementById('btn-pista').click());
-    const musicas = new Set();
-    for (let i = 0; i < 8; i++) { await pagina.waitForTimeout(500); musicas.add(await pagina.evaluate(() => window.__bandaSonora?.objetivo)); }
+    const musicas = new Set(); let viaja = false;
+    for (let i = 0; i < 8; i++) { await pagina.waitForTimeout(500); musicas.add(await pagina.evaluate(() => window.__bandaSonora?.objetivo)); viaja ||= await pagina.evaluate(() => window.__galaxia.escena.viajando); }
     await pagina.screenshot({ path: `.pruebas/capturas/pista-${n}.png` });
-    await pagina.waitForTimeout(3000);
-    console.log(`pista ${n}: músicas ${[...musicas].join(',')} · aviso «${await pagina.evaluate(() => document.querySelector('#aviso, .aviso')?.textContent?.slice(0, 40) ?? '')}»`);
+    console.log(`pista ${n}: músicas ${[...musicas].join(',')} · viaja ${viaja}`);
   }
   await pagina.waitForTimeout(3000);
   const tras = await pagina.evaluate(() => JSON.stringify(window.__galaxia.progreso.estado?.estrellas ?? null));

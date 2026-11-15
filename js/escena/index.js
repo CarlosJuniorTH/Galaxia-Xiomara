@@ -1815,22 +1815,8 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     },
     // La señal de luz de la carta del cuásar (js/ui/faroCuasar.js): sube por los chorros (0–1; −1 apagada).
     faroAcento: v => cosmos.acentoCuasar(v),
-    // Segunda y tercera pista: iluminar la zona y acercar la cámara a ella (sin la estrella).
+    // La pista: el anillo que se cierra sobre la estrella (sin mover la cámara).
     zonaPista(i) { return !!secretas.iluminarZona(i); },
-    // Pistas 3 y 4: no es un viaje (sin su música ni su tarjeta): la cámara se desliza hacia la estrella desde donde se mira,
-    // por la misma línea de visión, hasta verla de cerca (3) o muy de cerca (4). Ya se está en casa (lo asegura la interfaz).
-    acercarZona(i) {
-      const c = secretas.centroZona(i); if (!c) return Promise.resolve(false);
-      secretas.iluminarZona(i); soltarCielo();
-      const desde = camera.position.clone().sub(c).normalize();
-      return desplazar(c.clone().add(desde.multiplyScalar(distanciaEncuadre(620))), c, 3.2);
-    },
-    async pista(i) {
-      const pos = secretas.posicion(i); if (!pos) return false;
-      secretas.senalar(i); soltarCielo();
-      const desde = camera.position.clone().sub(pos).normalize();
-      return desplazar(pos.clone().add(desde.multiplyScalar(distanciaEncuadre(380))), pos, 3);
-    },
     posicionEstrella: i => secretas.posicion(i),
     dondeEstrella(i) {
       const v = secretas.posicion(i); if (!v) return null; v.project(camera);

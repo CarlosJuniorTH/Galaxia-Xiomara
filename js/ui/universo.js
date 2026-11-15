@@ -407,35 +407,18 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
       progreso.importar(copia.progreso); location.reload();
     } catch (e) { avisar(e.message || 'No se pudo leer la copia. Tus descubrimientos siguen aquí.'); }
   }
-  // Pista progresiva, para no quitar la sensación de descubrimiento: cada vez que se pide
-  // ayuda para la misma estrella se avanza un nivel.
-  //  1 · una frase que sugiere la región  2 · se ilumina la zona  3 · la cámara se acerca a
-  //  la zona  4 · se señala la estrella y la cámara la encuadra (el último toque es suyo).
-  const nivelPista = new Map();
-  function fraseZona(i) {
-    const p = escena.posicionEstrella(i); if (!p) return 'Hay una luz rosa que late más que las demás. Gira el universo despacio.';
-    const r = Math.hypot(p.x, p.z), arriba = p.y > 10;
-    const donde = r < 560 ? 'muy cerca del corazón de la galaxia, donde la luz se arremolina' : r < 820 ? 'en uno de sus brazos, a medio camino entre el centro y el borde' : 'hacia las afueras, donde las estrellas se vuelven tímidas';
-    return `Busca ${donde}, ${arriba ? 'un poco por encima del disco' : 'un poco por debajo del disco'}. Late en rosa, más despacio que las demás.`;
-  }
+  // La pista: un anillo dorado que se cierra varias veces sobre la estrella que falta. La cámara no se mueve (girar la galaxia
+  // es cosa suya, y el último toque también); cada vez que se pide, vuelve a empezar. Las estrellas están en casa: si se ha
+  // salido de ella, primero se vuelve.
   async function darPista() {
     if (celebrando) return;
     if (tour) terminarRuta(false, false);
     const pendiente = estrellas.findIndex(s => !progreso.tiene('estrellas', s.id));
     if (pendiente < 0) { avisar('Ya encontraste todas. Puedes releerlas en tu álbum o comenzar otro viaje.'); return; }
     if (escena.viajando) { avisar('Estamos llegando. Enseguida podrás seguir otra luz.'); return; }
-    const nivel = Math.min(4, (nivelPista.get(pendiente) || 0) + 1); nivelPista.set(pendiente, nivel);
-    if (nivel === 1) { avisar(`Pista 1 de 4 · ${fraseZona(pendiente)}`, { urgente: true }); return; }
-    if (nivel === 2) {
-      if (actual !== 'hogar') await visitar('hogar');
-      escena.zonaPista(pendiente); avisar('Pista 2 de 4 · Un anillo dorado se cierra sobre ella. Gira el universo hasta verlo.', { urgente: true }); return;
-    }
-    $('btn-pista').disabled = true;
-    try {
-      if (actual !== 'hogar') await visitar('hogar');   // (se buscan en casa; si se ha salido de ella, primero se vuelve)
-      if (nivel === 3) { avisar('Pista 3 de 4 · Te la acerco. Está en el centro del anillo dorado: tócala.', { urgente: true }); await escena.acercarZona(pendiente); }
-      else { avisar('Última pista · Es la luz rosa que late en el centro del anillo. El toque es tuyo.', { urgente: true }); await escena.pista(pendiente); }
-    } finally { $('btn-pista').disabled = false; }
+    if (actual !== 'hogar') await visitar('hogar');
+    escena.zonaPista(pendiente);
+    avisar('Un anillo dorado se cierra sobre la estrella que falta. Gira el universo hasta verla y tócala.', { urgente: true });
   }
   function tejer() {
     if (escena.viajando) { avisar('Espera a que lleguemos a la constelación.'); return; }
