@@ -145,18 +145,18 @@ export function crearEstrellasSecretas({ scene, camera, uScale, uPR }, cantidad,
     hiloReunion.material.uniforms.uOpacidad.value = 0; grupo.add(hiloReunion);
   }
   let hiloReunion = null;
-  // Zona iluminada (segunda y tercera pista): un resplandor centrado EN la estrella y una
-  // onda de luz que se cierra sobre ella una y otra vez, para que se vea dónde está.
-  const zona = new THREE.Sprite(new THREE.SpriteMaterial({ map: texBrillo(), color: '#ffd9a0', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
+  // Zona señalada (pistas 2 a 4): un anillo nítido que se cierra sobre la estrella tres veces y se apaga. Sin resplandor (era un
+  // halo que no dejaba de brillar) y sin quedarse encendido: cada pista lo vuelve a lanzar.
   const onda = new THREE.Sprite(new THREE.SpriteMaterial({ map: texAnillo(), color: '#fff0c8', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
-  grupo.add(zona, onda);
+  grupo.add(onda);
+  const ZONA_T = 5.6;   // (tres cierres de 1,8 s y el fundido)
   let zonaT = 0, zonaIndice = -1;
   const centroZona = i => estrellas[i].position.clone();
   return {
     destruir() { scene.remove(grupo); for (const s of estrellas) s.material.dispose(); geoLuz.dispose(); luces.material.dispose(); tex.dispose(); constelacion?.destruir(); },
     posicion(i) { return estrellas[i]?.getWorldPosition(new THREE.Vector3()); },
-    senalar(i) { pista = i; pistaT = 22; },
-    iluminarZona(i) { if (!estrellas[i]) return null; zonaIndice = i; zonaT = 20; return centroZona(i); },
+    senalar(i) { pista = i; pistaT = 9; if (estrellas[i]) { zonaIndice = i; zonaT = ZONA_T; } },
+    iluminarZona(i) { if (!estrellas[i]) return null; zonaIndice = i; zonaT = ZONA_T; return centroZona(i); },
     centroZona(i) { return estrellas[i] ? centroZona(i) : null; },
     reiniciar() { for (const s of estrellas) { s.userData.encontrada = false; s.material.color.copy(ROSA); } },
     // Devuelve el índice de la estrella tocada o -1
@@ -192,15 +192,14 @@ export function crearEstrellasSecretas({ scene, camera, uScale, uPR }, cantidad,
         hiloReunion.geometry.setDrawRange(0, Math.floor(220 * Math.min(1, Math.max(0, (reunion - 0.8) / 0.18))));
         hiloReunion.visible = u.uOpacidad.value > 0.01;
       }
-      zona.visible = onda.visible = zonaT > 0;
+      onda.visible = zonaT > 0;
       if (zonaT > 0 && estrellas[zonaIndice]) {
-        const fundido = Math.min(1, zonaT / 2, (20 - zonaT) / 1.2), p = estrellas[zonaIndice].position;
-        zona.position.copy(p); onda.position.copy(p);
+        const pasado = ZONA_T - zonaT, fundido = Math.min(1, zonaT / 0.6), p = estrellas[zonaIndice].position;
+        onda.position.copy(p);
         // Tamaño en pantalla estable: se calcula con la distancia a la cámara.
         const d = Math.max(60, camera.position.distanceTo(p)), k = d * 0.42;
-        zona.scale.setScalar(k * 0.55); zona.material.opacity = fundido * (0.45 + 0.12 * Math.sin(t * 3));
-        const ciclo = (t * 0.55) % 1;
-        onda.scale.setScalar(k * (1.3 - ciclo * 1.15)); onda.material.opacity = fundido * Math.sin(ciclo * Math.PI) * 0.9;
+        const ciclo = (pasado / 1.8) % 1;
+        onda.scale.setScalar(k * (0.5 - ciclo * 0.42)); onda.material.opacity = fundido * Math.sin(ciclo * Math.PI) * 0.75;   // (pequeño: se cierra justo sobre la estrella)
       }
       grupo.rotation.y = 0;
       for (const s of estrellas) {
@@ -209,7 +208,7 @@ export function crearEstrellasSecretas({ scene, camera, uScale, uPR }, cantidad,
         if (u.destello) u.destello = Math.max(0, u.destello - dt * 0.8);
         const senalada = u.indice === pista && pistaT > 0;
         const k = tam * (pulso + (u.destello || 0) * 1.5 + (senalada ? .7 + .3 * Math.sin(t * 5) : 0));
-        if (senalada) s.material.color.set('#fff0bd'); else s.material.color.copy(u.encontrada ? DORADO : ROSA);
+        s.material.color.copy(u.encontrada ? DORADO : ROSA);   // (señalada sigue rosa: en dorado parecía ya encontrada)
         s.position.copy(u.base); s.position.y = u.baseY + Math.sin(t * 0.8 + u.fase) * 8;
         const destino = destinos.get(u.indice);
         if (destino && reunion > 0) {

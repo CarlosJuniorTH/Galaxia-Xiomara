@@ -425,15 +425,16 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     if (pendiente < 0) { avisar('Ya encontraste todas. Puedes releerlas en tu álbum o comenzar otro viaje.'); return; }
     if (escena.viajando) { avisar('Estamos llegando. Enseguida podrás seguir otra luz.'); return; }
     const nivel = Math.min(4, (nivelPista.get(pendiente) || 0) + 1); nivelPista.set(pendiente, nivel);
-    if (nivel === 1) { avisar(`Pista 1 de 4 · ${fraseZona(pendiente)}`); return; }
+    if (nivel === 1) { avisar(`Pista 1 de 4 · ${fraseZona(pendiente)}`, { urgente: true }); return; }
     if (nivel === 2) {
       if (actual !== 'hogar') await visitar('hogar');
-      escena.zonaPista(pendiente); avisar('Pista 2 de 4 · Una onda dorada se cierra justo sobre ella. Gira el universo hasta verla.'); return;
+      escena.zonaPista(pendiente); avisar('Pista 2 de 4 · Un anillo dorado se cierra sobre ella. Gira el universo hasta verlo.', { urgente: true }); return;
     }
     $('btn-pista').disabled = true;
     try {
-      if (nivel === 3) { avisar('Pista 3 de 4 · Te acerco. Está en el centro de la onda dorada: tócala.'); await escena.acercarZona(pendiente); }
-      else { avisar('Última pista · Sigue el destello dorado. La cámara te acerca; el último toque es tuyo.'); await escena.pista(pendiente); }
+      if (actual !== 'hogar') await visitar('hogar');   // (se buscan en casa; si se ha salido de ella, primero se vuelve)
+      if (nivel === 3) { avisar('Pista 3 de 4 · Te la acerco. Está en el centro del anillo dorado: tócala.', { urgente: true }); await escena.acercarZona(pendiente); }
+      else { avisar('Última pista · Es la luz rosa que late en el centro del anillo. El toque es tuyo.', { urgente: true }); await escena.pista(pendiente); }
     } finally { $('btn-pista').disabled = false; }
   }
   function tejer() {

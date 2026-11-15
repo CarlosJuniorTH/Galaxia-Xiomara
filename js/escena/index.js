@@ -1817,17 +1817,19 @@ export async function crearEscena(canvas, { config, cantidadSecretas, encontrada
     faroAcento: v => cosmos.acentoCuasar(v),
     // Segunda y tercera pista: iluminar la zona y acercar la cámara a ella (sin la estrella).
     zonaPista(i) { return !!secretas.iluminarZona(i); },
+    // Pistas 3 y 4: no es un viaje (sin su música ni su tarjeta): la cámara se desliza hacia la estrella desde donde se mira,
+    // por la misma línea de visión, hasta verla de cerca (3) o muy de cerca (4). Ya se está en casa (lo asegura la interfaz).
     acercarZona(i) {
       const c = secretas.centroZona(i); if (!c) return Promise.resolve(false);
-      secretas.iluminarZona(i); soltarCielo(); destinoActual = 'hogar'; mundos.enfocar('hogar'); alViajar('hogar');
-      // La estrella queda en el centro de la pantalla, a media distancia, con su onda.
-      const fuera = c.clone().setY(0).normalize();
-      return desplazar(c.clone().add(fuera.multiplyScalar(distanciaEncuadre(560))).add(new THREE.Vector3(0, 300, 0)), c, 4.4);
+      secretas.iluminarZona(i); soltarCielo();
+      const desde = camera.position.clone().sub(c).normalize();
+      return desplazar(c.clone().add(desde.multiplyScalar(distanciaEncuadre(620))), c, 3.2);
     },
     async pista(i) {
       const pos = secretas.posicion(i); if (!pos) return false;
-      secretas.senalar(i); soltarCielo(); destinoActual = 'hogar'; mundos.enfocar('hogar'); alViajar('hogar');
-      return desplazar(pos.clone().add(new THREE.Vector3(50, 150, distanciaEncuadre(410))), pos, 4.2);
+      secretas.senalar(i); soltarCielo();
+      const desde = camera.position.clone().sub(pos).normalize();
+      return desplazar(pos.clone().add(desde.multiplyScalar(distanciaEncuadre(380))), pos, 3);
     },
     posicionEstrella: i => secretas.posicion(i),
     dondeEstrella(i) {
