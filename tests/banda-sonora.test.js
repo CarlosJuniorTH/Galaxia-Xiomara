@@ -106,3 +106,11 @@ test('cada estancia es la continuación de su canción: un tramo continuo, −20
     if (c.origen === e.origen) assert.ok(Math.abs(e.desde - (c.hasta - 3)) < 0.01, `${n}: la estancia arranca en ${e.desde}, el clip acaba en ${c.hasta}`);
   }
 });
+
+test('las pistas de los videoclips nunca suenan como canción del mes en casa', async () => {
+  const { configuracionActiva } = await import('../js/data/bandaSonora.js');
+  const { momentos } = configuracionActiva('');
+  for (const n of ['mes-11', 'mes-12', 'mes-dossoles']) assert.equal(momentos[n]?.clip, true, n);
+  const tiene = n => !!momentos[n]?.archivo && !momentos[n].clip;   // (la misma regla que js/ui/bandaSonora.js)
+  assert.equal(momentoReposo('hogar', 11, tiene), 'ambiente'); assert.equal(momentoReposo('hogar', 12, tiene), 'ambiente');
+});

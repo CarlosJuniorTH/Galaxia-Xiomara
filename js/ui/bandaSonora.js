@@ -149,7 +149,7 @@ export function crearBandaSonora({ volumen = () => 0.85, cargaEn = null } = {}) 
   }
   const duracionDe = p => p.buffer?.duration || p.conf.duracion || p.duracionIndice || (Number.isFinite(p.el?.duration) ? p.el.duration : 0);
   const volumenDe = canal => canal === ambiente ? 1 : Math.max(0, Math.min(1, (canal.conf.volumen ?? 1) * volumen()));
-  const reposo = () => momentoReposo(lugar, partesEnZona().mes, n => pistas.get(n)?.estado !== 'fallo' && pistas.has(n));
+  const reposo = () => momentoReposo(lugar, partesEnZona().mes, n => pistas.has(n) && pistas.get(n).estado !== 'fallo' && !pistas.get(n).conf.clip);
   const enMarcha = () => !!ctx && ctx.state === 'running' && relojMaestro.dominio === 'audio';
   // Qué se oye ahora: el objetivo, o mientras su archivo llega, el ambiente (la portada espera en silencio a su canción).
   function audible() {
