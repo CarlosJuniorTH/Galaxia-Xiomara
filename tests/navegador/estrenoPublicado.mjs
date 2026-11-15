@@ -1,7 +1,7 @@
 // Comprobación contra la web publicada, con el reloj real (no es de la batería): primera visita de un móvil limpio → intro y, al
 // pulsar, el clip del día; se recarga a mitad del clip → ya no vuelve a salir. node tests/navegador/estrenoPublicado.mjs
 import { lanzar } from './arnes.mjs';
-const URL = 'https://carlosjuniorth.github.io/Galaxia-Xiomara/';
+const URL = 'https://carlosjuniorth.github.io/Galaxia-Xiomara/#debug';   // (#debug solo expone los ganchos de prueba; no cambia el estreno)
 const PREPARADO = () => document.getElementById('btn-entrar')?.classList.contains('preparado') && document.getElementById('entrada').classList.contains('cielo');
 const { navegador, pagina, errores } = await lanzar('movil430', { musica: true });
 const pedidas = []; pagina.on('request', r => { const m = r.url().match(/musica\/([^?]+)/); if (m) pedidas.push(m[1]); });
