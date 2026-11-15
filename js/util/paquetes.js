@@ -8,18 +8,26 @@
 // «Actualizar» ya dentro. Una vez tocada la pantalla, nunca se recarga sola (antes lo hacía también en la portada: recargas
 // por sorpresa con varias publicaciones al día).
 // Solo en HTTPS (los navegadores no permiten service workers en http de la red local); ?sw=1 lo prueba en localhost.
-export function vigilarPaquetes({ dentro = () => document.body.classList.contains('dentro') } = {}) {
+// Devuelve una promesa «versión al día» que la carga espera antes de dejar empezar (js/main.js, antes de entrada.listo()):
+// mientras la página carga desde la copia guardada se pregunta al servidor si hay versión nueva (en paralelo con la carga:
+// una visita sin novedades no espera nada más). Si la hay, la pantalla de carga dice que la descarga (solo los archivos que
+// cambiaron), se aplica y la página se recarga ya nueva, antes del «toca para empezar»: un estreno nunca se pierde por abrir
+// la copia vieja. Sin red, o si tarda más de 45 s, se entra con lo guardado y queda el aviso de siempre.
+export function vigilarPaquetes({ dentro = () => document.body.classList.contains('dentro'), alDescargar = () => {} } = {}) {
   const permitido = location.protocol === 'https:' || new URLSearchParams(location.search).get('sw') === '1';
-  if (!('serviceWorker' in navigator) || !permitido) return;
-  let recargar = false, aviso = null, tocado = false;
+  if (!('serviceWorker' in navigator) || !permitido) return Promise.resolve();
+  let recargar = false, aviso = null, tocado = false, alDia;
+  let enCarga = true;   // hasta resolver «versión al día» la página aún no deja empezar: un toque ahí no corta nada
+  const versionAlDia = new Promise(r => { alDia = () => { enCarga = false; r(); }; });
+  setTimeout(alDia, 45000);
   // Antes de que quien mira toque nada (cargando o en la pantalla de «toca para empezar»), una versión nueva ya descargada se
   // aplica sola: recargar ahí no corta nada y así se abre directamente la versión nueva (un estreno no se pierde por estar
   // abierta la copia vieja en el teléfono). Una vez tocado, solo con «Actualizar». Una sola recarga así por minuto.
   for (const t of ['pointerdown', 'keydown']) addEventListener(t, () => { tocado = true; }, { capture: true, once: true });
   const recargadaHace = () => { try { return Date.now() - Number(sessionStorage.getItem('xiomara:recarga-version') || 0); } catch { return 0; } };
-  const sola = () => !tocado && recargadaHace() > 60000;
+  const sola = () => (enCarga || !tocado) && recargadaHace() > 60000;
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (recargar) location.reload(); });
-  navigator.serviceWorker.register('./sw.js').then(reg => {
+  navigator.serviceWorker.register('./sw.js').then(async reg => {
     const aplicar = () => { if (!reg.waiting) return; recargar = true; reg.waiting.postMessage('aplicar'); };
     const ofrecer = () => {
       // La primera instalación no tiene nada que aplicar: la página ya es esa versión.
@@ -31,9 +39,19 @@ export function vigilarPaquetes({ dentro = () => document.body.classList.contain
       aviso.textContent = '✦ El universo tiene mejoras · Actualizar';
       aviso.addEventListener('click', aplicar); document.body.append(aviso);
     };
+    const vigilar = w => w?.addEventListener('statechange', () => { if (w.state === 'installed') ofrecer(); if (w.state === 'redundant') alDia(); });
+    reg.addEventListener('updatefound', () => vigilar(reg.installing));
     ofrecer();
-    reg.addEventListener('updatefound', () => { const w = reg.installing; w?.addEventListener('statechange', () => { if (w.state === 'installed') ofrecer(); }); });
+    // Primera visita (sin copia guardada): la página ya es la versión publicada.
+    if (!navigator.serviceWorker.controller) { alDia(); return; }
+    // ¿Hay versión nueva? (6 s como mucho para saberlo; con mala red se entra con lo guardado.)
+    await Promise.race([reg.update().catch(() => {}), new Promise(r => setTimeout(r, 6000))]);
+    if ((reg.installing || reg.waiting) && sola()) {
+      if (reg.installing) { alDescargar(); vigilar(reg.installing); }   // ofrecer() aplicará al terminar de instalarse
+      if (reg.waiting) ofrecer();
+    } else alDia();
     // También si se queda abierto mucho tiempo.
     setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
-  }).catch(e => { console.warn('Sin paquetes guardados:', e.message); });
+  }).catch(e => { console.warn('Sin paquetes guardados:', e.message); alDia(); });
+  return versionAlDia;
 }

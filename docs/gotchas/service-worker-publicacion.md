@@ -12,10 +12,11 @@
 ## Service worker (generado, no editar `sw.js` a mano)
 - Versión derivada del contenido; cada publicación usa una caché nueva y borra las viejas (`preparar-pages.mjs:16`).
 - Guarda TODO lo que la página descarga desde la primera visita; una recarga no vuelve a descargar (`:37`).
-- Versión nueva: baja en segundo plano solo los archivos cambiados y **espera**. Si está lista antes de que quien mira toque
-  la pantalla, la página la aplica sola y recarga (`js/util/paquetes.js`; como mucho una vez por minuto); si ya ha tocado,
-  solo con «Actualizar» (`skipWaiting` solo con `'aplicar'`). Con la copia vieja abierta en iPhone salía «Actualizar» y no
-  el estreno. Al verificar un arreglo en un móvil, comprobar la versión.
+- Versión nueva: la carga pregunta por ella (`reg.update()`, máx. 6 s, en paralelo) y **no deja empezar** (`await
+  versionAlDia` antes de `entrada.listo()`) hasta saberlo; si la hay, «Descargando la versión nueva del universo…», baja
+  solo lo cambiado, se aplica y recarga (máx. 45 s; una recarga por minuto). Ya dentro, solo con «Actualizar»
+  (`skipWaiting` solo con `'aplicar'`). Antes se entraba con la copia vieja: sin estreno y con «Actualizar».
+  Probar en local con dos `dist/` y fechas distintas: `http.server` responde 304 si el `sw.js` nuevo es del mismo segundo.
 - La página y sus paquetes salen siempre de la MISMA versión guardada (`:97`): no mezclar versiones.
 - Solo en HTTPS. En la red local (http) no hay service worker; `?sw=1` lo prueba en localhost (`js/util/paquetes.js:9`).
 - El giroscopio de iOS también necesita HTTPS.

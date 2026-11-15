@@ -47,8 +47,8 @@ const hoyArgentina = partesEnZona().fecha, clipHoy = consulta.has('sinIntro') ||
 const banda = crearBandaSonora({ volumen: () => CONFIG.volumen, cargaEn: clipHoy ? guionVuelta(clipHoy).id : null });
 if (location.hash === '#debug' || new URLSearchParams(location.search).has('pruebaAudio')) window.__bandaSonora = banda;
 // Paquetes guardados en el dispositivo desde el primer momento (también en la primera visita: lo que se descarga se
-// guarda mientras llega). Nunca recarga la página por sí solo.
-vigilarPaquetes();
+// guarda mientras llega). Si al abrir hay versión nueva, se descarga en la carga y se recarga sola antes de dejar empezar.
+const versionAlDia = vigilarPaquetes({ alDescargar: () => entrada.avisoCarga('Descargando la versión nueva del universo…') });
 // Descargas por prioridad (util/descargas.js): en la carga solo lo imprescindible (módulos, texturas horneadas, cálculos
 // horneados, el cielo mediano y las canciones de la intro y de los viajes). Todo lo demás —las canciones de los destinos y
 // sus estancias, el cielo grande, fuentes, módulos tardíos— va a una cola que solo descarga en los momentos libres
@@ -205,6 +205,7 @@ try {
   });
   // El videoclip del día, ya preparado y estrenado en la GPU durante la carga (detrás de la pantalla opaca): empieza sin esperas.
   if (clipHoy) { etapa = 'preparación del videoclip del día'; if (await escena.teatroVuelta.preparar(clipHoy)) { escena.teatroVuelta.fijar(0); escena.teatroVuelta.dibujar(); } }
+  etapa = 'comprobación de la versión'; await versionAlDia;
   entrada.listo();
   crearMedidor(escena);
   window.__medidor?.conectar(escena);

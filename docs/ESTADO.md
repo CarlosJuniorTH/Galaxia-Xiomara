@@ -3,6 +3,12 @@
 Lo nuevo arriba. Se consulta con `grep`; no se lee entero. Resumen por temas de `git log --oneline` (los hashes
 permiten ver el detalle con `git show <hash>`).
 
+## 2026-11-15 · La versión nueva llega en la carga, nunca con «Actualizar»
+
+- Al abrir con una copia vieja guardada, la pantalla de carga comprueba la versión y, si hay nueva, la descarga y recarga
+  antes de dejar empezar (`js/util/paquetes.js`, `js/main.js`). Probado en local con dos versiones: recarga a los 2–3 s,
+  también tocando la carga; sin botón. No probado en un teléfono.
+
 ## 2026-11-06 · Los clips, tejidos en luz como el cuásar; los estrenos son eventos
 
 - Motivo: el adelanto no gustó, y la primera versión con Tierra tampoco: «puntitos mal hechos», Tierra de dibujos, un sol que se volvía galaxia sin sentido.

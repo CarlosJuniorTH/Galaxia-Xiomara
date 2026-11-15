@@ -227,6 +227,8 @@ export function crearEntrada(config, { viaje, banda, estreno = null } = {}) {   
   if (location.hash === '#debug') window.__descargas = descargas;
   if (location.hash === '#debug') window.__intro = { fijar: t => { fijo = t; }, soltar: () => { fijo = null; }, get tiempo() { return ultimo; }, get empezado() { return empezado; }, get conCancion() { return conCancion; }, get mundo() { return portada.mundo; } };
   return {
+    // Un texto fijo en la pantalla de carga (la versión nueva descargándose): el contador de MB ya no lo pisa.
+    avisoCarga(texto) { textoFinal = true; textoCarga.textContent = texto; },
     progreso(f, hasta = f) {
       f = Math.max(0, Math.min(1, f)); meta = Math.max(meta, f); techo = Math.max(meta, Math.min(1, hasta));
       if (!animando) { animando = true; anterior = performance.now(); requestAnimationFrame(avanzar); }
