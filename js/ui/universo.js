@@ -518,9 +518,11 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     if (!dentroDeCelebracion) { if (panel.open) cerrarPanel(); celebrando = true; }
     // Si aún hay que prepararlo (desde el álbum), que se sepa: un toque sin respuesta parece un fallo.
     if (!alFinal && escena.teatroVuelta.guion !== guionVuelta(m)) avisar('Preparando el videoclip… ♡');
-    // (Se anota al verlo entero: si el teléfono lo interrumpe, no se pierde.)
+    // Se anota a los 6 s de empezar (si se recarga o se cierra a mitad, no vuelve a salir: cada estreno, una vez) o al acabar.
+    const marca = setTimeout(() => { if (teatro.activo) progreso.anotar('celebraciones', `clip-${m}`); }, 6000);
     if (alFinal) await teatro.reproducir(m, { alFinal: () => { progreso.anotar('celebraciones', `clip-${m}`); alFinal(); } });
     else if (await teatro.reproducir(m)) progreso.anotar('celebraciones', `clip-${m}`);
+    clearTimeout(marca);
     if (!dentroDeCelebracion) celebrando = false;
     const lugar = Object.keys(CLIP_DE_LUGAR).find(l => CLIP_DE_LUGAR[l] === m);
     if (lugar && actual === lugar) setTimeout(() => { if (actual === lugar && !escena.viajando) teatro.anticipar(m); }, 1200);
