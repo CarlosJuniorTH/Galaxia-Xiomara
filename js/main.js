@@ -25,6 +25,8 @@ import { ocupado, ocupadoSi } from './util/descargas.js';
 import { crearMedidor } from './ui/medidor.js';
 import { cargaTerminada, texturasLigeras } from './util/dispositivo.js';
 import { conDiagnostico } from './util/diag.js';
+import { abrirCartaEstreno } from './ui/cartaEstreno.js';
+import { CARTAS_ESTRENO } from './data/universo.js';
 
 // Medidor de fluidez (?fps, js/util/medidorFps.js): solo se carga con ?fps, antes que nada (cuenta toda subida a la GPU).
 if (new URLSearchParams(location.search).has('fps')) await import('./util/medidorFps.js');
@@ -59,7 +61,7 @@ document.title = `Nuestro pequeño infinito · ${CONFIG.nombre}`;
 const inicio = leerFecha(CONFIG.fechaInicio);
 const estrellas = estrellasDisponibles(CONFIG.fechaInicio);
 const viaje = crearViaje(almacen);
-const entrada = crearEntrada(CONFIG, { viaje, banda, estreno: clipHoy ? { pista: guionVuelta(clipHoy).id, reproducir: () => interfaz.verClip(clipHoy, { alFinal: () => { entrada.entrarTrasClip(); const n = novedadDeEstreno(clipHoy); if (n) setTimeout(() => interfaz.anunciarEvento(n), 4200); } }) } : null }), musica = crearMusica(CONFIG, banda), mensajes = crearMensajes(CONFIG), efectos = crearEfectos();
+const entrada = crearEntrada(CONFIG, { viaje, banda, estreno: clipHoy ? { pista: guionVuelta(clipHoy).id, reproducir: () => interfaz.verClip(clipHoy, { alFinal: async () => { if (CARTAS_ESTRENO[clipHoy]) await abrirCartaEstreno(CARTAS_ESTRENO[clipHoy]); entrada.entrarTrasClip(); const n = novedadDeEstreno(clipHoy); if (n) setTimeout(() => interfaz.anunciarEvento(n), 4200); } }) } : null }), musica = crearMusica(CONFIG, banda), mensajes = crearMensajes(CONFIG), efectos = crearEfectos();
 // La carga (y el clip) ocupan la cola hasta que la intro termina; entonces se encola el resto y empieza a bajar en reposo.
 // (La lista se pide ya, en la carga: es pequeña, y así no sale nada a la red si se entra enseguida.)
 const listaReposo = precargarEnReposo({ cieloAlto: !texturasLigeras, cuando: new Promise(r => entrada.trasIntro(r)), abiertas: [hoyArgentina >= '2026-11-15' && 'assets/musica/mes-11.m4a', hoyArgentina >= '2026-11-15' && 'assets/musica/mes-dossoles.m4a', hoyArgentina >= '2026-12-15' && 'assets/musica/mes-12.m4a'].filter(Boolean) });

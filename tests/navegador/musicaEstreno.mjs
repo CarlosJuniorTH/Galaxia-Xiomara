@@ -24,6 +24,10 @@ try {
   for (let i = 0; i < 4; i++) { await pagina.waitForTimeout(1000); await anotar(`clip ${i}`); }
   await pagina.evaluate(d => window.__galaxia.interfaz.teatro.saltar(d), 60);
   await pagina.waitForFunction(() => !document.body.classList.contains('en-teatro'), null, { timeout: 30000 });
+  // (Su carta: se abre y se cierra.)
+  await pagina.waitForSelector('.carta-estreno .sobre', { timeout: 10000 }); await anotar('carta');
+  await pagina.evaluate(() => document.querySelector('.carta-estreno .sobre').click()); await pagina.waitForTimeout(2000);
+  await pagina.evaluate(() => document.querySelector('.carta-estreno .carta-seguir').click());
   for (let i = 0; i < 12; i++) { await pagina.waitForTimeout(1000); await anotar(`tras el clip ${i}`); }
   console.log(linea.join('\n')); console.log('errores', errores.slice(0, 3));
 } finally { await navegador.close(); servidor.kill(); }

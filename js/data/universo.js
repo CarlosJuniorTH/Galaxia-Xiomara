@@ -132,3 +132,20 @@ export const CONSTELACIONES = [
   { id: 'encuentro', nombre: 'Una luz nos encontró', icono: '✧', texto: 'Una estrella para aquel comienzo: el día en que dos caminos encontraron un mismo cielo.', puntos: [[0,140,0],[27,43,8],[132,43,0],[49,-15,-8],[80,-111,0],[0,-52,8],[-80,-111,0],[-49,-15,-8],[-132,43,0],[-27,43,8],[0,140,0]] },
   { id: 'infinito', nombre: 'Lo que seguimos escribiendo', icono: '∞', texto: 'Un lazo abierto al futuro, hecho de pequeños momentos que todavía queremos compartir.', puntos: Array.from({length:13},(_,i)=>{const a=i/12*Math.PI*2;return [145*Math.cos(a)/(1+Math.sin(a)**2),145*Math.sin(a)*Math.cos(a)/(1+Math.sin(a)**2),Math.sin(a)*12];}) }
 ];
+
+// La carta que sigue al videoclip de cada estreno (js/ui/cartaEstreno.js), por su clave (js/util/guionVuelta.js, ESTRENOS).
+// BORRADOR para que Carlos lo cambie a su gusto: sin recuerdos inventados, solo lo que el universo ya cuenta.
+export const CARTAS_ESTRENO = {
+  dossoles: {
+    para: 'Mi Xio:',
+    parrafos: [
+      'Hoy hace once meses que el universo decidió juntarnos, y todavía me parece increíble que, de todas las personas del mundo, me tocara la suerte de encontrarte a ti.',
+      'Entre Barcelona y Buenos Aires hay 10.466 kilómetros, un océano entero y unos relojes que nunca se ponen de acuerdo. Y aun así no hay un solo día en que no te sienta cerca. Eres lo primero que pienso al despertar y lo último antes de dormir.',
+      'En estos once meses me has enseñado que la distancia no mide lo que siente el corazón. Que se puede abrazar con palabras, cuidar con un mensaje a deshoras y estar presente aunque haya un mar en medio.',
+      'Gracias por tu paciencia, por tu risa, por quedarte en los días difíciles y por elegirme también en los días normales. Gracias por hacerme sentir en casa sin estar en el mismo sitio.',
+      'Este universo lo hice para ti porque no me cabía en el pecho todo lo que siento. Cada estrella, cada canción y cada rincón son una forma de decirte lo mismo: te quiero, y te quiero más con cada mes que pasa.',
+      'Falta un mes para nuestra primera vuelta al Sol y ya estoy deseando dar contigo todas las que vengan, hasta que la distancia sea solo un recuerdo bonito de cómo empezamos.'
+    ],
+    firma: 'Tuyo, en este y en todos los cielos,\nCarlos ♡'
+  }
+};

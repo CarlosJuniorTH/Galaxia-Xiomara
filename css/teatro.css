@@ -45,3 +45,27 @@ body.dia-anio #btn-entrar{border-color:#d9ae62}
 .evento-aviso{right:auto;left:18px;opacity:0;transform:translateY(8px);transition:opacity .7s ease,transform .7s ease}
 .evento-aviso.visible{opacity:1;transform:none}
 body.en-ruta .evento-aviso,body.en-calma .evento-aviso{display:none}
+/* La carta tras el videoclip de estreno (js/ui/cartaEstreno.js): negro, un sobre con su corazón y la carta que sube. */
+.carta-estreno{position:fixed;inset:0;z-index:1200;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .8s ease;color:#4a2a2a}
+.carta-estreno.saliendo{opacity:0}
+/* (El negro, al instante: tapa la portada desde el primer cuadro; solo el sobre aparece despacio.) */
+.carta-estreno:not(.visible) .sobre,.carta-estreno:not(.visible) .sobre-pie{opacity:0}
+.carta-estreno .sobre{position:relative;width:min(76vw,340px);aspect-ratio:1.5;border:0;padding:0;background:none;cursor:pointer;perspective:900px;transition:transform 1s ease,opacity .8s ease .3s;animation:sobre-respira 3.2s ease-in-out infinite}
+@keyframes sobre-respira{50%{transform:translateY(-6px)}}
+.carta-estreno .sobre-cuerpo{position:absolute;inset:0;border-radius:6px;background:linear-gradient(160deg,#f6e6d2,#e8cdb0);box-shadow:0 18px 40px rgba(0,0,0,.6)}
+.carta-estreno .sobre-cuerpo::before{content:'';position:absolute;inset:0;border-radius:6px;background:linear-gradient(to top right,transparent 49.6%,rgba(120,70,50,.18) 50%,transparent 50.4%),linear-gradient(to top left,transparent 49.6%,rgba(120,70,50,.18) 50%,transparent 50.4%)}
+.carta-estreno .sobre-solapa{position:absolute;left:0;right:0;top:0;height:58%;background:linear-gradient(180deg,#efd9bf,#e2c3a2);clip-path:polygon(0 0,100% 0,50% 100%);transform-origin:50% 0;transition:transform 1s cubic-bezier(.5,0,.2,1);z-index:2}
+.carta-estreno .sobre-sello{position:absolute;left:50%;top:58%;width:19%;transform:translate(-50%,-50%);z-index:3;fill:#d63a6e;stroke:#a51d4d;stroke-width:1.2;transition:opacity .4s ease;animation:sello-late 1.25s ease-in-out infinite}
+@keyframes sello-late{0%,100%{transform:translate(-50%,-50%) scale(1)}15%{transform:translate(-50%,-50%) scale(1.12)}30%{transform:translate(-50%,-50%) scale(1)}45%{transform:translate(-50%,-50%) scale(1.08)}}
+.carta-estreno .sobre-pie{margin-top:2.2rem;font:italic 500 clamp(1.05rem,4.6vw,1.35rem)/1.3 'Cormorant Garamond',Georgia,serif;color:#f4d9b4;transition:opacity .5s ease}
+.carta-estreno.abierta .sobre{animation:none}
+.carta-estreno.abierta .sobre-solapa{transform:rotateX(180deg)}
+.carta-estreno.abierta .sobre-sello,.carta-estreno.abierta .sobre-pie{opacity:0}
+.carta-estreno.leyendo .sobre{transform:translateY(40vh) scale(.9);opacity:0}
+.carta-estreno .carta-papel{position:absolute;left:50%;top:50%;width:min(88vw,520px);max-height:84vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:2rem 1.6rem 1.6rem;box-sizing:border-box;border-radius:6px;background:linear-gradient(175deg,#fbf3e8,#f1e2cd);box-shadow:0 20px 50px rgba(0,0,0,.7);transform:translate(-50%,-30%) scale(.86);opacity:0;pointer-events:none;transition:transform 1.2s cubic-bezier(.2,.8,.2,1),opacity .9s ease;text-align:left}
+.carta-estreno.leyendo .carta-papel{transform:translate(-50%,-50%) scale(1);opacity:1;pointer-events:auto}
+.carta-estreno .carta-texto h2{margin:0 0 1rem;font:400 clamp(2rem,9vw,2.6rem)/1.1 'Great Vibes',cursive;color:#a51d4d}
+.carta-estreno .carta-texto p{margin:0 0 .9rem;font:500 clamp(1.08rem,4.5vw,1.25rem)/1.45 'Cormorant Garamond',Georgia,serif;color:#4a2a2a}
+.carta-estreno .carta-texto .carta-firma{margin-top:1.4rem;text-align:right;font:400 clamp(1.6rem,7vw,2rem)/1.2 'Great Vibes',cursive;color:#a51d4d;white-space:pre-line}
+.carta-estreno .carta-seguir{display:block;margin:1.2rem auto 0;padding:.75rem 1.4rem;border:1px solid #c58a6a;border-radius:999px;background:#fff8ef;font:600 .95rem/1 'Quicksand',sans-serif;letter-spacing:.04em;color:#8a3550;cursor:pointer}
+@media (prefers-reduced-motion:reduce){.carta-estreno .sobre,.carta-estreno .sobre-sello{animation:none}}

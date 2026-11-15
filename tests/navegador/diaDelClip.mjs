@@ -33,6 +33,17 @@ export default async function ({ base, informe: inf }) {
       inf.comprobar(await pagina.evaluate(k => !window.__galaxia.progreso.tiene('celebraciones', `clip-${k}`) && !document.body.classList.contains('dentro'), clave), `${nombre}: durante el clip aún no está dentro ni anotado`);
       await pagina.evaluate(d => window.__galaxia.interfaz.teatro.saltar(d), dura - 6);
       await pagina.waitForFunction(() => !document.body.classList.contains('en-teatro'), null, { timeout: 20000 });
+      // Dos soles: antes de la galaxia, su carta en un sobre cerrado; al tocarlo se abre y se lee; su botón lleva a casa.
+      if (clave === 'dossoles') {
+        await pagina.waitForSelector('.carta-estreno.visible .sobre', { timeout: 10000 });
+        const cerrada = await pagina.evaluate(() => ({ dentro: document.body.classList.contains('dentro'), fondo: getComputedStyle(document.querySelector('.carta-estreno')).backgroundColor }));
+        await pagina.screenshot({ path: `${CAP}-${perfil}-sobre.png` });
+        await pagina.evaluate(() => document.querySelector('.carta-estreno .sobre').click()); await pagina.waitForTimeout(2600);   // (flota: el clic de Playwright esperaría a que pare)
+        const abierta = await pagina.evaluate(() => { const p = document.querySelector('.carta-papel'), r = p.getBoundingClientRect(); return { leyendo: document.querySelector('.carta-estreno').classList.contains('leyendo'), cabe: r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight, parrafos: p.querySelectorAll('p').length }; });
+        await pagina.screenshot({ path: `${CAP}-${perfil}-carta.png` });
+        inf.comprobar(!cerrada.dentro && cerrada.fondo === 'rgb(0, 0, 0)' && abierta.leyendo && abierta.cabe && abierta.parrafos > 3, `${nombre}: tras el clip, su carta en el sobre; se abre y se lee entera`, { cerrada, abierta });
+        await pagina.evaluate(() => document.querySelector('.carta-estreno .carta-seguir').click());
+      }
       await pagina.waitForFunction(() => document.body.classList.contains('dentro') && !window.__galaxia.escena.viajando, null, { timeout: 20000 });
       await pagina.waitForTimeout(1500);
       const tras = await pagina.evaluate(k => ({ anotado: window.__galaxia.progreso.tiene('celebraciones', `clip-${k}`), entrada: getComputedStyle(document.getElementById('entrada')).display, lugar: JSON.parse(localStorage.getItem('xiomara:universo:v2:lugar') || '{}').destino, nombre: document.getElementById('lugar-nombre')?.textContent || '' }), clave);
