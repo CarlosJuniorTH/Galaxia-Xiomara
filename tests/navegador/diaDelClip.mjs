@@ -10,7 +10,9 @@ export default async function ({ base, informe: inf }) {
     try {
       await fijarFecha(pagina, fecha);
       // Quien la última vez estaba en Deneb: al acabar el clip ha de quedar en casa, no ahí.
-      await pagina.addInitScript(() => { if (!sessionStorage.getItem('sembrado')) { sessionStorage.setItem('sembrado', '1'); localStorage.setItem('xiomara:universo:v2:lugar', JSON.stringify({ destino: 'deneb', fecha: Date.now() })); } });
+      // Y quien vio Dos soles antes de que tuviera carta (marca vieja «clip-dossoles»): el estreno reiniciado le sale otra vez.
+      await pagina.addInitScript(([vieja, version]) => { if (!sessionStorage.getItem('sembrado')) { sessionStorage.setItem('sembrado', '1'); localStorage.setItem('xiomara:universo:v2:lugar', JSON.stringify({ destino: 'deneb', fecha: Date.now() }));
+        if (vieja) localStorage.setItem('xiomara:universo:v2', JSON.stringify({ version, celebraciones: ['clip-dossoles'] })); } }, [clave === 'dossoles', 2]);   // (2: la versión del guardado, js/util/progreso.js)
       await pagina.goto(`${base}/?calidad=alta#debug`);
       await pagina.waitForSelector('#toque:not([hidden])', { timeout: 30000 });
       await pagina.click('#toque');
@@ -30,7 +32,7 @@ export default async function ({ base, informe: inf }) {
       await pagina.waitForTimeout(2000);
       await pagina.screenshot({ path: `.pruebas/capturas/estreno-${nombre.replace(/ /g, '-')}.png` });   // (el primer plano real del evento: la Tierra con sus texturas, no una bola lisa)
       await pagina.screenshot({ path: `${CAP}-${perfil}.png` });
-      inf.comprobar(await pagina.evaluate(k => !window.__galaxia.progreso.tiene('celebraciones', `clip-${k}`) && !document.body.classList.contains('dentro'), clave), `${nombre}: durante el clip aún no está dentro ni anotado`);
+      inf.comprobar(await pagina.evaluate(k => !window.__galaxia.progreso.tiene('celebraciones', k) && !document.body.classList.contains('dentro'), clave === 'dossoles' ? 'estreno-dossoles-v2' : 'estreno-12'), `${nombre}: durante el clip aún no está dentro ni anotado`);
       await pagina.evaluate(d => window.__galaxia.interfaz.teatro.saltar(d), dura - 6);
       await pagina.waitForFunction(() => !document.body.classList.contains('en-teatro'), null, { timeout: 20000 });
       // Dos soles: antes de la galaxia, su carta en un sobre cerrado; al tocarlo se abre y se lee; su botón lleva a casa.

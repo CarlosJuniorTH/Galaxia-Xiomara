@@ -185,8 +185,11 @@ export const MESES_CON_CLIP = [11, 12];
 // entró, espera a la primera visita dentro de su plazo: un regalo así no se pierde por no abrirlo a tiempo.
 const ESTRENOS = [
   { clave: 12, desde: '2026-12-15', hasta: '2027-01-14', lugar: 'vuelta', novedad: 'Se ha abierto un lugar nuevo', nombre: 'Nuestra primera vuelta', texto: 'Una órbita cerrada, con sus trece estrellas, que seguirá aquí todos los años que vengan.' },
-  { clave: 'dossoles', desde: '2026-11-15', hasta: '2026-12-14', lugar: 'dossoles', novedad: 'Se ha abierto un lugar nuevo', nombre: 'Dos soles', texto: 'Las dos estrellas que acabas de ver ya viven en tu universo, girando juntas para siempre.' }
+  { clave: 'dossoles', vuelta: 2, desde: '2026-11-15', hasta: '2026-12-14', lugar: 'dossoles', novedad: 'Se ha abierto un lugar nuevo', nombre: 'Dos soles', texto: 'Las dos estrellas que acabas de ver ya viven en tu universo, girando juntas para siempre.' }
 ];
+// La marca de «ya visto» de cada estreno. Subir su `vuelta` lo reinicia: en cada dispositivo vuelve a salir una vez (Dos soles: 2,
+// para que se viera con su carta, publicada después).
+export const marcaEstreno = clave => { const e = ESTRENOS.find(x => x.clave === clave); return `estreno-${clave}${e?.vuelta > 1 ? `-v${e.vuelta}` : ''}`; };
 // Lo que el evento deja en el universo: se anuncia al llegar a casa, como cuando un juego abre un mundo nuevo.
 export const novedadDeEstreno = clave => ESTRENOS.find(e => e.clave === clave) || null;
 export const clipDeEstreno = (fecha, visto = () => false) => ESTRENOS.find(e => fecha >= e.desde && fecha <= e.hasta && !visto(e.clave))?.clave ?? 0;

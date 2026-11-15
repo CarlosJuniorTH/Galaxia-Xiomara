@@ -497,15 +497,16 @@ export function crearInterfazUniverso({ config, escena, progreso, recuerdos, est
     r.classList.add('visible');
   }
   const clipPendiente = m => !!guionVuelta(m) && !progreso.tiene('celebraciones', `clip-${m}`);
-  async function verClip(m, { dentroDeCelebracion = false, alFinal } = {}) {
+  async function verClip(m, { dentroDeCelebracion = false, alFinal, marcaExtra = null } = {}) {
     if (!guionVuelta(m) || teatro.activo || (!dentroDeCelebracion && (celebrando || tour || escena.viajando))) return;
     if (!dentroDeCelebracion) { if (panel.open) cerrarPanel(); celebrando = true; }
     // Si aún hay que prepararlo (desde el álbum), que se sepa: un toque sin respuesta parece un fallo.
     if (!alFinal && escena.teatroVuelta.guion !== guionVuelta(m)) avisar('Preparando el videoclip… ♡');
     // Se anota a los 6 s de empezar (si se recarga o se cierra a mitad, no vuelve a salir: cada estreno, una vez) o al acabar.
-    const marca = setTimeout(() => { if (teatro.activo) progreso.anotar('celebraciones', `clip-${m}`); }, 6000);
-    if (alFinal) await teatro.reproducir(m, { alFinal: () => { progreso.anotar('celebraciones', `clip-${m}`); alFinal(); } });
-    else if (await teatro.reproducir(m)) progreso.anotar('celebraciones', `clip-${m}`);
+    const anotar = () => { progreso.anotar('celebraciones', `clip-${m}`); if (marcaExtra) progreso.anotar('celebraciones', marcaExtra); };   // (marcaExtra: la del estreno)
+    const marca = setTimeout(() => { if (teatro.activo) anotar(); }, 6000);
+    if (alFinal) await teatro.reproducir(m, { alFinal: () => { anotar(); alFinal(); } });
+    else if (await teatro.reproducir(m)) anotar();
     clearTimeout(marca);
     if (!dentroDeCelebracion) celebrando = false;
     const lugar = Object.keys(CLIP_DE_LUGAR).find(l => CLIP_DE_LUGAR[l] === m);

@@ -8,7 +8,7 @@ import { crearContador } from './ui/contador.js';
 import { crearMensajes } from './ui/mensajes.js';
 import { crearCarta } from './ui/carta.js';
 import { crearRecuerdos } from './ui/recuerdos.js';
-import { guionVuelta, clipDeEstreno, novedadDeEstreno } from './util/guionVuelta.js';
+import { guionVuelta, clipDeEstreno, novedadDeEstreno, marcaEstreno } from './util/guionVuelta.js';
 import './util/horno.js';   // empieza a descargar los cálculos horneados en cuanto arranca la página
 import { crearEfectos } from './ui/efectos.js';
 import { escucharToques } from './ui/toques.js';
@@ -43,7 +43,7 @@ let almacen;
 try { almacen = localStorage; } catch { almacen = { getItem() { return null; }, setItem() { throw Error('No disponible'); } }; }
 const progreso = crearProgreso(almacen, texto => interfaz?.avisar(texto));
 const consulta = new URLSearchParams(location.search), repetirEstreno = consulta.has('estreno') && !/github\.io$/.test(location.hostname);
-const hoyArgentina = partesEnZona().fecha, clipHoy = consulta.has('sinIntro') || consulta.has('sinEstreno') ? 0 : clipDeEstreno(hoyArgentina, c => !repetirEstreno && progreso.tiene('celebraciones', `clip-${c}`));
+const hoyArgentina = partesEnZona().fecha, clipHoy = consulta.has('sinIntro') || consulta.has('sinEstreno') ? 0 : clipDeEstreno(hoyArgentina, c => !repetirEstreno && progreso.tiene('celebraciones', marcaEstreno(c)));
 const banda = crearBandaSonora({ volumen: () => CONFIG.volumen, cargaEn: clipHoy ? guionVuelta(clipHoy).id : null });
 if (location.hash === '#debug' || new URLSearchParams(location.search).has('pruebaAudio')) window.__bandaSonora = banda;
 // Paquetes guardados en el dispositivo desde el primer momento (también en la primera visita: lo que se descarga se
@@ -61,7 +61,7 @@ document.title = `Nuestro pequeño infinito · ${CONFIG.nombre}`;
 const inicio = leerFecha(CONFIG.fechaInicio);
 const estrellas = estrellasDisponibles(CONFIG.fechaInicio);
 const viaje = crearViaje(almacen);
-const entrada = crearEntrada(CONFIG, { viaje, banda, estreno: clipHoy ? { pista: guionVuelta(clipHoy).id, reproducir: () => interfaz.verClip(clipHoy, { alFinal: async () => { if (CARTAS_ESTRENO[clipHoy]) await abrirCartaEstreno(CARTAS_ESTRENO[clipHoy]); entrada.entrarTrasClip(); const n = novedadDeEstreno(clipHoy); if (n) setTimeout(() => interfaz.anunciarEvento(n), 4200); } }) } : null }), musica = crearMusica(CONFIG, banda), mensajes = crearMensajes(CONFIG), efectos = crearEfectos();
+const entrada = crearEntrada(CONFIG, { viaje, banda, estreno: clipHoy ? { pista: guionVuelta(clipHoy).id, reproducir: () => interfaz.verClip(clipHoy, { marcaExtra: marcaEstreno(clipHoy), alFinal: async () => { if (CARTAS_ESTRENO[clipHoy]) await abrirCartaEstreno(CARTAS_ESTRENO[clipHoy]); entrada.entrarTrasClip(); const n = novedadDeEstreno(clipHoy); if (n) setTimeout(() => interfaz.anunciarEvento(n), 4200); } }) } : null }), musica = crearMusica(CONFIG, banda), mensajes = crearMensajes(CONFIG), efectos = crearEfectos();
 // La carga (y el clip) ocupan la cola hasta que la intro termina; entonces se encola el resto y empieza a bajar en reposo.
 // (La lista se pide ya, en la carga: es pequeña, y así no sale nada a la red si se entra enseguida.)
 const listaReposo = precargarEnReposo({ cieloAlto: !texturasLigeras, cuando: new Promise(r => entrada.trasIntro(r)), abiertas: [hoyArgentina >= '2026-11-15' && 'assets/musica/mes-11.m4a', hoyArgentina >= '2026-11-15' && 'assets/musica/mes-dossoles.m4a', hoyArgentina >= '2026-12-15' && 'assets/musica/mes-12.m4a'].filter(Boolean) });

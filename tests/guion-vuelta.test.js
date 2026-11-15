@@ -82,3 +82,13 @@ test('los dos soles giran alrededor de la cinta, no a través de ella', async ()
   }
   assert.equal(giroPareja([0, 0], 0, 1.75)[1], 0);                   // en el centro de la galaxia no hay línea: en el plano
 });
+
+test('estreno reiniciado: la marca nueva ignora la vieja', async () => {
+  const { marcaEstreno } = await import('../js/util/guionVuelta.js');
+  assert.equal(marcaEstreno('dossoles'), 'estreno-dossoles-v2');
+  assert.equal(marcaEstreno(12), 'estreno-12');
+  const vistos = new Set(['clip-dossoles']);   // (quien lo vio antes de la carta)
+  assert.equal(clipDeEstreno('2026-11-15', c => vistos.has(marcaEstreno(c))), 'dossoles');
+  vistos.add(marcaEstreno('dossoles'));
+  assert.equal(clipDeEstreno('2026-11-15', c => vistos.has(marcaEstreno(c))), 0);
+});
