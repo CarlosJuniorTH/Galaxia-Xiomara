@@ -23,9 +23,14 @@ export function abrirCartaEstreno({ para, parrafos, firma }) {
       raiz.classList.add('abierta');                                   // la solapa se abre…
       setTimeout(() => { raiz.classList.add('leyendo'); raiz.querySelector('.carta-seguir').focus({ preventScroll: true }); }, 1100);   // …y sube la carta
     });
-    raiz.querySelector('.carta-seguir').addEventListener('click', () => {
-      raiz.classList.add('saliendo');
-      setTimeout(() => { raiz.remove(); fin(); }, 900);
-    });
+    // La carta se guarda y, a la vez, la galaxia arranca debajo (fin() ya): el negro no se levanta hasta que hay galaxia que ver,
+    // así nunca asoma la portada.
+    const seguir = raiz.querySelector('.carta-seguir');
+    seguir.addEventListener('click', () => {
+      if (raiz.classList.contains('guardando')) return;
+      raiz.classList.add('guardando'); fin();
+      setTimeout(() => raiz.classList.add('saliendo'), 900);
+      setTimeout(() => raiz.remove(), 1800);
+    }, { once: true });
   });
 }

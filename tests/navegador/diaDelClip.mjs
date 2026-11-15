@@ -42,7 +42,10 @@ export default async function ({ base, informe: inf }) {
         const abierta = await pagina.evaluate(() => { const p = document.querySelector('.carta-papel'), r = p.getBoundingClientRect(); return { leyendo: document.querySelector('.carta-estreno').classList.contains('leyendo'), cabe: r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight, parrafos: p.querySelectorAll('p').length }; });
         await pagina.screenshot({ path: `${CAP}-${perfil}-carta.png` });
         inf.comprobar(!cerrada.dentro && cerrada.fondo === 'rgb(0, 0, 0)' && abierta.leyendo && abierta.cabe && abierta.parrafos > 3, `${nombre}: tras el clip, su carta en el sobre; se abre y se lee entera`, { cerrada, abierta });
-        await pagina.evaluate(() => document.querySelector('.carta-estreno .carta-seguir').click());
+        // Al pulsar «Ir a nuestra galaxia» nunca asoma la portada: se vigila cada cuadro hasta que la carta desaparece.
+        const asoma = await pagina.evaluate(() => new Promise(f => { let visto = false; document.querySelector('.carta-estreno .carta-seguir').click();
+          const mira = () => { const c = document.querySelector('.carta-estreno'), e = document.getElementById('entrada'); if (e && getComputedStyle(e).display !== 'none' && (!c || +getComputedStyle(c).opacity < 0.98)) visto = true; if (c) requestAnimationFrame(mira); else f(visto); }; requestAnimationFrame(mira); }));
+        inf.comprobar(!asoma, `${nombre}: al cerrar la carta, directo a la galaxia sin que asome la portada`);
       }
       await pagina.waitForFunction(() => document.body.classList.contains('dentro') && !window.__galaxia.escena.viajando, null, { timeout: 20000 });
       await pagina.waitForTimeout(1500);
