@@ -86,7 +86,7 @@ export const MOMENTOS = {
     // Los videoclips de la primera vuelta al Sol (js/util/guionVuelta.js): tramos que el universo aún no había usado.
     11: momento({ archivo: 'mes-11.m4a', duracion: 38.85 }),
     12: momento({ archivo: 'mes-12.m4a', duracion: 98.01 }),
-    dossoles: momento({ archivo: 'mes-dossoles.m4a', duracion: 59.28 })
+    dossoles: momento({ archivo: 'mes-dossoles.m4a', duracion: 64.784 })
   }
 };
 

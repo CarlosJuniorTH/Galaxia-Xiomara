@@ -4,7 +4,7 @@ import { lanzar, fijarFecha } from './arnes.mjs';
 const CAP = '.pruebas/capturas/navegador/diaDelClip';
 const PREPARADO = () => document.getElementById('btn-entrar')?.classList.contains('preparado') && document.getElementById('entrada').classList.contains('cielo');
 export default async function ({ base, informe: inf }) {
-  for (const [perfil, nombre, fecha, clave, pista, dura] of [['movil430', 'Dos soles', '2026-11-15T10:00:00-03:00', 'dossoles', 'mes-dossoles', 59.28], ['pc', 'año', '2026-12-15T10:00:00-03:00', 12, 'mes-12', 98.01]]) {
+  for (const [perfil, nombre, fecha, clave, pista, dura] of [['movil430', 'Dos soles', '2026-11-15T10:00:00-03:00', 'dossoles', 'mes-dossoles', 64.784], ['pc', 'año', '2026-12-15T10:00:00-03:00', 12, 'mes-12', 98.01]]) {
     const { navegador, pagina, errores } = await lanzar(perfil, { musica: true });
     const pedidas = []; pagina.on('request', r => { const m = r.url().match(/musica\/([^?]+)/); if (m) pedidas.push(m[1]); });
     try {

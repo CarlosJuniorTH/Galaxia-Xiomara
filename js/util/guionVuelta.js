@@ -146,7 +146,7 @@ GUIONES.dossoles = {
     az: pistaSuave([[0, 0], [20, 26], [46, 56], [59.28, 60]]),
     el: pistaSuave([[0, 30], [30, 42], [46, 72], [59.28, 80]]),
     dist: pistaSuave([[0, 64], [20.62, 58], [30.93, 46], [46, 36], [59.28, 34]]),
-    distV: pistaSuave([[0, 56], [8, 57], [22, 66], [44, 74], [59.28, 79]]),
+    distV: pistaSuave([[0, 56], [8, 57], [22, 66], [31, 73], [44, 77], [59.28, 80]]),
     abre: () => 1,
     mira: [() => 0, () => 0, () => 0]
   },
@@ -163,6 +163,21 @@ GUIONES.dossoles = {
     { desde: 49.5, hasta: 57.5, clase: 'pie', texto: 'Once meses. Un solo cielo.' }
   ]
 };
+// La canción de «Dos soles» («Si te interesa», de 39,27 a 104,05 s): su estribillo entra a los 31,21 s, cuando se tocan; compás de
+// 2,3915 s (99,4 por minuto). El guion se diseñó con el golpe a 30,93 s y 59,28 s de largo: cada tramo (antes y después del golpe)
+// se estira hasta la canción; el latido y la onda van en segundos reales, al compás.
+{
+  const g = GUIONES.dossoles, NUEVO = { dur: 64.784, golpe: 31.21 }, VIEJO = { dur: 59.28, golpe: 30.93 }, COMPAS = 2.3915;
+  const aViejo = s => s < NUEVO.golpe ? s * VIEJO.golpe / NUEVO.golpe : VIEJO.golpe + (s - NUEVO.golpe) * (VIEJO.dur - VIEJO.golpe) / (NUEVO.dur - NUEVO.golpe);
+  const aNuevo = v => v < VIEJO.golpe ? v * NUEVO.golpe / VIEJO.golpe : NUEVO.golpe + (v - VIEJO.golpe) * (NUEVO.dur - NUEVO.golpe) / (VIEJO.dur - VIEJO.golpe);
+  for (const k of ['disco', 'flujo', 'infinito', 'alcance', 'espiral', 'cielo', 'sep', 'ang']) { const f = g[k]; g[k] = s => f(aViejo(s)); }
+  for (const k of ['az', 'el', 'dist', 'distV']) { const f = g.camara[k]; g.camara[k] = s => f(aViejo(s)); }
+  g.contacto = s => s < NUEVO.golpe ? -1 : s - NUEVO.golpe;
+  g.pulso = s => s < NUEVO.golpe ? 0 : Math.exp(-((s - NUEVO.golpe) % COMPAS) * 2.8);
+  g.textos = g.textos.map(t => ({ ...t, desde: +aNuevo(t.desde).toFixed(2), hasta: +aNuevo(t.hasta).toFixed(2) }));
+  g.etiquetas = { ...g.etiquetas, desde: aNuevo(g.etiquetas.desde), hasta: aNuevo(g.etiquetas.hasta) };
+  g.duracion = NUEVO.dur;
+}
 export const guionVuelta = clave => GUIONES[clave] || null;
 export const MESES_CON_CLIP = [11, 12];
 // Los estrenos: desde su fecha (de Argentina, 'AAAA-MM-DD'), la primera vez que se entra en cada dispositivo la intro sale como

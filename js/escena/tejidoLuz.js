@@ -72,7 +72,7 @@ export function crearPlasmaDosSoles() {
         float ho = exp(-pow((p.y - onda) / ancho, 2.0)), hr = exp(-pow((p.y + onda) / ancho, 2.0));
         float to = hebra(fbm3(vec3(p.x * 0.42 + uT * 0.8, (p.y - onda) * 2.2, 1.0)), 3.0), tr = hebra(fbm3(vec3(p.x * 0.42 - uT * 0.8, (p.y + onda) * 2.2, 6.0)), 3.0);
         float lo = ho * (0.12 + 0.62 * to), lr = hr * (0.12 + 0.62 * tr), suma = lo + lr + 0.001;
-        b += uFlujo * (lo + lr) * (1.0 - 0.45 * uInfinito);
+        b += uFlujo * (lo + lr) * (0.5 - 0.2 * uInfinito);   // (más alto, el puente se quemaba en una X blanca y plana)
         c = mix(c, (vec3(1.0, 0.68, 0.26) * lo + vec3(1.0, 0.38, 0.68) * lr) / suma, uFlujo * min(1.0, suma * 1.5) * 0.85);
       }
       // El infinito: se enciende desde el punto de contacto y dos luces lo recorren sin parar.
