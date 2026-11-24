@@ -29,10 +29,11 @@ import { abrirCartaEstreno } from './ui/cartaEstreno.js';
 import { CARTAS_ESTRENO } from './data/universo.js';
 
 // Medidor de fluidez (?fps, js/util/medidorFps.js): solo se carga con ?fps, antes que nada (cuenta toda subida a la GPU).
+window.__arrancado = true;   // los módulos de la página encajan (index.html: rescate)
 if (new URLSearchParams(location.search).has('fps')) await import('./util/medidorFps.js');
 let interfaz, escena, contemplacion, etapa = 'fuentes';
 const problema = texto => { document.getElementById('problema-texto').textContent = texto; document.getElementById('problema-3d').hidden = false; if (interfaz?.enRuta) interfaz.pausarRuta(true); };
-document.getElementById('reintentar-3d').addEventListener('click', () => location.reload());
+// («Reintentar» lo atiende index.html: también funciona si este módulo no llega a arrancar.)
 document.getElementById('compatible-3d').addEventListener('click', () => { const url = new URL(location.href); url.searchParams.set('calidad', 'compatible'); location.href = url.href; });
 window.addEventListener('unhandledrejection', e => { console.error('Universo:', e.reason); });
 // Banda sonora (js/data/bandaSonora.js): sus canciones de la carga empiezan a descargarse ya, antes que nada (sin archivos
@@ -223,6 +224,8 @@ try {
   }, 60000);
 } catch (e) {
   const informe = describirFallo(e, etapa);
+  // Si el fallo no es de la tarjeta gráfica puede ser la copia guardada: se limpia y se vuelve a abrir (una vez; index.html).
+  if (e?.name !== 'ContextoWebGLNoDisponible' && window.__rescate?.solo()) await new Promise(() => {});
   console.error('Arranque del universo:', informe, e); problema(informe.texto);
   document.getElementById('error-arranque').hidden = false;
   document.getElementById('error-arranque-texto').textContent = `${informe.etapa}\n${informe.tipo}: ${informe.mensaje}`;

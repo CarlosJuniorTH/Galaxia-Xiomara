@@ -29,3 +29,6 @@
 ## Rebases
 - Un rebase dejó una importación duplicada en `cosmos.js` y el universo no arrancaba (99d53e5): tras un rebase, abrir la
   página y pasar `npm test` (`npm run check` está roto, ver `docs/ESTADO.md`).
+- Nunca guardar ni reutilizar un archivo sin comprobar su huella, ni descartar media copia: entera o nada (`caducar`). Una
+  versión nueva pregunta «sana?» a las páginas; si ninguna contesta, las releva y recarga. El rescate de `index.html` no
+  depende de módulos y comprueba la red con HEAD (a un GET contesta la propia copia). `navegador/copiasViejas.mjs`.

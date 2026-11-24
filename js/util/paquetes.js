@@ -26,6 +26,9 @@ export function vigilarPaquetes({ dentro = () => document.body.classList.contain
   for (const t of ['pointerdown', 'keydown']) addEventListener(t, () => { tocado = true; }, { capture: true, once: true });
   const recargadaHace = () => { try { return Date.now() - Number(sessionStorage.getItem('xiomara:recarga-version') || 0); } catch { return 0; } };
   const sola = () => (enCarga || !tocado) && recargadaHace() > 60000;
+  // Una versión nueva pregunta si esta página funciona: con respuesta espera su turno; sin ella (copia rota) la releva.
+  navigator.serviceWorker.addEventListener('message', e => { if (e.data === 'sana?' && document.getElementById('problema-3d')?.hidden) e.ports[0]?.postMessage(1); });
+  navigator.serviceWorker.startMessages?.();
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (recargar) location.reload(); });
   navigator.serviceWorker.register('./sw.js').then(async reg => {
     const aplicar = () => { if (!reg.waiting) return; recargar = true; reg.waiting.postMessage('aplicar'); };

@@ -3,6 +3,14 @@
 Lo nuevo arriba. Se consulta con `grep`; no se lee entero. Resumen por temas de `git log --oneline` (los hashes
 permiten ver el detalle con `git show <hash>`).
 
+## 2026-11-25 · «Volvamos a encender el cielo» con datos guardados
+
+- Causa reproducida: una copia guardada a medias (los archivos que bajan antes de activarse el service worker no se
+  guardaban) + una publicación nueva = código de dos versiones mezclado; «Reintentar» recargaba la misma mezcla.
+- Arreglo: huella comprobada en todo lo que se guarda; la versión nueva releva sola a páginas viejas o rotas («sana?»);
+  rescate en `index.html` (una vez solo, «Reintentar» siempre; sin red no borra; nunca toca el progreso).
+- Probado en local con 6 versiones publicadas y copias rotas (`tests/navegador/copiasViejas.mjs`); no en un teléfono.
+
 ## 2026-11-15 · La versión nueva llega en la carga, nunca con «Actualizar»
 
 - Al abrir con una copia vieja guardada, la pantalla de carga comprueba la versión y, si hay nueva, la descarga y recarga

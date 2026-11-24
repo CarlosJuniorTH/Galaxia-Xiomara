@@ -59,13 +59,29 @@ await writeFile(path.join(destino, 'sw.js'), `// Generado por scripts/preparar-p
 // instalación se activa en el acto y guarda cada archivo según pasa; tras entrar, la página pide «completar» lo que
 // falte). Después el universo se abre desde ahí (también sin conexión) y una recarga no vuelve a descargar nada.
 // Una versión nueva descarga en segundo plano SOLO los archivos que cambiaron (el resto se copia de la versión guardada) y
-// espera: se aplica en la próxima visita o cuando quien mira pulsa «Actualizar» (nunca recarga la página por sí sola).
+// espera si hay una página sana abierta (contesta a «sana?»); si ninguna contesta (copia vieja o rota: no llega a arrancar)
+// la releva en el acto y la recarga. Nada se guarda ni se reutiliza sin comprobar su huella: mezclar archivos de dos
+// versiones dejaba la página en «Volvamos a encender el cielo» para siempre (25/11/2026).
 const VERSION = 'universo-${version}';
 const HUELLAS = ${JSON.stringify(huellas)};
 const MANIFIESTO = './__huellas.json';
 const BASE = new URL('./', self.location).href;
 const claveDe = url => { const u = new URL(url); u.search = ''; u.hash = ''; return u.href.startsWith(BASE) ? './' + u.href.slice(BASE.length) : null; };
 const huellaDe = async r => { const h = new Uint8Array(await crypto.subtle.digest('SHA-256', await r.clone().arrayBuffer())); return [...h.slice(0, 8)].map(b => b.toString(16).padStart(2, '0')).join(''); };
+// Descarga comprobada: si la red da otra versión (una copia intermedia atrasada), se pide otra vez sin copias; si sigue sin
+// coincidir, falla: mejor seguir con la versión entera de antes que guardar una mezcla.
+const bajar = async (url, h) => {
+  for (const dir of [url, url + '?v=' + h]) { const r = await fetch(dir, { cache: 'reload' }); if (r.ok && await huellaDe(r) === h) return r; }
+  throw new Error('No coincide con su versión: ' + url);
+};
+// ¿Alguna página abierta funciona? (Las rotas y las de antes de este cambio no contestan.)
+let sinRespuesta = [];
+const haySana = async () => {
+  const paginas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  const sanas = await Promise.all(paginas.map(p => new Promise(ok => { const c = new MessageChannel(); c.port1.onmessage = () => ok(true); setTimeout(() => ok(false), 1500); p.postMessage('sana?', [c.port2]); })));
+  sinRespuesta = paginas.filter((_, i) => !sanas[i]).map(p => p.id);
+  return sanas.includes(true);
+};
 self.addEventListener('install', e => { e.waitUntil((async () => {
   // Primera instalación (ninguna versión activa): sin descargas propias; se activa ya y guarda lo que la página pida.
   if (!self.registration.active) { await self.skipWaiting(); return; }
@@ -73,32 +89,34 @@ self.addEventListener('install', e => { e.waitUntil((async () => {
   for (const k of await caches.keys()) if (k.startsWith('universo-') && k !== VERSION) { const c = await caches.open(k), m = await c.match(MANIFIESTO); viejas.push({ c, h: m ? await m.json() : null }); }
   const pendientes = Object.entries(HUELLAS);
   const uno = async ([url, h]) => {
-    if (await nueva.match(url)) return;
-    for (const v of viejas) { const r = await v.c.match(url); if (r && (v.h ? v.h[url] === h : await huellaDe(r) === h)) { await nueva.put(url, r); return; } }
-    const r = await fetch(url, { cache: 'no-cache' }); if (!r.ok) throw new Error('No se pudo descargar ' + url);
-    await nueva.put(url, r);
+    const ya = await nueva.match(url); if (ya && await huellaDe(ya) === h) return;
+    for (const v of viejas) { const r = await v.c.match(url); if (r && (!v.h || v.h[url] === h) && await huellaDe(r) === h) { await nueva.put(url, r); return; } }
+    await nueva.put(url, await bajar(url, h));
   };
   // Cuatro descargas a la vez: sin saturar la conexión del teléfono.
   await Promise.all(Array.from({ length: 4 }, async () => { while (pendientes.length) await uno(pendientes.shift()); }));
   await nueva.put(MANIFIESTO, new Response(JSON.stringify(HUELLAS), { headers: { 'Content-Type': 'application/json' } }));
+  if (await haySana()) sinRespuesta = []; else await self.skipWaiting();
 })()); });
 self.addEventListener('activate', e => { e.waitUntil((async () => {
   for (const k of await caches.keys()) if (k.startsWith('universo-') && k !== VERSION) await caches.delete(k);
   await self.clients.claim();
+  // Las páginas viejas o rotas relevadas se abren de nuevo, ya enteras (sin esperarlas: su carga espera a esta activación).
+  for (const p of await self.clients.matchAll({ type: 'window' })) if (sinRespuesta.includes(p.id)) p.navigate(p.url).catch(() => {});
 })()); });
 // Completar (tras entrar, sin prisa): lo que aún no esté guardado se descarga de dos en dos y se comprueba con su huella
 // (un archivo de otra versión no se queda guardado como de esta). Lo ya guardado no se vuelve a leer: comprobar las
 // huellas de todo eran decenas de MB en memoria a la vez en el teléfono.
 let completando = null;
 async function completar() {
-  const c = await caches.open(VERSION), pendientes = Object.entries(HUELLAS);
+  const c = await caches.open(VERSION), pendientes = Object.entries(HUELLAS); let faltan = 0;
   const uno = async ([url, h]) => {
     if (await c.match(url)) return;
-    const r = await fetch(url, { cache: 'no-cache' }).catch(() => null);
-    if (r && r.ok && await huellaDe(r) === h) await c.put(url, r); else await c.delete(url);
+    const r = await bajar(url, h).catch(() => null);
+    if (r) await c.put(url, r); else faltan++;
   };
-  await Promise.all(Array.from({ length: 2 }, async () => { while (pendientes.length) { try { await uno(pendientes.shift()); } catch {} } }));
-  await c.put(MANIFIESTO, new Response(JSON.stringify(HUELLAS), { headers: { 'Content-Type': 'application/json' } }));
+  await Promise.all(Array.from({ length: 2 }, async () => { while (pendientes.length) { try { await uno(pendientes.shift()); } catch { faltan++; } } }));
+  if (!faltan) await c.put(MANIFIESTO, new Response(JSON.stringify(HUELLAS), { headers: { 'Content-Type': 'application/json' } }));
 }
 // Una petición de la página a un archivo que el service worker está guardando en ese momento espera a ese guardado en
 // lugar de pedirlo otra vez (enCurso): cada archivo, una sola descarga.
@@ -119,14 +137,34 @@ self.addEventListener('fetch', e => {
   const clave = peticion.mode === 'navigate' ? './' : claveDe(peticion.url);
   const listado = clave && HUELLAS[clave] !== undefined;
   // (Si se está guardando ahora mismo, se espera a ese guardado: una sola descarga.)
-  e.respondWith(caches.open(VERSION).then(c => c.match(clave || peticion, { ignoreSearch: true }).then(r => r || (clave && enCurso.has(clave) ? enCurso.get(clave).then(() => c.match(clave)) : null)).then(r => r || fetch(listado ? new Request(peticion, { cache: 'no-cache' }) : peticion).then(red => {
-    // Se guarda según llega (lo listado, revalidado con el servidor; lo que no está en la lista —el cielo grande, solo en
-    // el PC— la primera vez que se usa). La página de entrada se guarda al completar.
-    // (Mientras se guarda, otra petición al mismo archivo espera a este guardado.)
-    if (red.ok && red.status === 200 && peticion.mode !== 'navigate') { const g = c.put(clave || peticion, red.clone()).then(() => true, () => false); if (clave && !enCurso.has(clave)) { enCurso.set(clave, g); g.finally(() => enCurso.delete(clave)); } }
-    return red;
-  }))));
+  e.respondWith(servir(peticion, clave, listado));
 });
+// Si lo publicado ya es otra versión y aquí falta algo, esta copia incompleta se descarta ENTERA: desde ahí todo sale de la
+// red (una sola versión) hasta que el service worker nuevo la releve.
+const CADUCA = './__caduca';
+async function caducar(c) { for (const k of await c.keys()) await c.delete(k); await c.put(CADUCA, new Response('1')); self.registration.update().catch(() => {}); }
+async function servir(peticion, clave, listado) {
+  const c = await caches.open(VERSION);
+  const directa = () => fetch(!listado ? peticion : peticion.mode === 'navigate' ? new Request(peticion.url, { cache: 'no-cache' }) : new Request(peticion, { cache: 'no-cache' }));
+  if (await c.match(CADUCA)) return directa();
+  let r = await c.match(clave || peticion, { ignoreSearch: true });
+  // (Si se está guardando ahora mismo, se espera a ese guardado: una sola descarga.)
+  if (!r && clave && enCurso.has(clave)) { await enCurso.get(clave); r = await c.match(clave); }
+  if (r) return r;
+  const red = await directa();
+  if (!red.ok || red.status !== 200) return red;
+  // Se guarda según llega, solo si es de esta versión (lo que no está en la lista —el cielo grande, solo en el PC— tal cual).
+  const copia = red.clone();
+  const guardar = async () => {
+    if (!listado) { if (peticion.mode !== 'navigate') await c.put(clave || peticion, copia); return; }
+    if (await huellaDe(copia) === HUELLAS[clave]) await c.put(clave, copia); else await caducar(c);
+  };
+  const g = guardar().catch(() => {});
+  if (clave && !enCurso.has(clave)) { enCurso.set(clave, g); g.finally(() => enCurso.delete(clave)); }
+  // La página espera la comprobación antes de pedir sus módulos: si ya es otra versión, la copia se ha descartado.
+  if (peticion.mode === 'navigate') await g;
+  return red;
+}
 `);
 console.log(`App sin conexión: ${archivos.length} archivos en la caché ${version}.`);
 console.log('dist/ preparado para GitHub Pages. No se ha publicado ni enviado ningún archivo.');

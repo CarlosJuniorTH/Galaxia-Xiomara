@@ -31,6 +31,42 @@
   <script>{ const f = !/github\.io$/.test(location.hostname) && new URLSearchParams(location.search).get('fecha'), t = f && Date.parse(/T/.test(f) ? f : f + 'T12:00:00');
     if (t) { const D = Date, desfase = t - D.now(); window.Date = class extends D { constructor(...a) { super(...(a.length ? a : [D.now() + desfase])); } static now() { return D.now() + desfase; } }; } }</script>
   <script>if (!(window.HTMLScriptElement && HTMLScriptElement.supports && HTMLScriptElement.supports('importmap'))) { const s = document.createElement('script'); s.async = true; s.src = 'assets/vendor/es-module-shims.js'; document.head.appendChild(s); }</script>
+  <script>
+  // Rescate (no depende de ningún módulo): si la página no arranca por su copia guardada, la descarta, trae los archivos de
+  // nuevo de la red y se abre otra vez. Nunca toca el progreso (localStorage). Sola, una vez cada 10 min; «Reintentar», siempre.
+  window.__rescate = (function () {
+    var enMarcha = false, CLAVE = 'xiomara:rescate';
+    function tope(p, ms) { return Promise.race([p, new Promise(function (r) { setTimeout(r, ms); })]).catch(function () {}); }
+    function pulsado() {
+      if (enMarcha) return; enMarcha = true;
+      var b = document.getElementById('reintentar-3d'); if (b) { b.disabled = true; b.textContent = 'Encendiendo el cielo…'; }
+      // Sin conexión no se borra nada: la copia guardada es lo único que hay. (HEAD: el service worker no lo atiende; con GET
+      // contestaba la propia copia y parecía que había red.)
+      fetch('paquetes.json?r=' + Date.now(), { method: 'HEAD', cache: 'no-store' }).then(function (r) { if (!r.ok) throw 0; return fetch('paquetes.json', { cache: 'no-store' }); }).then(function (r) { return r.json(); }).then(function (lista) {
+        var sw = navigator.serviceWorker, limpiar = [];
+        if (window.caches) limpiar.push(caches.keys().then(function (ks) { return Promise.all(ks.filter(function (k) { return k.indexOf('universo-') === 0; }).map(function (k) { return caches.delete(k); })); }));
+        if (sw) limpiar.push(sw.getRegistrations().then(function (rs) { return Promise.all(rs.filter(function (x) { return location.href.indexOf(x.scope) === 0; }).map(function (x) { return x.unregister(); })); }));
+        return tope(Promise.all(limpiar), 5000).then(function () {
+          // (También la copia corriente del navegador: GitHub Pages deja 10 min cada archivo.)
+          return tope(Promise.all(Object.keys(lista).filter(function (u) { return /\.(js|css)$/.test(u); }).map(function (u) { return fetch(u, { cache: 'reload' }).catch(function () {}); })), 20000);
+        });
+      }).catch(function () {}).then(function () { var u = new URL(location.href); u.searchParams.set('r', Date.now()); u.searchParams.delete('calidad'); location.replace(u.href); });
+    }
+    function solo() {
+      try { if (Date.now() - Number(localStorage.getItem(CLAVE) || 0) < 600000) return false; localStorage.setItem(CLAVE, Date.now()); if (!localStorage.getItem(CLAVE)) return false; } catch (e) { return false; }
+      pulsado(); return true;
+    }
+    // Un módulo que no existe o no encaja con los demás: main.js no llega a ejecutarse y nadie mostraría nada.
+    function noArranca() {
+      if (window.__arrancado || enMarcha || solo()) return;
+      var p = document.getElementById('problema-3d'), t = document.getElementById('problema-texto'); if (!p) return;
+      t.textContent = 'No se ha podido abrir el universo. Tu progreso está guardado. Pulsa «Reintentar» para descargarlo de nuevo.'; p.hidden = false;
+    }
+    addEventListener('error', function (e) { if (window.__arrancado) return; if (e.target && e.target.tagName === 'SCRIPT' ? e.target.type === 'module' : /SyntaxError|does not provide|import|module/i.test(e.message || '')) noArranca(); }, true);
+    document.addEventListener('click', function (e) { if (e.target && e.target.closest && e.target.closest('#reintentar-3d')) pulsado(); });
+    return { solo: solo, pulsado: pulsado };
+  })();
+  </script>
   <script type="importmap">
   {"imports":{"three":"./assets/vendor/three/three.module.min.js","three/addons/":"./assets/vendor/three/addons/"}}
   </script>
