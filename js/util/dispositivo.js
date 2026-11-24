@@ -47,6 +47,11 @@ if (typeof addEventListener === 'function') {
 // Texturas a la medida de la pantalla: el móvil usa los mismos tamaños que el PC (sus objetos se ven igual de grandes o más
 // en su pantalla; con la mitad se veían borrosos). Solo tras un cierre por memoria (modo seguro) se usan las reducidas.
 export const texturasLigeras = nivelSeguro >= 1;
+// Gráficos perdidos (memoria): la visita siguiente arranca un nivel más ligera. Se deja de vigilar la carga para que el pagehide
+// de «Reintentar» no borre esta nota (arrancaba igual de pesada y volvía a caer, en bucle).
+export function graficosPerdidos() { cargando = false; marcarCarga(true); }
+// Un fallo que no es de memoria no cuenta como cierre: la visita siguiente, con la calidad completa.
+export function falloAjeno() { cargando = false; marcarCarga(false); }
 export function cargaTerminada() {
   cargando = false;
   try { localStorage.setItem(CLAVE_CARGA, JSON.stringify({ enCurso: false, nivel: 0 })); } catch {}

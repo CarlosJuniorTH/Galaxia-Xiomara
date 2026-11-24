@@ -40,6 +40,8 @@
     function pulsado() {
       if (enMarcha) return; enMarcha = true;
       var b = document.getElementById('reintentar-3d'); if (b) { b.disabled = true; b.textContent = 'Encendiendo el cielo…'; }
+      // Un fallo de la tarjeta gráfica no es de la copia: se abre otra vez (más ligera) sin volver a descargarlo todo.
+      if (window.__rescate.soloRecargar) { location.reload(); return; }
       // Sin conexión no se borra nada: la copia guardada es lo único que hay. (HEAD: el service worker no lo atiende; con GET
       // contestaba la propia copia y parecía que había red.)
       fetch('paquetes.json?r=' + Date.now(), { method: 'HEAD', cache: 'no-store' }).then(function (r) { if (!r.ok) throw 0; return fetch('paquetes.json', { cache: 'no-store' }); }).then(function (r) { return r.json(); }).then(function (lista) {

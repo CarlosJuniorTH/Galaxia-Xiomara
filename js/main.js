@@ -15,7 +15,7 @@ import { escucharToques } from './ui/toques.js';
 import { crearProgreso } from './util/progreso.js';
 import { estrellasDisponibles, saludoMomento, partesEnZona } from './util/tiempo.js';
 import { crearInterfazUniverso } from './ui/universo.js';
-import { describirFallo } from './util/webgl.js';
+import { describirFallo, esperarWebGL } from './util/webgl.js';
 import { cargarContenido, aplicarContenido } from './data/contenido.js';
 import { crearContemplacion } from './ui/contemplacion.js';
 import { crearViaje } from './util/viaje.js';
@@ -23,7 +23,7 @@ import { vigilarPaquetes } from './util/paquetes.js';
 import { precargarEnReposo } from './util/precarga.js';
 import { ocupado, ocupadoSi } from './util/descargas.js';
 import { crearMedidor } from './ui/medidor.js';
-import { cargaTerminada, texturasLigeras } from './util/dispositivo.js';
+import { nivelSeguro, cargaTerminada, graficosPerdidos, falloAjeno, texturasLigeras } from './util/dispositivo.js';
 import { conDiagnostico } from './util/diag.js';
 import { abrirCartaEstreno } from './ui/cartaEstreno.js';
 import { CARTAS_ESTRENO } from './data/universo.js';
@@ -32,6 +32,8 @@ import { CARTAS_ESTRENO } from './data/universo.js';
 window.__arrancado = true;   // los módulos de la página encajan (index.html: rescate)
 if (new URLSearchParams(location.search).has('fps')) await import('./util/medidorFps.js');
 let interfaz, escena, contemplacion, etapa = 'fuentes';
+// El detalle va a la vista: es lo que hace falta para saber qué pasa en un aparato que no se tiene delante.
+const mostrarDetalle = t => { const d = document.getElementById('error-arranque'); d.hidden = false; d.open = true; document.getElementById('error-arranque-texto').textContent = `${t}\nseguro ${nivelSeguro} · ${innerWidth}×${innerHeight}@${devicePixelRatio}\n${navigator.userAgent}`; };
 const problema = texto => { document.getElementById('problema-texto').textContent = texto; document.getElementById('problema-3d').hidden = false; if (interfaz?.enRuta) interfaz.pausarRuta(true); };
 // («Reintentar» lo atiende index.html: también funciona si este módulo no llega a arrancar.)
 document.getElementById('compatible-3d').addEventListener('click', () => { const url = new URL(location.href); url.searchParams.set('calidad', 'compatible'); location.href = url.href; });
@@ -99,6 +101,7 @@ try {
   etapa = 'carga de módulos 3D'; entrada.progreso(0.03, 0.08);
   const { crearEscena } = await modulos3D; entrada.progreso(0.08);
   etapa = 'creación de la escena 3D';
+  await esperarWebGL();
   // Un viaje corta lo que la cola esté bajando y la para hasta que aterriza (también el segundo tramo hacia el sistema solar).
   let mirandoVuelo = 0;
   const vueloOcupa = () => {
@@ -120,7 +123,7 @@ try {
     // entre sus dos tramos, restanteViaje: si en ese instante no hay vuelo, la banda no lo da por terminado.)
     alViajar: id => { vueloOcupa(); interfaz?.situar(id); contemplacion?.despertar(); viaje.anotarDestino(id); banda.viajar(id, { viajando: () => !!escena?.viajando || (escena?.restanteViaje ?? 0) > 0, fin: () => escena?.finViaje ?? null, ceremoniaPendiente: d => d === 'supernova' }); },
     // El viaje terminó (en este cuadro): la canción del destino y la escena del gigante empiezan a la vez.
-    alLlegar: id => { banda.llegada(id); interfaz?.llegada(id); }, alProblema: problema,
+    alLlegar: id => { banda.llegada(id); interfaz?.llegada(id); }, alProblema: texto => { graficosPerdidos(); window.__rescate.soloRecargar = true; problema(texto); mostrarDetalle(`gráficos perdidos (${etapa})`); },
     alProgreso: (f, techo) => entrada.progreso(0.08 + 0.92 * f, 0.08 + 0.92 * techo)
   });
   // Un vuelo y un gesto (arrastre, pellizco, rueda, con su inercia) ocupan la cola de descargas: nada baja mientras.
@@ -227,7 +230,7 @@ try {
   // Si el fallo no es de la tarjeta gráfica puede ser la copia guardada: se limpia y se vuelve a abrir (una vez; index.html).
   if (e?.name !== 'ContextoWebGLNoDisponible' && window.__rescate?.solo()) await new Promise(() => {});
   console.error('Arranque del universo:', informe, e); problema(informe.texto);
-  document.getElementById('error-arranque').hidden = false;
-  document.getElementById('error-arranque-texto').textContent = `${informe.etapa}\n${informe.tipo}: ${informe.mensaje}`;
+  falloAjeno(); if (e?.name === 'ContextoWebGLNoDisponible') window.__rescate.soloRecargar = true;
+  mostrarDetalle(`${informe.etapa}\n${informe.tipo}: ${informe.mensaje.slice(0, 400)}`);
   if (conDiagnostico && location.protocol === 'http:' && /^(localhost$|127\.|192\.168\.|10\.)/.test(location.hostname)) fetch('./__diagnostico3d', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...informe, navegador: navigator.userAgent }) }).catch(() => {});
 }

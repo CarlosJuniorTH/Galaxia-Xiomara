@@ -10,6 +10,9 @@ permiten ver el detalle con `git show <hash>`).
 - Arreglo: huella comprobada en todo lo que se guarda; la versión nueva releva sola a páginas viejas o rotas («sana?»);
   rescate en `index.html` (una vez solo, «Reintentar» siempre; sin red no borra; nunca toca el progreso).
 - Probado en local con 6 versiones publicadas y copias rotas (`tests/navegador/copiasViejas.mjs`); no en un teléfono.
+- Después: al perder los gráficos, «Reintentar» borraba la nota del modo ligero (pagehide) y volvía a caer igual: ahora sube un
+  nivel; si el navegador niega WebGL se espera hasta 8 s; el detalle del error sale a la vista. Probado con simulación, no
+  en teléfonos.
 
 ## 2026-11-15 · La versión nueva llega en la carga, nunca con «Actualizar»
 

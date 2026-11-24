@@ -33,8 +33,18 @@ export function describirFallo(error, etapa) {
     tipo: error?.name || 'Error',
     mensaje: String(error?.message || error || 'Error desconocido').slice(0, 3000),
     texto: esWebGL
-      ? 'Chrome no ha permitido crear el contexto 3D. Esto puede ocurrir aunque el ajuste de aceleración esté activado. Tu progreso está guardado.'
+      ? 'Este navegador no permite ahora mismo los gráficos 3D. Ciérralo del todo y vuelve a abrirlo, o prueba con otro navegador. Tu progreso está guardado.'
       : 'El universo encontró un error al arrancar. El detalle de abajo indica la causa; no significa que la aceleración gráfica esté desactivada. Tu progreso está guardado.',
     intentos: error?.intentos || []
   };
+}
+// Tras una caída de la tarjeta gráfica el navegador niega el 3D unos segundos: se espera (hasta 8 s) antes de darlo por perdido.
+export async function esperarWebGL(hasta = 8000) {
+  const t0 = performance.now();
+  for (;;) {
+    const c = document.createElement('canvas'), gl = c.getContext('webgl2') || c.getContext('webgl');
+    if (gl) { gl.getExtension('WEBGL_lose_context')?.loseContext(); return true; }
+    if (performance.now() - t0 > hasta) return false;
+    await new Promise(r => setTimeout(r, 800));
+  }
 }
